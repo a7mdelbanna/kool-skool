@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -12,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { Loader2, Calendar, UserPlus, Users, Mail, Shield } from "lucide-react";
+import { Loader2, Calendar, UserPlus, Users, Mail, Shield, EyeIcon, EyeOffIcon } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInCalendarDays } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -44,6 +43,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 const staffSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   role: z.string().min(1, { message: "Please select a role" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
 type StaffFormValues = z.infer<typeof staffSchema>;
@@ -55,6 +55,7 @@ const SubscriptionInfo = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingStaff, setIsAddingStaff] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { user } = useAuth();
   
   // Initialize form
@@ -63,6 +64,7 @@ const SubscriptionInfo = () => {
     defaultValues: {
       email: "",
       role: "",
+      password: "",
     },
   });
 
@@ -186,23 +188,64 @@ const SubscriptionInfo = () => {
         
         toast.success(`${data.email} added to your school as ${data.role}`);
       } else {
-        // Create a custom UUID for the new profile
-        const profileId = crypto.randomUUID();
+        // Create a complete auth account for the staff member
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email: data.email,
+          password: data.password,
+          email_confirm: true,
+          user_metadata: {
+            role: data.role
+          }
+        });
         
-        // If user doesn't exist, create a new profile
-        // Note: We're not using 'status' field as it doesn't exist in the schema
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: profileId,
+        if (authError) {
+          // If admin create fails, try regular signup
+          const { data: signupData, error: signupError } = await supabase.auth.signUp({
             email: data.email,
-            role: data.role,
-            school_id: school.id
+            password: data.password,
+            options: {
+              data: {
+                role: data.role
+              }
+            }
           });
           
-        if (insertError) throw insertError;
+          if (signupError) throw signupError;
+          
+          // Create profile entry with the new user ID
+          const profileId = signupData.user?.id;
+          
+          if (!profileId) {
+            throw new Error("Failed to create user account");
+          }
+          
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: profileId,
+              email: data.email,
+              role: data.role,
+              school_id: school.id
+            });
+            
+          if (insertError) throw insertError;
+        } else {
+          // If admin create works, create profile entry
+          const profileId = authData.user.id;
+          
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: profileId,
+              email: data.email,
+              role: data.role,
+              school_id: school.id
+            });
+            
+          if (insertError) throw insertError;
+        }
         
-        toast.success(`Invitation sent to ${data.email} as ${data.role}`);
+        toast.success(`Account created for ${data.email} as ${data.role}`);
       }
       
       // Reset form and close dialog
@@ -218,6 +261,10 @@ const SubscriptionInfo = () => {
     } finally {
       setIsAddingStaff(false);
     }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   const getRemainingDays = () => {
@@ -265,9 +312,7 @@ const SubscriptionInfo = () => {
     return role.charAt(0).toUpperCase() + role.slice(1);
   };
 
-  // Helper function to determine if a staff member is pending
   const isStaffPending = (staff: any) => {
-    // Check if any required fields are missing
     return !staff.first_name || !staff.last_name;
   };
 
@@ -287,7 +332,6 @@ const SubscriptionInfo = () => {
 
   return (
     <div className="space-y-6">
-      {/* School Subscription Card */}
       <Card>
         <CardHeader>
           <CardTitle>Subscription Information</CardTitle>
@@ -302,7 +346,6 @@ const SubscriptionInfo = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* School Profile with Logo */}
               <div className="flex items-center space-x-4">
                 <Avatar className="h-16 w-16">
                   <AvatarImage src={school?.logo || ""} alt={school?.name} />
@@ -318,7 +361,6 @@ const SubscriptionInfo = () => {
                 </div>
               </div>
 
-              {/* Subscription Details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg border bg-muted/20">
                   <div className="text-sm font-medium text-muted-foreground mb-1">Status</div>
@@ -355,7 +397,6 @@ const SubscriptionInfo = () => {
         </CardContent>
       </Card>
 
-      {/* Staff Members Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -375,7 +416,7 @@ const SubscriptionInfo = () => {
               <DialogHeader>
                 <DialogTitle>Add Staff Member</DialogTitle>
                 <DialogDescription>
-                  Invite a new staff member to join your school.
+                  Create an account for a new staff member to join your school.
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -412,6 +453,40 @@ const SubscriptionInfo = () => {
                             <SelectItem value="staff">Staff</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"} 
+                              placeholder="Enter password" 
+                              {...field} 
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-0 h-full px-3"
+                              onClick={togglePasswordVisibility}
+                            >
+                              {showPassword ? 
+                                <EyeOffIcon className="h-4 w-4" /> : 
+                                <EyeIcon className="h-4 w-4" />
+                              }
+                              <span className="sr-only">
+                                {showPassword ? "Hide password" : "Show password"}
+                              </span>
+                            </Button>
+                          </div>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
