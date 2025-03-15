@@ -2,7 +2,7 @@
 import React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
-import LicenseManager from "@/components/school-setup/LicenseManager";
+import SubscriptionInfo from "@/components/school-setup/SubscriptionInfo";
 
 const SchoolSetup = () => {
   return (
@@ -13,12 +13,12 @@ const SchoolSetup = () => {
         <Info className="h-4 w-4" />
         <AlertTitle>School Administration</AlertTitle>
         <AlertDescription>
-          Set up your school, manage licenses, and add staff members.
+          View your school subscription and manage staff members.
         </AlertDescription>
       </Alert>
       
       <div className="space-y-6">
-        <LicenseManager />
+        <SubscriptionInfo />
       </div>
     </div>
   );
