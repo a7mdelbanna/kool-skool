@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 // License verification schema
 const licenseSchema = z.object({
@@ -17,13 +18,10 @@ const licenseSchema = z.object({
 
 type LicenseFormValues = z.infer<typeof licenseSchema>;
 
-interface LicenseVerificationProps {
-  onLicenseVerified: (licenseId: string) => void;
-}
-
-const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVerified }) => {
-  const { signUp, isLoading } = useAuth();
+const LicenseVerification: React.FC = () => {
+  const { signUp } = useAuth();
   const [isVerifying, setIsVerifying] = useState(false);
+  const navigate = useNavigate();
   
   const licenseForm = useForm<LicenseFormValues>({
     resolver: zodResolver(licenseSchema),
@@ -43,8 +41,8 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
       
       if (result.valid && result.licenseId) {
         toast.success(result.message || "License validated successfully");
-        // Force redirection by immediately calling onLicenseVerified
-        onLicenseVerified(result.licenseId);
+        // Use direct navigation to the account creation page with licenseId as URL parameter
+        navigate(`/auth/create-account/${result.licenseId}`);
       } else {
         toast.error(result.message || "License verification failed");
       }
@@ -65,11 +63,7 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
 
       <Form {...licenseForm}>
         <form 
-          onSubmit={(e) => {
-            // Prevent default form submission
-            e.preventDefault();
-            licenseForm.handleSubmit(verifyLicense)();
-          }} 
+          onSubmit={licenseForm.handleSubmit(verifyLicense)} 
           className="space-y-4"
         >
           <FormField
@@ -112,7 +106,7 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
       <div className="text-center mt-4">
         <p className="text-sm text-muted-foreground">
           Already have an account? 
-          <Button variant="link" className="p-0 ml-1">Log in</Button>
+          <Button variant="link" className="p-0 ml-1" onClick={() => navigate("/auth")}>Log in</Button>
         </p>
       </div>
     </div>

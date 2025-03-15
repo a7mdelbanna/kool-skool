@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Account details schema
 const accountSchema = z.object({
@@ -23,14 +24,19 @@ const accountSchema = z.object({
 
 type AccountFormValues = z.infer<typeof accountSchema>;
 
-interface AccountCreationProps {
-  licenseId: string;
-}
-
-const AccountCreation: React.FC<AccountCreationProps> = ({ licenseId }) => {
+const AccountCreation: React.FC = () => {
   const { completeSignUp, isLoading } = useAuth();
   const navigate = useNavigate();
+  const { licenseId } = useParams<{ licenseId: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Redirect to auth page if no licenseId is provided
+  useEffect(() => {
+    if (!licenseId) {
+      toast.error("Invalid license. Please verify your license first.");
+      navigate("/auth");
+    }
+  }, [licenseId, navigate]);
   
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
@@ -42,6 +48,12 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseId }) => {
   });
 
   const handleSubmit = async (data: AccountFormValues) => {
+    if (!licenseId) {
+      toast.error("Invalid license. Please verify your license first.");
+      navigate("/auth");
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
       console.log("Creating account with license ID:", licenseId);
@@ -65,76 +77,91 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseId }) => {
     }
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold">Create Your Account</h1>
-        <p className="text-muted-foreground">Enter your credentials to complete signup</p>
-      </div>
+  if (!licenseId) {
+    return null; // Will redirect in useEffect
+  }
 
-      <Form {...accountForm}>
-        <form 
-          onSubmit={(e) => {
-            e.preventDefault();
-            accountForm.handleSubmit(handleSubmit)(e);
-          }} 
-          className="space-y-4"
-        >
-          <FormField
-            control={accountForm.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email Address</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="your@email.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={accountForm.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={accountForm.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button 
-            type="submit" 
-            className="w-full" 
-            disabled={isSubmitting || isLoading}
-          >
-            {isSubmitting || isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating Account...
-              </>
-            ) : (
-              "Create Account"
-            )}
-          </Button>
-        </form>
-      </Form>
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-muted">
+      <div className="p-4 w-full max-w-md">
+        <Card className="shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Create Your Account</CardTitle>
+            <CardDescription>Enter your credentials to complete signup</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...accountForm}>
+              <form 
+                onSubmit={accountForm.handleSubmit(handleSubmit)} 
+                className="space-y-4"
+              >
+                <FormField
+                  control={accountForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="your@email.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={accountForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={accountForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isSubmitting || isLoading}
+                >
+                  {isSubmitting || isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
+                
+                <div className="text-center mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Already have an account? 
+                    <Button variant="link" className="p-0 ml-1" onClick={() => navigate("/auth")}>
+                      Log in
+                    </Button>
+                  </p>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

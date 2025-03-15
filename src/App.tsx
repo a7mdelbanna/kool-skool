@@ -14,6 +14,7 @@ import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import AccountCreation from "./components/auth/signup/AccountCreation";
 import { PaymentProvider } from "./contexts/PaymentContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -30,6 +31,7 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/create-account/:licenseId" element={<AccountCreation />} />
               <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route path="/" element={<Index />} />
                 <Route path="/students" element={<Students />} />
