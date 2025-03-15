@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DashboardStats from '@/components/DashboardStats';
 import StudentCard, { Student } from '@/components/StudentCard';
 import UpcomingLessons, { Lesson } from '@/components/UpcomingLessons';
+import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
 
 // Sample data for demonstration
 const sampleStudents: Student[] = [
@@ -85,6 +85,42 @@ const sampleLessons: Lesson[] = [
   },
 ];
 
+// Sample data for upcoming payments
+const samplePayments: Payment[] = [
+  {
+    id: '1',
+    studentName: 'Michael Davis',
+    amount: 150,
+    dueDate: new Date(2024, 5, 15), // June 15, 2024
+    subject: 'English Literature',
+    status: 'pending'
+  },
+  {
+    id: '2',
+    studentName: 'Noah Martinez',
+    amount: 180,
+    dueDate: new Date(2024, 5, 5), // June 5, 2024 (already past)
+    subject: 'Chemistry',
+    status: 'overdue'
+  },
+  {
+    id: '3',
+    studentName: 'William Taylor',
+    amount: 120,
+    dueDate: new Date(2024, 5, 12), // June 12, 2024
+    subject: 'Physics',
+    status: 'pending'
+  },
+  {
+    id: '4',
+    studentName: 'Sophia Chen',
+    amount: 90,
+    dueDate: new Date(2024, 5, 10), // June 10, 2024
+    subject: 'Science',
+    status: 'pending'
+  }
+];
+
 const Index = () => {
   return (
     <div className="space-y-8">
@@ -118,8 +154,9 @@ const Index = () => {
           </div>
         </div>
         
-        <div>
+        <div className="space-y-6">
           <UpcomingLessons lessons={sampleLessons} className="glass glass-hover" />
+          <UpcomingPayments payments={samplePayments} className="glass glass-hover" />
         </div>
       </div>
     </div>
