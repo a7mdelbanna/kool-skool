@@ -24,13 +24,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { usePayments } from '@/contexts/PaymentContext';
+import { usePayments, Session } from '@/contexts/PaymentContext';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerClose, DrawerFooter } from '@/components/ui/drawer';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useMediaQuery } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Constants
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 AM to 7 PM
@@ -60,7 +60,7 @@ const Calendar = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSession, setSelectedSession] = useState<(Session & { subject: string }) | null>(null);
   const [open, setOpen] = useState(false);
-  const isMobile = useMediaQuery("(max-width: 640px)");
+  const isMobile = useIsMobile();
   
   const { sessions } = usePayments();
   
@@ -128,7 +128,7 @@ const Calendar = () => {
   const getStatusBadge = (status: Session['status']) => {
     switch (status) {
       case 'completed':
-        return { label: 'Completed', variant: 'success' as const, icon: <CheckCircle className="w-4 h-4 mr-1" /> };
+        return { label: 'Completed', variant: 'default' as const, icon: <CheckCircle className="w-4 h-4 mr-1" /> };
       case 'canceled':
         return { label: 'Canceled', variant: 'destructive' as const, icon: <XCircle className="w-4 h-4 mr-1" /> };
       case 'missed':
@@ -141,7 +141,7 @@ const Calendar = () => {
   // Get payment status badge details
   const getPaymentBadge = (status: Session['paymentStatus']) => {
     if (status === 'paid') {
-      return { label: 'Paid', variant: 'success' as const, icon: <DollarSign className="w-4 h-4 mr-1" /> };
+      return { label: 'Paid', variant: 'default' as const, icon: <DollarSign className="w-4 h-4 mr-1" /> };
     }
     return { label: 'Unpaid', variant: 'destructive' as const, icon: <CreditCard className="w-4 h-4 mr-1" /> };
   };
