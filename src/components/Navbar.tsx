@@ -9,7 +9,9 @@ import {
   Settings,
   Menu,
   X,
-  School
+  School,
+  User,
+  UsersRound
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -109,6 +111,20 @@ const MobileNavbar = () => {
             onClick={closeMenu}
           />
           <NavItem 
+            to="/profile" 
+            icon={<User size={20} />} 
+            label="Profile" 
+            isActive={location.pathname === "/profile"} 
+            onClick={closeMenu}
+          />
+          <NavItem 
+            to="/access" 
+            icon={<UsersRound size={20} />} 
+            label="Access" 
+            isActive={location.pathname === "/access"} 
+            onClick={closeMenu}
+          />
+          <NavItem 
             to="/settings" 
             icon={<Settings size={20} />} 
             label="Settings" 
@@ -119,7 +135,7 @@ const MobileNavbar = () => {
       </div>
 
       {/* Bottom tab bar */}
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t z-30 grid grid-cols-6 items-center lg:hidden">
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t z-30 grid grid-cols-8 items-center lg:hidden">
         <NavItem 
           to="/" 
           icon={<Home size={20} />} 
@@ -149,6 +165,18 @@ const MobileNavbar = () => {
           icon={<School size={20} />} 
           label="Setup" 
           isActive={location.pathname === "/school-setup"} 
+        />
+        <NavItem 
+          to="/profile" 
+          icon={<User size={20} />} 
+          label="Profile" 
+          isActive={location.pathname === "/profile"} 
+        />
+        <NavItem 
+          to="/access" 
+          icon={<UsersRound size={20} />} 
+          label="Access" 
+          isActive={location.pathname === "/access"} 
         />
         <NavItem 
           to="/settings" 

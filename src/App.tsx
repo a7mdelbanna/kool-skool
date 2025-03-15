@@ -19,6 +19,8 @@ import OnboardingFlow from "./components/auth/signup/OnboardingFlow";
 import { PaymentProvider } from "./contexts/PaymentContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PersonalProfile from "./pages/PersonalProfile";
+import Access from "./pages/Access";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,8 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/school-setup" element={<SchoolSetup />} />
                 <Route path="/reports" element={<StatesReports />} />
+                <Route path="/profile" element={<PersonalProfile />} />
+                <Route path="/access" element={<Access />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

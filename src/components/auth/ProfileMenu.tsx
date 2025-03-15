@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, User } from "lucide-react";
+import { Settings, LogOut, User, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const ProfileMenu = () => {
@@ -41,12 +41,25 @@ const ProfileMenu = () => {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <Link to="/profile">
+          <DropdownMenuItem>
+            <User className="h-4 w-4 mr-2" />
+            <span>Profile</span>
+          </DropdownMenuItem>
+        </Link>
+        <Link to="/access">
+          <DropdownMenuItem>
+            <UsersRound className="h-4 w-4 mr-2" />
+            <span>Access Management</span>
+          </DropdownMenuItem>
+        </Link>
         <Link to="/settings">
           <DropdownMenuItem>
             <Settings className="h-4 w-4 mr-2" />
             <span>Settings</span>
           </DropdownMenuItem>
         </Link>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut}>
           <LogOut className="h-4 w-4 mr-2" />
           <span>Log out</span>
