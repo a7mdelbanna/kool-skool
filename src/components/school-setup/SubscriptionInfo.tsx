@@ -310,46 +310,16 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      // First verify the license
-      const { data: licenseData, error: licenseError } = await supabase
-        .rpc('handle_license_signup', { license_number: data.license_number });
-        
-      if (licenseError || !licenseData || !licenseData[0]?.valid) {
-        const errorMessage = licenseData?.[0]?.message || licenseError?.message || "License validation failed";
-        toast.error(errorMessage);
-        throw new Error(errorMessage);
-      }
+      // Call stored procedure to create school and update profile in one transaction
+      const { error } = await supabase.rpc('create_school_and_update_profile', {
+        school_name: data.name,
+        license_number: data.license_number
+      });
       
-      const licenseId = licenseData[0].license_id;
-      
-      // Create school first
-      const { data: schoolData, error: schoolError } = await supabase
-        .from('schools')
-        .insert({
-          name: data.name,
-          license_id: licenseId,
-          created_by: user.id
-        })
-        .select()
-        .single();
-        
-      if (schoolError) {
-        console.error("School creation error:", schoolError);
-        throw schoolError;
-      }
-      
-      // After school is created, update user profile in a separate step
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          school_id: schoolData.id,
-          role: 'admin' // Set as admin since they're creating the school
-        })
-        .eq('id', user.id);
-        
-      if (profileError) {
-        console.error("Profile update error:", profileError);
-        throw profileError;
+      if (error) {
+        console.error("Error creating school:", error);
+        toast.error(`Error creating school: ${error.message}`);
+        throw error;
       }
       
       toast.success("School created successfully!");
