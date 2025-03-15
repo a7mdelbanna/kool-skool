@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React from "react";
 import {
   Form,
   FormControl,
@@ -20,19 +19,11 @@ import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { usePayments, Payment } from "@/contexts/PaymentContext";
 
 interface PaymentsTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
-}
-
-interface Payment {
-  id: string;
-  amount: number;
-  date: Date;
-  method: string;
-  notes: string;
-  status: "completed" | "pending" | "failed";
 }
 
 const paymentSchema = z.object({
@@ -47,7 +38,7 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
 
 const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }) => {
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const { payments, addPayment, removePayment } = usePayments();
   
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -60,21 +51,15 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }
   });
   
   const handleAddPayment = (data: PaymentFormValues) => {
-    const newPayment: Payment = {
-      id: Date.now().toString(),
+    addPayment({
       amount: data.amount,
       date: data.date,
       method: data.method,
       notes: data.notes || "",
       status: "completed",
-    };
+    });
     
-    setPayments([...payments, newPayment]);
     form.reset();
-  };
-  
-  const handleRemovePayment = (id: string) => {
-    setPayments(payments.filter(payment => payment.id !== id));
   };
 
   return (
@@ -101,6 +86,11 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }
                     <span className="text-sm text-muted-foreground">
                       via {payment.method}
                     </span>
+                    {payment.relatedSubscriptionId && (
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
+                        Subscription
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm my-1">
                     Paid on {format(payment.date, "PPP")}
@@ -112,7 +102,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleRemovePayment(payment.id)}
+                  onClick={() => removePayment(payment.id)}
                 >
                   <Trash className="h-4 w-4 text-destructive" />
                 </Button>

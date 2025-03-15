@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   DollarSign, 
@@ -27,88 +26,73 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Payment } from '@/contexts/PaymentContext';
 
 // Sample data for demonstration
-const payments = [
+const payments: Payment[] = [
   {
     id: '1',
-    studentName: 'Alex Johnson',
-    studentImage: '',
     amount: 120,
     date: new Date(2024, 5, 10), // June 10, 2024
-    status: 'paid',
-    lessons: 4,
-    method: 'Credit Card'
+    status: 'completed',
+    method: 'Credit Card',
+    notes: 'Payment for 4 lessons (1 month) for Alex Johnson'
   },
   {
     id: '2',
-    studentName: 'Sophia Chen',
-    studentImage: '',
     amount: 90,
     date: new Date(2024, 5, 8), // June 8, 2024
-    status: 'paid',
-    lessons: 3,
-    method: 'Bank Transfer'
+    status: 'completed',
+    method: 'Bank Transfer',
+    notes: 'Payment for 3 lessons (1 month) for Sophia Chen'
   },
   {
     id: '3',
-    studentName: 'Michael Davis',
-    studentImage: '',
     amount: 150,
     date: new Date(2024, 5, 15), // June 15, 2024
     status: 'pending',
-    lessons: 5,
-    method: 'PayPal'
+    method: 'PayPal',
+    notes: 'Payment for 5 lessons (1 month) for Michael Davis'
   },
   {
     id: '4',
-    studentName: 'Emma Wilson',
-    studentImage: '',
     amount: 60,
     date: new Date(2024, 5, 5), // June 5, 2024
-    status: 'paid',
-    lessons: 2,
-    method: 'Cash'
+    status: 'completed',
+    method: 'Cash',
+    notes: 'Payment for 2 lessons (1 month) for Emma Wilson'
   },
   {
     id: '5',
-    studentName: 'Noah Martinez',
-    studentImage: '',
     amount: 180,
     date: new Date(2024, 5, 20), // June 20, 2024
-    status: 'overdue',
-    lessons: 6,
-    method: 'Credit Card'
+    status: 'failed',
+    method: 'Credit Card',
+    notes: 'Payment for 6 lessons (1 month) for Noah Martinez'
   },
   {
     id: '6',
-    studentName: 'Olivia Brown',
-    studentImage: '',
     amount: 90,
     date: new Date(2024, 5, 12), // June 12, 2024
-    status: 'paid',
-    lessons: 3,
-    method: 'Bank Transfer'
+    status: 'completed',
+    method: 'Bank Transfer',
+    notes: 'Payment for 3 lessons (1 month) for Olivia Brown'
   },
   {
     id: '7',
-    studentName: 'William Taylor',
-    studentImage: '',
     amount: 120,
     date: new Date(2024, 5, 18), // June 18, 2024
     status: 'pending',
-    lessons: 4,
-    method: 'PayPal'
+    method: 'PayPal',
+    notes: 'Payment for 4 lessons (1 month) for William Taylor'
   },
   {
     id: '8',
-    studentName: 'Ava Anderson',
-    studentImage: '',
     amount: 150,
     date: new Date(2024, 4, 30), // May 30, 2024
-    status: 'overdue',
-    lessons: 5,
-    method: 'Credit Card'
+    status: 'failed',
+    method: 'Credit Card',
+    notes: 'Payment for 5 lessons (1 month) for Ava Anderson'
   },
 ];
 
@@ -123,9 +107,9 @@ const Payments = () => {
       .reduce((sum, payment) => sum + payment.amount, 0);
   };
   
-  const totalPaid = calculateTotal('paid');
+  const totalPaid = calculateTotal('completed');
   const totalPending = calculateTotal('pending');
-  const totalOverdue = calculateTotal('overdue');
+  const totalOverdue = calculateTotal('failed');
   const totalAll = payments.reduce((sum, payment) => sum + payment.amount, 0);
   
   const handleSort = (column: string) => {
@@ -139,7 +123,7 @@ const Payments = () => {
   
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'paid':
+      case 'completed':
         return (
           <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 gap-1">
             <CheckCircle className="h-3 w-3" />
@@ -153,7 +137,7 @@ const Payments = () => {
             <span>Pending</span>
           </Badge>
         );
-      case 'overdue':
+      case 'failed':
         return (
           <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 gap-1">
             <AlertCircle className="h-3 w-3" />
@@ -167,7 +151,7 @@ const Payments = () => {
   
   const filteredPayments = payments
     .filter(payment => 
-      payment.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.method.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
@@ -179,10 +163,10 @@ const Payments = () => {
         return sortDirection === 'asc' 
           ? a.amount - b.amount
           : b.amount - a.amount;
-      } else if (sortColumn === 'studentName') {
+      } else if (sortColumn === 'notes') {
         return sortDirection === 'asc'
-          ? a.studentName.localeCompare(b.studentName)
-          : b.studentName.localeCompare(a.studentName);
+          ? a.notes.localeCompare(b.notes)
+          : b.notes.localeCompare(a.notes);
       }
       return 0;
     });
@@ -273,7 +257,7 @@ const Payments = () => {
               <TableHead className="w-[250px]">
                 <Button 
                   variant="ghost" 
-                  onClick={() => handleSort('studentName')}
+                  onClick={() => handleSort('notes')}
                   className="gap-1 font-medium"
                 >
                   Student
@@ -301,8 +285,8 @@ const Payments = () => {
                   <ArrowUpDown className="h-3 w-3" />
                 </Button>
               </TableHead>
-              <TableHead>Lessons</TableHead>
               <TableHead>Method</TableHead>
+              <TableHead>Notes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -311,13 +295,13 @@ const Payments = () => {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={payment.studentImage} alt={payment.studentName} />
+                      <AvatarImage src="" alt={payment.notes} />
                       <AvatarFallback className="bg-primary/10 text-primary">
-                        {payment.studentName.split(' ').map(n => n[0]).join('')}
+                        {payment.notes.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <div className="font-medium">{payment.studentName}</div>
+                      <div className="font-medium">{payment.notes}</div>
                     </div>
                   </div>
                 </TableCell>
@@ -331,13 +315,8 @@ const Payments = () => {
                     <span>{format(payment.date, 'MMM d, yyyy')}</span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    <span>{payment.lessons} lessons</span>
-                  </div>
-                </TableCell>
                 <TableCell>{payment.method}</TableCell>
+                <TableCell>{payment.notes}</TableCell>
               </TableRow>
             ))}
           </TableBody>

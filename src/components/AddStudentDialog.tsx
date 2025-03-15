@@ -10,6 +10,7 @@ import SessionsTab from "./student-tabs/SessionsTab";
 import { Student } from "./StudentCard";
 import { User, CreditCard, Calendar, BookOpen } from "lucide-react";
 import { toast } from "sonner";
+import { PaymentProvider } from "@/contexts/PaymentContext";
 
 interface AddStudentDialogProps {
   open: boolean;
@@ -53,42 +54,44 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid grid-cols-4 mb-6">
-            <TabsTrigger value="profile" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span>Profile</span>
-            </TabsTrigger>
-            <TabsTrigger value="subscriptions" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span>Subscriptions</span>
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              <span>Payments</span>
-            </TabsTrigger>
-            <TabsTrigger value="sessions" className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              <span>Sessions</span>
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="profile">
-            <ProfileTab studentData={studentData} setStudentData={setStudentData} />
-          </TabsContent>
-          
-          <TabsContent value="subscriptions">
-            <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} />
-          </TabsContent>
-          
-          <TabsContent value="payments">
-            <PaymentsTab studentData={studentData} setStudentData={setStudentData} />
-          </TabsContent>
-          
-          <TabsContent value="sessions">
-            <SessionsTab studentData={studentData} setStudentData={setStudentData} />
-          </TabsContent>
-        </Tabs>
+        <PaymentProvider>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+            <TabsList className="grid grid-cols-4 mb-6">
+              <TabsTrigger value="profile" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span>Profile</span>
+              </TabsTrigger>
+              <TabsTrigger value="subscriptions" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span>Subscriptions</span>
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                <span>Payments</span>
+              </TabsTrigger>
+              <TabsTrigger value="sessions" className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                <span>Sessions</span>
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profile">
+              <ProfileTab studentData={studentData} setStudentData={setStudentData} />
+            </TabsContent>
+            
+            <TabsContent value="subscriptions">
+              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} />
+            </TabsContent>
+            
+            <TabsContent value="payments">
+              <PaymentsTab studentData={studentData} setStudentData={setStudentData} />
+            </TabsContent>
+            
+            <TabsContent value="sessions">
+              <SessionsTab studentData={studentData} setStudentData={setStudentData} />
+            </TabsContent>
+          </Tabs>
+        </PaymentProvider>
         
         <div className="flex justify-end mt-6 space-x-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

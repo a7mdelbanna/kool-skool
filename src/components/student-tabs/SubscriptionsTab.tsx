@@ -30,12 +30,7 @@ import {
   ToggleGroup,
   ToggleGroupItem
 } from "@/components/ui/toggle-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { usePayments } from "@/contexts/PaymentContext";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -97,6 +92,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [selectedDays, setSelectedDays] = useState<DaySchedule[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
+  const { addPayment } = usePayments();
   
   const form = useForm<SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
@@ -176,6 +172,15 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       currency: data.currency,
       notes: data.notes || "",
     };
+    
+    addPayment({
+      amount: calculatedTotalPrice,
+      date: new Date(),
+      method: "Credit Card",
+      notes: `Payment for ${data.sessionCount} lessons (${data.duration}) starting on ${format(data.startDate, "PPP")}`,
+      status: "completed",
+      relatedSubscriptionId: newSubscription.id,
+    });
     
     setSubscriptions([...subscriptions, newSubscription]);
     form.reset();
