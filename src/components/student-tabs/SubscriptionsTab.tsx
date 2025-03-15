@@ -27,6 +27,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  ToggleGroup,
+  ToggleGroupItem
+} from "@/components/ui/toggle-group";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -44,7 +48,9 @@ interface Subscription {
   duration: string;
   startDate: Date;
   schedule: DaySchedule[];
+  priceMode: "perSession" | "fixed";
   pricePerSession: number;
+  fixedPrice: number;
   totalPrice: number;
   notes: string;
 }
@@ -66,7 +72,9 @@ const subscriptionSchema = z.object({
     day: z.string(),
     time: z.string()
   })).min(1, { message: "At least one day with time must be selected" }),
+  priceMode: z.enum(["perSession", "fixed"]),
   pricePerSession: z.coerce.number().min(0, { message: "Price cannot be negative" }),
+  fixedPrice: z.coerce.number().min(0, { message: "Price cannot be negative" }),
   notes: z.string().optional(),
 });
 
@@ -83,14 +91,22 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       duration: "1 month",
       startDate: new Date(),
       schedule: [], 
+      priceMode: "perSession",
       pricePerSession: 0,
+      fixedPrice: 0,
       notes: "",
     },
   });
   
+  const watchPriceMode = form.watch("priceMode");
   const watchPricePerSession = form.watch("pricePerSession");
+  const watchFixedPrice = form.watch("fixedPrice");
   const watchSessionCount = form.watch("sessionCount");
-  const totalPrice = watchPricePerSession * watchSessionCount;
+  
+  // Calculate total price based on selected price mode
+  const totalPrice = watchPriceMode === "perSession" 
+    ? watchPricePerSession * watchSessionCount
+    : watchFixedPrice;
   
   const toggleDay = (day: string) => {
     const existingDay = selectedDays.find(d => d.day === day);
@@ -123,9 +139,13 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       sessionCount: data.sessionCount,
       duration: data.duration,
       startDate: data.startDate,
-      schedule: data.schedule as DaySchedule[], // Ensure proper type casting
+      schedule: data.schedule as DaySchedule[],
+      priceMode: data.priceMode,
       pricePerSession: data.pricePerSession,
-      totalPrice: data.pricePerSession * data.sessionCount,
+      fixedPrice: data.fixedPrice,
+      totalPrice: data.priceMode === "perSession" 
+        ? data.pricePerSession * data.sessionCount 
+        : data.fixedPrice,
       notes: data.notes || "",
     };
     
@@ -168,10 +188,17 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     {subscription.schedule.map(s => `${s.day} at ${s.time}`).join(", ")}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm font-medium">${subscription.totalPrice}</span>
-                    <span className="text-xs text-muted-foreground">
-                      (${subscription.pricePerSession} per session)
-                    </span>
+                    <span className="text-sm font-medium">${subscription.totalPrice.toFixed(2)}</span>
+                    {subscription.priceMode === "perSession" && (
+                      <span className="text-xs text-muted-foreground">
+                        (${subscription.pricePerSession} per session)
+                      </span>
+                    )}
+                    {subscription.priceMode === "fixed" && (
+                      <span className="text-xs text-muted-foreground">
+                        (Fixed price)
+                      </span>
+                    )}
                   </div>
                 </div>
                 <Button 
@@ -326,20 +353,64 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               )}
             />
             
+            <FormField
+              control={form.control}
+              name="priceMode"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel>Pricing Method</FormLabel>
+                  <FormControl>
+                    <ToggleGroup
+                      type="single"
+                      value={field.value}
+                      onValueChange={(value) => {
+                        if (value) field.onChange(value);
+                      }}
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="perSession" aria-label="Per Session">
+                        Per Session
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="fixed" aria-label="Fixed Price">
+                        Fixed Price
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="pricePerSession"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price per Session ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {watchPriceMode === "perSession" ? (
+                <FormField
+                  control={form.control}
+                  name="pricePerSession"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price per Session ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="fixedPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fixed Price ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               
               <div>
                 <FormLabel>Total Price</FormLabel>
