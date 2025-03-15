@@ -11,7 +11,8 @@ import {
   CheckCircle,
   XCircle,
   CalendarX,
-  Hash
+  Hash,
+  RefreshCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +69,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
+  const [changeStatusDialogOpen, setChangeStatusDialogOpen] = useState(false);
 
   const processedSessions = sessions
     .map(session => {
@@ -127,6 +137,18 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     }
   };
 
+  const handleChangeStatus = (newStatus: Session['status']) => {
+    if (selectedSession) {
+      updateSessionStatus(selectedSession.id, newStatus);
+      toast({
+        title: "Status updated",
+        description: `Session status has been changed to ${newStatus}.`,
+      });
+      setChangeStatusDialogOpen(false);
+      setSelectedSession(null);
+    }
+  };
+
   const renderStatusBadge = (status: Session['status']) => {
     switch(status) {
       case "scheduled":
@@ -175,6 +197,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
   const renderActionButtons = (session: SessionWithSubject) => {
     const isScheduled = session.status === "scheduled";
     const isCanceled = session.status === "canceled";
+    const isCompleted = session.status === "completed";
     const isPast = new Date(session.date) < new Date() && session.status !== "completed" && session.status !== "canceled";
     
     return (
@@ -208,7 +231,22 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
           </>
         )}
         
-        {(isScheduled || isCanceled) && session.subscriptionId && (
+        {(isCompleted || isCanceled) && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-purple-500 text-purple-500 hover:bg-purple-50"
+            onClick={() => {
+              setSelectedSession(session);
+              setChangeStatusDialogOpen(true);
+            }}
+          >
+            <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+            Change Status
+          </Button>
+        )}
+        
+        {session.subscriptionId && (
           <Button 
             variant="outline" 
             size="sm" 
@@ -386,6 +424,63 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={changeStatusDialogOpen} onOpenChange={setChangeStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Session Status</DialogTitle>
+            <DialogDescription>
+              Select a new status for this session.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <h4 className="font-medium">Current Status: {selectedSession?.status}</h4>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={() => handleChangeStatus("scheduled")}
+                  variant="outline"
+                  className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                >
+                  <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+                  Mark as Scheduled
+                </Button>
+                <Button 
+                  onClick={() => handleChangeStatus("completed")} 
+                  variant="outline"
+                  className="border-green-500 text-green-500 hover:bg-green-50"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                  Mark as Completed
+                </Button>
+                <Button 
+                  onClick={() => handleChangeStatus("canceled")}
+                  variant="outline" 
+                  className="border-red-500 text-red-500 hover:bg-red-50"
+                >
+                  <CalendarX className="h-3.5 w-3.5 mr-1" />
+                  Mark as Canceled
+                </Button>
+                <Button 
+                  onClick={() => handleChangeStatus("missed")}
+                  variant="outline"
+                  className="border-amber-500 text-amber-500 hover:bg-amber-50"
+                >
+                  <XCircle className="h-3.5 w-3.5 mr-1" />
+                  Mark as Missed
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeStatusDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

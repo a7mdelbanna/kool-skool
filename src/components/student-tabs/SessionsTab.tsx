@@ -1,4 +1,3 @@
-
 import React from "react";
 import { format } from "date-fns";
 import { 
@@ -9,7 +8,9 @@ import {
   AlertTriangle, 
   CalendarX,
   ArrowRight,
-  Check
+  Check,
+  XCircle,
+  RefreshCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
@@ -26,6 +27,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface SessionsTabProps {
@@ -45,15 +54,15 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = React.useState(false);
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = React.useState(false);
+  const [changeStatusDialogOpen, setChangeStatusDialogOpen] = React.useState(false);
   
-  // Filter sessions to upcoming and past
   const upcomingSessions = sessions.filter(
     session => session.status === "scheduled" && new Date(session.date) >= new Date()
   ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   
   const pastSessions = sessions.filter(
     session => session.status !== "scheduled" || new Date(session.date) < new Date()
-  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort from most recent to oldest
+  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
   const handleCancelSession = () => {
     if (selectedSession) {
@@ -87,6 +96,18 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         description: "Session has been moved to the next available date.",
       });
       setRescheduleDialogOpen(false);
+      setSelectedSession(null);
+    }
+  };
+
+  const handleChangeStatus = (newStatus: Session['status']) => {
+    if (selectedSession) {
+      updateSessionStatus(selectedSession.id, newStatus);
+      toast({
+        title: "Status updated",
+        description: `Session status has been changed to ${newStatus}.`,
+      });
+      setChangeStatusDialogOpen(false);
       setSelectedSession(null);
     }
   };
@@ -191,7 +212,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
 
               {!isViewMode && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {/* Show action buttons based on session status */}
                   {session.status === "scheduled" && (
                     <>
                       <Button 
@@ -218,23 +238,25 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                         <X className="h-3.5 w-3.5 mr-1" />
                         Cancel Session
                       </Button>
-                      {session.subscriptionId && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="border-blue-500 text-blue-500 hover:bg-blue-50"
-                          onClick={() => {
-                            setSelectedSession(session);
-                            setRescheduleDialogOpen(true);
-                          }}
-                        >
-                          <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                          Reschedule
-                        </Button>
-                      )}
                     </>
                   )}
-                  {session.status === "canceled" && (
+                  
+                  {(session.status === "completed" || session.status === "canceled" || session.status === "missed") && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-purple-500 text-purple-500 hover:bg-purple-50"
+                      onClick={() => {
+                        setSelectedSession(session);
+                        setChangeStatusDialogOpen(true);
+                      }}
+                    >
+                      <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                      Change Status
+                    </Button>
+                  )}
+                  
+                  {session.subscriptionId && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -269,7 +291,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         </p>
       </div>
 
-      {/* Cancel Session Dialog */}
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -290,7 +311,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Mark as Attended Dialog */}
       <AlertDialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -311,7 +331,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reschedule Session Dialog */}
       <AlertDialog open={rescheduleDialogOpen} onOpenChange={setRescheduleDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -331,6 +350,63 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={changeStatusDialogOpen} onOpenChange={setChangeStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Session Status</DialogTitle>
+            <DialogDescription>
+              Select a new status for this session.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <h4 className="font-medium">Current Status: {selectedSession?.status}</h4>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={() => handleChangeStatus("scheduled")}
+                  variant="outline"
+                  className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                >
+                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                  Mark as Scheduled
+                </Button>
+                <Button 
+                  onClick={() => handleChangeStatus("completed")} 
+                  variant="outline"
+                  className="border-green-500 text-green-500 hover:bg-green-50"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                  Mark as Completed
+                </Button>
+                <Button 
+                  onClick={() => handleChangeStatus("canceled")}
+                  variant="outline" 
+                  className="border-red-500 text-red-500 hover:bg-red-50"
+                >
+                  <CalendarX className="h-3.5 w-3.5 mr-1" />
+                  Mark as Canceled
+                </Button>
+                <Button 
+                  onClick={() => handleChangeStatus("missed")}
+                  variant="outline"
+                  className="border-amber-500 text-amber-500 hover:bg-amber-50"
+                >
+                  <XCircle className="h-3.5 w-3.5 mr-1" />
+                  Mark as Missed
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeStatusDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
