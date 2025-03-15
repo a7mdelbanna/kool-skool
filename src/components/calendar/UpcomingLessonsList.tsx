@@ -177,11 +177,95 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     );
   };
 
+  // Render action buttons based on session status
+  const renderActionButtons = (session: SessionWithSubject) => {
+    const isScheduled = session.status === "scheduled";
+    const isCanceled = session.status === "canceled";
+    
+    return (
+      <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
+        {isScheduled && (
+          <>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="border-green-500 text-green-500 hover:bg-green-50"
+              onClick={() => {
+                setSelectedSession(session);
+                setCompleteDialogOpen(true);
+              }}
+            >
+              <Check className="h-3.5 w-3.5 mr-1" />
+              Attended
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="border-red-500 text-red-500 hover:bg-red-50"
+              onClick={() => {
+                setSelectedSession(session);
+                setCancelDialogOpen(true);
+              }}
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              Cancel
+            </Button>
+          </>
+        )}
+        
+        {/* Show reschedule for scheduled or canceled sessions with subscriptionId */}
+        {(isScheduled || isCanceled) && session.subscriptionId && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-blue-500 text-blue-500 hover:bg-blue-50"
+            onClick={() => {
+              setSelectedSession(session);
+              setRescheduleDialogOpen(true);
+            }}
+          >
+            <ArrowRight className="h-3.5 w-3.5 mr-1" />
+            Reschedule
+          </Button>
+        )}
+        
+        {/* For past sessions that are not yet marked as completed or canceled */}
+        {!isScheduled && !isCanceled && session.status !== "completed" && (
+          <>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="border-green-500 text-green-500 hover:bg-green-50"
+              onClick={() => {
+                setSelectedSession(session);
+                setCompleteDialogOpen(true);
+              }}
+            >
+              <Check className="h-3.5 w-3.5 mr-1" />
+              Attended
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="border-red-500 text-red-500 hover:bg-red-50"
+              onClick={() => {
+                setSelectedSession(session);
+                setCancelDialogOpen(true);
+              }}
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              Cancel
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  };
+
   // Render session card
   const renderSessionCard = (session: SessionWithSubject) => {
     const colors = getSubjectColors(session.subject);
     const sessionDate = new Date(session.date);
-    const isUpcoming = session.status === "scheduled" && sessionDate >= today;
     
     return (
       <Card 
@@ -235,63 +319,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
                 {renderPaymentBadge(session)}
               </div>
               
-              {isUpcoming && (
-                <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="border-green-500 text-green-500 hover:bg-green-50"
-                    onClick={() => {
-                      setSelectedSession(session);
-                      setCompleteDialogOpen(true);
-                    }}
-                  >
-                    <Check className="h-3.5 w-3.5 mr-1" />
-                    Attended
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="border-red-500 text-red-500 hover:bg-red-50"
-                    onClick={() => {
-                      setSelectedSession(session);
-                      setCancelDialogOpen(true);
-                    }}
-                  >
-                    <X className="h-3.5 w-3.5 mr-1" />
-                    Cancel
-                  </Button>
-                  {session.subscriptionId && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-blue-500 text-blue-500 hover:bg-blue-50"
-                      onClick={() => {
-                        setSelectedSession(session);
-                        setRescheduleDialogOpen(true);
-                      }}
-                    >
-                      <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                      Reschedule
-                    </Button>
-                  )}
-                </div>
-              )}
-              
-              {session.status === "canceled" && session.subscriptionId && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="border-blue-500 text-blue-500 hover:bg-blue-50 mt-2 md:mt-0"
-                  onClick={() => {
-                    setSelectedSession(session);
-                    setRescheduleDialogOpen(true);
-                  }}
-                >
-                  <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                  Reschedule
-                </Button>
-              )}
+              {renderActionButtons(session)}
             </div>
           </div>
         </CardContent>
