@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Form,
   FormControl,
@@ -83,6 +82,7 @@ type SubscriptionFormValues = z.infer<typeof subscriptionSchema>;
 const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStudentData }) => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [selectedDays, setSelectedDays] = useState<DaySchedule[]>([]);
+  const [totalPrice, setTotalPrice] = useState<number>(0);
   
   const form = useForm<SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
@@ -103,27 +103,27 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   const watchFixedPrice = form.watch("fixedPrice");
   const watchSessionCount = form.watch("sessionCount");
   
-  // Calculate total price based on selected price mode
+  useEffect(() => {
+    const newTotalPrice = calculateTotalPrice();
+    setTotalPrice(newTotalPrice);
+  }, [watchPriceMode, watchPricePerSession, watchFixedPrice, watchSessionCount]);
+  
   const calculateTotalPrice = (): number => {
     if (watchPriceMode === "perSession") {
-      return watchPricePerSession * watchSessionCount;
+      return Number(watchPricePerSession) * Number(watchSessionCount);
     } else {
-      return watchFixedPrice;
+      return Number(watchFixedPrice);
     }
   };
-  
-  const totalPrice = calculateTotalPrice();
   
   const toggleDay = (day: string) => {
     const existingDay = selectedDays.find(d => d.day === day);
     
     if (existingDay) {
-      // Remove the day if it's already selected
       const updatedDays = selectedDays.filter(d => d.day !== day);
       setSelectedDays(updatedDays);
       form.setValue("schedule", updatedDays);
     } else {
-      // Add the day with default time if not selected
       const newDay: DaySchedule = { day: day, time: "15:00" };
       const newSchedule = [...selectedDays, newDay];
       setSelectedDays(newSchedule);
@@ -140,6 +140,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   };
   
   const handleAddSubscription = (data: SubscriptionFormValues) => {
+    const calculatedTotalPrice = calculateTotalPrice();
+    
     const newSubscription: Subscription = {
       id: Date.now().toString(),
       sessionCount: data.sessionCount,
@@ -147,11 +149,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       startDate: data.startDate,
       schedule: data.schedule as DaySchedule[],
       priceMode: data.priceMode,
-      pricePerSession: data.pricePerSession,
-      fixedPrice: data.fixedPrice,
-      totalPrice: data.priceMode === "perSession" 
-        ? data.pricePerSession * data.sessionCount 
-        : data.fixedPrice,
+      pricePerSession: Number(data.pricePerSession),
+      fixedPrice: Number(data.fixedPrice),
+      totalPrice: calculatedTotalPrice,
       notes: data.notes || "",
     };
     
@@ -396,7 +396,15 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     <FormItem>
                       <FormLabel>Price per Session ($)</FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" step="0.01" {...field} />
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="0.01" 
+                          {...field} 
+                          onChange={(e) => {
+                            field.onChange(e);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -410,7 +418,15 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     <FormItem>
                       <FormLabel>Fixed Price ($)</FormLabel>
                       <FormControl>
-                        <Input type="number" min="0" step="0.01" {...field} />
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="0.01" 
+                          {...field} 
+                          onChange={(e) => {
+                            field.onChange(e);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -421,7 +437,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               <div>
                 <FormLabel>Total Price</FormLabel>
                 <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 flex items-center">
-                  <span className="font-medium">${typeof totalPrice === 'number' ? totalPrice.toFixed(2) : '0.00'}</span>
+                  <span className="font-medium">${totalPrice.toFixed(2)}</span>
                 </div>
               </div>
             </div>
