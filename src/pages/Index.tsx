@@ -1,6 +1,13 @@
-import React from 'react';
-import { PlusCircle } from 'lucide-react';
+
+import React, { useState } from 'react';
+import { PlusCircle, Calendar, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import EnhancedDashboardStats from '@/components/EnhancedDashboardStats';
+import RevenueExpensesChart from '@/components/RevenueExpensesChart';
+import NewStudentsStats from '@/components/NewStudentsStats';
 import DashboardStats from '@/components/DashboardStats';
 import StudentCard, { Student } from '@/components/StudentCard';
 import UpcomingLessons, { Lesson } from '@/components/UpcomingLessons';
@@ -138,6 +145,9 @@ const samplePayments: Payment[] = [
 ];
 
 const Index = () => {
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [view, setView] = useState<'standard' | 'enhanced'>('enhanced');
+  
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -147,6 +157,44 @@ const Index = () => {
         </div>
         
         <div className="flex gap-2">
+          <Tabs defaultValue="enhanced" className="hidden md:block" onValueChange={(value) => setView(value as 'standard' | 'enhanced')}>
+            <TabsList>
+              <TabsTrigger value="enhanced">Enhanced View</TabsTrigger>
+              <TabsTrigger value="standard">Standard View</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium leading-none">Filters</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Customize your dashboard view
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button variant="outline" size="sm" className="justify-center">
+                      Daily
+                    </Button>
+                    <Button variant="default" size="sm" className="justify-center">
+                      Weekly
+                    </Button>
+                    <Button variant="outline" size="sm" className="justify-center">
+                      Monthly
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          
           <Button className="gap-2" variant="default">
             <PlusCircle className="h-4 w-4" />
             <span>New Student</span>
@@ -154,7 +202,18 @@ const Index = () => {
         </div>
       </div>
       
-      <DashboardStats />
+      {view === 'enhanced' ? <EnhancedDashboardStats /> : <DashboardStats />}
+      
+      {view === 'enhanced' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 element-transition">
+          <div className="lg:col-span-2">
+            <RevenueExpensesChart />
+          </div>
+          <div>
+            <NewStudentsStats />
+          </div>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
