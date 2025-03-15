@@ -70,9 +70,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   });
 
   const getDateSessions = (date: Date) => {
-    return processedSessions.filter(session => 
-      isSameDay(parseISO(session.date), date)
-    );
+    return processedSessions.filter(session => {
+      // Convert session.date to Date object if it's a string
+      const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
+      return isSameDay(sessionDate, date);
+    });
   };
 
   const getSubjectColors = (subject: string) => {

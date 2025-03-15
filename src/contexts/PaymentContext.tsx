@@ -15,7 +15,7 @@ export interface Payment {
 
 export interface Session {
   id: string;
-  date: Date;
+  date: Date | string; // Allow both Date and string for flexibility
   time: string;
   duration: string;
   status: "scheduled" | "completed" | "canceled" | "missed";
@@ -78,16 +78,16 @@ const generateMockSessions = (): Session[] => {
     
     return {
       id: `session-${i + 1}`,
-      date,
+      date, // Store as Date object
       time: `${date.getHours()}:00`,
-      duration,
-      status,
-      paymentStatus,
+      duration: durations[Math.floor(Math.random() * durations.length)],
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      paymentStatus: paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)],
       cost: 25 + Math.floor(Math.random() * 50), // $25 to $75
-      notes: `${subject} lesson with Student ${i % 5 + 1}`,
-      subscriptionId: subscription.id,
-      sessionNumber: (i % subscription.totalSessions) + 1, // Calculate session number
-      totalSessions: subscription.totalSessions
+      notes: `${subjects[Math.floor(Math.random() * subjects.length)]} lesson with Student ${i % 5 + 1}`,
+      subscriptionId: subscriptions[Math.floor(i / 4)].id,
+      sessionNumber: (i % subscriptions[Math.floor(i / 4)].totalSessions) + 1,
+      totalSessions: subscriptions[Math.floor(i / 4)].totalSessions
     };
   });
   
