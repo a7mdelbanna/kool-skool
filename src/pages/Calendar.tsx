@@ -180,7 +180,10 @@ const Calendar = () => {
       {/* Main content based on display mode */}
       <div className="bg-card rounded-lg border shadow-sm p-4">
         {displayMode === 'list' ? (
-          <UpcomingLessonsList searchQuery={searchQuery} />
+          <UpcomingLessonsList 
+            searchQuery={searchQuery}
+            onLessonClick={handleLessonClick}
+          />
         ) : (
           <CalendarView 
             viewMode={viewMode} 

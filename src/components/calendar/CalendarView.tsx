@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   format, 
@@ -51,19 +50,19 @@ interface CalendarViewProps {
   currentDate: Date;
   currentWeekStart: Date;
   sessions: Session[];
+  onLessonClick: (session: Session) => void;
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ 
   viewMode, 
   currentDate, 
   currentWeekStart,
-  sessions 
+  sessions,
+  onLessonClick
 }) => {
-  // Add state for selected session
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   
-  // Add debugging
   console.log("CalendarView rendering with sessions:", sessions.length);
   
   const processedSessions = sessions.map(session => {
@@ -77,13 +76,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   });
 
   const handleSessionClick = (session: Session) => {
-    setSelectedSession(session);
-    setDialogOpen(true);
+    onLessonClick(session);
   };
 
   const getDateSessions = (date: Date) => {
     return processedSessions.filter(session => {
-      // Convert session.date to Date object if it's a string
       const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
       return isSameDay(sessionDate, date);
     });
@@ -250,7 +247,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             
             const dateSessions = getDateSessions(day)
               .sort((a, b) => {
-                // Extract hours and minutes from time strings and compare
                 const [aHours, aMinutes] = a.time.split(':').map(Number);
                 const [bHours, bMinutes] = b.time.split(':').map(Number);
                 return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
@@ -319,13 +315,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const renderDayView = () => {
     const dateSessions = getDateSessions(currentDate)
       .sort((a, b) => {
-        // Extract hours and minutes from time strings and compare
         const [aHours, aMinutes] = a.time.split(':').map(Number);
         const [bHours, bMinutes] = b.time.split(':').map(Number);
         return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
       });
     
-    // Create time slots from 8 AM to 8 PM
     const timeSlots = Array.from({ length: 13 }, (_, i) => {
       const hour = i + 8;
       return `${hour}:00${hour < 12 ? 'am' : hour === 12 ? 'pm' : 'pm'}`;
@@ -335,7 +329,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       <div className="space-y-4">
         <div className="grid grid-cols-[80px_1fr] gap-2">
           {timeSlots.map((timeSlot, index) => {
-            // Filter sessions that fall within this hour
             const slotSessions = dateSessions.filter(session => {
               const [sessionHour] = session.time.split(':').map(Number);
               return sessionHour === index + 8;
@@ -398,13 +391,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'week' && renderWeekView()}
       {viewMode === 'day' && renderDayView()}
-      
-      {/* Lesson Details Dialog */}
-      <LessonDetailsDialog 
-        session={selectedSession}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-      />
     </div>
   );
 };
