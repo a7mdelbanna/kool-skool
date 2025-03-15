@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Calendar, CheckSquare, DollarSign, Eye, Edit, Trash2, CreditCard } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -75,7 +74,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
         "overflow-hidden transition-all duration-300 hover:shadow-md cursor-pointer", 
         className
       )}
-      onClick={() => onView?.(student)}
+      onClick={() => onEdit?.(student)}
     >
       <CardContent className="p-6">
         <div className="flex items-center gap-4">
@@ -104,10 +103,6 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenuItem className="cursor-pointer" onClick={() => onView?.(student)}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    <span>View</span>
-                  </DropdownMenuItem>
                   <DropdownMenuItem className="cursor-pointer" onClick={() => onEdit?.(student)}>
                     <Edit className="mr-2 h-4 w-4" />
                     <span>Edit</span>

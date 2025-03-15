@@ -37,7 +37,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     paymentStatus: "pending"
   });
   
-  const isViewMode = student && !isEditMode;
+  // Always in edit mode, so remove isViewMode variable
   
   // Load student data when viewing or editing
   useEffect(() => {
@@ -79,12 +79,10 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {isViewMode ? 'Student Details' : isEditMode ? 'Edit Student' : 'Add New Student'}
+            {isEditMode ? 'Edit Student' : 'Add New Student'}
           </DialogTitle>
           <DialogDescription>
-            {isViewMode ? 
-              "View student's details across multiple categories" : 
-              isEditMode ? 
+            {isEditMode ? 
               "Edit student's details across multiple categories" :
               "Add a new student's details across multiple categories"
             }
@@ -113,32 +111,30 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
             </TabsList>
             
             <TabsContent value="profile">
-              <ProfileTab studentData={studentData} setStudentData={setStudentData} isViewMode={isViewMode} />
+              <ProfileTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
             </TabsContent>
             
             <TabsContent value="subscriptions">
-              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} isViewMode={isViewMode} />
+              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
             </TabsContent>
             
             <TabsContent value="payments">
-              <PaymentsTab studentData={studentData} setStudentData={setStudentData} isViewMode={isViewMode} />
+              <PaymentsTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
             </TabsContent>
             
             <TabsContent value="sessions">
-              <SessionsTab studentData={studentData} setStudentData={setStudentData} isViewMode={isViewMode} />
+              <SessionsTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
             </TabsContent>
           </Tabs>
         </PaymentProvider>
         
         <div className="flex justify-end mt-6 space-x-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {isViewMode ? 'Close' : 'Cancel'}
+            Cancel
           </Button>
-          {!isViewMode && (
-            <Button onClick={handleSave}>
-              {isEditMode ? 'Update Student' : 'Save Student'}
-            </Button>
-          )}
+          <Button onClick={handleSave}>
+            {isEditMode ? 'Update Student' : 'Save Student'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

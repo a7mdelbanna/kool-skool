@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -166,7 +167,7 @@ const Students = () => {
   
   const handleViewStudent = (student: Student) => {
     setSelectedStudent(student);
-    setIsEditMode(false);
+    setIsEditMode(true);
     setIsAddStudentOpen(true);
   };
   
@@ -281,7 +282,6 @@ const Students = () => {
                   key={student.id} 
                   student={student} 
                   className="glass glass-hover" 
-                  onView={handleViewStudent}
                   onEdit={handleEditStudent}
                   onDelete={handleDeleteStudent}
                 />
