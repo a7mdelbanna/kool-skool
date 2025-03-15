@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -91,13 +90,21 @@ const SubscriptionInfo = () => {
     try {
       setIsLoading(true);
       
+      if (!user?.id) {
+        console.log("No user ID found");
+        setIsLoading(false);
+        setNoSchoolFound(true);
+        return;
+      }
+
       // First get the school ID from the RPC function
       const { data: schoolIdData, error: schoolIdError } = await supabase
-        .rpc('get_user_school_id', { user_id_param: user?.id });
+        .rpc('get_user_school_id', { user_id_param: user.id });
 
       if (schoolIdError) {
         console.error("Error fetching school ID:", schoolIdError);
         toast.error(`Error fetching school ID: ${schoolIdError.message}`);
+        setNoSchoolFound(true);
         setIsLoading(false);
         return;
       }
@@ -123,6 +130,7 @@ const SubscriptionInfo = () => {
       if (schoolError) {
         console.error("Error fetching school:", schoolError);
         toast.error(`Error fetching school: ${schoolError.message}`);
+        setNoSchoolFound(true);
         setIsLoading(false);
         return;
       }
@@ -164,6 +172,7 @@ const SubscriptionInfo = () => {
     } catch (error: any) {
       console.error("Error in fetchSubscriptionInfo:", error);
       toast.error(`Error fetching subscription info: ${error.message}`);
+      setNoSchoolFound(true);
     } finally {
       setIsLoading(false);
     }
@@ -172,6 +181,9 @@ const SubscriptionInfo = () => {
   useEffect(() => {
     if (user) {
       fetchSubscriptionInfo();
+    } else {
+      setNoSchoolFound(true);
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -208,17 +220,37 @@ const SubscriptionInfo = () => {
         
         toast.success(`${data.email} added to your school as ${data.role}`);
       } else {
-        // Create a complete auth account for the staff member
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email: data.email,
-          password: data.password,
-          email_confirm: true,
-          user_metadata: {
-            role: data.role
-          }
-        });
-        
-        if (authError) {
+        // Try to create a complete auth account for the staff member
+        try {
+          const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email: data.email,
+            password: data.password,
+            email_confirm: true,
+            user_metadata: {
+              role: data.role
+            }
+          });
+          
+          if (authError) throw authError;
+          
+          // Create profile entry with the new user ID
+          const profileId = authData.user.id;
+          
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: profileId,
+              email: data.email,
+              role: data.role,
+              school_id: school.id
+            });
+            
+          if (insertError) throw insertError;
+          
+          toast.success(`Account created for ${data.email} as ${data.role}`);
+        } catch (adminError: any) {
+          console.error("Admin creation failed, trying regular signup:", adminError);
+          
           // If admin create fails, try regular signup
           const { data: signupData, error: signupError } = await supabase.auth.signUp({
             email: data.email,
@@ -249,23 +281,9 @@ const SubscriptionInfo = () => {
             });
             
           if (insertError) throw insertError;
-        } else {
-          // If admin create works, create profile entry
-          const profileId = authData.user.id;
           
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: profileId,
-              email: data.email,
-              role: data.role,
-              school_id: school.id
-            });
-            
-          if (insertError) throw insertError;
+          toast.success(`Account created for ${data.email} as ${data.role}`);
         }
-        
-        toast.success(`Account created for ${data.email} as ${data.role}`);
       }
       
       // Reset form and close dialog
@@ -287,6 +305,11 @@ const SubscriptionInfo = () => {
     setIsCreatingSchool(true);
     
     try {
+      if (!user?.id) {
+        toast.error("You must be logged in to create a school");
+        return;
+      }
+
       // First verify the license
       const { data: licenseData, error: licenseError } = await supabase
         .rpc('handle_license_signup', { license_number: data.license_number });
@@ -305,7 +328,7 @@ const SubscriptionInfo = () => {
         .insert({
           name: data.name,
           license_id: licenseId,
-          created_by: user?.id
+          created_by: user.id
         })
         .select()
         .single();
@@ -315,18 +338,16 @@ const SubscriptionInfo = () => {
       }
       
       // Update user profile with school ID
-      if (user?.id) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            school_id: schoolData.id,
-            role: 'admin' // Set as admin since they're creating the school
-          })
-          .eq('id', user.id);
-          
-        if (profileError) {
-          throw profileError;
-        }
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          school_id: schoolData.id,
+          role: 'admin' // Set as admin since they're creating the school
+        })
+        .eq('id', user.id);
+        
+      if (profileError) {
+        throw profileError;
       }
       
       toast.success("School created successfully!");
