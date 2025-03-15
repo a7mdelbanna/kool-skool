@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { addDays, subDays, addWeeks, getDay } from 'date-fns';
 
@@ -69,13 +68,6 @@ const generateMockSessions = (): Session[] => {
     // Set hours between 8 AM and 7 PM
     date.setHours(8 + Math.floor(Math.random() * 12), 0, 0, 0);
     
-    const subject = subjects[Math.floor(Math.random() * subjects.length)];
-    const duration = durations[Math.floor(Math.random() * durations.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    const paymentStatus = paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)];
-    const subscriptionIndex = Math.floor(i / 4);
-    const subscription = subscriptions[subscriptionIndex];
-    
     return {
       id: `session-${i + 1}`,
       date, // Store as Date object
@@ -100,8 +92,11 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Initialize with mock data on first render
   useEffect(() => {
+    console.log("PaymentProvider initializing");
     if (sessions.length === 0) {
-      setSessions(generateMockSessions());
+      const mockSessions = generateMockSessions();
+      console.log("Generated mock sessions:", mockSessions.length);
+      setSessions(mockSessions);
     }
   }, [sessions.length]);
 
@@ -187,17 +182,22 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
+  // Create the context value
+  const contextValue = {
+    payments,
+    addPayment,
+    removePayment,
+    sessions,
+    addSessions,
+    removeSessionsBySubscriptionId,
+    updateSessionStatus,
+    rescheduleSession
+  };
+
+  console.log("PaymentProvider rendering with sessions:", sessions.length);
+
   return (
-    <PaymentContext.Provider value={{ 
-      payments, 
-      addPayment, 
-      removePayment,
-      sessions,
-      addSessions,
-      removeSessionsBySubscriptionId,
-      updateSessionStatus,
-      rescheduleSession
-    }}>
+    <PaymentContext.Provider value={contextValue}>
       {children}
     </PaymentContext.Provider>
   );

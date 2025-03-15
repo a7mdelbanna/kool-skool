@@ -8,8 +8,7 @@ import {
   isSameMonth,
   isSameDay,
   getDay,
-  addDays,
-  parseISO 
+  addDays
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
@@ -59,6 +58,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   currentWeekStart,
   sessions 
 }) => {
+  // Add debugging
+  console.log("CalendarView rendering with sessions:", sessions.length);
+  
   const processedSessions = sessions.map(session => {
     const noteParts = session.notes?.split(' ') || [];
     const subject = noteParts.length > 0 ? noteParts[0] : 'default';

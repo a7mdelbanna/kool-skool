@@ -9,7 +9,7 @@ import {
   LayoutGrid,
   List
 } from 'lucide-react';
-import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, isSameDay } from 'date-fns';
+import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -26,7 +26,7 @@ const Calendar = () => {
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('calendar'); // Set calendar as default
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('calendar');
   const { sessions } = usePayments();
 
   // Navigation functions
@@ -80,10 +80,15 @@ const Calendar = () => {
     }
   };
 
+  // Filter sessions based on search query
   const filteredSessions = sessions.filter(session => {
     if (!searchQuery) return true;
     return session.notes?.toLowerCase().includes(searchQuery.toLowerCase());
   });
+
+  // For debugging
+  console.log("Sessions available:", sessions.length);
+  console.log("Filtered sessions:", filteredSessions.length);
 
   return (
     <div className="space-y-6">
