@@ -1,91 +1,28 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { format } from "date-fns";
 import { Calendar, Clock, CheckCircle, X, AlertTriangle, CalendarX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { Badge } from "@/components/ui/badge";
+import { usePayments } from "@/contexts/PaymentContext";
 
 interface SessionsTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
 }
 
-interface Session {
-  id: string;
-  date: Date;
-  time: string;
-  duration: string;
-  status: "scheduled" | "completed" | "canceled" | "missed";
-  paymentStatus: "paid" | "unpaid";
-  cost: number;
-  notes?: string;
-}
-
-// Sample sessions for demonstration
-const sampleSessions: Session[] = [
-  {
-    id: "1",
-    date: new Date(new Date().getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-    time: "15:00",
-    duration: "1 hour",
-    status: "scheduled",
-    paymentStatus: "paid",
-    cost: 50,
-    notes: "Algebra review session"
-  },
-  {
-    id: "2",
-    date: new Date(new Date().getTime() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    time: "16:00",
-    duration: "1 hour",
-    status: "completed",
-    paymentStatus: "paid",
-    cost: 50,
-    notes: "Worked on trigonometry"
-  },
-  {
-    id: "3",
-    date: new Date(new Date().getTime() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
-    time: "15:00",
-    duration: "1 hour",
-    status: "completed",
-    paymentStatus: "paid",
-    cost: 50
-  },
-  {
-    id: "4",
-    date: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-    time: "14:00",
-    duration: "1 hour",
-    status: "scheduled",
-    paymentStatus: "unpaid",
-    cost: 50,
-    notes: "Will cover calculus fundamentals"
-  },
-  {
-    id: "5",
-    date: new Date(new Date().getTime() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
-    time: "17:00",
-    duration: "1 hour",
-    status: "canceled",
-    paymentStatus: "unpaid",
-    cost: 0,
-    notes: "Student was sick"
-  }
-];
-
 const SessionsTab: React.FC<SessionsTabProps> = ({ studentData, setStudentData }) => {
-  const [sessions] = useState<Session[]>(sampleSessions);
+  const { sessions } = usePayments();
   
   // Filter sessions to upcoming and past
   const upcomingSessions = sessions.filter(
     session => session.status === "scheduled" && new Date(session.date) >= new Date()
-  ).sort((a, b) => a.date.getTime() - b.date.getTime());
+  ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   
   const pastSessions = sessions.filter(
     session => session.status !== "scheduled" || new Date(session.date) < new Date()
-  ).sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort from most recent to oldest
+  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort from most recent to oldest
   
   const getStatusBadge = (session: Session) => {
     switch(session.status) {
@@ -159,7 +96,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({ studentData, setStudentData }
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">
-                      {format(session.date, "EEEE, MMMM d, yyyy")}
+                      {format(new Date(session.date), "EEEE, MMMM d, yyyy")}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
@@ -199,7 +136,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({ studentData, setStudentData }
       <div className="border-t pt-4 mt-6">
         <p className="text-sm text-muted-foreground">
           <AlertTriangle className="h-4 w-4 inline mr-1" />
-          Session management is connected to subscriptions. Add subscriptions in the Subscriptions tab to automatically generate sessions.
+          Sessions are automatically generated when you add a subscription in the Subscriptions tab.
         </p>
       </div>
     </div>

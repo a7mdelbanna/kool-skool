@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, addMonths, addDays, parse, getDay } from "date-fns";
 import { CalendarIcon, Plus, Trash, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
@@ -92,7 +92,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [selectedDays, setSelectedDays] = useState<DaySchedule[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
-  const { addPayment } = usePayments();
+  const { addPayment, addSessions, removeSessionsBySubscriptionId } = usePayments();
   
   const form = useForm<SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
@@ -156,6 +156,70 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
     form.setValue("schedule", updatedDays);
   };
   
+  const generateSessions = (subscription: Subscription) => {
+    const { sessionCount, startDate, schedule, pricePerSession, fixedPrice, priceMode, duration, id } = subscription;
+    
+    const durationMonths = parseInt(duration.split(" ")[0]);
+    
+    const endDate = addMonths(startDate, durationMonths);
+    
+    const dayMapping: { [key: string]: number } = {
+      "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, 
+      "Friday": 5, "Saturday": 6, "Sunday": 0
+    };
+    
+    const sessionDates: Date[] = [];
+    let currentDate = new Date(startDate);
+    
+    while (currentDate < endDate && sessionDates.length < sessionCount) {
+      for (const { day, time } of schedule) {
+        const dayNumber = dayMapping[day];
+        const currentDayNumber = getDay(currentDate);
+        
+        let daysToAdd = dayNumber - currentDayNumber;
+        if (daysToAdd < 0) daysToAdd += 7;
+        
+        if (daysToAdd === 0 && currentDate === startDate) {
+        } else if (daysToAdd === 0) {
+          daysToAdd = 7;
+        }
+        
+        const sessionDate = addDays(new Date(currentDate), daysToAdd);
+        
+        const [hours, minutes] = time.split(':').map(Number);
+        sessionDate.setHours(hours, minutes);
+        
+        if (sessionDate <= endDate && sessionDates.length < sessionCount) {
+          sessionDates.push(sessionDate);
+        }
+      }
+      
+      currentDate = addDays(currentDate, 7);
+    }
+    
+    const sessions = sessionDates.slice(0, sessionCount).map(date => {
+      const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][getDay(date)];
+      const scheduleItem = schedule.find(s => s.day === dayName);
+      
+      const cost = priceMode === "perSession" 
+        ? pricePerSession 
+        : fixedPrice / sessionCount;
+      
+      return {
+        date,
+        time: scheduleItem ? scheduleItem.time : "00:00",
+        duration: "1 hour",
+        status: "scheduled" as const,
+        paymentStatus: "paid" as const,
+        cost,
+        notes: subscription.notes,
+        subscriptionId: id
+      };
+    });
+    
+    return sessions;
+  };
+  
   const handleAddSubscription = (data: SubscriptionFormValues) => {
     const calculatedTotalPrice = calculateTotalPrice();
     
@@ -173,6 +237,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       notes: data.notes || "",
     };
     
+    const sessions = generateSessions(newSubscription);
+    addSessions(sessions);
+    
     addPayment({
       amount: calculatedTotalPrice,
       date: new Date(),
@@ -189,6 +256,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   
   const handleRemoveSubscription = (id: string) => {
     setSubscriptions(subscriptions.filter(sub => sub.id !== id));
+    removeSessionsBySubscriptionId(id);
   };
 
   return (
