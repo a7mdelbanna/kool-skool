@@ -322,7 +322,7 @@ const SubscriptionInfo = () => {
       
       const licenseId = licenseData[0].license_id;
       
-      // Create school
+      // Create school first
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
         .insert({
@@ -334,10 +334,11 @@ const SubscriptionInfo = () => {
         .single();
         
       if (schoolError) {
+        console.error("School creation error:", schoolError);
         throw schoolError;
       }
       
-      // Update user profile with school ID
+      // After school is created, update user profile in a separate step
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -347,6 +348,7 @@ const SubscriptionInfo = () => {
         .eq('id', user.id);
         
       if (profileError) {
+        console.error("Profile update error:", profileError);
         throw profileError;
       }
       
