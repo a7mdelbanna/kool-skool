@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Form,
@@ -123,7 +124,8 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         <div className="border-t pt-6">
           <h3 className="text-lg font-medium mb-4">Add New Payment</h3>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleAddPayment)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleAddPayment)} className="space-y-5">
+              {/* Improved layout - Amount and Date side by side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -133,7 +135,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                       <FormLabel>Amount ($)</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2">$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                           <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
                         </div>
                       </FormControl>
@@ -154,7 +156,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                             <Button
                               variant={"outline"}
                               className={cn(
-                                "pl-3 text-left font-normal",
+                                "w-full pl-3 text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
@@ -223,6 +225,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                     <FormControl>
                       <Textarea
                         placeholder="Add any additional notes about this payment"
+                        className="resize-none"
                         {...field}
                       />
                     </FormControl>
@@ -231,7 +234,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                 )}
               />
               
-              <Button type="submit" className="w-full mt-4">
+              <Button type="submit" className="w-full">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Payment
               </Button>
