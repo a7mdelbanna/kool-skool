@@ -9,7 +9,8 @@ import {
   Settings,
   LogOut,
   PlusCircle,
-  GraduationCap
+  GraduationCap,
+  School
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -113,6 +114,23 @@ export function Sidebar() {
           <SidebarGroupLabel>Account</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <Sidebar
+MenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/school-setup"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <School className="h-5 w-5" />
+                    <span>School Setup</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink 

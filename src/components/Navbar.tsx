@@ -8,7 +8,8 @@ import {
   DollarSign, 
   Settings,
   Menu,
-  X
+  X,
+  School
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -101,6 +102,13 @@ const MobileNavbar = () => {
             onClick={closeMenu}
           />
           <NavItem 
+            to="/school-setup" 
+            icon={<School size={20} />} 
+            label="School Setup" 
+            isActive={location.pathname === "/school-setup"} 
+            onClick={closeMenu}
+          />
+          <NavItem 
             to="/settings" 
             icon={<Settings size={20} />} 
             label="Settings" 
@@ -110,8 +118,8 @@ const MobileNavbar = () => {
         </div>
       </div>
 
-      {/* Bottom tab bar (always visible on mobile) */}
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t z-30 grid grid-cols-5 items-center lg:hidden">
+      {/* Bottom tab bar */}
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t z-30 grid grid-cols-6 items-center lg:hidden">
         <NavItem 
           to="/" 
           icon={<Home size={20} />} 
@@ -135,6 +143,12 @@ const MobileNavbar = () => {
           icon={<DollarSign size={20} />} 
           label="Payments" 
           isActive={location.pathname === "/payments"} 
+        />
+        <NavItem 
+          to="/school-setup" 
+          icon={<School size={20} />} 
+          label="Setup" 
+          isActive={location.pathname === "/school-setup"} 
         />
         <NavItem 
           to="/settings" 
