@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -11,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { Loader2, Calendar, UserPlus, Users, Mail, Shield, EyeIcon, EyeOffIcon } from "lucide-react";
+import { Loader2, Calendar, UserPlus, Users, Mail, Shield, EyeIcon, EyeOffIcon, PlusCircle, School } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInCalendarDays } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,14 @@ const staffSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
+// Form schema for creating a school
+const schoolSchema = z.object({
+  name: z.string().min(1, { message: "School name is required" }),
+  license_number: z.string().min(1, { message: "License number is required" }),
+});
+
 type StaffFormValues = z.infer<typeof staffSchema>;
+type SchoolFormValues = z.infer<typeof schoolSchema>;
 
 const SubscriptionInfo = () => {
   const [license, setLicense] = useState<any>(null);
@@ -54,17 +62,28 @@ const SubscriptionInfo = () => {
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [isCreatingSchool, setIsCreatingSchool] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [schoolDialogOpen, setSchoolDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [noSchoolFound, setNoSchoolFound] = useState(false);
   const { user } = useAuth();
   
-  // Initialize form
-  const form = useForm<StaffFormValues>({
+  // Initialize forms
+  const staffForm = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
     defaultValues: {
       email: "",
       role: "",
       password: "",
+    },
+  });
+
+  const schoolForm = useForm<SchoolFormValues>({
+    resolver: zodResolver(schoolSchema),
+    defaultValues: {
+      name: "",
+      license_number: "",
     },
   });
 
@@ -85,13 +104,14 @@ const SubscriptionInfo = () => {
       
       if (!schoolIdData || !Array.isArray(schoolIdData) || schoolIdData.length === 0 || !schoolIdData[0]?.school_id) {
         console.log("No school ID found:", schoolIdData);
-        toast.error("No school associated with this account");
+        setNoSchoolFound(true);
         setIsLoading(false);
         return;
       }
       
       const schoolId = schoolIdData[0].school_id;
       console.log("Found school ID:", schoolId);
+      setNoSchoolFound(false);
 
       // Get school info
       const { data: schoolData, error: schoolError } = await supabase
@@ -249,7 +269,7 @@ const SubscriptionInfo = () => {
       }
       
       // Reset form and close dialog
-      form.reset();
+      staffForm.reset();
       setDialogOpen(false);
       
       // Refresh the staff list
@@ -260,6 +280,67 @@ const SubscriptionInfo = () => {
       toast.error(`Failed to add staff: ${error.message}`);
     } finally {
       setIsAddingStaff(false);
+    }
+  };
+
+  const onSubmitSchoolForm = async (data: SchoolFormValues) => {
+    setIsCreatingSchool(true);
+    
+    try {
+      // First verify the license
+      const { data: licenseData, error: licenseError } = await supabase
+        .rpc('handle_license_signup', { license_number: data.license_number });
+        
+      if (licenseError || !licenseData || !licenseData[0]?.valid) {
+        const errorMessage = licenseData?.[0]?.message || licenseError?.message || "License validation failed";
+        toast.error(errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      const licenseId = licenseData[0].license_id;
+      
+      // Create school
+      const { data: schoolData, error: schoolError } = await supabase
+        .from('schools')
+        .insert({
+          name: data.name,
+          license_id: licenseId,
+          created_by: user?.id
+        })
+        .select()
+        .single();
+        
+      if (schoolError) {
+        throw schoolError;
+      }
+      
+      // Update user profile with school ID
+      if (user?.id) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            school_id: schoolData.id,
+            role: 'admin' // Set as admin since they're creating the school
+          })
+          .eq('id', user.id);
+          
+        if (profileError) {
+          throw profileError;
+        }
+      }
+      
+      toast.success("School created successfully!");
+      schoolForm.reset();
+      setSchoolDialogOpen(false);
+      
+      // Refresh to show the new school info
+      fetchSubscriptionInfo();
+      
+    } catch (error: any) {
+      console.error("Error creating school:", error);
+      toast.error(`Failed to create school: ${error.message}`);
+    } finally {
+      setIsCreatingSchool(false);
     }
   };
 
@@ -315,6 +396,88 @@ const SubscriptionInfo = () => {
   const isStaffPending = (staff: any) => {
     return !staff.first_name || !staff.last_name;
   };
+
+  // No school found view
+  if (noSchoolFound && !isLoading) {
+    return (
+      <Card className="text-center">
+        <CardHeader>
+          <CardTitle>No School Found</CardTitle>
+          <CardDescription>
+            You don't have a school associated with your account yet. 
+            Create a school to manage your subscription and staff.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6 pb-8 flex flex-col items-center">
+          <School className="h-12 w-12 text-muted-foreground mb-4" />
+          <Dialog open={schoolDialogOpen} onOpenChange={setSchoolDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="mt-4">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create School
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create a School</DialogTitle>
+                <DialogDescription>
+                  Set up your school and connect it to your license.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...schoolForm}>
+                <form onSubmit={schoolForm.handleSubmit(onSubmitSchoolForm)} className="space-y-4">
+                  <FormField
+                    control={schoolForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>School Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter school name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={schoolForm.control}
+                    name="license_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>License Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your license number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isCreatingSchool}>
+                      {isCreatingSchool ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Create School
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -419,10 +582,10 @@ const SubscriptionInfo = () => {
                   Create an account for a new staff member to join your school.
                 </DialogDescription>
               </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmitStaffForm)} className="space-y-4">
+              <Form {...staffForm}>
+                <form onSubmit={staffForm.handleSubmit(onSubmitStaffForm)} className="space-y-4">
                   <FormField
-                    control={form.control}
+                    control={staffForm.control}
                     name="email"
                     render={({ field }) => (
                       <FormItem>
@@ -435,7 +598,7 @@ const SubscriptionInfo = () => {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={staffForm.control}
                     name="role"
                     render={({ field }) => (
                       <FormItem>
@@ -458,7 +621,7 @@ const SubscriptionInfo = () => {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={staffForm.control}
                     name="password"
                     render={({ field }) => (
                       <FormItem>
