@@ -16,6 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import UpcomingLessonsList from '@/components/calendar/UpcomingLessonsList';
 import CalendarView from '@/components/calendar/CalendarView';
 import { usePayments } from '@/contexts/PaymentContext';
+import NewLessonDialog from '@/components/calendar/NewLessonDialog';
 
 type ViewMode = 'day' | 'week' | 'month';
 type DisplayMode = 'calendar' | 'list';
@@ -27,6 +28,7 @@ const Calendar = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('calendar');
+  const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
   const { sessions } = usePayments();
 
   // Navigation functions
@@ -120,7 +122,10 @@ const Calendar = () => {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <Button className="gap-2 rounded-lg shadow-md bg-primary hover:bg-primary/90">
+          <Button 
+            className="gap-2 rounded-lg shadow-md bg-primary hover:bg-primary/90"
+            onClick={() => setNewLessonDialogOpen(true)}
+          >
             <Plus className="h-4 w-4" />
             <span>New Lesson</span>
           </Button>
@@ -175,6 +180,13 @@ const Calendar = () => {
           />
         )}
       </div>
+
+      {/* New Lesson Dialog */}
+      <NewLessonDialog 
+        open={newLessonDialogOpen} 
+        onOpenChange={setNewLessonDialogOpen} 
+        initialDate={currentDate}
+      />
     </div>
   );
 };

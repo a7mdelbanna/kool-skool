@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   format, 
   startOfMonth,
@@ -26,6 +26,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import LessonDetailsDialog from './LessonDetailsDialog';
 
 const subjectColorMap: Record<string, { bg: string, border: string, text: string }> = {
   'Mathematics': { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
@@ -58,6 +59,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   currentWeekStart,
   sessions 
 }) => {
+  // Add state for selected session
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
   // Add debugging
   console.log("CalendarView rendering with sessions:", sessions.length);
   
@@ -70,6 +75,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     
     return { ...session, subject, studentName } as SessionWithSubject;
   });
+
+  const handleSessionClick = (session: Session) => {
+    setSelectedSession(session);
+    setDialogOpen(true);
+  };
 
   const getDateSessions = (date: Date) => {
     return processedSessions.filter(session => {
@@ -171,9 +181,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                             <div 
                               key={session.id} 
                               className={cn(
-                                "p-2 rounded-md border text-sm",
+                                "p-2 rounded-md border text-sm cursor-pointer hover:bg-accent",
                                 colors.border
                               )}
+                              onClick={() => handleSessionClick(session)}
                             >
                               <div className="flex items-center gap-2">
                                 <Avatar className={cn("h-7 w-7", colors.border)}>
@@ -265,10 +276,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                         <div 
                           key={session.id} 
                           className={cn(
-                            "p-2 rounded-md border text-sm",
+                            "p-2 rounded-md border text-sm cursor-pointer hover:bg-accent/50",
                             colors.border,
                             session.status === "canceled" && "opacity-60"
                           )}
+                          onClick={() => handleSessionClick(session)}
                         >
                           <div className="flex items-center gap-2">
                             <Avatar className={cn("h-6 w-6", colors.border)}>
@@ -342,10 +354,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       <div 
                         key={session.id} 
                         className={cn(
-                          "p-2 rounded-md border text-sm",
+                          "p-2 rounded-md border text-sm cursor-pointer hover:bg-accent/50",
                           colors.border,
                           session.status === "canceled" && "opacity-60"
                         )}
+                        onClick={() => handleSessionClick(session)}
                       >
                         <div className="flex items-center gap-2">
                           <Avatar className={cn("h-8 w-8", colors.border)}>
@@ -385,6 +398,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'week' && renderWeekView()}
       {viewMode === 'day' && renderDayView()}
+      
+      {/* Lesson Details Dialog */}
+      <LessonDetailsDialog 
+        session={selectedSession}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </div>
   );
 };
