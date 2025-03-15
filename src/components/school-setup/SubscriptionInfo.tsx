@@ -297,13 +297,10 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      const { error } = await supabase.rpc(
-        'create_school_and_update_profile',
-        {
-          school_name: data.name,
-          license_number: data.license_number
-        }
-      );
+      const { error } = await supabase.rest.rpc('create_school_and_update_profile', {
+        school_name: data.name,
+        license_number: data.license_number
+      });
       
       if (error) {
         console.error("Error creating school:", error);
