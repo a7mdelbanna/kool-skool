@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Form,
@@ -48,7 +49,9 @@ const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other
 const currencies = [
   { symbol: "$", code: "USD", name: "US Dollar", icon: DollarSign },
   { symbol: "€", code: "EUR", name: "Euro", icon: Euro },
-  { symbol: "₽", code: "RUB", name: "Russian Ruble", icon: DollarSign },
+  { symbol: "₽", code: "RUB", name: "Russian Ruble", icon: ({ className }: { className?: string }) => (
+    <span className={cn("font-bold text-sm", className)}>₽</span>
+  )},
 ];
 
 const PaymentsTab: React.FC<PaymentsTabProps> = ({ 
