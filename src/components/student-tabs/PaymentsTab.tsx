@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Form,
   FormControl,
@@ -14,13 +14,20 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, CreditCard, Plus, Receipt, Trash } from "lucide-react";
+import { CalendarIcon, CreditCard, DollarSign, Euro, Plus, Receipt, Trash, PoundSterling, Yen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { usePayments, Payment } from "@/contexts/PaymentContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface PaymentsTabProps {
   studentData: Partial<Student>;
@@ -33,11 +40,18 @@ const paymentSchema = z.object({
   date: z.date({ required_error: "Payment date is required" }),
   method: z.string().min(1, { message: "Payment method is required" }),
   notes: z.string().optional(),
+  currency: z.string().default("USD"),
 });
 
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
+const currencies = [
+  { code: "USD", symbol: "$", label: "US Dollar", icon: DollarSign },
+  { code: "EUR", symbol: "€", label: "Euro", icon: Euro },
+  { code: "GBP", symbol: "£", label: "British Pound", icon: PoundSterling },
+  { code: "JPY", symbol: "¥", label: "Japanese Yen", icon: Yen },
+];
 
 const PaymentsTab: React.FC<PaymentsTabProps> = ({ 
   studentData, 
@@ -45,6 +59,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   isViewMode = false 
 }) => {
   const { payments, addPayment, removePayment } = usePayments();
+  const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]);
   
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -53,6 +68,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       date: new Date(),
       method: "",
       notes: "",
+      currency: "USD",
     },
   });
   
@@ -63,9 +79,16 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       method: data.method,
       notes: data.notes || "",
       status: "completed",
+      currency: data.currency,
     });
     
     form.reset();
+  };
+
+  const handleCurrencyChange = (currencyCode: string) => {
+    const currency = currencies.find(c => c.code === currencyCode) || currencies[0];
+    setSelectedCurrency(currency);
+    form.setValue("currency", currencyCode);
   };
 
   return (
@@ -88,7 +111,11 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <h4 className="font-medium">${payment.amount.toFixed(2)}</h4>
+                    <h4 className="font-medium">
+                      {payment.currency ? 
+                        currencies.find(c => c.code === payment.currency)?.symbol || '$' 
+                        : '$'}{payment.amount.toFixed(2)}
+                    </h4>
                     <span className="text-sm text-muted-foreground">
                       via {payment.method}
                     </span>
@@ -125,17 +152,53 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
           <h3 className="text-lg font-medium mb-4">Add New Payment</h3>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleAddPayment)} className="space-y-5">
-              {/* Fixed layout - Amount and Date side by side for all screen sizes */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Layout with currency selector, amount and date in one row */}
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Currency</FormLabel>
+                      <Select 
+                        defaultValue={field.value} 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          handleCurrencyChange(value);
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select currency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {currencies.map((currency) => (
+                            <SelectItem key={currency.code} value={currency.code}>
+                              <div className="flex items-center gap-2">
+                                <currency.icon className="h-4 w-4" />
+                                <span>{currency.code}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Amount ($)</FormLabel>
+                      <FormLabel>Amount ({selectedCurrency.symbol})</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            {selectedCurrency.symbol}
+                          </span>
                           <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
                         </div>
                       </FormControl>

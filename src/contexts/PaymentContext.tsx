@@ -9,6 +9,7 @@ export interface Payment {
   notes: string;
   status: "completed" | "pending" | "failed";
   relatedSubscriptionId?: string;
+  currency?: string;
 }
 
 export interface Session {
