@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { 
@@ -11,7 +10,8 @@ import {
   ArrowRight,
   CheckCircle,
   XCircle,
-  CalendarX
+  CalendarX,
+  Hash
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 
-// Map subject names to colors
 const subjectColorMap: Record<string, { bg: string, border: string, text: string }> = {
   'Mathematics': { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
   'Science': { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-700' },
@@ -47,6 +46,7 @@ const subjectColorMap: Record<string, { bg: string, border: string, text: string
 
 interface SessionWithSubject extends Session {
   subject: string;
+  studentName: string;
 }
 
 interface UpcomingLessonsListProps {
@@ -61,25 +61,24 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
 
-  // Extract subject from notes and sort lessons by date
   const processedSessions = sessions
     .map(session => {
-      // Extract subject from notes (e.g., "Mathematics lesson with Student 1")
       const noteParts = session.notes?.split(' ') || [];
       const subject = noteParts.length > 0 ? noteParts[0] : 'default';
-      return { ...session, subject } as SessionWithSubject;
+      
+      const studentNameMatch = session.notes?.match(/with\s+(.*?)$/);
+      const studentName = studentNameMatch ? studentNameMatch[1] : `Student ${session.id.slice(-1)}`;
+      
+      return { ...session, subject, studentName } as SessionWithSubject;
     })
     .filter(session => {
-      // Filter by search query if provided
       if (!searchQuery) return true;
       return session.notes?.toLowerCase().includes(searchQuery.toLowerCase());
     })
     .sort((a, b) => {
-      // Sort by date (earliest first)
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
-  // Split into upcoming and past sessions
   const today = new Date();
   const upcomingSessions = processedSessions.filter(
     session => session.status === "scheduled" && new Date(session.date) >= today
@@ -88,12 +87,10 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     session => session.status !== "scheduled" || new Date(session.date) < today
   );
 
-  // Get colors for a subject
   const getSubjectColors = (subject: string) => {
     return subjectColorMap[subject] || subjectColorMap.default;
   };
 
-  // Handle session actions
   const handleCancelSession = () => {
     if (selectedSession) {
       updateSessionStatus(selectedSession.id, "canceled");
@@ -130,7 +127,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     }
   };
 
-  // Render status badge
   const renderStatusBadge = (status: Session['status']) => {
     switch(status) {
       case "scheduled":
@@ -164,7 +160,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     }
   };
 
-  // Render payment badge
   const renderPaymentBadge = (session: Session) => {
     if (session.status === "canceled" && session.cost === 0) {
       return null;
@@ -177,14 +172,14 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     );
   };
 
-  // Render action buttons based on session status
   const renderActionButtons = (session: SessionWithSubject) => {
     const isScheduled = session.status === "scheduled";
     const isCanceled = session.status === "canceled";
+    const isPast = new Date(session.date) < today && session.status !== "completed" && session.status !== "canceled";
     
     return (
       <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
-        {isScheduled && (
+        {(isScheduled || isPast) && (
           <>
             <Button 
               variant="outline" 
@@ -213,7 +208,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
           </>
         )}
         
-        {/* Show reschedule for scheduled or canceled sessions with subscriptionId */}
         {(isScheduled || isCanceled) && session.subscriptionId && (
           <Button 
             variant="outline" 
@@ -228,41 +222,10 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
             Reschedule
           </Button>
         )}
-        
-        {/* For past sessions that are not yet marked as completed or canceled */}
-        {!isScheduled && !isCanceled && session.status !== "completed" && (
-          <>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="border-green-500 text-green-500 hover:bg-green-50"
-              onClick={() => {
-                setSelectedSession(session);
-                setCompleteDialogOpen(true);
-              }}
-            >
-              <Check className="h-3.5 w-3.5 mr-1" />
-              Attended
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="border-red-500 text-red-500 hover:bg-red-50"
-              onClick={() => {
-                setSelectedSession(session);
-                setCancelDialogOpen(true);
-              }}
-            >
-              <X className="h-3.5 w-3.5 mr-1" />
-              Cancel
-            </Button>
-          </>
-        )}
       </div>
     );
   };
 
-  // Render session card
   const renderSessionCard = (session: SessionWithSubject) => {
     const colors = getSubjectColors(session.subject);
     const sessionDate = new Date(session.date);
@@ -286,10 +249,17 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
               
               <div className="space-y-1">
                 <div className="flex flex-wrap gap-2 items-center">
-                  <h3 className="font-medium">{session.subject}</h3>
+                  <h3 className="font-medium">{session.studentName}</h3>
                   <Badge variant="outline" className={cn(colors.bg, colors.text, colors.border, "border")}>
-                    {session.notes?.split(' ')[0] || 'Lesson'}
+                    {session.subject}
                   </Badge>
+                  
+                  {session.sessionNumber && session.totalSessions && (
+                    <Badge variant="outline" className="flex items-center gap-1">
+                      <Hash className="h-3 w-3" />
+                      {session.sessionNumber}/{session.totalSessions}
+                    </Badge>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm text-muted-foreground">
@@ -300,10 +270,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
                   <div className="flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5" />
                     <span>{session.time} ({session.duration})</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5" />
-                    <span>{session.notes?.split(' with ')[1] || `Student ${session.id.slice(-1)}`}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <DollarSign className="h-3.5 w-3.5" />
@@ -362,7 +328,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
         )}
       </div>
 
-      {/* Cancel Session Dialog */}
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -383,7 +348,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Mark as Attended Dialog */}
       <AlertDialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -404,7 +368,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reschedule Session Dialog */}
       <AlertDialog open={rescheduleDialogOpen} onOpenChange={setRescheduleDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

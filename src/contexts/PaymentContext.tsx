@@ -23,6 +23,8 @@ export interface Session {
   cost: number;
   notes?: string;
   subscriptionId?: string;
+  sessionNumber?: number;
+  totalSessions?: number;
 }
 
 interface PaymentContextType {
@@ -51,8 +53,14 @@ const generateMockSessions = (): Session[] => {
   const paymentStatuses: Session['paymentStatus'][] = ['paid', 'unpaid'];
   const durations = ['30 min', '45 min', '60 min', '90 min'];
   
+  // Create subscriptions with total sessions count
+  const subscriptions = Array.from({ length: 5 }, (_, i) => ({
+    id: `sub-${i + 1}`,
+    totalSessions: 8 + Math.floor(Math.random() * 8) // 8-16 sessions per subscription
+  }));
+  
   // Generate 20 random sessions across 7 days before and 14 days after today
-  return Array.from({ length: 20 }, (_, i) => {
+  const generatedSessions = Array.from({ length: 20 }, (_, i) => {
     const randomDayOffset = Math.floor(Math.random() * 21) - 7; // -7 to +14 days
     const date = randomDayOffset >= 0 
       ? addDays(today, randomDayOffset) 
@@ -65,6 +73,8 @@ const generateMockSessions = (): Session[] => {
     const duration = durations[Math.floor(Math.random() * durations.length)];
     const status = statuses[Math.floor(Math.random() * statuses.length)];
     const paymentStatus = paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)];
+    const subscriptionIndex = Math.floor(i / 4);
+    const subscription = subscriptions[subscriptionIndex];
     
     return {
       id: `session-${i + 1}`,
@@ -75,9 +85,13 @@ const generateMockSessions = (): Session[] => {
       paymentStatus,
       cost: 25 + Math.floor(Math.random() * 50), // $25 to $75
       notes: `${subject} lesson with Student ${i % 5 + 1}`,
-      subscriptionId: `sub-${Math.floor(i / 4) + 1}`
+      subscriptionId: subscription.id,
+      sessionNumber: (i % subscription.totalSessions) + 1, // Calculate session number
+      totalSessions: subscription.totalSessions
     };
   });
+  
+  return generatedSessions;
 };
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
