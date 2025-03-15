@@ -123,6 +123,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         options: {
           data: {
             license_id: userData.licenseId,
+            first_name: userData.firstName,
+            last_name: userData.lastName,
           }
         }
       });

@@ -1,64 +1,67 @@
 
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, ArrowRight, ArrowLeft, Upload, UserPlus, Plus, X } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Loader2, ArrowRight, ArrowLeft, Upload, Plus, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import confetti from "canvas-confetti";
 
 // License verification step schema
 const licenseSchema = z.object({
-  licenseNumber: z.string().length(16, { message: "License number must be exactly a 16-character code" }),
+  licenseNumber: z.string().min(4, { message: "License number is required" }),
 });
 
-// Account details schema
+// Account details step schema
 const accountSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
-  confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  confirmPassword: z.string().min(8, { message: "Password must be at least 8 characters" }),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
+  message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
-// Profile details schema
+// Profile details step schema
 const profileSchema = z.object({
-  firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
-  lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
-  role: z.string().min(1, { message: "Please select a role" }),
+  firstName: z.string().min(2, { message: "First name is required" }),
+  lastName: z.string().min(2, { message: "Last name is required" }),
+  role: z.string().min(1, { message: "Role is required" }),
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
   telegram: z.string().optional(),
   instagram: z.string().optional(),
+  profilePicture: z.string().optional(),
 });
 
-// School details schema
+// School information step schema
 const schoolSchema = z.object({
-  schoolName: z.string().min(2, { message: "School name must be at least 2 characters" }),
+  schoolName: z.string().min(2, { message: "School name is required" }),
+  schoolLogo: z.string().optional(),
   schoolPhone: z.string().optional(),
-  schoolWhatsapp: z.string().optional(),
   schoolTelegram: z.string().optional(),
+  schoolWhatsapp: z.string().optional(),
   schoolInstagram: z.string().optional(),
-  skipSchoolDetails: z.boolean().optional(),
 });
 
-// Team members schema
+// Team member schema
 const teamMemberSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  role: z.string().min(1, { message: "Please select a role" }),
+  email: z.string().email({ message: "Invalid email address" }),
+  role: z.string().min(1, { message: "Role is required" }),
 });
 
+// Team members step schema
 const teamSchema = z.object({
   teamMembers: z.array(teamMemberSchema).optional(),
-  skipTeamSetup: z.boolean().optional(),
 });
 
 type LicenseFormValues = z.infer<typeof licenseSchema>;
@@ -67,22 +70,18 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 type SchoolFormValues = z.infer<typeof schoolSchema>;
 type TeamFormValues = z.infer<typeof teamSchema>;
 
-const roles = [
-  { value: "director", label: "School Director" },
-  { value: "teacher", label: "Teacher" },
-  { value: "manager", label: "Manager" },
-  { value: "admin", label: "Administrator" },
-];
-
 const SignupForm = () => {
   const { signUp, completeSignUp, isLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [licenseData, setLicenseData] = useState<{ licenseId: string | null }>({ licenseId: null });
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
-  const [teamMembers, setTeamMembers] = useState<{ email: string; role: string }[]>([]);
+  const [accountData, setAccountData] = useState<AccountFormValues | null>(null);
+  const [profileData, setProfileData] = useState<ProfileFormValues | null>(null);
+  const [schoolData, setSchoolData] = useState<SchoolFormValues | null>(null);
+  const [teamData, setTeamData] = useState<{ teamMembers: { email: string; role: string }[] }>({ 
+    teamMembers: [] 
+  });
 
-  // License verification form
+  // Initialize form for license verification
   const licenseForm = useForm<LicenseFormValues>({
     resolver: zodResolver(licenseSchema),
     defaultValues: {
@@ -90,7 +89,7 @@ const SignupForm = () => {
     },
   });
 
-  // Account details form
+  // Initialize form for account details
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
@@ -100,42 +99,43 @@ const SignupForm = () => {
     },
   });
 
-  // Profile details form
+  // Initialize form for profile details
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
-      role: "director",
+      role: "owner",
       phone: "",
       whatsapp: "",
       telegram: "",
       instagram: "",
+      profilePicture: "",
     },
   });
 
-  // School details form
+  // Initialize form for school information
   const schoolForm = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolSchema),
     defaultValues: {
       schoolName: "",
+      schoolLogo: "",
       schoolPhone: "",
-      schoolWhatsapp: "",
       schoolTelegram: "",
+      schoolWhatsapp: "",
       schoolInstagram: "",
-      skipSchoolDetails: false,
     },
   });
 
-  // Team setup form
+  // Team members form (add/remove members)
   const teamForm = useForm<TeamFormValues>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
       teamMembers: [],
-      skipTeamSetup: false,
     },
   });
 
+  // License verification submission handler
   const handleLicenseSubmit = async (data: LicenseFormValues) => {
     try {
       const result = await signUp(data.licenseNumber);
@@ -155,676 +155,587 @@ const SignupForm = () => {
     }
   };
 
+  // Account details submission handler
   const handleAccountSubmit = (data: AccountFormValues) => {
+    setAccountData(data);
     setStep(3);
   };
 
+  // Profile details submission handler
   const handleProfileSubmit = (data: ProfileFormValues) => {
+    setProfileData(data);
     setStep(4);
   };
 
+  // School information submission handler
   const handleSchoolSubmit = (data: SchoolFormValues) => {
-    if (data.skipSchoolDetails) {
-      setStep(5);
-      return;
-    }
-    
-    // If school details are provided, update state and proceed
+    setSchoolData(data);
     setStep(5);
   };
 
-  const handleTeamSubmit = async (data: TeamFormValues) => {
-    // Combine all form data
-    const profileData = profileForm.getValues();
-    const schoolData = schoolForm.getValues();
+  // Add team member
+  const addTeamMember = () => {
+    setTeamData(prev => ({
+      teamMembers: [
+        ...prev.teamMembers, 
+        { email: "", role: "teacher" }
+      ]
+    }));
+  };
 
-    const userData = {
-      firstName: profileData.firstName,
-      lastName: profileData.lastName,
-      role: profileData.role,
-      phone: profileData.phone,
-      whatsapp: profileData.whatsapp,
-      telegram: profileData.telegram,
-      instagram: profileData.instagram,
-      schoolName: schoolData.schoolName,
-      schoolLogo: schoolLogo,
-      schoolPhone: schoolData.schoolPhone,
-      schoolWhatsapp: schoolData.schoolWhatsapp,
-      schoolTelegram: schoolData.schoolTelegram,
-      schoolInstagram: schoolData.schoolInstagram,
-      teamMembers: data.skipTeamSetup ? [] : teamMembers,
-      licenseId: licenseData.licenseId,
-      profilePicture: profileImage,
+  // Update team member
+  const updateTeamMember = (index: number, field: "email" | "role", value: string) => {
+    const updatedMembers = [...teamData.teamMembers];
+    updatedMembers[index] = { 
+      ...updatedMembers[index],
+      [field]: value
     };
+    setTeamData({ teamMembers: updatedMembers });
+  };
+
+  // Remove team member
+  const removeTeamMember = (index: number) => {
+    const updatedMembers = teamData.teamMembers.filter((_, i) => i !== index);
+    setTeamData({ teamMembers: updatedMembers });
+  };
+
+  // Final submission
+  const handleFinalSubmit = async () => {
+    if (!accountData || !profileData || !licenseData.licenseId) {
+      toast.error("Missing required information");
+      return;
+    }
 
     try {
-      await completeSignUp(
-        accountForm.getValues().email,
-        accountForm.getValues().password,
-        userData
-      );
+      // Combine all data for final submission
+      const userData = {
+        ...profileData,
+        licenseId: licenseData.licenseId,
+        schoolName: schoolData?.schoolName || "My School",
+        schoolLogo: schoolData?.schoolLogo,
+        schoolPhone: schoolData?.schoolPhone,
+        schoolTelegram: schoolData?.schoolTelegram,
+        schoolWhatsapp: schoolData?.schoolWhatsapp,
+        schoolInstagram: schoolData?.schoolInstagram,
+        teamMembers: teamData.teamMembers.length > 0 ? teamData.teamMembers : undefined,
+      };
+
+      await completeSignUp(accountData.email, accountData.password, userData);
       
-      // Trigger confetti animation
+      // Trigger confetti animation on success
       confetti({
-        particleCount: 100,
-        spread: 70,
+        particleCount: 150,
+        spread: 100,
         origin: { y: 0.6 }
       });
     } catch (error) {
-      console.error("Signup completion error:", error);
-      toast.error("An error occurred while completing signup");
+      console.error("Signup error:", error);
+      toast.error("An error occurred during signup");
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, setImage: (image: string | null) => void) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-    
-    if (!file.type.startsWith("image/")) {
-      toast.error("Only image files are allowed");
-      return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setImage(result);
-    };
-    reader.readAsDataURL(file);
+  // Handle file uploads (mock - would connect to supabase storage in real app)
+  const handleFileUpload = (setter: (value: string) => void) => {
+    // Mock the file upload process - in a real app this would upload to storage
+    setTimeout(() => {
+      // Simulate a successful upload with a random placeholder image
+      const placeholderImage = "https://api.dicebear.com/7.x/initials/svg?seed=" + Math.random().toString(36).substring(7);
+      setter(placeholderImage);
+      toast.success("Image uploaded successfully");
+    }, 1000);
   };
 
-  const addTeamMember = () => {
-    const email = teamForm.getValues("teamMembers")?.[0]?.email || "";
-    const role = teamForm.getValues("teamMembers")?.[0]?.role || "teacher";
-    
-    if (!email) {
-      toast.error("Please enter an email address");
-      return;
-    }
-    
-    if (!z.string().email().safeParse(email).success) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    
-    setTeamMembers([...teamMembers, { email, role }]);
-    
-    // Reset the input fields
-    teamForm.setValue("teamMembers", [{ email: "", role: "teacher" }]);
-  };
-
-  const removeTeamMember = (index: number) => {
-    setTeamMembers(teamMembers.filter((_, i) => i !== index));
-  };
-
-  return (
-    <div>
-      {step === 1 && (
-        <Form {...licenseForm}>
-          <form onSubmit={licenseForm.handleSubmit(handleLicenseSubmit)} className="space-y-4">
-            <FormField
-              control={licenseForm.control}
-              name="licenseNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>License Number</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="Enter your 16-character license code" 
-                      {...field} 
-                      disabled={isLoading}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Enter the 16-character license code provided to your school.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  Continue
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </form>
-        </Form>
-      )}
-
-      {step === 2 && (
-        <Form {...accountForm}>
-          <form onSubmit={accountForm.handleSubmit(handleAccountSubmit)} className="space-y-4">
-            <h2 className="text-xl font-semibold mb-2">Account Details</h2>
-            <p className="text-sm text-muted-foreground mb-4">Create your login credentials</p>
-            
-            <FormField
-              control={accountForm.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="your-email@example.com" 
-                      type="email" 
-                      {...field} 
-                      disabled={isLoading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={accountForm.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="••••••••" 
-                      type="password" 
-                      {...field} 
-                      disabled={isLoading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={accountForm.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm Password</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="••••••••" 
-                      type="password" 
-                      {...field} 
-                      disabled={isLoading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex justify-between pt-2">
-              <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={isLoading}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                Continue
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </form>
-        </Form>
-      )}
-
-      {step === 3 && (
-        <Form {...profileForm}>
-          <form onSubmit={profileForm.handleSubmit(handleProfileSubmit)} className="space-y-4">
-            <h2 className="text-xl font-semibold mb-2">Your Profile</h2>
-            <p className="text-sm text-muted-foreground mb-4">Tell us about yourself</p>
-            
-            <div className="flex flex-col items-center mb-4">
-              <Avatar className="h-24 w-24 mb-2">
-                <AvatarImage src={profileImage || ""} alt="Profile" />
-                <AvatarFallback>
-                  {profileForm.watch("firstName")[0] || ""}{profileForm.watch("lastName")[0] || ""}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex items-center">
-                <input 
-                  type="file" 
-                  id="profile-pic" 
-                  className="hidden" 
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload(e, setProfileImage)}
-                  disabled={isLoading}
-                />
-                <label htmlFor="profile-pic">
-                  <Button type="button" variant="outline" size="sm" className="cursor-pointer" asChild>
-                    <span>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Photo
-                    </span>
-                  </Button>
-                </label>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+  // Render the current step
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <Form {...licenseForm}>
+            <form onSubmit={licenseForm.handleSubmit(handleLicenseSubmit)} className="space-y-4">
               <FormField
-                control={profileForm.control}
-                name="firstName"
+                control={licenseForm.control}
+                name="licenseNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>License Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="First Name" {...field} disabled={isLoading} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={profileForm.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Last Name" {...field} disabled={isLoading} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={profileForm.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Your Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {roles.map((role) => (
-                        <SelectItem key={role.value} value={role.value}>
-                          {role.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={profileForm.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Phone Number" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={profileForm.control}
-                name="whatsapp"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>WhatsApp</FormLabel>
-                    <FormControl>
-                      <Input placeholder="WhatsApp (optional)" {...field} disabled={isLoading} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={profileForm.control}
-                name="telegram"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telegram</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Telegram (optional)" {...field} disabled={isLoading} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={profileForm.control}
-                name="instagram"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Instagram</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Instagram (optional)" {...field} disabled={isLoading} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <Button type="button" variant="outline" onClick={() => setStep(2)} disabled={isLoading}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                Continue
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </form>
-        </Form>
-      )}
-
-      {step === 4 && (
-        <Form {...schoolForm}>
-          <form onSubmit={schoolForm.handleSubmit(handleSchoolSubmit)} className="space-y-4">
-            <h2 className="text-xl font-semibold mb-2">School Information</h2>
-            <p className="text-sm text-muted-foreground mb-4">Tell us about your school</p>
-            
-            <div className="flex items-end justify-between mb-4">
-              <FormField
-                control={schoolForm.control}
-                name="skipSchoolDetails"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                      <Input
+                        placeholder="Enter your license number"
+                        {...field}
                         disabled={isLoading}
                       />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Skip this step</FormLabel>
-                      <FormDescription>
-                        You can complete the school details later in settings
-                      </FormDescription>
-                    </div>
+                    <FormDescription>
+                      Enter the license number provided to your school
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    Verify License
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+          </Form>
+        );
+
+      case 2:
+        return (
+          <Form {...accountForm}>
+            <form onSubmit={accountForm.handleSubmit(handleAccountSubmit)} className="space-y-4">
+              <h2 className="text-lg font-semibold">Create Your Account</h2>
+              <FormField
+                control={accountForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="your@email.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={accountForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={accountForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-between">
+                <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                <Button type="submit">
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </form>
+          </Form>
+        );
+
+      case 3:
+        return (
+          <Form {...profileForm}>
+            <form onSubmit={profileForm.handleSubmit(handleProfileSubmit)} className="space-y-4">
+              <h2 className="text-lg font-semibold">Your Profile Information</h2>
+              
+              <div className="flex justify-center mb-4">
+                <div className="relative">
+                  <Avatar className="w-24 h-24">
+                    <AvatarImage src={profileForm.watch('profilePicture')} />
+                    <AvatarFallback>
+                      {profileForm.watch('firstName')?.charAt(0) || ''}
+                      {profileForm.watch('lastName')?.charAt(0) || ''}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon" 
+                    className="absolute bottom-0 right-0 rounded-full" 
+                    onClick={() => handleFileUpload((url) => profileForm.setValue('profilePicture', url))}
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={profileForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={profileForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={profileForm.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="owner">Owner</SelectItem>
+                        <SelectItem value="director">Director</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="teacher">Teacher</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
               
-              <div className="flex flex-col items-center">
-                <Avatar className="h-24 w-24 mb-2">
-                  <AvatarImage src={schoolLogo || ""} alt="School Logo" />
-                  <AvatarFallback>
-                    {schoolForm.watch("schoolName")[0] || "S"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex items-center">
-                  <input 
-                    type="file" 
-                    id="school-logo" 
-                    className="hidden" 
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, setSchoolLogo)}
-                    disabled={isLoading || schoolForm.watch("skipSchoolDetails")}
-                  />
-                  <label htmlFor="school-logo">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      className="cursor-pointer" 
-                      disabled={schoolForm.watch("skipSchoolDetails")}
-                      asChild
-                    >
-                      <span>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Logo
-                      </span>
-                    </Button>
-                  </label>
-                </div>
+              <FormField
+                control={profileForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+1 234 567 8900" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={profileForm.control}
+                  name="whatsapp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>WhatsApp</FormLabel>
+                      <FormControl>
+                        <Input placeholder="WhatsApp number or ID" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={profileForm.control}
+                  name="telegram"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telegram</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Telegram username" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={profileForm.control}
+                  name="instagram"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Instagram</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Instagram handle" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            </div>
+              
+              <div className="flex justify-between">
+                <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                <Button type="submit">
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </form>
+          </Form>
+        );
 
-            <FormField
-              control={schoolForm.control}
-              name="schoolName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>School Name</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="School Name" 
-                      {...field} 
-                      disabled={isLoading || schoolForm.watch("skipSchoolDetails")} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={schoolForm.control}
-              name="schoolPhone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>School Phone</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="School Phone Number" 
-                      {...field} 
-                      disabled={isLoading || schoolForm.watch("skipSchoolDetails")} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={schoolForm.control}
-                name="schoolWhatsapp"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>School WhatsApp</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="WhatsApp (optional)" 
-                        {...field} 
-                        disabled={isLoading || schoolForm.watch("skipSchoolDetails")} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={schoolForm.control}
-                name="schoolTelegram"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>School Telegram</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Telegram (optional)" 
-                        {...field} 
-                        disabled={isLoading || schoolForm.watch("skipSchoolDetails")} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={schoolForm.control}
-                name="schoolInstagram"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>School Instagram</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Instagram (optional)" 
-                        {...field} 
-                        disabled={isLoading || schoolForm.watch("skipSchoolDetails")} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <Button type="button" variant="outline" onClick={() => setStep(3)} disabled={isLoading}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                Continue
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </form>
-        </Form>
-      )}
-
-      {step === 5 && (
-        <Form {...teamForm}>
-          <form onSubmit={teamForm.handleSubmit(handleTeamSubmit)} className="space-y-4">
-            <h2 className="text-xl font-semibold mb-2">Invite Team Members</h2>
-            <p className="text-sm text-muted-foreground mb-4">Add teachers and staff to your school</p>
-            
-            <FormField
-              control={teamForm.control}
-              name="skipTeamSetup"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 mb-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isLoading}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Skip team setup</FormLabel>
-                    <FormDescription>
-                      You can invite team members later
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-            
-            {!teamForm.watch("skipTeamSetup") && (
-              <>
-                <div className="flex items-end gap-4 mb-2">
-                  <div className="flex-1">
-                    <FormLabel>Email</FormLabel>
-                    <Input 
-                      placeholder="team-member@example.com" 
-                      value={teamForm.getValues("teamMembers")?.[0]?.email || ""}
-                      onChange={(e) => teamForm.setValue("teamMembers", [{ 
-                        email: e.target.value, 
-                        role: teamForm.getValues("teamMembers")?.[0]?.role || "teacher" 
-                      }])}
-                      disabled={isLoading} 
-                    />
-                  </div>
-                  <div className="w-40">
-                    <FormLabel>Role</FormLabel>
-                    <Select 
-                      defaultValue="teacher"
-                      onValueChange={(value) => teamForm.setValue("teamMembers", [{ 
-                        email: teamForm.getValues("teamMembers")?.[0]?.email || "", 
-                        role: value 
-                      }])}
-                      disabled={isLoading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((role) => (
-                          <SelectItem key={role.value} value={role.value}>
-                            {role.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+      case 4:
+        return (
+          <Form {...schoolForm}>
+            <form onSubmit={schoolForm.handleSubmit(handleSchoolSubmit)} className="space-y-4">
+              <h2 className="text-lg font-semibold">School Information</h2>
+              
+              <div className="flex justify-center mb-4">
+                <div className="relative">
+                  <Avatar className="w-24 h-24">
+                    <AvatarImage src={schoolForm.watch('schoolLogo')} />
+                    <AvatarFallback>
+                      {schoolForm.watch('schoolName')?.charAt(0) || 'S'}
+                    </AvatarFallback>
+                  </Avatar>
                   <Button 
                     type="button" 
+                    variant="outline" 
                     size="icon" 
-                    onClick={addTeamMember}
-                    disabled={isLoading}
+                    className="absolute bottom-0 right-0 rounded-full" 
+                    onClick={() => handleFileUpload((url) => schoolForm.setValue('schoolLogo', url))}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Upload className="h-4 w-4" />
                   </Button>
                 </div>
-
-                {teamMembers.length > 0 && (
-                  <div className="border rounded-md p-4 space-y-2">
-                    <h3 className="text-sm font-medium mb-2">Team Members to Invite:</h3>
-                    {teamMembers.map((member, index) => (
-                      <div key={index} className="flex items-center justify-between bg-muted p-2 rounded-md">
-                        <div className="flex items-center gap-2">
-                          <UserPlus className="h-4 w-4 text-muted-foreground" />
-                          <span>{member.email}</span>
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            {roles.find(r => r.value === member.role)?.label || member.role}
-                          </span>
-                        </div>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => removeTeamMember(index)}
-                          disabled={isLoading}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+              </div>
+              
+              <FormField
+                control={schoolForm.control}
+                name="schoolName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>School Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="My Driving School" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </>
-            )}
+              />
+              
+              <FormField
+                control={schoolForm.control}
+                name="schoolPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>School Phone Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+1 234 567 8900" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={schoolForm.control}
+                  name="schoolWhatsapp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>School WhatsApp</FormLabel>
+                      <FormControl>
+                        <Input placeholder="WhatsApp number or ID" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={schoolForm.control}
+                  name="schoolTelegram"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>School Telegram</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Telegram username" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={schoolForm.control}
+                  name="schoolInstagram"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>School Instagram</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Instagram handle" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex justify-between">
+                <Button type="button" variant="outline" onClick={() => setStep(3)}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                <Button type="submit">
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </form>
+          </Form>
+        );
 
-            <div className="flex justify-between pt-2">
-              <Button type="button" variant="outline" onClick={() => setStep(4)} disabled={isLoading}>
+      case 5:
+        return (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Team Members (Optional)</h2>
+            <p className="text-sm text-muted-foreground">
+              Add team members who will receive invitations to join your school.
+            </p>
+            
+            {teamData.teamMembers.map((member, index) => (
+              <Card key={index} className="p-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex-1 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`email-${index}`}>Email Address</Label>
+                        <Input
+                          id={`email-${index}`}
+                          type="email"
+                          placeholder="team.member@email.com"
+                          value={member.email}
+                          onChange={(e) => updateTeamMember(index, "email", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`role-${index}`}>Role</Label>
+                        <Select
+                          value={member.role}
+                          onValueChange={(value) => updateTeamMember(index, "role", value)}
+                        >
+                          <SelectTrigger id={`role-${index}`}>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="director">Director</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="teacher">Teacher</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeTeamMember(index)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+            
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={addTeamMember}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Team Member
+            </Button>
+            
+            <div className="flex justify-between pt-4">
+              <Button type="button" variant="outline" onClick={() => setStep(4)}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="button" onClick={handleFinalSubmit} disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating Account...
                   </>
                 ) : (
-                  "Complete Setup"
+                  <>
+                    Complete Setup
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
                 )}
               </Button>
             </div>
-          </form>
-        </Form>
-      )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            {[1, 2, 3, 4, 5].map((stepNumber) => (
+              <React.Fragment key={stepNumber}>
+                <div 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    step === stepNumber
+                      ? "bg-primary text-primary-foreground"
+                      : step > stepNumber
+                      ? "bg-primary/20 text-primary"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {stepNumber}
+                </div>
+                {stepNumber < 5 && (
+                  <div 
+                    className={`h-1 w-4 ${
+                      step > stepNumber ? "bg-primary" : "bg-muted"
+                    }`}
+                  />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+          <span className="text-sm text-muted-foreground">Step {step} of 5</span>
+        </div>
+        <h3 className="text-sm font-medium">
+          {step === 1 && "License Verification"}
+          {step === 2 && "Account Details"}
+          {step === 3 && "Profile Information"}
+          {step === 4 && "School Information"}
+          {step === 5 && "Team Members"}
+        </h3>
+      </div>
+      {renderStep()}
     </div>
   );
 };

@@ -48,6 +48,7 @@ export type Database = {
           email: string
           first_name: string | null
           id: string
+          instagram: string | null
           last_name: string | null
           phone: string | null
           profile_picture: string | null
@@ -62,6 +63,7 @@ export type Database = {
           email: string
           first_name?: string | null
           id: string
+          instagram?: string | null
           last_name?: string | null
           phone?: string | null
           profile_picture?: string | null
@@ -76,6 +78,7 @@ export type Database = {
           email?: string
           first_name?: string | null
           id?: string
+          instagram?: string | null
           last_name?: string | null
           phone?: string | null
           profile_picture?: string | null
@@ -100,22 +103,37 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          instagram: string | null
           license_id: string | null
+          logo: string | null
           name: string
+          phone: string | null
+          telegram: string | null
+          whatsapp: string | null
         }
         Insert: {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          instagram?: string | null
           license_id?: string | null
+          logo?: string | null
           name: string
+          phone?: string | null
+          telegram?: string | null
+          whatsapp?: string | null
         }
         Update: {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          instagram?: string | null
           license_id?: string | null
+          logo?: string | null
           name?: string
+          phone?: string | null
+          telegram?: string | null
+          whatsapp?: string | null
         }
         Relationships: [
           {
