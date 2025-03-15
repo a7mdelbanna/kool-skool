@@ -145,6 +145,7 @@ const SignupForm = () => {
       if (result.valid) {
         setLicenseData({ licenseId: result.licenseId });
         toast.success(result.message || "License validated successfully");
+        // Force the step change after a successful validation
         setStep(2);
       } else {
         toast.error(result.message || "License verification failed");
