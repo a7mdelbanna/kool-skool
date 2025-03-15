@@ -116,6 +116,35 @@ const lessonCategories = [
 // Chart colors
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
+// Define types for our data objects
+interface TeacherIncomeData {
+  date: string;
+  income: number;
+  lessons: number;
+  hours: number;
+}
+
+interface ExpensesData {
+  date: string;
+  expenses: number;
+  income: number;
+}
+
+interface StudentMetricsData {
+  date: string;
+  newStudents: number;
+  lostStudents: number;
+}
+
+interface CashFlowData {
+  date: string;
+  income: number;
+  expenses: number;
+  profit: number;
+}
+
+type DataType = 'teacherIncome' | 'expenses' | 'students' | 'cashFlow';
+
 const StatesReports = () => {
   const { payments, expenses, sessions } = usePayments();
   
@@ -129,7 +158,7 @@ const StatesReports = () => {
   const [currencyFilter, setCurrencyFilter] = useState("USD");
   
   // Generate mock data for teacher income
-  const generateTeacherIncomeData = (days = 30) => {
+  const generateTeacherIncomeData = (days = 30): TeacherIncomeData[] => {
     return Array.from({ length: days }).map((_, i) => {
       const date = subDays(new Date(), days - i - 1);
       return {
@@ -142,7 +171,7 @@ const StatesReports = () => {
   };
   
   // Generate mock data for expenses
-  const generateExpensesData = (days = 30) => {
+  const generateExpensesData = (days = 30): ExpensesData[] => {
     return Array.from({ length: days }).map((_, i) => {
       const date = subDays(new Date(), days - i - 1);
       return {
@@ -154,7 +183,7 @@ const StatesReports = () => {
   };
   
   // Generate mock data for student metrics
-  const generateStudentMetricsData = (days = 30) => {
+  const generateStudentMetricsData = (days = 30): StudentMetricsData[] => {
     return Array.from({ length: days }).map((_, i) => {
       const date = subDays(new Date(), days - i - 1);
       return {
@@ -166,7 +195,7 @@ const StatesReports = () => {
   };
   
   // Generate mock data for cash flow
-  const generateCashFlowData = (days = 30) => {
+  const generateCashFlowData = (days = 30): CashFlowData[] => {
     return Array.from({ length: days }).map((_, i) => {
       const date = subDays(new Date(), days - i - 1);
       const income = Math.floor(Math.random() * 800) + 400;
@@ -200,8 +229,8 @@ const StatesReports = () => {
     ];
   };
   
-  // Get appropriate data based on date range
-  const getDataByDateRange = (type) => {
+  // Get appropriate data based on date range with proper typing
+  const getDataByDateRange = (type: DataType) => {
     switch (type) {
       case 'teacherIncome':
         switch (dateRangeFilter) {
@@ -240,21 +269,21 @@ const StatesReports = () => {
     }
   };
   
-  // Calculate totals
-  const teacherIncomeData = getDataByDateRange('teacherIncome');
+  // Calculate totals with proper typing
+  const teacherIncomeData = getDataByDateRange('teacherIncome') as TeacherIncomeData[];
   const totalTeacherIncome = teacherIncomeData.reduce((sum, item) => sum + item.income, 0);
   const totalTeacherHours = teacherIncomeData.reduce((sum, item) => sum + item.hours, 0);
   const totalTeacherLessons = teacherIncomeData.reduce((sum, item) => sum + item.lessons, 0);
   
-  const expensesData = getDataByDateRange('expenses');
+  const expensesData = getDataByDateRange('expenses') as ExpensesData[];
   const totalExpenses = expensesData.reduce((sum, item) => sum + item.expenses, 0);
   const totalIncome = expensesData.reduce((sum, item) => sum + item.income, 0);
   
-  const studentMetricsData = getDataByDateRange('students');
+  const studentMetricsData = getDataByDateRange('students') as StudentMetricsData[];
   const totalNewStudents = studentMetricsData.reduce((sum, item) => sum + item.newStudents, 0);
   const totalLostStudents = studentMetricsData.reduce((sum, item) => sum + item.lostStudents, 0);
   
-  const cashFlowData = getDataByDateRange('cashFlow');
+  const cashFlowData = getDataByDateRange('cashFlow') as CashFlowData[];
   const netCashFlow = cashFlowData.reduce((sum, item) => sum + item.profit, 0);
   
   // Calculate upcoming data (next period)
