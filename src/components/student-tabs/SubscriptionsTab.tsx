@@ -35,6 +35,7 @@ import { usePayments } from "@/contexts/PaymentContext";
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
+  isViewMode?: boolean;
 }
 
 interface DaySchedule {
@@ -88,7 +89,11 @@ const subscriptionSchema = z.object({
 
 type SubscriptionFormValues = z.infer<typeof subscriptionSchema>;
 
-const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStudentData }) => {
+const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ 
+  studentData, 
+  setStudentData, 
+  isViewMode = false 
+}) => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [selectedDays, setSelectedDays] = useState<DaySchedule[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
@@ -267,7 +272,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
           <div className="text-center py-8 border rounded-md bg-muted/30">
             <p className="text-muted-foreground">No subscriptions yet</p>
             <p className="text-sm text-muted-foreground">
-              Add a new subscription below to get started
+              {!isViewMode && "Add a new subscription below to get started"}
             </p>
           </div>
         ) : (
@@ -304,32 +309,183 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     )}
                   </div>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => handleRemoveSubscription(subscription.id)}
-                >
-                  <Trash className="h-4 w-4 text-destructive" />
-                </Button>
+                {!isViewMode && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleRemoveSubscription(subscription.id)}
+                  >
+                    <Trash className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
       
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-medium mb-4">Add New Subscription</h3>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleAddSubscription)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {!isViewMode && (
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-medium mb-4">Add New Subscription</h3>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleAddSubscription)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="sessionCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Sessions</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="duration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duration</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select duration" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {durationOptions.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Start Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
               <FormField
                 control={form.control}
-                name="sessionCount"
-                render={({ field }) => (
+                name="schedule"
+                render={() => (
                   <FormItem>
-                    <FormLabel>Number of Sessions</FormLabel>
+                    <FormLabel>Days of Week & Time</FormLabel>
+                    <div className="space-y-4 mt-2">
+                      <div className="flex flex-wrap gap-2">
+                        {daysOfWeek.map((day) => (
+                          <Button
+                            key={day}
+                            type="button"
+                            variant={selectedDays.some(d => d.day === day) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleDay(day)}
+                            className="h-8"
+                          >
+                            {day.substring(0, 3)}
+                          </Button>
+                        ))}
+                      </div>
+                      
+                      {selectedDays.length > 0 && (
+                        <div className="space-y-2 mt-4">
+                          <p className="text-sm text-muted-foreground">Set time for each day:</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {selectedDays.map((daySchedule) => (
+                              <div key={daySchedule.day} className="flex items-center border rounded-md p-2 gap-2">
+                                <span className="text-sm font-medium w-20">{daySchedule.day.substring(0, 3)}</span>
+                                <div className="relative flex-1">
+                                  <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                  <Input
+                                    type="time"
+                                    value={daySchedule.time}
+                                    onChange={(e) => updateDayTime(daySchedule.day, e.target.value)}
+                                    className="pl-8"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="priceMode"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel>Pricing Method</FormLabel>
                     <FormControl>
-                      <Input type="number" min="1" {...field} />
+                      <ToggleGroup
+                        type="single"
+                        value={field.value}
+                        onValueChange={(value) => {
+                          if (value) field.onChange(value);
+                        }}
+                        className="justify-start"
+                      >
+                        <ToggleGroupItem value="perSession" aria-label="Per Session">
+                          Per Session
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="fixed" aria-label="Fixed Price">
+                          Fixed Price
+                        </ToggleGroupItem>
+                      </ToggleGroup>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -338,23 +494,26 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               
               <FormField
                 control={form.control}
-                name="duration"
+                name="currency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Duration</FormLabel>
+                    <FormLabel>Currency</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
                       defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select duration" />
+                          <SelectValue placeholder="Select currency" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {durationOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
+                        {currencyOptions.map((currency) => (
+                          <SelectItem key={currency.code} value={currency.code}>
+                            <div className="flex items-center">
+                              <span className="mr-2">{currency.symbol}</span>
+                              <span>{currency.name}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -363,245 +522,95 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                   </FormItem>
                 )}
               />
-            </div>
-            
-            <div className="grid grid-cols-1 gap-4">
+              
+              <div className="flex items-start gap-4">
+                <div className="flex-1">
+                  {watchPriceMode === "perSession" ? (
+                    <FormField
+                      control={form.control}
+                      name="pricePerSession"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Session</FormLabel>
+                          <div className="relative">
+                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                              {getCurrencySymbol(watchCurrency)}
+                            </div>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                step="0.01" 
+                                className="pl-7"
+                                {...field} 
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="fixedPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fixed Price</FormLabel>
+                          <div className="relative">
+                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                              {getCurrencySymbol(watchCurrency)}
+                            </div>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                step="0.01"
+                                className="pl-7"
+                                {...field} 
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+                
+                <div className="flex-1">
+                  <FormLabel>Total Price</FormLabel>
+                  <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 flex items-center">
+                    <span className="font-medium">{getCurrencySymbol(watchCurrency)}{totalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              
               <FormField
                 control={form.control}
-                name="startDate"
+                name="notes"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Start Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Add any additional notes about this subscription"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="schedule"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Days of Week & Time</FormLabel>
-                  <div className="space-y-4 mt-2">
-                    <div className="flex flex-wrap gap-2">
-                      {daysOfWeek.map((day) => (
-                        <Button
-                          key={day}
-                          type="button"
-                          variant={selectedDays.some(d => d.day === day) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleDay(day)}
-                          className="h-8"
-                        >
-                          {day.substring(0, 3)}
-                        </Button>
-                      ))}
-                    </div>
-                    
-                    {selectedDays.length > 0 && (
-                      <div className="space-y-2 mt-4">
-                        <p className="text-sm text-muted-foreground">Set time for each day:</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {selectedDays.map((daySchedule) => (
-                            <div key={daySchedule.day} className="flex items-center border rounded-md p-2 gap-2">
-                              <span className="text-sm font-medium w-20">{daySchedule.day.substring(0, 3)}</span>
-                              <div className="relative flex-1">
-                                <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  type="time"
-                                  value={daySchedule.time}
-                                  onChange={(e) => updateDayTime(daySchedule.day, e.target.value)}
-                                  className="pl-8"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="priceMode"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel>Pricing Method</FormLabel>
-                  <FormControl>
-                    <ToggleGroup
-                      type="single"
-                      value={field.value}
-                      onValueChange={(value) => {
-                        if (value) field.onChange(value);
-                      }}
-                      className="justify-start"
-                    >
-                      <ToggleGroupItem value="perSession" aria-label="Per Session">
-                        Per Session
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="fixed" aria-label="Fixed Price">
-                        Fixed Price
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="currency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Currency</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select currency" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {currencyOptions.map((currency) => (
-                        <SelectItem key={currency.code} value={currency.code}>
-                          <div className="flex items-center">
-                            <span className="mr-2">{currency.symbol}</span>
-                            <span>{currency.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="flex items-start gap-4">
-              <div className="flex-1">
-                {watchPriceMode === "perSession" ? (
-                  <FormField
-                    control={form.control}
-                    name="pricePerSession"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Price per Session</FormLabel>
-                        <div className="relative">
-                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                            {getCurrencySymbol(watchCurrency)}
-                          </div>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              step="0.01" 
-                              className="pl-7"
-                              {...field} 
-                            />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <FormField
-                    control={form.control}
-                    name="fixedPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fixed Price</FormLabel>
-                        <div className="relative">
-                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                            {getCurrencySymbol(watchCurrency)}
-                          </div>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              step="0.01"
-                              className="pl-7"
-                              {...field} 
-                            />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
               
-              <div className="flex-1">
-                <FormLabel>Total Price</FormLabel>
-                <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 flex items-center">
-                  <span className="font-medium">{getCurrencySymbol(watchCurrency)}{totalPrice.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Add any additional notes about this subscription"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <Button type="submit" className="w-full mt-4">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Subscription
-            </Button>
-          </form>
-        </Form>
-      </div>
+              <Button type="submit" className="w-full mt-4">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Subscription
+              </Button>
+            </form>
+          </Form>
+        </div>
+      )}
     </div>
   );
 };

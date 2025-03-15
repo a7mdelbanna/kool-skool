@@ -1,4 +1,3 @@
-
 import React from "react";
 import { 
   Form,
@@ -43,9 +42,9 @@ import {
 interface ProfileTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
+  isViewMode?: boolean;
 }
 
-// This is a temporary list of courses - in the future this would come from an API or database
 const availableCourses = [
   "English Conversation",
   "Business English",
@@ -78,7 +77,7 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
-const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) => {
+const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData, isViewMode = false }) => {
   const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
 
   const form = useForm<ProfileFormValues>({
@@ -107,28 +106,23 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
     const file = event.target.files?.[0];
     if (!file) return;
     
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image size should be less than 5MB");
       return;
     }
     
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Only image files are allowed");
       return;
     }
     
-    // Create a URL for preview
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
       setPhotoPreview(result);
       
-      // Update form data
       form.setValue("image", file);
       
-      // Update student data
       setStudentData(prev => ({
         ...prev,
         image: result
@@ -141,7 +135,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
     setStudentData((prev) => ({ ...prev, ...data }));
   };
   
-  // Update parent state when form values change
   React.useEffect(() => {
     const subscription = form.watch((value) => {
       setStudentData(prev => ({
@@ -171,18 +164,22 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                 : <User />}
             </AvatarFallback>
           </Avatar>
-          <input 
-            type="file" 
-            id="photo-upload" 
-            className="hidden" 
-            accept="image/*"
-            onChange={handlePhotoUpload}
-          />
-          <label htmlFor="photo-upload">
-            <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-              <span>Upload Photo</span>
-            </Button>
-          </label>
+          {!isViewMode && (
+            <>
+              <input 
+                type="file" 
+                id="photo-upload" 
+                className="hidden" 
+                accept="image/*"
+                onChange={handlePhotoUpload}
+              />
+              <label htmlFor="photo-upload">
+                <Button variant="outline" size="sm" className="cursor-pointer" asChild>
+                  <span>Upload Photo</span>
+                </Button>
+              </label>
+            </>
+          )}
         </div>
         
         <div className="flex-1">
@@ -196,7 +193,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                     <FormItem>
                       <FormLabel>First Name*</FormLabel>
                       <FormControl>
-                        <Input placeholder="John" {...field} />
+                        <Input placeholder="John" {...field} disabled={isViewMode} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -210,7 +207,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                     <FormItem>
                       <FormLabel>Last Name*</FormLabel>
                       <FormControl>
-                        <Input placeholder="Doe" {...field} />
+                        <Input placeholder="Doe" {...field} disabled={isViewMode} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -226,7 +223,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-10" placeholder="john@example.com" {...field} />
+                          <Input className="pl-10" placeholder="john@example.com" {...field} disabled={isViewMode} />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -243,7 +240,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                       <FormControl>
                         <div className="relative">
                           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-10" placeholder="+1 234 567 8900" {...field} />
+                          <Input className="pl-10" placeholder="+1 234 567 8900" {...field} disabled={isViewMode} />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -260,6 +257,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
+                        disabled={isViewMode}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">
@@ -288,6 +286,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
+                        disabled={isViewMode}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">
@@ -316,6 +315,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
+                        disabled={isViewMode}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">
@@ -345,6 +345,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
+                        disabled={isViewMode}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">
@@ -379,7 +380,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                         <FormControl>
                           <div className="relative">
                             <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Facebook username" {...field} />
+                            <Input className="pl-10" placeholder="Facebook username" {...field} disabled={isViewMode} />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -396,7 +397,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                         <FormControl>
                           <div className="relative">
                             <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Twitter username" {...field} />
+                            <Input className="pl-10" placeholder="Twitter username" {...field} disabled={isViewMode} />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -413,7 +414,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                         <FormControl>
                           <div className="relative">
                             <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Instagram username" {...field} />
+                            <Input className="pl-10" placeholder="Instagram username" {...field} disabled={isViewMode} />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -430,7 +431,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                         <FormControl>
                           <div className="relative">
                             <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="LinkedIn username" {...field} />
+                            <Input className="pl-10" placeholder="LinkedIn username" {...field} disabled={isViewMode} />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -447,7 +448,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                         <FormControl>
                           <div className="relative">
                             <Send className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Telegram username" {...field} />
+                            <Input className="pl-10" placeholder="Telegram username" {...field} disabled={isViewMode} />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -464,7 +465,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                         <FormControl>
                           <div className="relative">
                             <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="WhatsApp number" {...field} />
+                            <Input className="pl-10" placeholder="WhatsApp number" {...field} disabled={isViewMode} />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -483,7 +484,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                     <FormControl>
                       <Textarea 
                         placeholder="Add any additional information about the student here" 
-                        {...field} 
+                        {...field}
+                        disabled={isViewMode}
                       />
                     </FormControl>
                     <FormMessage />

@@ -10,9 +10,14 @@ import { usePayments, Session } from "@/contexts/PaymentContext";
 interface SessionsTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
+  isViewMode?: boolean;
 }
 
-const SessionsTab: React.FC<SessionsTabProps> = ({ studentData, setStudentData }) => {
+const SessionsTab: React.FC<SessionsTabProps> = ({ 
+  studentData, 
+  setStudentData, 
+  isViewMode = false 
+}) => {
   const { sessions } = usePayments();
   
   // Filter sessions to upcoming and past

@@ -24,6 +24,7 @@ import { usePayments, Payment } from "@/contexts/PaymentContext";
 interface PaymentsTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
+  isViewMode?: boolean;
 }
 
 const paymentSchema = z.object({
@@ -37,7 +38,11 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
 
-const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }) => {
+const PaymentsTab: React.FC<PaymentsTabProps> = ({ 
+  studentData, 
+  setStudentData, 
+  isViewMode = false 
+}) => {
   const { payments, addPayment, removePayment } = usePayments();
   
   const form = useForm<PaymentFormValues>({
@@ -70,7 +75,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }
           <div className="text-center py-8 border rounded-md bg-muted/30">
             <p className="text-muted-foreground">No payment history</p>
             <p className="text-sm text-muted-foreground">
-              Add a new payment below to start tracking
+              {!isViewMode && "Add a new payment below to start tracking"}
             </p>
           </div>
         ) : (
@@ -99,36 +104,111 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }
                     <p className="text-sm text-muted-foreground mt-1">{payment.notes}</p>
                   )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removePayment(payment.id)}
-                >
-                  <Trash className="h-4 w-4 text-destructive" />
-                </Button>
+                {!isViewMode && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removePayment(payment.id)}
+                  >
+                    <Trash className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
       
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-medium mb-4">Add New Payment</h3>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleAddPayment)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {!isViewMode && (
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-medium mb-4">Add New Payment</h3>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleAddPayment)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Amount ($)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2">$</span>
+                          <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Payment Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
               <FormField
                 control={form.control}
-                name="amount"
+                name="method"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount ($)</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2">$</span>
-                        <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
-                      </div>
-                    </FormControl>
+                    <FormLabel>Payment Method</FormLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {paymentMethods.map((method) => (
+                        <Button
+                          key={method}
+                          type="button"
+                          variant={field.value === method ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => form.setValue("method", method)}
+                          className={cn(
+                            "h-9",
+                            method === "Credit Card" && field.value === method && "bg-blue-600",
+                            method === "PayPal" && field.value === method && "bg-indigo-600"
+                          )}
+                        >
+                          {method === "Credit Card" && <CreditCard className="h-4 w-4 mr-2" />}
+                          {method === "Cash" && <Receipt className="h-4 w-4 mr-2" />}
+                          {method}
+                        </Button>
+                      ))}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -136,100 +216,29 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }
               
               <FormField
                 control={form.control}
-                name="date"
+                name="notes"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Payment Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Add any additional notes about this payment"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="method"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Method</FormLabel>
-                  <div className="flex flex-wrap gap-2">
-                    {paymentMethods.map((method) => (
-                      <Button
-                        key={method}
-                        type="button"
-                        variant={field.value === method ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => form.setValue("method", method)}
-                        className={cn(
-                          "h-9",
-                          method === "Credit Card" && field.value === method && "bg-blue-600",
-                          method === "PayPal" && field.value === method && "bg-indigo-600"
-                        )}
-                      >
-                        {method === "Credit Card" && <CreditCard className="h-4 w-4 mr-2" />}
-                        {method === "Cash" && <Receipt className="h-4 w-4 mr-2" />}
-                        {method}
-                      </Button>
-                    ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Add any additional notes about this payment"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <Button type="submit" className="w-full mt-4">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Payment
-            </Button>
-          </form>
-        </Form>
-      </div>
+              
+              <Button type="submit" className="w-full mt-4">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Payment
+              </Button>
+            </form>
+          </Form>
+        </div>
+      )}
     </div>
   );
 };
