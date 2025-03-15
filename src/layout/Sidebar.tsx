@@ -114,8 +114,7 @@ export function Sidebar() {
           <SidebarGroupLabel>Account</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <Sidebar
-MenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink 
                     to="/school-setup"
