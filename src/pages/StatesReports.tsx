@@ -230,7 +230,7 @@ const StatesReports = () => {
   };
   
   // Get appropriate data based on date range with proper typing
-  const getDataByDateRange = (type: DataType) => {
+  const getDataByDateRange = (type: DataType): TeacherIncomeData[] | ExpensesData[] | StudentMetricsData[] | CashFlowData[] => {
     switch (type) {
       case 'teacherIncome':
         switch (dateRangeFilter) {
