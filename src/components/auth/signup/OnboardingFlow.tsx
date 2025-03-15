@@ -116,11 +116,12 @@ const OnboardingFlow = () => {
     }
   };
 
-  // Save personal details to database - Modified to use direct SQL RPC call
+  // Save personal details to database using our custom RPC function
   const savePersonalDetails = async () => {
     if (!user) return;
     
     try {
+      // Using the custom RPC function we created to avoid RLS recursion
       const { error } = await supabase.rpc('update_user_profile', {
         user_id: user.id,
         first_name_param: onboardingData.firstName,
@@ -147,16 +148,20 @@ const OnboardingFlow = () => {
     // Skip if no school name is provided
     if (!onboardingData.schoolName.trim()) return;
     
-    // First get the user's profile to get the school_id
-    const { data: profileData, error: profileError } = await supabase.rpc('get_user_school_id', {
+    // First get the user's profile to get the school_id using our custom function
+    const { data, error: profileError } = await supabase.rpc('get_user_school_id', {
       user_id_param: user.id
     });
     
     if (profileError) throw profileError;
     
-    if (!profileData?.school_id) {
+    // Extract the school_id from the returned data
+    // The function returns a table with a single column 'school_id'
+    if (!data || !data[0]?.school_id) {
       throw new Error("No school associated with this account");
     }
+    
+    const schoolId = data[0].school_id;
     
     const { error } = await supabase
       .from('schools')
@@ -168,7 +173,7 @@ const OnboardingFlow = () => {
         whatsapp: onboardingData.schoolWhatsapp || null,
         instagram: onboardingData.schoolInstagram || null
       })
-      .eq('id', profileData.school_id);
+      .eq('id', schoolId);
     
     if (error) throw error;
     toast.success("School details saved successfully");

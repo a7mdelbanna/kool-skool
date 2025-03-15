@@ -154,6 +154,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_user_school_id: {
+        Args: {
+          user_id_param: string
+        }
+        Returns: {
+          school_id: string
+        }[]
+      }
       handle_license_signup: {
         Args: {
           license_number: string
@@ -163,6 +171,19 @@ export type Database = {
           message: string
           license_id: string
         }[]
+      }
+      update_user_profile: {
+        Args: {
+          user_id: string
+          first_name_param: string
+          last_name_param: string
+          phone_param: string
+          profile_picture_param: string
+          telegram_param: string
+          whatsapp_param: string
+          instagram_param: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
