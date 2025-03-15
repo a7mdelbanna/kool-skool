@@ -12,72 +12,104 @@ import AddStudentDialog from '@/components/AddStudentDialog';
 const sampleStudents: Student[] = [
   {
     id: '1',
-    name: 'Alex Johnson',
+    firstName: 'Alex',
+    lastName: 'Johnson',
     email: 'alex.j@example.com',
-    subject: 'Mathematics',
+    courseName: 'English Conversation',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'beginner',
     lessonsCompleted: 12,
     nextLesson: 'Today, 4 PM',
     paymentStatus: 'paid'
   },
   {
     id: '2',
-    name: 'Sophia Chen',
+    firstName: 'Sophia',
+    lastName: 'Chen',
     email: 'sophia.c@example.com',
-    subject: 'Science',
+    courseName: 'Business English',
+    lessonType: 'group',
+    ageGroup: 'adult',
+    level: 'intermediate',
     lessonsCompleted: 8,
     nextLesson: 'Tomorrow, 3 PM',
     paymentStatus: 'pending'
   },
   {
     id: '3',
-    name: 'Michael Davis',
+    firstName: 'Michael',
+    lastName: 'Davis',
     email: 'michael.d@example.com',
-    subject: 'English',
+    courseName: 'IELTS Preparation',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'advanced',
     lessonsCompleted: 15,
     nextLesson: 'Friday, 5 PM',
     paymentStatus: 'overdue'
   },
   {
     id: '4',
-    name: 'Emma Wilson',
+    firstName: 'Emma',
+    lastName: 'Wilson',
     email: 'emma.w@example.com',
-    subject: 'Physics',
+    courseName: 'TOEFL Preparation',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'advanced',
     lessonsCompleted: 6,
     nextLesson: 'Today, 6 PM',
     paymentStatus: 'paid'
   },
   {
     id: '5',
-    name: 'Noah Martinez',
+    firstName: 'Noah',
+    lastName: 'Martinez',
     email: 'noah.m@example.com',
-    subject: 'Chemistry',
+    courseName: 'Grammar Fundamentals',
+    lessonType: 'group',
+    ageGroup: 'kid',
+    level: 'beginner',
     lessonsCompleted: 10,
     nextLesson: 'Monday, 5 PM',
     paymentStatus: 'paid'
   },
   {
     id: '6',
-    name: 'Olivia Brown',
+    firstName: 'Olivia',
+    lastName: 'Brown',
     email: 'olivia.b@example.com',
-    subject: 'Biology',
+    courseName: 'Vocabulary Building',
+    lessonType: 'group',
+    ageGroup: 'kid',
+    level: 'intermediate',
     lessonsCompleted: 9,
     nextLesson: 'Wednesday, 4 PM',
     paymentStatus: 'overdue'
   },
   {
     id: '7',
-    name: 'William Taylor',
+    firstName: 'William',
+    lastName: 'Taylor',
     email: 'william.t@example.com',
-    subject: 'Computer Science',
+    courseName: 'Academic Writing',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'advanced',
     lessonsCompleted: 14,
     nextLesson: 'Thursday, 6 PM',
     paymentStatus: 'pending'
   },
   {
     id: '8',
-    name: 'Ava Anderson',
+    firstName: 'Ava',
+    lastName: 'Anderson',
     email: 'ava.a@example.com',
-    subject: 'History',
+    courseName: 'Pronunciation Workshop',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'intermediate',
     lessonsCompleted: 7,
     nextLesson: 'Tuesday, 3 PM',
     paymentStatus: 'paid'
@@ -90,7 +122,7 @@ const Students = () => {
   const [selectedTab, setSelectedTab] = useState('all');
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   
-  const subjects = Array.from(new Set(sampleStudents.map(s => s.subject)));
+  const courses = Array.from(new Set(sampleStudents.map(s => s.courseName)));
   
   const handleFilterToggle = (filter: string) => {
     if (activeFilters.includes(filter)) {
@@ -107,16 +139,16 @@ const Students = () => {
     if (searchTerm) {
       filtered = filtered.filter(
         student => 
-          student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          `${student.firstName} ${student.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
           student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          student.subject.toLowerCase().includes(searchTerm.toLowerCase())
+          student.courseName.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
-    // Apply subject filters
+    // Apply course filters
     if (activeFilters.length > 0) {
       filtered = filtered.filter(student => 
-        activeFilters.includes(student.subject)
+        activeFilters.includes(student.courseName)
       );
     }
     
@@ -167,18 +199,18 @@ const Students = () => {
             <span>Filter</span>
           </Button>
           
-          {subjects.map(subject => (
+          {courses.map(course => (
             <Badge 
-              key={subject}
+              key={course}
               className="cursor-pointer"
-              variant={activeFilters.includes(subject) ? "default" : "outline"} 
-              onClick={() => handleFilterToggle(subject)}
+              variant={activeFilters.includes(course) ? "default" : "outline"} 
+              onClick={() => handleFilterToggle(course)}
             >
-              {subject}
-              {activeFilters.includes(subject) && (
+              {course}
+              {activeFilters.includes(course) && (
                 <X className="h-3 w-3 ml-1 cursor-pointer" onClick={(e) => {
                   e.stopPropagation();
-                  handleFilterToggle(subject);
+                  handleFilterToggle(course);
                 }} />
               )}
             </Badge>
@@ -238,4 +270,3 @@ const Students = () => {
 };
 
 export default Students;
-

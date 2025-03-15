@@ -22,7 +22,8 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState("profile");
   const [studentData, setStudentData] = useState<Partial<Student>>({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     lessonType: "individual",
     ageGroup: "adult",
@@ -33,7 +34,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
 
   const handleSave = () => {
     // Here you would typically save the student data to your database
-    if (!studentData.name || !studentData.email || !studentData.courseName) {
+    if (!studentData.firstName || !studentData.lastName || !studentData.email || !studentData.courseName) {
       toast.error("Please fill in required fields");
       return;
     }

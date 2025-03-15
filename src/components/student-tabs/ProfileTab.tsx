@@ -45,8 +45,21 @@ interface ProfileTabProps {
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
 }
 
+// This is a temporary list of courses - in the future this would come from an API or database
+const availableCourses = [
+  "English Conversation",
+  "Business English",
+  "IELTS Preparation",
+  "TOEFL Preparation",
+  "Grammar Fundamentals",
+  "Vocabulary Building",
+  "Academic Writing",
+  "Pronunciation Workshop"
+];
+
 const profileSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
+  lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
   phone: z.string().optional(),
   lessonType: z.enum(["individual", "group"]),
@@ -71,9 +84,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      name: studentData.name || "",
+      firstName: studentData.firstName || "",
+      lastName: studentData.lastName || "",
       email: studentData.email || "",
-      phone: "",
+      phone: studentData.phone || "",
       lessonType: studentData.lessonType || "individual",
       ageGroup: studentData.ageGroup || "adult",
       courseName: studentData.courseName || "",
@@ -139,12 +153,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
     return () => subscription.unsubscribe();
   }, [form, setStudentData]);
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName: string, lastName: string) => {
+    const firstInitial = firstName ? firstName[0] : '';
+    const lastInitial = lastName ? lastName[0] : '';
+    return (firstInitial + lastInitial).toUpperCase();
   };
 
   return (
@@ -152,9 +164,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
       <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
         <div className="flex flex-col items-center gap-2">
           <Avatar className="h-24 w-24">
-            <AvatarImage src={photoPreview || studentData.image || ""} alt={studentData.name} />
+            <AvatarImage src={photoPreview || studentData.image || ""} alt={studentData.firstName} />
             <AvatarFallback className="text-xl">
-              {studentData.name ? getInitials(studentData.name) : <User />}
+              {studentData.firstName && studentData.lastName 
+                ? getInitials(studentData.firstName, studentData.lastName) 
+                : <User />}
             </AvatarFallback>
           </Avatar>
           <input 
@@ -177,12 +191,26 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name*</FormLabel>
+                      <FormLabel>First Name*</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="John" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name*</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Doe" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -285,12 +313,24 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Course Name*</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Book className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-10" placeholder="English Conversation" {...field} />
-                        </div>
-                      </FormControl>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <div className="flex items-center gap-2">
+                              <Book className="h-4 w-4 text-muted-foreground" />
+                              <SelectValue placeholder="Select course" />
+                            </div>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {availableCourses.map(course => (
+                            <SelectItem key={course} value={course}>{course}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
