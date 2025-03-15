@@ -113,19 +113,19 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
             </TabsList>
             
             <TabsContent value="profile">
-              <ProfileTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
+              <ProfileTab studentData={studentData} setStudentData={setStudentData} />
             </TabsContent>
             
             <TabsContent value="subscriptions">
-              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
+              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} />
             </TabsContent>
             
             <TabsContent value="payments">
-              <PaymentsTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
+              <PaymentsTab studentData={studentData} setStudentData={setStudentData} />
             </TabsContent>
             
             <TabsContent value="sessions">
-              <SessionsTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
+              <SessionsTab studentData={studentData} setStudentData={setStudentData} />
             </TabsContent>
           </Tabs>
         </PaymentProvider>
