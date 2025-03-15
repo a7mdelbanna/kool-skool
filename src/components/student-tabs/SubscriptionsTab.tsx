@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Trash } from "lucide-react";
+import { CalendarIcon, Plus, Trash, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
@@ -26,13 +26,17 @@ interface SubscriptionsTabProps {
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
 }
 
+interface DaySchedule {
+  day: string;
+  time: string;
+}
+
 interface Subscription {
   id: string;
   sessionCount: number;
   duration: string;
   startDate: Date;
-  daysOfWeek: string[];
-  time: string;
+  schedule: DaySchedule[];
   pricePerSession: number;
   totalPrice: number;
   notes: string;
@@ -46,8 +50,10 @@ const subscriptionSchema = z.object({
   sessionCount: z.coerce.number().min(1, { message: "At least 1 session required" }),
   duration: z.string().min(1, { message: "Duration is required" }),
   startDate: z.date({ required_error: "Start date is required" }),
-  daysOfWeek: z.array(z.string()).min(1, { message: "At least one day must be selected" }),
-  time: z.string().min(1, { message: "Time is required" }),
+  schedule: z.array(z.object({
+    day: z.string(),
+    time: z.string()
+  })).min(1, { message: "At least one day with time must be selected" }),
   pricePerSession: z.coerce.number().min(0, { message: "Price cannot be negative" }),
   notes: z.string().optional(),
 });
@@ -56,7 +62,7 @@ type SubscriptionFormValues = z.infer<typeof subscriptionSchema>;
 
 const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStudentData }) => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [selectedDays, setSelectedDays] = useState<DaySchedule[]>([]);
   
   const form = useForm<SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
@@ -64,8 +70,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       sessionCount: 1,
       duration: "1 month",
       startDate: new Date(),
-      daysOfWeek: [],
-      time: "15:00",
+      schedule: [],
       pricePerSession: 0,
       notes: "",
     },
@@ -76,20 +81,39 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   const totalPrice = watchPricePerSession * watchSessionCount;
   
   const toggleDay = (day: string) => {
-    if (selectedDays.includes(day)) {
-      setSelectedDays(selectedDays.filter(d => d !== day));
-      form.setValue("daysOfWeek", selectedDays.filter(d => d !== day));
+    const existingDay = selectedDays.find(d => d.day === day);
+    
+    if (existingDay) {
+      // Remove the day if it's already selected
+      const updatedDays = selectedDays.filter(d => d.day !== day);
+      setSelectedDays(updatedDays);
+      form.setValue("schedule", updatedDays);
     } else {
-      setSelectedDays([...selectedDays, day]);
-      form.setValue("daysOfWeek", [...selectedDays, day]);
+      // Add the day with default time if not selected
+      const newSchedule = [...selectedDays, { day, time: "15:00" }];
+      setSelectedDays(newSchedule);
+      form.setValue("schedule", newSchedule);
     }
+  };
+  
+  const updateDayTime = (day: string, time: string) => {
+    const updatedDays = selectedDays.map(d => 
+      d.day === day ? { ...d, time } : d
+    );
+    setSelectedDays(updatedDays);
+    form.setValue("schedule", updatedDays);
   };
   
   const handleAddSubscription = (data: SubscriptionFormValues) => {
     const newSubscription: Subscription = {
       id: Date.now().toString(),
-      ...data,
+      sessionCount: data.sessionCount,
+      duration: data.duration,
+      startDate: data.startDate,
+      schedule: data.schedule,
+      pricePerSession: data.pricePerSession,
       totalPrice: data.pricePerSession * data.sessionCount,
+      notes: data.notes || "",
     };
     
     setSubscriptions([...subscriptions, newSubscription]);
@@ -128,7 +152,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     Starting {format(subscription.startDate, "PPP")}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {subscription.daysOfWeek.join(", ")} at {subscription.time}
+                    {subscription.schedule.map(s => `${s.day} at ${s.time}`).join(", ")}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-sm font-medium">${subscription.totalPrice}</span>
@@ -184,7 +208,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <FormField
                 control={form.control}
                 name="startDate"
@@ -224,41 +248,51 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                   </FormItem>
                 )}
               />
-              
-              <FormField
-                control={form.control}
-                name="time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Time</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
             
             <FormField
               control={form.control}
-              name="daysOfWeek"
+              name="schedule"
               render={() => (
                 <FormItem>
-                  <FormLabel>Days of Week</FormLabel>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {daysOfWeek.map((day) => (
-                      <Button
-                        key={day}
-                        type="button"
-                        variant={selectedDays.includes(day) ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => toggleDay(day)}
-                        className="h-8"
-                      >
-                        {day.substring(0, 3)}
-                      </Button>
-                    ))}
+                  <FormLabel>Days of Week & Time</FormLabel>
+                  <div className="space-y-4 mt-2">
+                    <div className="flex flex-wrap gap-2">
+                      {daysOfWeek.map((day) => (
+                        <Button
+                          key={day}
+                          type="button"
+                          variant={selectedDays.some(d => d.day === day) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleDay(day)}
+                          className="h-8"
+                        >
+                          {day.substring(0, 3)}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    {selectedDays.length > 0 && (
+                      <div className="space-y-2 mt-4">
+                        <p className="text-sm text-muted-foreground">Set time for each day:</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {selectedDays.map((daySchedule) => (
+                            <div key={daySchedule.day} className="flex items-center border rounded-md p-2 gap-2">
+                              <span className="text-sm font-medium w-20">{daySchedule.day.substring(0, 3)}</span>
+                              <div className="relative flex-1">
+                                <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  type="time"
+                                  value={daySchedule.time}
+                                  onChange={(e) => updateDayTime(daySchedule.day, e.target.value)}
+                                  className="pl-8"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <FormMessage />
                 </FormItem>
