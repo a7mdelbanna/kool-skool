@@ -25,8 +25,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     name: "",
     email: "",
     subject: "",
-    paymentStatus: "pending",
-    photoUrl: ""
+    paymentStatus: "pending"
   });
 
   const handleSave = () => {

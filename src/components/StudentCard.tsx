@@ -1,106 +1,92 @@
+
 import React from 'react';
-import { MoreVertical, BookOpen, Calendar, CreditCard } from 'lucide-react';
+import { Calendar, CheckSquare, DollarSign } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
-export interface Student {
+export type Student = {
   id: string;
   name: string;
+  image?: string;
   email: string;
   subject: string;
   lessonsCompleted: number;
-  nextLesson: string;
+  nextLesson?: string;
   paymentStatus: 'paid' | 'pending' | 'overdue';
-  phone?: string;
-  facebook?: string;
-  twitter?: string;
-  instagram?: string;
-  linkedin?: string;
-  notes?: string;
-  photoUrl?: string;
-}
+};
 
 interface StudentCardProps {
   student: Student;
   className?: string;
 }
 
-const StudentCard: React.FC<StudentCardProps> = ({ student, className }) => {
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
+const StudentCard = ({ student, className }: StudentCardProps) => {
+  const getPaymentStatusColor = (status: Student['paymentStatus']) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'overdue':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return '';
+    }
   };
 
   return (
-    <Card className={className}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={student.photoUrl} alt={student.name} />
-              <AvatarFallback>{getInitials(student.name)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="font-semibold">{student.name}</h2>
-              <p className="text-sm text-muted-foreground">{student.subject}</p>
+    <Card className={cn("overflow-hidden transition-all duration-300 hover:shadow-md", className)}>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+            <AvatarImage src={student.image} alt={student.name} />
+            <AvatarFallback className="bg-primary/10 text-primary">
+              {student.name.split(' ').map(n => n[0]).join('')}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base truncate">{student.name}</h3>
+            <p className="text-sm text-muted-foreground truncate">{student.email}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="text-xs bg-secondary">
+                {student.subject}
+              </Badge>
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>View Profile</DropdownMenuItem>
-              <DropdownMenuItem>Edit</DropdownMenuItem>
-              <DropdownMenuItem>Delete</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
-
-        <div className="grid grid-cols-2 gap-2 mt-4 text-sm">
+        
+        <div className="grid grid-cols-3 gap-4 mt-4">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-            <span>{student.lessonsCompleted} Lessons</span>
+            <CheckSquare className="h-4 w-4 text-primary" />
+            <div className="text-xs">
+              <p className="text-muted-foreground">Lessons</p>
+              <p className="font-medium">{student.lessonsCompleted}</p>
+            </div>
           </div>
+          
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>Next: {student.nextLesson}</span>
+            <Calendar className="h-4 w-4 text-primary" />
+            <div className="text-xs">
+              <p className="text-muted-foreground">Next</p>
+              <p className="font-medium">{student.nextLesson || 'Not scheduled'}</p>
+            </div>
           </div>
-        </div>
-
-        <div className="mt-4">
-          {student.paymentStatus === 'paid' && (
-            <Badge variant="outline" className="gap-2">
-              <CheckCircle className="h-3 w-3 text-green-500" />
-              Paid
-            </Badge>
-          )}
-          {student.paymentStatus === 'pending' && (
-            <Badge variant="outline" className="gap-2">
-              <span className="h-2 w-2 rounded-full bg-yellow-500" />
-              Pending
-            </Badge>
-          )}
-          {student.paymentStatus === 'overdue' && (
-            <Badge variant="outline" className="gap-2">
-              <span className="h-2 w-2 rounded-full bg-red-500" />
-              Overdue
-            </Badge>
-          )}
+          
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-primary" />
+            <div className="text-xs">
+              <p className="text-muted-foreground">Payment</p>
+              <p className={cn(
+                "font-medium px-1.5 py-0.5 rounded-full text-xs capitalize",
+                getPaymentStatusColor(student.paymentStatus)
+              )}>
+                {student.paymentStatus}
+              </p>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
