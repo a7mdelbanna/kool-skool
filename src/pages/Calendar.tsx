@@ -9,11 +9,13 @@ import {
   LayoutGrid,
   List
 } from 'lucide-react';
-import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
+import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, isSameDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import UpcomingLessonsList from '@/components/calendar/UpcomingLessonsList';
+import CalendarView from '@/components/calendar/CalendarView';
+import { usePayments } from '@/contexts/PaymentContext';
 
 type ViewMode = 'day' | 'week' | 'month';
 type DisplayMode = 'calendar' | 'list';
@@ -24,7 +26,8 @@ const Calendar = () => {
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('list'); // Set list as default
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('calendar'); // Set calendar as default
+  const { sessions } = usePayments();
 
   // Navigation functions
   const goToPreviousPeriod = () => {
@@ -76,6 +79,11 @@ const Calendar = () => {
       return format(currentDate, 'MMMM yyyy');
     }
   };
+
+  const filteredSessions = sessions.filter(session => {
+    if (!searchQuery) return true;
+    return session.notes?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
     <div className="space-y-6">
@@ -154,10 +162,12 @@ const Calendar = () => {
         {displayMode === 'list' ? (
           <UpcomingLessonsList searchQuery={searchQuery} />
         ) : (
-          <div className="text-center py-10">
-            <p className="text-muted-foreground">Calendar view is coming soon!</p>
-            <p className="text-muted-foreground mt-2">Please use the list view for now.</p>
-          </div>
+          <CalendarView 
+            viewMode={viewMode} 
+            currentDate={currentDate}
+            currentWeekStart={currentWeekStart}
+            sessions={filteredSessions}
+          />
         )}
       </div>
     </div>
