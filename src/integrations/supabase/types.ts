@@ -172,6 +172,12 @@ export type Database = {
           license_id: string
         }[]
       }
+      is_user_in_school: {
+        Args: {
+          user_id_param: string
+        }
+        Returns: boolean
+      }
       update_user_profile: {
         Args: {
           user_id: string
