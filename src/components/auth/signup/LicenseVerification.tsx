@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,6 +23,7 @@ interface LicenseVerificationProps {
 
 const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVerified }) => {
   const { signUp, isLoading } = useAuth();
+  const [isVerifying, setIsVerifying] = useState(false);
   
   const licenseForm = useForm<LicenseFormValues>({
     resolver: zodResolver(licenseSchema),
@@ -31,10 +32,9 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
     },
   });
 
-  const handleSubmit = async (data: LicenseFormValues, e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const verifyLicense = async (data: LicenseFormValues) => {
     try {
+      setIsVerifying(true);
       console.log("Verifying license:", data.licenseNumber);
       
       const result = await signUp(data.licenseNumber);
@@ -43,6 +43,7 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
       
       if (result.valid && result.licenseId) {
         toast.success(result.message || "License validated successfully");
+        // Force redirection by immediately calling onLicenseVerified
         onLicenseVerified(result.licenseId);
       } else {
         toast.error(result.message || "License verification failed");
@@ -50,6 +51,8 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
     } catch (error) {
       console.error("License verification error:", error);
       toast.error("An error occurred during license verification");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -63,8 +66,9 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
       <Form {...licenseForm}>
         <form 
           onSubmit={(e) => {
+            // Prevent default form submission
             e.preventDefault();
-            licenseForm.handleSubmit((data) => handleSubmit(data, e))();
+            licenseForm.handleSubmit(verifyLicense)();
           }} 
           className="space-y-4"
         >
@@ -78,7 +82,7 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
                   <Input
                     placeholder="Enter your license number"
                     {...field}
-                    disabled={isLoading}
+                    disabled={isVerifying}
                   />
                 </FormControl>
                 <FormDescription>
@@ -88,8 +92,12 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isVerifying}
+          >
+            {isVerifying ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Verifying...

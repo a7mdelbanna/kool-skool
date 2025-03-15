@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -30,6 +30,7 @@ interface AccountCreationProps {
 const AccountCreation: React.FC<AccountCreationProps> = ({ licenseId }) => {
   const { completeSignUp, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
@@ -42,6 +43,9 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseId }) => {
 
   const handleSubmit = async (data: AccountFormValues) => {
     try {
+      setIsSubmitting(true);
+      console.log("Creating account with license ID:", licenseId);
+      
       // Simple user data for initial account creation
       const userData = {
         licenseId: licenseId,
@@ -56,6 +60,8 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseId }) => {
     } catch (error: any) {
       console.error("Account creation error:", error);
       toast.error(error.message || "An error occurred during account creation");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -113,8 +119,12 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseId }) => {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isSubmitting || isLoading}
+          >
+            {isSubmitting || isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Creating Account...

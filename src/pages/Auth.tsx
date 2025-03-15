@@ -46,7 +46,7 @@ const Auth = () => {
               <TabsContent value="login">
                 <LoginForm />
               </TabsContent>
-              <TabsContent value="signup">
+              <TabsContent value="signup" className="outline-none focus:outline-none">
                 <SignupForm />
               </TabsContent>
             </Tabs>
