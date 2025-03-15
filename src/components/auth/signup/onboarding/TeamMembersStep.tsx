@@ -53,7 +53,13 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
   });
 
   const addTeamMember = (values: TeamMemberFormValues) => {
-    const updatedTeamMembers = [...teamMembers, values];
+    // Ensure we're adding a complete TeamMember object with required fields
+    const newTeamMember: TeamMember = {
+      email: values.email,
+      role: values.role,
+    };
+    
+    const updatedTeamMembers = [...teamMembers, newTeamMember];
     setTeamMembers(updatedTeamMembers);
     updateData({ teamMembers: updatedTeamMembers });
     form.reset();

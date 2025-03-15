@@ -1,4 +1,3 @@
-
 import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -6,7 +5,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, User, Image, Phone, BrandTelegram, MessageSquare, Instagram } from "lucide-react";
+import { Loader2, User, Image, Phone, MessagesSquare, Instagram } from "lucide-react";
 
 // Personal details form schema
 const personalDetailsSchema = z.object({
@@ -153,7 +152,7 @@ const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
                 <FormLabel>Telegram</FormLabel>
                 <FormControl>
                   <div className="flex items-center">
-                    <BrandTelegram className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <MessagesSquare className="w-4 h-4 mr-2 text-muted-foreground" />
                     <Input placeholder="Your Telegram handle" {...field} />
                   </div>
                 </FormControl>
@@ -170,7 +169,7 @@ const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
                 <FormLabel>WhatsApp</FormLabel>
                 <FormControl>
                   <div className="flex items-center">
-                    <MessageSquare className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <MessagesSquare className="w-4 h-4 mr-2 text-muted-foreground" />
                     <Input placeholder="Your WhatsApp number" {...field} />
                   </div>
                 </FormControl>
