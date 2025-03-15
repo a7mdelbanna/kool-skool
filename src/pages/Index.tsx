@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { PlusCircle, Calendar, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,36 +16,52 @@ import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
 const sampleStudents: Student[] = [
   {
     id: '1',
-    name: 'Alex Johnson',
+    firstName: 'Alex',
+    lastName: 'Johnson',
     email: 'alex.j@example.com',
-    subject: 'Mathematics',
+    courseName: 'English Conversation',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'beginner',
     lessonsCompleted: 12,
     nextLesson: 'Today, 4 PM',
     paymentStatus: 'paid'
   },
   {
     id: '2',
-    name: 'Sophia Chen',
+    firstName: 'Sophia',
+    lastName: 'Chen',
     email: 'sophia.c@example.com',
-    subject: 'Science',
+    courseName: 'Business English',
+    lessonType: 'group',
+    ageGroup: 'adult',
+    level: 'intermediate',
     lessonsCompleted: 8,
     nextLesson: 'Tomorrow, 3 PM',
     paymentStatus: 'pending'
   },
   {
     id: '3',
-    name: 'Michael Davis',
+    firstName: 'Michael',
+    lastName: 'Davis',
     email: 'michael.d@example.com',
-    subject: 'English',
+    courseName: 'IELTS Preparation',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'advanced',
     lessonsCompleted: 15,
     nextLesson: 'Friday, 5 PM',
     paymentStatus: 'overdue'
   },
   {
     id: '4',
-    name: 'Emma Wilson',
+    firstName: 'Emma',
+    lastName: 'Wilson',
     email: 'emma.w@example.com',
-    subject: 'Physics',
+    courseName: 'TOEFL Preparation',
+    lessonType: 'individual',
+    ageGroup: 'adult',
+    level: 'advanced',
     lessonsCompleted: 6,
     nextLesson: 'Today, 6 PM',
     paymentStatus: 'paid'
@@ -92,7 +107,6 @@ const sampleLessons: Lesson[] = [
   },
 ];
 
-// Sample data for upcoming payments
 const samplePayments: Payment[] = [
   {
     id: '1',

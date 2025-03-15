@@ -8,9 +8,11 @@ import { cn } from '@/lib/utils';
 
 export type Student = {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   image?: string;
   email: string;
+  phone?: string;
   lessonType: 'individual' | 'group';
   ageGroup: 'kid' | 'adult';
   courseName: string;
@@ -66,14 +68,14 @@ const StudentCard = ({ student, className }: StudentCardProps) => {
       <CardContent className="p-6">
         <div className="flex items-center gap-4">
           <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-            <AvatarImage src={student.image} alt={student.name} />
+            <AvatarImage src={student.image} alt={`${student.firstName} ${student.lastName}`} />
             <AvatarFallback className="bg-primary/10 text-primary">
-              {student.name.split(' ').map(n => n[0]).join('')}
+              {`${student.firstName[0]}${student.lastName[0]}`}
             </AvatarFallback>
           </Avatar>
           
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base truncate">{student.name}</h3>
+            <h3 className="font-semibold text-base truncate">{`${student.firstName} ${student.lastName}`}</h3>
             <p className="text-sm text-muted-foreground truncate">{student.email}</p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge variant="outline" className={cn("text-xs", getLevelColor(student.level))}>
