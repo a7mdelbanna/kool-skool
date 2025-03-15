@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useRef } from "react";
 import { 
   Form,
   FormControl,
@@ -21,9 +21,14 @@ import {
   Linkedin, 
   Mail, 
   Phone, 
-  User
+  User,
+  Camera,
+  Upload,
+  X
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface ProfileTabProps {
   studentData: Partial<Student>;
@@ -40,23 +45,28 @@ const profileSchema = z.object({
   instagram: z.string().optional(),
   linkedin: z.string().optional(),
   notes: z.string().optional(),
+  photoUrl: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) => {
+  const [avatarHover, setAvatarHover] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: studentData.name || "",
       email: studentData.email || "",
-      phone: "",
+      phone: studentData.phone || "",
       subject: studentData.subject || "",
-      facebook: "",
-      twitter: "",
-      instagram: "",
-      linkedin: "",
-      notes: "",
+      facebook: studentData.facebook || "",
+      twitter: studentData.twitter || "",
+      instagram: studentData.instagram || "",
+      linkedin: studentData.linkedin || "",
+      notes: studentData.notes || "",
+      photoUrl: studentData.photoUrl || "",
     },
   });
 
@@ -83,18 +93,105 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
       .join("")
       .toUpperCase();
   };
+  
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please select an image file");
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const photoUrl = e.target?.result as string;
+      form.setValue("photoUrl", photoUrl);
+      setStudentData(prev => ({
+        ...prev,
+        photoUrl
+      }));
+      toast.success("Photo updated successfully");
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const handleRemovePhoto = () => {
+    form.setValue("photoUrl", "");
+    setStudentData(prev => ({
+      ...prev,
+      photoUrl: ""
+    }));
+    toast.success("Photo removed");
+  };
+  
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+  
+  const photoUrl = form.watch("photoUrl");
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
         <div className="flex flex-col items-center gap-2">
-          <Avatar className="h-24 w-24">
-            <AvatarImage src="" alt={studentData.name} />
-            <AvatarFallback className="text-xl">
-              {studentData.name ? getInitials(studentData.name) : <User />}
-            </AvatarFallback>
-          </Avatar>
-          {/* We could add an upload photo button here in the future */}
+          <div 
+            className="relative"
+            onMouseEnter={() => setAvatarHover(true)}
+            onMouseLeave={() => setAvatarHover(false)}
+          >
+            <Avatar className="h-24 w-24 cursor-pointer" onClick={triggerFileUpload}>
+              <AvatarImage src={photoUrl} alt={studentData.name} />
+              <AvatarFallback className="text-xl">
+                {studentData.name ? getInitials(studentData.name) : <User />}
+              </AvatarFallback>
+            </Avatar>
+            
+            {avatarHover && (
+              <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                <Camera className="h-8 w-8 text-white" />
+              </div>
+            )}
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*"
+              onChange={handlePhotoUpload}
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-xs" 
+              onClick={triggerFileUpload}
+            >
+              <Upload className="h-3 w-3 mr-1" />
+              Upload Photo
+            </Button>
+            
+            {photoUrl && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs text-red-500 hover:text-red-600" 
+                onClick={handleRemovePhoto}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Remove
+              </Button>
+            )}
+          </div>
         </div>
         
         <div className="flex-1">
