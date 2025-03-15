@@ -1,365 +1,332 @@
 
-import React, { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
-import { CalendarIcon, CreditCard, Receipt, BadgeCheck, ClockIcon, AlertCircle, RepeatIcon } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Expense, ExpenseCategory, Account, usePayments } from "@/contexts/PaymentContext";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
+import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon, Repeat } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { Expense, usePayments } from '@/contexts/PaymentContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface ExpenseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   expense?: Expense;
-  mode: "add" | "edit";
+  mode: 'add' | 'edit';
 }
 
-const expenseSchema = z.object({
-  amount: z.coerce.number().min(0.01, { message: "Amount must be greater than 0" }),
-  date: z.date({ required_error: "Expense date is required" }),
-  category: z.string().min(1, { message: "Category is required" }),
-  name: z.string().min(1, { message: "Expense name is required" }),
-  notes: z.string().optional(),
-  recurring: z.boolean().default(false),
-  frequency: z.string().optional(),
-  accountId: z.string().optional(),
-});
-
-type ExpenseFormValues = z.infer<typeof expenseSchema>;
-
-const frequencies = ["daily", "weekly", "biweekly", "monthly", "quarterly", "yearly"];
-
-const ExpenseDialog: React.FC<ExpenseDialogProps> = ({ open, onOpenChange, expense, mode }) => {
+const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps) => {
   const { addExpense, updateExpense, expenseCategories, accounts } = usePayments();
-  const [expenseNames, setExpenseNames] = useState<string[]>([]);
+  const { toast } = useToast();
 
-  const form = useForm<ExpenseFormValues>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: {
-      amount: expense?.amount || 0,
-      date: expense?.date || new Date(),
-      category: expense?.category || "",
-      name: expense?.name || "",
-      notes: expense?.notes || "",
-      recurring: expense?.recurring || false,
-      frequency: expense?.frequency || "monthly",
-      accountId: expense?.accountId || "",
-    },
-  });
+  const [amount, setAmount] = useState<number>(0);
+  const [date, setDate] = useState<Date>(new Date());
+  const [category, setCategory] = useState<string>('');
+  const [name, setName] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  const [recurring, setRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<string>('monthly');
+  const [accountId, setAccountId] = useState<string>('');
 
-  // Update form when expense changes
+  // Initialize form when expense changes or dialog opens
   useEffect(() => {
-    if (expense && open) {
-      form.reset({
-        amount: expense.amount,
-        date: expense.date,
-        category: expense.category,
-        name: expense.name,
-        notes: expense.notes,
-        recurring: expense.recurring,
-        frequency: expense.frequency || "monthly",
-        accountId: expense.accountId || "",
+    if (expense && mode === 'edit') {
+      setAmount(expense.amount);
+      setDate(new Date(expense.date));
+      setCategory(expense.category);
+      setName(expense.name);
+      setNotes(expense.notes);
+      setRecurring(expense.recurring);
+      setFrequency(expense.frequency || 'monthly');
+      setAccountId(expense.accountId || '');
+    } else {
+      // Default values for add mode
+      setAmount(0);
+      setDate(new Date());
+      setCategory('');
+      setName('');
+      setNotes('');
+      setRecurring(false);
+      setFrequency('monthly');
+      setAccountId('');
+    }
+  }, [expense, mode, open]);
+
+  const handleSubmit = () => {
+    if (!amount) {
+      toast({
+        title: "Error",
+        description: "Amount is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!category) {
+      toast({
+        title: "Error",
+        description: "Category is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!name) {
+      toast({
+        title: "Error",
+        description: "Name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const expenseData = {
+      amount,
+      date,
+      category,
+      name,
+      notes,
+      recurring,
+      frequency: recurring ? frequency : undefined,
+      accountId,
+    };
+
+    if (mode === 'add') {
+      addExpense(expenseData as Required<typeof expenseData>);
+      toast({
+        title: "Expense added",
+        description: `Expense of $${amount} has been added.`,
+      });
+    } else if (expense) {
+      updateExpense(expense.id, expenseData);
+      toast({
+        title: "Expense updated",
+        description: `Expense of $${amount} has been updated.`,
       });
     }
-  }, [expense, open, form]);
 
-  // Update expense names when category changes
-  useEffect(() => {
-    const currentCategory = form.watch("category");
-    if (currentCategory) {
-      const category = expenseCategories.find(c => c.name === currentCategory);
-      if (category) {
-        setExpenseNames(category.expenseNames);
-        
-        // If recurring is not already set by the user, set it from the category
-        if (mode === "add") {
-          form.setValue("recurring", category.recurring);
-          if (category.recurring && category.frequency) {
-            form.setValue("frequency", category.frequency);
-          }
-        }
-      } else {
-        setExpenseNames([]);
-      }
-    }
-  }, [form.watch("category"), expenseCategories, form, mode]);
-
-  const onSubmit = (data: ExpenseFormValues) => {
-    if (mode === "add") {
-      addExpense(data);
-    } else if (mode === "edit" && expense) {
-      updateExpense(expense.id, data);
-    }
     onOpenChange(false);
-    form.reset();
+  };
+
+  // Get expense name suggestions based on selected category
+  const getExpenseNameSuggestions = () => {
+    const selectedCategory = expenseCategories.find(cat => cat.name === category);
+    return selectedCategory?.expenseNames || [];
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{mode === "add" ? "Add New Expense" : "Edit Expense"}</DialogTitle>
+          <DialogTitle>{mode === 'add' ? 'Add New Expense' : 'Edit Expense'}</DialogTitle>
           <DialogDescription>
-            {mode === "add" 
-              ? "Record a new expense for your business" 
-              : "Update the expense details"}
+            {mode === 'add' 
+              ? 'Record a new expense for your school.' 
+              : 'Update the expense details.'}
           </DialogDescription>
         </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {expenseCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+        
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="amount" className="text-right">
+              Amount
+            </Label>
+            <div className="col-span-3 relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                $
+              </span>
+              <Input
+                id="amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(parseFloat(e.target.value))}
+                className="pl-7"
+                placeholder="0.00"
+                required
               />
-
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expense Name</FormLabel>
-                    {expenseNames.length > 0 ? (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select expense name" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {expenseNames.map((name) => (
-                            <SelectItem key={name} value={name}>
-                              {name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="other">Other (Custom)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <FormControl>
-                        <Input placeholder="Enter expense name" {...field} />
-                      </FormControl>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="date" className="text-right">
+              Date
+            </Label>
+            <div className="col-span-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !date && "text-muted-foreground"
                     )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(newDate) => newDate && setDate(newDate)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                          $
-                        </span>
-                        <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Expense Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="category" className="text-right">
+              Category
+            </Label>
+            <div className="col-span-3">
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {expenseCategories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-
-            <FormField
-              control={form.control}
-              name="recurring"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <FormLabel>Recurring Expense</FormLabel>
-                    <FormDescription>
-                      Does this expense repeat regularly?
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            {form.watch("recurring") && (
-              <FormField
-                control={form.control}
-                name="frequency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Frequency</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {frequencies.map((freq) => (
-                          <SelectItem key={freq} value={freq}>
-                            <div className="flex items-center gap-2">
-                              <RepeatIcon className="h-4 w-4" />
-                              <span className="capitalize">{freq}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <div className="col-span-3">
+              <Select value={name} onValueChange={setName}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select or type expense name" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getExpenseNameSuggestions().map((name, index) => (
+                    <SelectItem key={index} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="recurring" className="text-right">
+              Recurring
+            </Label>
+            <div className="flex items-center gap-2 col-span-3">
+              <Switch 
+                id="recurring" 
+                checked={recurring} 
+                onCheckedChange={setRecurring} 
               />
-            )}
-
-            {accounts.length > 0 && (
-              <FormField
-                control={form.control}
-                name="accountId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {accounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name} ({account.currency})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Add any additional notes about this expense"
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              <span className="text-sm text-muted-foreground">
+                {recurring ? 'Yes' : 'No'}
+              </span>
+            </div>
+          </div>
+          
+          {recurring && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="frequency" className="text-right">
+                Frequency
+              </Label>
+              <div className="col-span-3">
+                <Select value={frequency} onValueChange={setFrequency}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="annually">Annually</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          {accounts.length > 0 && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="account" className="text-right">
+                Account
+              </Label>
+              <div className="col-span-3">
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(account => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name} ({account.currency})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="notes" className="text-right pt-2">
+              Notes
+            </Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any additional notes here"
+              className="col-span-3"
             />
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {mode === "add" ? "Add Expense" : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSubmit}>
+            {mode === 'add' ? 'Add Expense' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
-
-const FormDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => {
-  return (
-    <p
-      ref={ref}
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  );
-});
-FormDescription.displayName = "FormDescription";
 
 export default ExpenseDialog;

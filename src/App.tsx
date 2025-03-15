@@ -11,6 +11,7 @@ import Calendar from "./pages/Calendar";
 import Payments from "./pages/Payments";
 import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
+import StatesReports from "./pages/StatesReports";
 import NotFound from "./pages/NotFound";
 import { PaymentProvider } from "./contexts/PaymentContext";
 
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="/payments" element={<Payments />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/school-setup" element={<SchoolSetup />} />
+              <Route path="/reports" element={<StatesReports />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

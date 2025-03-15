@@ -1,320 +1,282 @@
 
-import React, { useEffect } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
-import { CalendarIcon, CreditCard, Receipt, BadgeCheck, ClockIcon, AlertCircle } from "lucide-react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Payment, Account, usePayments } from "@/contexts/PaymentContext";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { Payment, usePayments } from '@/contexts/PaymentContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   payment?: Payment;
-  mode: "add" | "edit";
+  mode: 'add' | 'edit';
 }
 
-const paymentSchema = z.object({
-  amount: z.coerce.number().min(0.01, { message: "Amount must be greater than 0" }),
-  date: z.date({ required_error: "Payment date is required" }),
-  method: z.string().min(1, { message: "Payment method is required" }),
-  notes: z.string().optional(),
-  status: z.enum(["completed", "pending", "failed"]),
-  studentName: z.string().min(1, { message: "Student name is required" }),
-  accountId: z.string().optional(),
-  currency: z.string().optional(),
-});
-
-type PaymentFormValues = z.infer<typeof paymentSchema>;
-
-const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
-
-const PaymentDialog: React.FC<PaymentDialogProps> = ({ open, onOpenChange, payment, mode }) => {
+const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps) => {
   const { addPayment, updatePayment, accounts } = usePayments();
+  const { toast } = useToast();
 
-  const form = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentSchema),
-    defaultValues: {
-      amount: payment?.amount || 0,
-      date: payment?.date || new Date(),
-      method: payment?.method || "",
-      notes: payment?.notes || "",
-      status: payment?.status || "completed",
-      studentName: payment?.studentName || "",
-      accountId: payment?.accountId || "",
-      currency: payment?.currency || (accounts[0]?.currency || "USD"),
-    },
-  });
+  const [amount, setAmount] = useState<number>(0);
+  const [date, setDate] = useState<Date>(new Date());
+  const [method, setMethod] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  const [status, setStatus] = useState<"completed" | "pending" | "failed">('completed');
+  const [accountId, setAccountId] = useState<string>('');
+  const [studentName, setStudentName] = useState<string>('');
 
+  // Initialize form when payment changes or dialog opens
   useEffect(() => {
-    if (payment && open) {
-      form.reset({
-        amount: payment.amount,
-        date: payment.date,
-        method: payment.method,
-        notes: payment.notes,
-        status: payment.status,
-        studentName: payment.studentName || "",
-        accountId: payment.accountId || "",
-        currency: payment.currency || (accounts[0]?.currency || "USD"),
+    if (payment && mode === 'edit') {
+      setAmount(payment.amount);
+      setDate(new Date(payment.date));
+      setMethod(payment.method);
+      setNotes(payment.notes);
+      setStatus(payment.status);
+      setAccountId(payment.accountId || '');
+      setStudentName(payment.studentName || '');
+    } else {
+      // Default values for add mode
+      setAmount(0);
+      setDate(new Date());
+      setMethod('');
+      setNotes('');
+      setStatus('completed');
+      setAccountId('');
+      setStudentName('');
+    }
+  }, [payment, mode, open]);
+
+  const handleSubmit = () => {
+    if (!amount) {
+      toast({
+        title: "Error",
+        description: "Amount is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const paymentData = {
+      amount,
+      date,
+      method: method || 'Cash',
+      notes,
+      status,
+      accountId,
+      studentName,
+    };
+
+    if (mode === 'add') {
+      addPayment(paymentData as Required<typeof paymentData>);
+      toast({
+        title: "Payment added",
+        description: `Payment of $${amount} has been added.`,
+      });
+    } else if (payment) {
+      updatePayment(payment.id, paymentData);
+      toast({
+        title: "Payment updated",
+        description: `Payment of $${amount} has been updated.`,
       });
     }
-  }, [payment, open, form, accounts]);
 
-  const onSubmit = (data: PaymentFormValues) => {
-    if (mode === "add") {
-      addPayment(data);
-    } else if (mode === "edit" && payment) {
-      updatePayment(payment.id, data);
-    }
     onOpenChange(false);
-    form.reset();
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <BadgeCheck className="h-4 w-4" />;
-      case "pending":
-        return <ClockIcon className="h-4 w-4" />;
-      case "failed":
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return null;
-    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{mode === "add" ? "Add New Payment" : "Edit Payment"}</DialogTitle>
+          <DialogTitle>{mode === 'add' ? 'Add New Payment' : 'Edit Payment'}</DialogTitle>
           <DialogDescription>
-            {mode === "add" 
-              ? "Record a new payment from a student" 
-              : "Update the payment details"}
+            {mode === 'add' 
+              ? 'Record a new payment received from a student.' 
+              : 'Update the payment details.'}
           </DialogDescription>
         </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="studentName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Student Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter student name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                          $
-                        </span>
-                        <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Payment Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
+        
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="amount" className="text-right">
+              Amount
+            </Label>
+            <div className="col-span-3 relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                $
+              </span>
+              <Input
+                id="amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(parseFloat(e.target.value))}
+                className="pl-7"
+                placeholder="0.00"
+                required
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="method"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Method</FormLabel>
-                  <div className="flex flex-wrap gap-2">
-                    {paymentMethods.map((method) => (
-                      <Button
-                        key={method}
-                        type="button"
-                        variant={field.value === method ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => form.setValue("method", method)}
-                        className={cn(
-                          "h-9",
-                          method === "Credit Card" && field.value === method && "bg-blue-600",
-                          method === "PayPal" && field.value === method && "bg-indigo-600"
-                        )}
-                      >
-                        {method === "Credit Card" && <CreditCard className="h-4 w-4 mr-2" />}
-                        {method === "Cash" && <Receipt className="h-4 w-4 mr-2" />}
-                        {method}
-                      </Button>
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="date" className="text-right">
+              Date
+            </Label>
+            <div className="col-span-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(newDate) => newDate && setDate(newDate)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="method" className="text-right">
+              Method
+            </Label>
+            <div className="col-span-3">
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Credit Card">Credit Card</SelectItem>
+                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="PayPal">PayPal</SelectItem>
+                  <SelectItem value="Venmo">Venmo</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="status" className="text-right">
+              Status
+            </Label>
+            <div className="col-span-3">
+              <Select value={status} onValueChange={(value: "completed" | "pending" | "failed") => setStatus(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="completed" className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Completed</span>
+                  </SelectItem>
+                  <SelectItem value="pending" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    <span>Pending</span>
+                  </SelectItem>
+                  <SelectItem value="failed" className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <span>Failed</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {accounts.length > 0 && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="account" className="text-right">
+                Account
+              </Label>
+              <div className="col-span-3">
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(account => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name} ({account.currency})
+                      </SelectItem>
                     ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="completed">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                              <BadgeCheck className="h-3 w-3 mr-1" />
-                              Paid
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="pending">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                              <ClockIcon className="h-3 w-3 mr-1" />
-                              Pending
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="failed">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                              <AlertCircle className="h-3 w-3 mr-1" />
-                              Overdue
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {accounts.length > 0 && (
-                <FormField
-                  control={form.control}
-                  name="accountId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Account</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select account" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {accounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.name} ({account.currency})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Add any additional notes about this payment"
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          )}
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="student" className="text-right">
+              Student
+            </Label>
+            <Input
+              id="student"
+              value={studentName}
+              onChange={(e) => setStudentName(e.target.value)}
+              placeholder="Student name"
+              className="col-span-3"
             />
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {mode === "add" ? "Add Payment" : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          </div>
+          
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="notes" className="text-right pt-2">
+              Notes
+            </Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any additional notes here"
+              className="col-span-3"
+            />
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSubmit}>
+            {mode === 'add' ? 'Add Payment' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
