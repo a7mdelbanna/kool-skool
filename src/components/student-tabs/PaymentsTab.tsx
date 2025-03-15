@@ -125,8 +125,8 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
           <h3 className="text-lg font-medium mb-4">Add New Payment</h3>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleAddPayment)} className="space-y-5">
-              {/* Improved layout - Amount and Date side by side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Fixed layout - Amount and Date side by side for all screen sizes */}
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="amount"
