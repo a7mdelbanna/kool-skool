@@ -175,10 +175,10 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
   const renderActionButtons = (session: SessionWithSubject) => {
     const isScheduled = session.status === "scheduled";
     const isCanceled = session.status === "canceled";
-    const isPast = new Date(session.date) < today && session.status !== "completed" && session.status !== "canceled";
+    const isPast = new Date(session.date) < new Date() && session.status !== "completed" && session.status !== "canceled";
     
     return (
-      <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
+      <div className="flex flex-wrap gap-2">
         {(isScheduled || isPast) && (
           <>
             <Button 
@@ -274,17 +274,16 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
                   <div className="flex items-center gap-1.5">
                     <DollarSign className="h-3.5 w-3.5" />
                     <span>${session.cost}</span>
+                    <div className="ml-2 flex gap-2">
+                      {renderStatusBadge(session.status)}
+                      {renderPaymentBadge(session)}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-2 items-start md:items-center">
-              <div className="flex flex-wrap gap-2">
-                {renderStatusBadge(session.status)}
-                {renderPaymentBadge(session)}
-              </div>
-              
+            <div className="flex items-center">
               {renderActionButtons(session)}
             </div>
           </div>
