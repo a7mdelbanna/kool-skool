@@ -20,6 +20,13 @@ import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -46,6 +53,11 @@ const daysOfWeek = [
   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
 ];
 
+const durationOptions = [
+  "1 month", "2 months", "3 months", "4 months", "5 months", "6 months", 
+  "7 months", "8 months", "9 months", "10 months", "11 months", "12 months"
+];
+
 const subscriptionSchema = z.object({
   sessionCount: z.coerce.number().min(1, { message: "At least 1 session required" }),
   duration: z.string().min(1, { message: "Duration is required" }),
@@ -70,7 +82,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       sessionCount: 1,
       duration: "1 month",
       startDate: new Date(),
-      schedule: [], // This will be populated with DaySchedule objects
+      schedule: [], 
       pricePerSession: 0,
       notes: "",
     },
@@ -200,9 +212,23 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Duration</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 1 month, 3 months" {...field} />
-                    </FormControl>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select duration" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {durationOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
