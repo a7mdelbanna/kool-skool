@@ -72,8 +72,13 @@ const UpcomingPayments = ({ payments, className }: UpcomingPaymentsProps) => {
                 </div>
                 <div className="text-right">
                   <div className="font-medium">${payment.amount.toFixed(2)}</div>
-                  <div className="flex items-center gap-1 text-xs">
-                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                  <div className="flex flex-col items-end text-xs">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {format(payment.dueDate, 'MMM d, yyyy')}
+                      </span>
+                    </div>
                     <span className={cn(
                       payment.status === 'overdue' ? "text-red-500 font-medium" : "text-muted-foreground"
                     )}>
