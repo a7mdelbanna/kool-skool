@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, ArrowRight, ArrowLeft, Upload } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toast } from "sonner";
 
 // License verification step schema
 const licenseSchema = z.object({
@@ -87,11 +88,23 @@ const SignupForm = () => {
   });
 
   const handleLicenseSubmit = async (data: LicenseFormValues) => {
-    const result = await signUp(data.licenseNumber);
-    
-    if (result.valid) {
-      setLicenseData({ licenseId: result.licenseId });
-      setStep(2);
+    try {
+      const result = await signUp(data.licenseNumber);
+      
+      // Add debugging logs
+      console.log("License verification result:", result);
+      
+      if (result.valid) {
+        setLicenseData({ licenseId: result.licenseId });
+        toast.success(result.message || "License validated successfully");
+        setStep(2);
+      } else {
+        // Show error message to the user if license verification fails
+        toast.error(result.message || "License verification failed");
+      }
+    } catch (error) {
+      console.error("License verification error:", error);
+      toast.error("An error occurred during license verification");
     }
   };
 

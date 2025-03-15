@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -68,34 +67,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUp = async (licenseNumber: string) => {
     try {
       setIsLoading(true);
+      console.log("Verifying license:", licenseNumber);
       
       // First verify the license
       const { data, error } = await supabase
         .rpc('handle_license_signup', { license_number: licenseNumber });
       
+      console.log("License verification response:", { data, error });
+      
       if (error) {
+        console.error("License verification error:", error);
         toast.error(error.message);
         return { valid: false, message: error.message, licenseId: null };
       }
       
-      if (!data || !data[0].valid) {
-        toast.error(data ? data[0].message : "Invalid license");
+      if (!data || data.length === 0 || !data[0].valid) {
+        const errorMessage = data && data[0] ? data[0].message : "Invalid license";
+        console.error("License validation failed:", errorMessage);
+        toast.error(errorMessage);
         return { 
           valid: false, 
-          message: data ? data[0].message : "Invalid license number", 
+          message: errorMessage, 
           licenseId: null 
         };
       }
       
+      const successMessage = data[0].message || "License validated successfully";
+      toast.success(successMessage);
+      
       return { 
         valid: true, 
-        message: data[0].message, 
+        message: successMessage, 
         licenseId: data[0].license_id 
       };
       
     } catch (error: any) {
-      toast.error(error.message || "An error occurred during license verification");
-      return { valid: false, message: error.message || "An error occurred", licenseId: null };
+      console.error("License signup error:", error);
+      const errorMessage = error.message || "An error occurred during license verification";
+      toast.error(errorMessage);
+      return { valid: false, message: errorMessage, licenseId: null };
     } finally {
       setIsLoading(false);
     }
