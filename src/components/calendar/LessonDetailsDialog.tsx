@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Dialog,
   DialogContent,
@@ -21,7 +21,8 @@ import {
   Pencil,
   Trash2,
   RefreshCw,
-  Check
+  Check,
+  RefreshCcw
 } from 'lucide-react';
 import { Session } from '@/contexts/PaymentContext';
 import { format } from 'date-fns';
@@ -57,6 +58,7 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
 }) => {
   const { updateSessionStatus, rescheduleSession } = usePayments();
   const { toast } = useToast();
+  const [statusChangeOpen, setStatusChangeOpen] = useState(false);
 
   if (!session) return null;
 
@@ -103,6 +105,24 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
     onOpenChange(false);
   };
 
+  const handleStatusChange = (newStatus: Session['status']) => {
+    updateSessionStatus(session.id, newStatus);
+    
+    const statusMessages = {
+      scheduled: "scheduled",
+      completed: "marked as attended",
+      canceled: "canceled",
+      missed: "marked as missed"
+    };
+    
+    toast({
+      title: `Lesson status updated`,
+      description: `${subject} lesson with ${studentName} ${statusMessages[newStatus]}.`
+    });
+    
+    setStatusChangeOpen(false);
+  };
+
   // Render status badge
   const renderStatusBadge = (status: Session['status']) => {
     switch(status) {
@@ -132,9 +152,6 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
         return <XCircle className="h-4 w-4 text-red-500" />;
     }
   };
-
-  // Determine if action buttons should be disabled
-  const isActionDisabled = session.status !== "scheduled";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,7 +227,59 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
             </div>
           )}
 
-          {/* Action Buttons - New Section */}
+          {/* Status Change Button */}
+          <Button 
+            variant="outline" 
+            className="w-full flex items-center justify-center gap-2 border-purple-500 text-purple-500 hover:bg-purple-50"
+            onClick={() => setStatusChangeOpen(!statusChangeOpen)}
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Change Status
+          </Button>
+
+          {/* Status Change Options */}
+          {statusChangeOpen && (
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                onClick={() => handleStatusChange("scheduled")} 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+                disabled={session.status === "scheduled"}
+              >
+                <CalendarDays className="h-4 w-4 mr-1" />
+                Schedule
+              </Button>
+              <Button 
+                onClick={() => handleStatusChange("completed")} 
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+                disabled={session.status === "completed"}
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Attend
+              </Button>
+              <Button 
+                onClick={() => handleStatusChange("canceled")} 
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                size="sm"
+                disabled={session.status === "canceled"}
+              >
+                <CalendarX className="h-4 w-4 mr-1" />
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => handleStatusChange("missed")} 
+                className="bg-red-600 hover:bg-red-700 text-white"
+                size="sm"
+                disabled={session.status === "missed"}
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                Mark Missed
+              </Button>
+            </div>
+          )}
+
+          {/* Action Buttons - Only for scheduled sessions */}
           {session.status === "scheduled" && (
             <div className="grid grid-cols-3 gap-3 pt-2">
               <Button 
