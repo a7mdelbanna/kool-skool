@@ -11,26 +11,29 @@ import Calendar from "./pages/Calendar";
 import Payments from "./pages/Payments";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import { PaymentProvider } from "./contexts/PaymentContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<Index />} />
-            <Route path="/students" element={<Students />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/payments" element={<Payments />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <PaymentProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/students" element={<Students />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/payments" element={<Payments />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </PaymentProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
