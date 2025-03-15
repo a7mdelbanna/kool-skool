@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   Form,
@@ -14,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, CreditCard, DollarSign, Euro, Plus, Receipt, Trash, PoundSterling } from "lucide-react";
+import { CalendarIcon, CreditCard, DollarSign, Euro, Plus, Receipt, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
@@ -50,8 +49,6 @@ const currencies = [
   { symbol: "$", code: "USD", name: "US Dollar", icon: DollarSign },
   { symbol: "€", code: "EUR", name: "Euro", icon: Euro },
   { symbol: "₽", code: "RUB", name: "Russian Ruble", icon: DollarSign },
-  { symbol: "£", code: "GBP", name: "British Pound", icon: PoundSterling },
-  { symbol: "¥", code: "JPY", name: "Japanese Yen", icon: DollarSign },
 ];
 
 const PaymentsTab: React.FC<PaymentsTabProps> = ({ 
