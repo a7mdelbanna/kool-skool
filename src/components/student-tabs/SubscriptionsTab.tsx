@@ -70,7 +70,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       sessionCount: 1,
       duration: "1 month",
       startDate: new Date(),
-      schedule: [],
+      schedule: [], // This will be populated with DaySchedule objects
       pricePerSession: 0,
       notes: "",
     },
@@ -90,7 +90,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       form.setValue("schedule", updatedDays);
     } else {
       // Add the day with default time if not selected
-      const newSchedule = [...selectedDays, { day, time: "15:00" }];
+      const newDay: DaySchedule = { day: day, time: "15:00" };
+      const newSchedule = [...selectedDays, newDay];
       setSelectedDays(newSchedule);
       form.setValue("schedule", newSchedule);
     }
@@ -98,7 +99,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   
   const updateDayTime = (day: string, time: string) => {
     const updatedDays = selectedDays.map(d => 
-      d.day === day ? { ...d, time } : d
+      d.day === day ? { day: day, time: time } : d
     );
     setSelectedDays(updatedDays);
     form.setValue("schedule", updatedDays);

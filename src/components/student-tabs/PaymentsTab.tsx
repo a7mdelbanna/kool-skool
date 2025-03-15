@@ -62,7 +62,10 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({ studentData, setStudentData }
   const handleAddPayment = (data: PaymentFormValues) => {
     const newPayment: Payment = {
       id: Date.now().toString(),
-      ...data,
+      amount: data.amount,
+      date: data.date,
+      method: data.method,
+      notes: data.notes || "",
       status: "completed",
     };
     
