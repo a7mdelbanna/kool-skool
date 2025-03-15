@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signUp = async (licenseNumber: string) => {
+  const signUp = async (licenseNumber: string): Promise<{valid: boolean; message: string; licenseId: string | null}> => {
     try {
       setIsLoading(true);
       console.log("Verifying license:", licenseNumber);
@@ -94,6 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       const successMessage = data[0].message || "License validated successfully";
+      console.log("License validated successfully with ID:", data[0].license_id);
       toast.success(successMessage);
       
       return { 
