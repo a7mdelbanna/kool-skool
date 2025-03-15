@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from '@/components/ui/badge';
+import { DollarSign, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface LessonTypeROI {
   name: string;
@@ -15,37 +16,74 @@ interface ROIByLessonTypeCardProps {
 }
 
 const ROIByLessonTypeCard: React.FC<ROIByLessonTypeCardProps> = ({ data, className }) => {
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  
+  const toggleSort = () => {
+    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+  };
+  
+  const sortedData = [...data].sort((a, b) => {
+    return sortOrder === "asc" ? a.roi - b.roi : b.roi - a.roi;
+  });
+  
+  // Calculate average ROI
+  const averageROI = Math.round(data.reduce((sum, item) => sum + item.roi, 0) / data.length);
+  
+  // Get ROI performance indicator
+  const getRoiPerformance = (roi: number) => {
+    const diff = roi - averageROI;
+    const percentage = Math.round((diff / averageROI) * 100);
+    
+    if (Math.abs(percentage) < 5) return { label: "Average", class: "bg-blue-100 text-blue-800" };
+    if (percentage >= 5) return { label: `${percentage}% above avg`, class: "bg-green-100 text-green-800", icon: <ArrowUp className="h-3 w-3" /> };
+    return { label: `${Math.abs(percentage)}% below avg`, class: "bg-red-100 text-red-800", icon: <ArrowDown className="h-3 w-3" /> };
+  };
+  
   return (
     <Card className={className}>
-      <CardHeader>
-        <CardTitle>Student ROI by Category</CardTitle>
-        <p className="text-sm text-muted-foreground">Return on investment by lesson type</p>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle>Student ROI by Category</CardTitle>
+          <p className="text-sm text-muted-foreground">Return on investment by lesson type</p>
+        </div>
+        <Badge variant="outline" className="bg-blue-50 text-blue-800 flex gap-1">
+          <DollarSign className="h-4 w-4" />
+          Avg: ${averageROI}
+        </Badge>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
-          <ChartContainer
-            config={{
-              roi: { theme: { light: "#0088FE", dark: "#0088FE" } },
-            }}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={data}
-                layout="vertical"
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Lesson Type</TableHead>
+              <TableHead 
+                className="text-right cursor-pointer" 
+                onClick={toggleSort}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="name" />
-                <ChartTooltip 
-                  content={<ChartTooltipContent />} 
-                  formatter={(value) => [`$${value}`, 'ROI']} 
-                />
-                <Bar dataKey="roi" name="ROI" fill="#0088FE" barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </div>
+                ROI {sortOrder === "asc" ? "↑" : "↓"}
+              </TableHead>
+              <TableHead className="text-right">Performance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedData.map((item, index) => {
+              const performance = getRoiPerformance(item.roi);
+              
+              return (
+                <TableRow key={index}>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="text-right font-mono">${item.roi}</TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant="outline" className={`${performance.class} flex gap-1 ml-auto`}>
+                      {performance.icon}
+                      {performance.label}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              )}
+            )}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
