@@ -47,10 +47,11 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
 const currencies = [
-  { code: "USD", symbol: "$", label: "US Dollar", icon: DollarSign },
-  { code: "EUR", symbol: "€", label: "Euro", icon: Euro },
-  { code: "GBP", symbol: "£", label: "British Pound", icon: PoundSterling },
-  { code: "JPY", symbol: "¥", label: "Japanese Yen", icon: DollarSign }, // Changed from Yen to DollarSign as a fallback
+  { symbol: "$", code: "USD", name: "US Dollar", icon: DollarSign },
+  { symbol: "€", code: "EUR", name: "Euro", icon: Euro },
+  { symbol: "₽", code: "RUB", name: "Russian Ruble", icon: DollarSign },
+  { symbol: "£", code: "GBP", name: "British Pound", icon: PoundSterling },
+  { symbol: "¥", code: "JPY", name: "Japanese Yen", icon: DollarSign },
 ];
 
 const PaymentsTab: React.FC<PaymentsTabProps> = ({ 
