@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   Calendar as CalendarIcon, 
@@ -780,4 +781,29 @@ const Calendar = () => {
 
       {/* Main content based on view and display mode */}
       <div className="bg-card rounded-lg border shadow-sm p-4">
-        {displayMode
+        {displayMode === 'calendar' ? (
+          <>
+            {viewMode === 'day' && renderDayView()}
+            {viewMode === 'week' && renderWeekView()}
+            {viewMode === 'month' && renderMonthView()}
+          </>
+        ) : (
+          renderListView()
+        )}
+      </div>
+
+      {/* Session details sheet/drawer */}
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={setOpen}>
+          <SessionDetails />
+        </Drawer>
+      ) : (
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SessionDetails />
+        </Sheet>
+      )}
+    </div>
+  );
+};
+
+export default Calendar;
