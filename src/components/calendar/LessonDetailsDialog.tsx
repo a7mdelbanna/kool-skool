@@ -19,12 +19,16 @@ import {
   XCircle,
   CalendarDays,
   Pencil,
-  Trash2
+  Trash2,
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { Session } from '@/contexts/PaymentContext';
 import { format } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { usePayments } from '@/contexts/PaymentContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface LessonDetailsDialogProps {
   session: Session | null;
@@ -41,6 +45,7 @@ const subjectColorMap: Record<string, { bg: string, border: string, text: string
   'Biology': { bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-700' },
   'Geography': { bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-700' },
   'Literature': { bg: 'bg-indigo-100', border: 'border-indigo-300', text: 'text-indigo-700' },
+  'History': { bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-700' },
   'Computer Science': { bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-700' },
   'default': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' }
 };
@@ -50,6 +55,9 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
   open, 
   onOpenChange 
 }) => {
+  const { updateSessionStatus, rescheduleSession } = usePayments();
+  const { toast } = useToast();
+
   if (!session) return null;
 
   // Parse subject from notes
@@ -66,6 +74,34 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
   // Format the date
   const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
   const formattedDate = format(sessionDate, 'EEEE, MMMM d, yyyy');
+
+  // Handle session actions
+  const handleAttend = () => {
+    updateSessionStatus(session.id, "completed");
+    toast({
+      title: "Lesson marked as completed",
+      description: `${subject} lesson with ${studentName} marked as attended.`
+    });
+    onOpenChange(false);
+  };
+
+  const handleCancel = () => {
+    updateSessionStatus(session.id, "canceled");
+    toast({
+      title: "Lesson canceled",
+      description: `${subject} lesson with ${studentName} has been canceled.`
+    });
+    onOpenChange(false);
+  };
+
+  const handleReschedule = () => {
+    rescheduleSession(session.id);
+    toast({
+      title: "Lesson rescheduled",
+      description: `${subject} lesson with ${studentName} has been rescheduled.`
+    });
+    onOpenChange(false);
+  };
 
   // Render status badge
   const renderStatusBadge = (status: Session['status']) => {
@@ -96,6 +132,9 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
         return <XCircle className="h-4 w-4 text-red-500" />;
     }
   };
+
+  // Determine if action buttons should be disabled
+  const isActionDisabled = session.status !== "scheduled";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -168,6 +207,36 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
             <div className="border rounded-md p-3">
               <div className="text-sm font-medium">Notes</div>
               <div className="text-sm text-muted-foreground mt-1">{session.notes}</div>
+            </div>
+          )}
+
+          {/* Action Buttons - New Section */}
+          {session.status === "scheduled" && (
+            <div className="grid grid-cols-3 gap-3 pt-2">
+              <Button 
+                onClick={handleAttend} 
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Attend
+              </Button>
+              <Button 
+                onClick={handleCancel} 
+                className="bg-red-600 hover:bg-red-700 text-white"
+                size="sm"
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleReschedule} 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Reschedule
+              </Button>
             </div>
           )}
         </div>

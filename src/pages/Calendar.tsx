@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Calendar as CalendarIcon, 
@@ -35,7 +34,6 @@ const Calendar = () => {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const { sessions } = usePayments();
 
-  // Navigation functions
   const goToPreviousPeriod = () => {
     if (viewMode === 'day') {
       setCurrentDate(prev => addDays(prev, -1));
@@ -63,12 +61,10 @@ const Calendar = () => {
     setCurrentWeekStart(startOfWeek(today, { weekStartsOn: 0 }));
   };
 
-  // Change view mode (day, week, month)
   const handleViewModeChange = (value: string) => {
     setViewMode(value as ViewMode);
   };
 
-  // Get view specific title
   const getViewTitle = () => {
     if (viewMode === 'day') {
       return format(currentDate, 'EEEE, MMMM d, yyyy');
@@ -86,19 +82,16 @@ const Calendar = () => {
     }
   };
 
-  // Handle lesson click to open details
   const handleLessonClick = (session: Session) => {
     setSelectedSession(session);
     setDetailsDialogOpen(true);
   };
 
-  // Filter sessions based on search query
   const filteredSessions = sessions.filter(session => {
     if (!searchQuery) return true;
     return session.notes?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  // For debugging
   console.log("Sessions available:", sessions.length);
   console.log("Filtered sessions:", filteredSessions.length);
 
@@ -177,7 +170,6 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* Main content based on display mode */}
       <div className="bg-card rounded-lg border shadow-sm p-4">
         {displayMode === 'list' ? (
           <UpcomingLessonsList 
@@ -195,14 +187,12 @@ const Calendar = () => {
         )}
       </div>
 
-      {/* New Lesson Dialog */}
       <NewLessonDialog 
         open={newLessonDialogOpen} 
         onOpenChange={setNewLessonDialogOpen} 
         initialDate={currentDate}
       />
 
-      {/* Lesson Details Dialog */}
       {selectedSession && (
         <LessonDetailsDialog 
           session={selectedSession} 
