@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { 
   Form,
@@ -30,6 +31,12 @@ import {
   ToggleGroup,
   ToggleGroupItem
 } from "@/components/ui/toggle-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -51,6 +58,7 @@ interface Subscription {
   pricePerSession: number;
   fixedPrice: number;
   totalPrice: number;
+  currency: string;
   notes: string;
 }
 
@@ -61,6 +69,16 @@ const daysOfWeek = [
 const durationOptions = [
   "1 month", "2 months", "3 months", "4 months", "5 months", "6 months", 
   "7 months", "8 months", "9 months", "10 months", "11 months", "12 months"
+];
+
+const currencyOptions = [
+  { symbol: "$", code: "USD", name: "US Dollar" },
+  { symbol: "€", code: "EUR", name: "Euro" },
+  { symbol: "£", code: "GBP", name: "British Pound" },
+  { symbol: "¥", code: "JPY", name: "Japanese Yen" },
+  { symbol: "₹", code: "INR", name: "Indian Rupee" },
+  { symbol: "A$", code: "AUD", name: "Australian Dollar" },
+  { symbol: "C$", code: "CAD", name: "Canadian Dollar" },
 ];
 
 const subscriptionSchema = z.object({
@@ -74,6 +92,7 @@ const subscriptionSchema = z.object({
   priceMode: z.enum(["perSession", "fixed"]),
   pricePerSession: z.coerce.number().min(0, { message: "Price cannot be negative" }),
   fixedPrice: z.coerce.number().min(0, { message: "Price cannot be negative" }),
+  currency: z.string().default("USD"),
   notes: z.string().optional(),
 });
 
@@ -94,6 +113,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       priceMode: "perSession",
       pricePerSession: 0,
       fixedPrice: 0,
+      currency: "USD",
       notes: "",
     },
   });
@@ -102,6 +122,12 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   const watchPricePerSession = form.watch("pricePerSession");
   const watchFixedPrice = form.watch("fixedPrice");
   const watchSessionCount = form.watch("sessionCount");
+  const watchCurrency = form.watch("currency");
+  
+  const getCurrencySymbol = (currencyCode: string) => {
+    const currency = currencyOptions.find(c => c.code === currencyCode);
+    return currency ? currency.symbol : "$";
+  };
   
   useEffect(() => {
     const newTotalPrice = calculateTotalPrice();
@@ -152,6 +178,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       pricePerSession: Number(data.pricePerSession),
       fixedPrice: Number(data.fixedPrice),
       totalPrice: calculatedTotalPrice,
+      currency: data.currency,
       notes: data.notes || "",
     };
     
@@ -194,10 +221,12 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     {subscription.schedule.map(s => `${s.day} at ${s.time}`).join(", ")}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm font-medium">${subscription.totalPrice.toFixed(2)}</span>
+                    <span className="text-sm font-medium">
+                      {getCurrencySymbol(subscription.currency)}{subscription.totalPrice.toFixed(2)}
+                    </span>
                     {subscription.priceMode === "perSession" && (
                       <span className="text-xs text-muted-foreground">
-                        (${subscription.pricePerSession.toFixed(2)} per session)
+                        ({getCurrencySymbol(subscription.currency)}{subscription.pricePerSession.toFixed(2)} per session)
                       </span>
                     )}
                     {subscription.priceMode === "fixed" && (
@@ -387,6 +416,37 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               )}
             />
             
+            <FormField
+              control={form.control}
+              name="currency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Currency</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {currencyOptions.map((currency) => (
+                        <SelectItem key={currency.code} value={currency.code}>
+                          <div className="flex items-center">
+                            <span className="mr-2">{currency.symbol}</span>
+                            <span>{currency.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <div className="flex gap-4">
               <div className="flex-1">
                 {watchPriceMode === "perSession" ? (
@@ -395,15 +455,21 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     name="pricePerSession"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price per Session ($)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0" 
-                            step="0.01" 
-                            {...field} 
-                          />
-                        </FormControl>
+                        <FormLabel>Price per Session</FormLabel>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                            {getCurrencySymbol(watchCurrency)}
+                          </div>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="0.01" 
+                              className="pl-7"
+                              {...field} 
+                            />
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -414,15 +480,21 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     name="fixedPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Fixed Price ($)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0" 
-                            step="0.01" 
-                            {...field} 
-                          />
-                        </FormControl>
+                        <FormLabel>Fixed Price</FormLabel>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                            {getCurrencySymbol(watchCurrency)}
+                          </div>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="0.01"
+                              className="pl-7"
+                              {...field} 
+                            />
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -433,7 +505,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               <div className="flex-1">
                 <FormLabel>Total Price</FormLabel>
                 <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 flex items-center">
-                  <span className="font-medium">${totalPrice.toFixed(2)}</span>
+                  <span className="font-medium">{getCurrencySymbol(watchCurrency)}{totalPrice.toFixed(2)}</span>
                 </div>
               </div>
             </div>
