@@ -17,6 +17,8 @@ import UpcomingLessonsList from '@/components/calendar/UpcomingLessonsList';
 import CalendarView from '@/components/calendar/CalendarView';
 import { usePayments } from '@/contexts/PaymentContext';
 import NewLessonDialog from '@/components/calendar/NewLessonDialog';
+import LessonDetailsDialog from '@/components/calendar/LessonDetailsDialog';
+import { Session } from '@/contexts/PaymentContext';
 
 type ViewMode = 'day' | 'week' | 'month';
 type DisplayMode = 'calendar' | 'list';
@@ -29,6 +31,8 @@ const Calendar = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('calendar');
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const { sessions } = usePayments();
 
   // Navigation functions
@@ -80,6 +84,12 @@ const Calendar = () => {
     } else {
       return format(currentDate, 'MMMM yyyy');
     }
+  };
+
+  // Handle lesson click to open details
+  const handleLessonClick = (session: Session) => {
+    setSelectedSession(session);
+    setDetailsDialogOpen(true);
   };
 
   // Filter sessions based on search query
@@ -177,6 +187,7 @@ const Calendar = () => {
             currentDate={currentDate}
             currentWeekStart={currentWeekStart}
             sessions={filteredSessions}
+            onLessonClick={handleLessonClick}
           />
         )}
       </div>
@@ -187,6 +198,15 @@ const Calendar = () => {
         onOpenChange={setNewLessonDialogOpen} 
         initialDate={currentDate}
       />
+
+      {/* Lesson Details Dialog */}
+      {selectedSession && (
+        <LessonDetailsDialog 
+          session={selectedSession} 
+          open={detailsDialogOpen} 
+          onOpenChange={setDetailsDialogOpen} 
+        />
+      )}
     </div>
   );
 };

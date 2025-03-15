@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { 
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import LessonDetailsDialog from "./LessonDetailsDialog";
 
 const subjectColorMap: Record<string, { bg: string, border: string, text: string }> = {
   'Mathematics': { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
@@ -70,6 +72,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
   const [changeStatusDialogOpen, setChangeStatusDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   const processedSessions = sessions
     .map(session => {
@@ -147,6 +150,11 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
       setChangeStatusDialogOpen(false);
       setSelectedSession(null);
     }
+  };
+
+  const handleViewDetails = (session: SessionWithSubject) => {
+    setSelectedSession(session);
+    setDetailsDialogOpen(true);
   };
 
   const renderStatusBadge = (status: Session['status']) => {
@@ -272,9 +280,10 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
       <Card 
         key={session.id} 
         className={cn(
-          "mb-4 border-l-4 hover:shadow-md transition-shadow",
+          "mb-4 border-l-4 hover:shadow-md transition-shadow cursor-pointer",
           colors.border
         )}
+        onClick={() => handleViewDetails(session)}
       >
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -321,7 +330,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
               </div>
             </div>
             
-            <div className="flex items-center">
+            <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
               {renderActionButtons(session)}
             </div>
           </div>
@@ -365,6 +374,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
         )}
       </div>
 
+      {/* All the existing dialogs */}
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -481,6 +491,15 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add Lesson Details Dialog */}
+      {selectedSession && (
+        <LessonDetailsDialog
+          session={selectedSession}
+          open={detailsDialogOpen}
+          onOpenChange={setDetailsDialogOpen}
+        />
+      )}
     </div>
   );
 };

@@ -63,6 +63,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   const [subject, setSubject] = useState<string>('');
   const [time, setTime] = useState<string>('');
   const [duration, setDuration] = useState<string>('');
+  const [cost, setCost] = useState<string>('');
   
   const { addSessions } = usePayments();
 
@@ -88,7 +89,8 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
       paymentStatus: "unpaid" as const,
       notes: `${subject} lesson with ${student}`,
       sessionNumber: 1,
-      totalSessions: 10
+      totalSessions: 10,
+      cost: cost ? Number(cost) : 0 // Add cost property
     };
     
     // Add to context
@@ -111,6 +113,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
     setSubject('');
     setTime('');
     setDuration('');
+    setCost('');
   };
 
   return (
@@ -208,6 +211,19 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          
+          {/* Cost */}
+          <div className="space-y-2">
+            <Label htmlFor="cost">Cost ($)</Label>
+            <Input 
+              id="cost" 
+              type="number" 
+              min="0" 
+              placeholder="Enter lesson cost" 
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+            />
           </div>
           
           <DialogFooter className="pt-4">
