@@ -111,7 +111,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
       sessionCount: data.sessionCount,
       duration: data.duration,
       startDate: data.startDate,
-      schedule: data.schedule,
+      schedule: data.schedule as DaySchedule[], // Ensure proper type casting
       pricePerSession: data.pricePerSession,
       totalPrice: data.pricePerSession * data.sessionCount,
       notes: data.notes || "",
