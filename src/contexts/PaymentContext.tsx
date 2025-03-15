@@ -117,7 +117,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
-  // New method to update session status (for cancel and complete actions)
+  // Method to update session status (for cancel and complete actions)
   const updateSessionStatus = (sessionId: string, status: Session['status']) => {
     setSessions(prevSessions => 
       prevSessions.map(session => 
@@ -126,7 +126,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
-  // New method to reschedule a session to the next available date
+  // Method to reschedule a session to the next available date
   const rescheduleSession = (sessionId: string) => {
     setSessions(prevSessions => {
       const sessionToReschedule = prevSessions.find(s => s.id === sessionId);
@@ -158,20 +158,18 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Set the same time as original
       newDate.setHours(originalDate.getHours(), originalDate.getMinutes());
       
-      // Create updated session
-      const updatedSessions = prevSessions.map(session => {
+      // Create updated session with correct status type
+      return prevSessions.map(session => {
         if (session.id === sessionId) {
           return {
             ...session,
             date: newDate,
             time: `${newDate.getHours()}:00`,
-            status: "scheduled"
+            status: "scheduled" as const
           };
         }
         return session;
       });
-      
-      return updatedSessions;
     });
   };
 
