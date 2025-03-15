@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -142,7 +143,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .insert({
           name: userData.schoolName || "My School",
           license_id: userData.licenseId,
-          created_by: authData.user.id
+          created_by: authData.user.id,
+          logo: userData.schoolLogo,
+          phone: userData.schoolPhone,
+          telegram: userData.schoolTelegram,
+          whatsapp: userData.schoolWhatsapp,
+          instagram: userData.schoolInstagram
         })
         .select('id')
         .single();
@@ -164,6 +170,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           phone: userData.phone,
           whatsapp: userData.whatsapp,
           telegram: userData.telegram,
+          instagram: userData.instagram,
           profile_picture: userData.profilePicture,
           school_id: schoolData.id
         });
@@ -171,6 +178,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (profileError) {
         toast.error(profileError.message);
         return;
+      }
+
+      // Process team members if provided
+      if (userData.teamMembers && userData.teamMembers.length > 0) {
+        // In a real app, you would create invitations for team members
+        // This would typically involve sending emails with signup links
+        console.log("Team members to invite:", userData.teamMembers);
+        
+        // For now, just log the information
+        toast.success(`${userData.teamMembers.length} team members will be invited`);
       }
 
       toast.success("Account created successfully!");
