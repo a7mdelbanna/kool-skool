@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { format, differenceInDays } from "date-fns";
+import { format } from "date-fns";
 import { Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInCalendarDays } from "date-fns";
@@ -26,25 +26,25 @@ const SubscriptionInfo = () => {
     try {
       setIsLoading(true);
 
-      // First get the user's school ID
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('school_id')
-        .eq('id', user?.id)
-        .single();
+      // First get the school ID directly from the RPC function
+      const { data: schoolIdData, error: schoolIdError } = await supabase
+        .rpc('get_user_school_id', { user_id_param: user?.id });
 
-      if (profileError) throw profileError;
-      if (!profileData?.school_id) {
+      if (schoolIdError) throw schoolIdError;
+      
+      if (!schoolIdData || schoolIdData.length === 0 || !schoolIdData[0]?.school_id) {
         toast.error("No school associated with this account");
         setIsLoading(false);
         return;
       }
+      
+      const schoolId = schoolIdData[0].school_id;
 
       // Get school info
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
-        .select('*, licenses(*)')
-        .eq('id', profileData.school_id)
+        .select('*')
+        .eq('id', schoolId)
         .single();
 
       if (schoolError) throw schoolError;
