@@ -5,7 +5,7 @@ import { Calendar, Clock, CheckCircle, X, AlertTriangle, CalendarX } from "lucid
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { Badge } from "@/components/ui/badge";
-import { usePayments } from "@/contexts/PaymentContext";
+import { usePayments, Session } from "@/contexts/PaymentContext";
 
 interface SessionsTabProps {
   studentData: Partial<Student>;
