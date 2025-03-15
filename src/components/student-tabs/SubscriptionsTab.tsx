@@ -104,9 +104,15 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
   const watchSessionCount = form.watch("sessionCount");
   
   // Calculate total price based on selected price mode
-  const totalPrice = watchPriceMode === "perSession" 
-    ? watchPricePerSession * watchSessionCount
-    : watchFixedPrice;
+  const calculateTotalPrice = (): number => {
+    if (watchPriceMode === "perSession") {
+      return watchPricePerSession * watchSessionCount;
+    } else {
+      return watchFixedPrice;
+    }
+  };
+  
+  const totalPrice = calculateTotalPrice();
   
   const toggleDay = (day: string) => {
     const existingDay = selectedDays.find(d => d.day === day);
@@ -191,7 +197,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                     <span className="text-sm font-medium">${subscription.totalPrice.toFixed(2)}</span>
                     {subscription.priceMode === "perSession" && (
                       <span className="text-xs text-muted-foreground">
-                        (${subscription.pricePerSession} per session)
+                        (${subscription.pricePerSession.toFixed(2)} per session)
                       </span>
                     )}
                     {subscription.priceMode === "fixed" && (
@@ -415,7 +421,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               <div>
                 <FormLabel>Total Price</FormLabel>
                 <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 flex items-center">
-                  <span className="font-medium">${totalPrice.toFixed(2)}</span>
+                  <span className="font-medium">${typeof totalPrice === 'number' ? totalPrice.toFixed(2) : '0.00'}</span>
                 </div>
               </div>
             </div>
