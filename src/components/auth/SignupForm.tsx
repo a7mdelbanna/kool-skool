@@ -138,6 +138,8 @@ const SignupForm = () => {
   // License verification submission handler
   const handleLicenseSubmit = async (data: LicenseFormValues) => {
     try {
+      console.log("Submitting license number:", data.licenseNumber);
+      
       const result = await signUp(data.licenseNumber);
       
       console.log("License verification result:", result);
@@ -145,8 +147,13 @@ const SignupForm = () => {
       if (result.valid) {
         setLicenseData({ licenseId: result.licenseId });
         toast.success(result.message || "License validated successfully");
-        // Force the step change after a successful validation
-        setStep(2);
+        console.log("Setting step to 2");
+        
+        // Important: Force step change with a small delay to ensure the state is updated
+        setTimeout(() => {
+          setStep(2);
+          console.log("Step should now be 2");
+        }, 100);
       } else {
         toast.error(result.message || "License verification failed");
       }
