@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,7 +40,7 @@ const OnboardingFlow = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const totalSteps = 4;
-
+  
   // Initialize onboarding data with empty values
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     firstName: "",
