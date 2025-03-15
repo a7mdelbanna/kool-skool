@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,15 @@ import { PaymentProvider } from "@/contexts/PaymentContext";
 interface AddStudentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  student?: Student | null;
+  isEditMode?: boolean;
 }
 
 const AddStudentDialog: React.FC<AddStudentDialogProps> = ({ 
   open, 
-  onOpenChange 
+  onOpenChange,
+  student,
+  isEditMode = false
 }) => {
   const [activeTab, setActiveTab] = useState("profile");
   const [studentData, setStudentData] = useState<Partial<Student>>({
@@ -32,6 +36,27 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     level: "beginner",
     paymentStatus: "pending"
   });
+  
+  const isViewMode = student && !isEditMode;
+  
+  // Load student data when viewing or editing
+  useEffect(() => {
+    if (student) {
+      setStudentData(student);
+    } else {
+      // Reset to default values when adding a new student
+      setStudentData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        lessonType: "individual",
+        ageGroup: "adult",
+        courseName: "",
+        level: "beginner",
+        paymentStatus: "pending"
+      });
+    }
+  }, [student, open]);
 
   const handleSave = () => {
     // Here you would typically save the student data to your database
@@ -40,7 +65,12 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
       return;
     }
     
-    toast.success("Student added successfully");
+    if (isEditMode) {
+      toast.success(`${studentData.firstName} ${studentData.lastName} updated successfully`);
+    } else if (!student) {
+      toast.success("Student added successfully");
+    }
+    
     onOpenChange(false);
   };
 
@@ -48,9 +78,16 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Add New Student</DialogTitle>
+          <DialogTitle className="text-2xl">
+            {isViewMode ? 'Student Details' : isEditMode ? 'Edit Student' : 'Add New Student'}
+          </DialogTitle>
           <DialogDescription>
-            Add a new student's details across multiple categories
+            {isViewMode ? 
+              "View student's details across multiple categories" : 
+              isEditMode ? 
+              "Edit student's details across multiple categories" :
+              "Add a new student's details across multiple categories"
+            }
           </DialogDescription>
         </DialogHeader>
         
@@ -76,30 +113,32 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
             </TabsList>
             
             <TabsContent value="profile">
-              <ProfileTab studentData={studentData} setStudentData={setStudentData} />
+              <ProfileTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
             </TabsContent>
             
             <TabsContent value="subscriptions">
-              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} />
+              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
             </TabsContent>
             
             <TabsContent value="payments">
-              <PaymentsTab studentData={studentData} setStudentData={setStudentData} />
+              <PaymentsTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
             </TabsContent>
             
             <TabsContent value="sessions">
-              <SessionsTab studentData={studentData} setStudentData={setStudentData} />
+              <SessionsTab studentData={studentData} setStudentData={setStudentData} readOnly={isViewMode} />
             </TabsContent>
           </Tabs>
         </PaymentProvider>
         
         <div className="flex justify-end mt-6 space-x-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {isViewMode ? 'Close' : 'Cancel'}
           </Button>
-          <Button onClick={handleSave}>
-            Save Student
-          </Button>
+          {!isViewMode && (
+            <Button onClick={handleSave}>
+              {isEditMode ? 'Update Student' : 'Save Student'}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StudentCard, { Student } from '@/components/StudentCard';
 import AddStudentDialog from '@/components/AddStudentDialog';
+import { toast } from 'sonner';
+import { PaymentProvider } from '@/contexts/PaymentContext';
 
-// Sample data for demonstration
 const sampleStudents: Student[] = [
   {
     id: '1',
@@ -20,7 +21,8 @@ const sampleStudents: Student[] = [
     level: 'beginner',
     lessonsCompleted: 12,
     nextLesson: 'Today, 4 PM',
-    paymentStatus: 'paid'
+    paymentStatus: 'paid',
+    nextPaymentDate: 'Next month, 15'
   },
   {
     id: '2',
@@ -33,7 +35,8 @@ const sampleStudents: Student[] = [
     level: 'intermediate',
     lessonsCompleted: 8,
     nextLesson: 'Tomorrow, 3 PM',
-    paymentStatus: 'pending'
+    paymentStatus: 'pending',
+    nextPaymentDate: 'This week, Friday'
   },
   {
     id: '3',
@@ -46,7 +49,8 @@ const sampleStudents: Student[] = [
     level: 'advanced',
     lessonsCompleted: 15,
     nextLesson: 'Friday, 5 PM',
-    paymentStatus: 'overdue'
+    paymentStatus: 'overdue',
+    nextPaymentDate: 'Overdue since 05/15'
   },
   {
     id: '4',
@@ -120,6 +124,8 @@ const Students = () => {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedTab, setSelectedTab] = useState('all');
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   const courses = Array.from(new Set(sampleStudents.map(s => s.courseName)));
   
@@ -134,7 +140,6 @@ const Students = () => {
   const filterStudents = () => {
     let filtered = [...sampleStudents];
     
-    // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(
         student => 
@@ -144,14 +149,12 @@ const Students = () => {
       );
     }
     
-    // Apply course filters
     if (activeFilters.length > 0) {
       filtered = filtered.filter(student => 
         activeFilters.includes(student.courseName)
       );
     }
     
-    // Apply tab filters
     if (selectedTab !== 'all') {
       filtered = filtered.filter(student => 
         student.paymentStatus === selectedTab
@@ -159,6 +162,28 @@ const Students = () => {
     }
     
     return filtered;
+  };
+  
+  const handleViewStudent = (student: Student) => {
+    setSelectedStudent(student);
+    setIsEditMode(false);
+    setIsAddStudentOpen(true);
+  };
+  
+  const handleEditStudent = (student: Student) => {
+    setSelectedStudent(student);
+    setIsEditMode(true);
+    setIsAddStudentOpen(true);
+  };
+  
+  const handleDeleteStudent = (student: Student) => {
+    toast.success(`${student.firstName} ${student.lastName} deleted successfully`);
+  };
+  
+  const handleCloseDialog = () => {
+    setIsAddStudentOpen(false);
+    setSelectedStudent(null);
+    setIsEditMode(false);
   };
   
   const filteredStudents = filterStudents();
@@ -174,7 +199,11 @@ const Students = () => {
         <Button 
           className="gap-2 shrink-0" 
           variant="default"
-          onClick={() => setIsAddStudentOpen(true)}
+          onClick={() => {
+            setSelectedStudent(null);
+            setIsEditMode(false);
+            setIsAddStudentOpen(true);
+          }}
         >
           <PlusCircle className="h-4 w-4" />
           <span>Add New Student</span>
@@ -248,7 +277,14 @@ const Students = () => {
           {filteredStudents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 element-transition">
               {filteredStudents.map(student => (
-                <StudentCard key={student.id} student={student} className="glass glass-hover" />
+                <StudentCard 
+                  key={student.id} 
+                  student={student} 
+                  className="glass glass-hover" 
+                  onView={handleViewStudent}
+                  onEdit={handleEditStudent}
+                  onDelete={handleDeleteStudent}
+                />
               ))}
             </div>
           ) : (
@@ -260,10 +296,14 @@ const Students = () => {
         </TabsContent>
       </Tabs>
       
-      <AddStudentDialog 
-        open={isAddStudentOpen} 
-        onOpenChange={setIsAddStudentOpen}
-      />
+      <PaymentProvider>
+        <AddStudentDialog 
+          open={isAddStudentOpen} 
+          onOpenChange={handleCloseDialog}
+          student={selectedStudent}
+          isEditMode={isEditMode}
+        />
+      </PaymentProvider>
     </div>
   );
 };
