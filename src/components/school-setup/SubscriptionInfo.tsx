@@ -12,17 +12,59 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { Loader2, Calendar, UserPlus, Users } from "lucide-react";
+import { Loader2, Calendar, UserPlus, Users, Mail, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInCalendarDays } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+// Form schema for adding staff
+const staffSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  role: z.string().min(1, { message: "Please select a role" }),
+});
+
+type StaffFormValues = z.infer<typeof staffSchema>;
 
 const SubscriptionInfo = () => {
   const [license, setLicense] = useState<any>(null);
   const [school, setSchool] = useState<any>(null);
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const { user } = useAuth();
+  
+  // Initialize form
+  const form = useForm<StaffFormValues>({
+    resolver: zodResolver(staffSchema),
+    defaultValues: {
+      email: "",
+      role: "",
+    },
+  });
 
   const fetchSubscriptionInfo = async () => {
     try {
@@ -110,6 +152,69 @@ const SubscriptionInfo = () => {
       fetchSubscriptionInfo();
     }
   }, [user]);
+
+  const onSubmitStaffForm = async (data: StaffFormValues) => {
+    if (!school?.id) {
+      toast.error("School information not found");
+      return;
+    }
+    
+    setIsAddingStaff(true);
+    
+    try {
+      // Check if user already exists with this email
+      const { data: existingUserData, error: existingUserError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', data.email);
+        
+      if (existingUserError) {
+        throw existingUserError;
+      }
+      
+      if (existingUserData && existingUserData.length > 0) {
+        // If user exists, update their role and school_id
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            school_id: school.id,
+            role: data.role
+          })
+          .eq('email', data.email);
+          
+        if (updateError) throw updateError;
+        
+        toast.success(`${data.email} added to your school as ${data.role}`);
+      } else {
+        // If user doesn't exist, create a "pending" profile
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            email: data.email,
+            role: data.role,
+            school_id: school.id,
+            status: 'pending'
+          });
+          
+        if (insertError) throw insertError;
+        
+        toast.success(`Invitation sent to ${data.email} as ${data.role}`);
+      }
+      
+      // Reset form and close dialog
+      form.reset();
+      setDialogOpen(false);
+      
+      // Refresh the staff list
+      fetchSubscriptionInfo();
+      
+    } catch (error: any) {
+      console.error("Error adding staff member:", error);
+      toast.error(`Failed to add staff: ${error.message}`);
+    } finally {
+      setIsAddingStaff(false);
+    }
+  };
 
   const getRemainingDays = () => {
     if (!license?.expires_at) return 0;
@@ -249,10 +354,80 @@ const SubscriptionInfo = () => {
               Manage staff members associated with your school
             </CardDescription>
           </div>
-          <Button className="ml-auto">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Staff
-          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="ml-auto">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add Staff
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add Staff Member</DialogTitle>
+                <DialogDescription>
+                  Invite a new staff member to join your school.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmitStaffForm)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter email address" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="teacher">Teacher</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="director">Director</SelectItem>
+                            <SelectItem value="staff">Staff</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isAddingStaff}>
+                      {isAddingStaff ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Add Staff
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </CardHeader>
         <CardContent>
           {staffMembers.length === 0 ? (
@@ -275,10 +450,23 @@ const SubscriptionInfo = () => {
                       <p className="font-medium">
                         {staff.first_name} {staff.last_name}
                       </p>
-                      <p className="text-sm text-muted-foreground">{staff.email}</p>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Mail className="h-3 w-3" />
+                        <span>{staff.email}</span>
+                      </div>
                     </div>
                   </div>
-                  <Badge>{getRoleLabel(staff.role)}</Badge>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-xs">
+                      <Shield className="h-3 w-3" />
+                      <span>{getRoleLabel(staff.role)}</span>
+                    </div>
+                    {staff.status === 'pending' && (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-600">
+                        Pending
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
