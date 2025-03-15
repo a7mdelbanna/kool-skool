@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -115,25 +116,28 @@ const OnboardingFlow = () => {
     }
   };
 
-  // Save personal details to database
+  // Save personal details to database - Modified to use direct SQL RPC call
   const savePersonalDetails = async () => {
     if (!user) return;
     
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        first_name: onboardingData.firstName,
-        last_name: onboardingData.lastName,
-        phone: onboardingData.phone,
-        profile_picture: onboardingData.profilePicture,
-        telegram: onboardingData.telegram || null,
-        whatsapp: onboardingData.whatsapp || null,
-        instagram: onboardingData.instagram || null
-      })
-      .eq('id', user.id);
-    
-    if (error) throw error;
-    toast.success("Personal details saved successfully");
+    try {
+      const { error } = await supabase.rpc('update_user_profile', {
+        user_id: user.id,
+        first_name_param: onboardingData.firstName,
+        last_name_param: onboardingData.lastName,
+        phone_param: onboardingData.phone,
+        profile_picture_param: onboardingData.profilePicture,
+        telegram_param: onboardingData.telegram || null,
+        whatsapp_param: onboardingData.whatsapp || null,
+        instagram_param: onboardingData.instagram || null
+      });
+      
+      if (error) throw error;
+      toast.success("Personal details saved successfully");
+    } catch (error: any) {
+      console.error("Error saving personal details:", error);
+      throw error;
+    }
   };
 
   // Save school details to database
@@ -144,15 +148,13 @@ const OnboardingFlow = () => {
     if (!onboardingData.schoolName.trim()) return;
     
     // First get the user's profile to get the school_id
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('school_id')
-      .eq('id', user.id)
-      .single();
+    const { data: profileData, error: profileError } = await supabase.rpc('get_user_school_id', {
+      user_id_param: user.id
+    });
     
     if (profileError) throw profileError;
     
-    if (!profileData.school_id) {
+    if (!profileData?.school_id) {
       throw new Error("No school associated with this account");
     }
     
