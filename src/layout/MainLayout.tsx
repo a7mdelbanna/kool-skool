@@ -12,7 +12,7 @@ const MainLayout = () => {
         <Sidebar />
         <div className="flex-1 flex flex-col">
           <MobileNavbar />
-          <main className="flex-1 p-4 pt-20 pb-20 lg:pt-4 lg:pb-4 overflow-auto">
+          <main className="flex-1 p-4 pt-20 pb-20 lg:pt-6 lg:pb-6 overflow-auto">
             <div className="max-w-7xl mx-auto transition-all duration-300 page-transition">
               <Outlet />
             </div>
