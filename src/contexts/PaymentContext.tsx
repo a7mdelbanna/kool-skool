@@ -1,6 +1,6 @@
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { addDays, subDays } from 'date-fns';
+import { addDays, subDays, addWeeks, getDay } from 'date-fns';
 
 export interface Payment {
   id: string;
@@ -32,6 +32,8 @@ interface PaymentContextType {
   sessions: Session[];
   addSessions: (sessions: Omit<Session, 'id'>[]) => void;
   removeSessionsBySubscriptionId: (subscriptionId: string) => void;
+  updateSessionStatus: (sessionId: string, status: Session['status']) => void;
+  rescheduleSession: (sessionId: string) => void;
 }
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
@@ -115,6 +117,64 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
+  // New method to update session status (for cancel and complete actions)
+  const updateSessionStatus = (sessionId: string, status: Session['status']) => {
+    setSessions(prevSessions => 
+      prevSessions.map(session => 
+        session.id === sessionId ? { ...session, status } : session
+      )
+    );
+  };
+
+  // New method to reschedule a session to the next available date
+  const rescheduleSession = (sessionId: string) => {
+    setSessions(prevSessions => {
+      const sessionToReschedule = prevSessions.find(s => s.id === sessionId);
+      
+      if (!sessionToReschedule || !sessionToReschedule.subscriptionId) {
+        return prevSessions;
+      }
+      
+      // Find all sessions from the same subscription
+      const subscriptionSessions = prevSessions
+        .filter(s => s.subscriptionId === sessionToReschedule.subscriptionId)
+        .filter(s => s.status === "scheduled" || s.id === sessionId);
+      
+      // Find the last scheduled session date
+      const lastSessionDate = new Date(
+        Math.max(...subscriptionSessions.map(s => new Date(s.date).getTime()))
+      );
+      
+      // Determine the day of week for the original session
+      const originalDate = new Date(sessionToReschedule.date);
+      const dayOfWeek = getDay(originalDate);
+      
+      // Find next occurrence of that day after the last session
+      let newDate = addWeeks(lastSessionDate, 1);
+      while (getDay(newDate) !== dayOfWeek) {
+        newDate = addDays(newDate, 1);
+      }
+      
+      // Set the same time as original
+      newDate.setHours(originalDate.getHours(), originalDate.getMinutes());
+      
+      // Create updated session
+      const updatedSessions = prevSessions.map(session => {
+        if (session.id === sessionId) {
+          return {
+            ...session,
+            date: newDate,
+            time: `${newDate.getHours()}:00`,
+            status: "scheduled"
+          };
+        }
+        return session;
+      });
+      
+      return updatedSessions;
+    });
+  };
+
   return (
     <PaymentContext.Provider value={{ 
       payments, 
@@ -122,7 +182,9 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       removePayment,
       sessions,
       addSessions,
-      removeSessionsBySubscriptionId
+      removeSessionsBySubscriptionId,
+      updateSessionStatus,
+      rescheduleSession
     }}>
       {children}
     </PaymentContext.Provider>
