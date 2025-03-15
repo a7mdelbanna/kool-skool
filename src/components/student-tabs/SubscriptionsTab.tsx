@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { 
   Form,
@@ -74,11 +73,7 @@ const durationOptions = [
 const currencyOptions = [
   { symbol: "$", code: "USD", name: "US Dollar" },
   { symbol: "€", code: "EUR", name: "Euro" },
-  { symbol: "£", code: "GBP", name: "British Pound" },
-  { symbol: "¥", code: "JPY", name: "Japanese Yen" },
-  { symbol: "₹", code: "INR", name: "Indian Rupee" },
-  { symbol: "A$", code: "AUD", name: "Australian Dollar" },
-  { symbol: "C$", code: "CAD", name: "Canadian Dollar" },
+  { symbol: "₽", code: "RUB", name: "Russian Ruble" },
 ];
 
 const subscriptionSchema = z.object({
@@ -447,7 +442,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               )}
             />
             
-            <div className="flex gap-4">
+            <div className="flex items-start gap-4">
               <div className="flex-1">
                 {watchPriceMode === "perSession" ? (
                   <FormField
