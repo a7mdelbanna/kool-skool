@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StudentCard, { Student } from '@/components/StudentCard';
+import AddStudentDialog from '@/components/AddStudentDialog';
 
 // Sample data for demonstration
 const sampleStudents: Student[] = [
@@ -87,6 +88,7 @@ const Students = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedTab, setSelectedTab] = useState('all');
+  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   
   const subjects = Array.from(new Set(sampleStudents.map(s => s.subject)));
   
@@ -138,7 +140,11 @@ const Students = () => {
           <p className="text-muted-foreground mt-1">Manage your students and track their progress</p>
         </div>
         
-        <Button className="gap-2 shrink-0" variant="default">
+        <Button 
+          className="gap-2 shrink-0" 
+          variant="default"
+          onClick={() => setIsAddStudentOpen(true)}
+        >
           <PlusCircle className="h-4 w-4" />
           <span>Add New Student</span>
         </Button>
@@ -222,8 +228,14 @@ const Students = () => {
           )}
         </TabsContent>
       </Tabs>
+      
+      <AddStudentDialog 
+        open={isAddStudentOpen} 
+        onOpenChange={setIsAddStudentOpen}
+      />
     </div>
   );
 };
 
 export default Students;
+
