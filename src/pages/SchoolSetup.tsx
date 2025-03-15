@@ -16,7 +16,7 @@ import {
   School, 
   Phone, 
   Instagram, 
-  Telegram, 
+  MessageSquare, 
   Briefcase,
   Users,
   Upload,
@@ -384,7 +384,7 @@ const SchoolSetup = () => {
               <div className="space-y-2">
                 <Label htmlFor="school-telegram">Telegram</Label>
                 <div className="flex items-center">
-                  <Telegram className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
                   <Input 
                     id="school-telegram" 
                     name="telegram" 
@@ -504,7 +504,7 @@ const SchoolSetup = () => {
                   <div className="space-y-2">
                     <Label htmlFor={`teacher-telegram-${teacher.id}`}>Telegram</Label>
                     <div className="flex items-center">
-                      <Telegram className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
                       <Input 
                         id={`teacher-telegram-${teacher.id}`}
                         value={teacher.telegram}
