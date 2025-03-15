@@ -35,6 +35,26 @@ interface OnboardingData {
   teamMembers: { email: string; role: string }[];
 }
 
+// Type definitions for our custom RPC functions
+type UpdateUserProfileParams = {
+  user_id: string;
+  first_name_param: string;
+  last_name_param: string;
+  phone_param: string;
+  profile_picture_param: string | null;
+  telegram_param: string | null;
+  whatsapp_param: string | null;
+  instagram_param: string | null;
+};
+
+type GetUserSchoolIdParams = {
+  user_id_param: string;
+};
+
+type SchoolIdData = {
+  school_id: string;
+}[];
+
 const OnboardingFlow = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -122,16 +142,20 @@ const OnboardingFlow = () => {
     
     try {
       // Using the custom RPC function we created to avoid RLS recursion
-      const { error } = await supabase.rpc('update_user_profile', {
-        user_id: user.id,
-        first_name_param: onboardingData.firstName,
-        last_name_param: onboardingData.lastName,
-        phone_param: onboardingData.phone,
-        profile_picture_param: onboardingData.profilePicture,
-        telegram_param: onboardingData.telegram || null,
-        whatsapp_param: onboardingData.whatsapp || null,
-        instagram_param: onboardingData.instagram || null
-      });
+      // Use type assertion to allow using the custom function
+      const { error } = await supabase.rpc<void, UpdateUserProfileParams>(
+        'update_user_profile', 
+        {
+          user_id: user.id,
+          first_name_param: onboardingData.firstName,
+          last_name_param: onboardingData.lastName,
+          phone_param: onboardingData.phone,
+          profile_picture_param: onboardingData.profilePicture,
+          telegram_param: onboardingData.telegram || null,
+          whatsapp_param: onboardingData.whatsapp || null,
+          instagram_param: onboardingData.instagram || null
+        }
+      );
       
       if (error) throw error;
       toast.success("Personal details saved successfully");
@@ -149,15 +173,19 @@ const OnboardingFlow = () => {
     if (!onboardingData.schoolName.trim()) return;
     
     // First get the user's profile to get the school_id using our custom function
-    const { data, error: profileError } = await supabase.rpc('get_user_school_id', {
-      user_id_param: user.id
-    });
+    // Use type assertion to allow using the custom function
+    const { data, error: profileError } = await supabase.rpc<SchoolIdData, GetUserSchoolIdParams>(
+      'get_user_school_id',
+      {
+        user_id_param: user.id
+      }
+    );
     
     if (profileError) throw profileError;
     
     // Extract the school_id from the returned data
     // The function returns a table with a single column 'school_id'
-    if (!data || !data[0]?.school_id) {
+    if (!data || data.length === 0 || !data[0]?.school_id) {
       throw new Error("No school associated with this account");
     }
     
