@@ -387,48 +387,50 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               )}
             />
             
-            <div className="grid grid-cols-2 gap-4">
-              {watchPriceMode === "perSession" ? (
-                <FormField
-                  control={form.control}
-                  name="pricePerSession"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price per Session ($)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          step="0.01" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="fixedPrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fixed Price ($)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          step="0.01" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+            <div className="flex gap-4">
+              <div className="flex-1">
+                {watchPriceMode === "perSession" ? (
+                  <FormField
+                    control={form.control}
+                    name="pricePerSession"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price per Session ($)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="fixedPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fixed Price ($)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
               
-              <div>
+              <div className="flex-1">
                 <FormLabel>Total Price</FormLabel>
                 <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 flex items-center">
                   <span className="font-medium">${totalPrice.toFixed(2)}</span>
