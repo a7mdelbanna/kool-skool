@@ -21,9 +21,13 @@ import {
   Linkedin, 
   Mail, 
   Phone, 
-  User
+  User,
+  MessageCircle,
+  Send
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface ProfileTabProps {
   studentData: Partial<Student>;
@@ -39,12 +43,17 @@ const profileSchema = z.object({
   twitter: z.string().optional(),
   instagram: z.string().optional(),
   linkedin: z.string().optional(),
+  telegram: z.string().optional(),
+  whatsapp: z.string().optional(),
   notes: z.string().optional(),
+  image: z.any().optional()
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) => {
+  const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -56,9 +65,46 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
       twitter: "",
       instagram: "",
       linkedin: "",
+      telegram: "",
+      whatsapp: "",
       notes: "",
+      image: null
     },
   });
+
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+    
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Only image files are allowed");
+      return;
+    }
+    
+    // Create a URL for preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setPhotoPreview(result);
+      
+      // Update form data
+      form.setValue("image", file);
+      
+      // Update student data
+      setStudentData(prev => ({
+        ...prev,
+        image: result
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const onSubmit = (data: ProfileFormValues) => {
     setStudentData((prev) => ({ ...prev, ...data }));
@@ -89,12 +135,23 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
       <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
         <div className="flex flex-col items-center gap-2">
           <Avatar className="h-24 w-24">
-            <AvatarImage src="" alt={studentData.name} />
+            <AvatarImage src={photoPreview || ""} alt={studentData.name} />
             <AvatarFallback className="text-xl">
               {studentData.name ? getInitials(studentData.name) : <User />}
             </AvatarFallback>
           </Avatar>
-          {/* We could add an upload photo button here in the future */}
+          <input 
+            type="file" 
+            id="photo-upload" 
+            className="hidden" 
+            accept="image/*"
+            onChange={handlePhotoUpload}
+          />
+          <label htmlFor="photo-upload">
+            <Button variant="outline" size="sm" className="cursor-pointer" asChild>
+              <span>Upload Photo</span>
+            </Button>
+          </label>
         </div>
         
         <div className="flex-1">
@@ -228,6 +285,40 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                           <div className="relative">
                             <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input className="pl-10" placeholder="LinkedIn username" {...field} />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="telegram"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telegram</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Send className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input className="pl-10" placeholder="Telegram username" {...field} />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="whatsapp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WhatsApp</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input className="pl-10" placeholder="WhatsApp number" {...field} />
                           </div>
                         </FormControl>
                         <FormMessage />

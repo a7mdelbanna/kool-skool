@@ -15,6 +15,13 @@ export type Student = {
   lessonsCompleted: number;
   nextLesson?: string;
   paymentStatus: 'paid' | 'pending' | 'overdue';
+  facebook?: string;
+  twitter?: string;
+  instagram?: string;
+  linkedin?: string;
+  telegram?: string;
+  whatsapp?: string;
+  notes?: string;
 };
 
 interface StudentCardProps {
