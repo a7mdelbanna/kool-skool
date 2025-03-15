@@ -186,14 +186,18 @@ const SubscriptionInfo = () => {
         
         toast.success(`${data.email} added to your school as ${data.role}`);
       } else {
-        // If user doesn't exist, create a "pending" profile
+        // Create a custom UUID for the new profile
+        const profileId = crypto.randomUUID();
+        
+        // If user doesn't exist, create a new profile
+        // Note: We're not using 'status' field as it doesn't exist in the schema
         const { error: insertError } = await supabase
           .from('profiles')
           .insert({
+            id: profileId,
             email: data.email,
             role: data.role,
-            school_id: school.id,
-            status: 'pending'
+            school_id: school.id
           });
           
         if (insertError) throw insertError;
@@ -259,6 +263,12 @@ const SubscriptionInfo = () => {
 
   const getRoleLabel = (role: string) => {
     return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
+  // Helper function to determine if a staff member is pending
+  const isStaffPending = (staff: any) => {
+    // Check if any required fields are missing
+    return !staff.first_name || !staff.last_name;
   };
 
   if (isLoading) {
@@ -448,7 +458,7 @@ const SubscriptionInfo = () => {
                     </Avatar>
                     <div>
                       <p className="font-medium">
-                        {staff.first_name} {staff.last_name}
+                        {staff.first_name} {staff.last_name || "(No name set)"}
                       </p>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Mail className="h-3 w-3" />
@@ -461,7 +471,7 @@ const SubscriptionInfo = () => {
                       <Shield className="h-3 w-3" />
                       <span>{getRoleLabel(staff.role)}</span>
                     </div>
-                    {staff.status === 'pending' && (
+                    {isStaffPending(staff) && (
                       <Badge variant="outline" className="bg-amber-50 text-amber-600">
                         Pending
                       </Badge>
