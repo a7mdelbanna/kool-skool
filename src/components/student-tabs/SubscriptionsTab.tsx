@@ -387,7 +387,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
               )}
             />
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {watchPriceMode === "perSession" ? (
                 <FormField
                   control={form.control}
@@ -401,9 +401,6 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                           min="0" 
                           step="0.01" 
                           {...field} 
-                          onChange={(e) => {
-                            field.onChange(e);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -423,9 +420,6 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ studentData, setStu
                           min="0" 
                           step="0.01" 
                           {...field} 
-                          onChange={(e) => {
-                            field.onChange(e);
-                          }}
                         />
                       </FormControl>
                       <FormMessage />
