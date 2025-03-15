@@ -68,7 +68,6 @@ const SubscriptionInfo = () => {
   const [noSchoolFound, setNoSchoolFound] = useState(false);
   const { user } = useAuth();
   
-  // Initialize forms
   const staffForm = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
     defaultValues: {
@@ -97,7 +96,6 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      // First get the school ID from the RPC function
       const { data: schoolIdData, error: schoolIdError } = await supabase
         .rpc('get_user_school_id', { user_id_param: user.id });
 
@@ -120,7 +118,6 @@ const SubscriptionInfo = () => {
       console.log("Found school ID:", schoolId);
       setNoSchoolFound(false);
 
-      // Get school info
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
         .select('*')
@@ -138,7 +135,6 @@ const SubscriptionInfo = () => {
       console.log("School data:", schoolData);
       setSchool(schoolData);
       
-      // Get license info using license_id from school
       if (schoolData.license_id) {
         const { data: licenseData, error: licenseError } = await supabase
           .from('licenses')
@@ -155,7 +151,6 @@ const SubscriptionInfo = () => {
         }
       }
       
-      // Fetch staff members (profiles with the same school_id)
       const { data: staffData, error: staffError } = await supabase
         .from('profiles')
         .select('*')
@@ -196,7 +191,6 @@ const SubscriptionInfo = () => {
     setIsAddingStaff(true);
     
     try {
-      // Check if user already exists with this email
       const { data: existingUserData, error: existingUserError } = await supabase
         .from('profiles')
         .select('*')
@@ -207,7 +201,6 @@ const SubscriptionInfo = () => {
       }
       
       if (existingUserData && existingUserData.length > 0) {
-        // If user exists, update their role and school_id
         const { error: updateError } = await supabase
           .from('profiles')
           .update({
@@ -220,7 +213,6 @@ const SubscriptionInfo = () => {
         
         toast.success(`${data.email} added to your school as ${data.role}`);
       } else {
-        // Try to create a complete auth account for the staff member
         try {
           const { data: authData, error: authError } = await supabase.auth.admin.createUser({
             email: data.email,
@@ -233,7 +225,6 @@ const SubscriptionInfo = () => {
           
           if (authError) throw authError;
           
-          // Create profile entry with the new user ID
           const profileId = authData.user.id;
           
           const { error: insertError } = await supabase
@@ -251,7 +242,6 @@ const SubscriptionInfo = () => {
         } catch (adminError: any) {
           console.error("Admin creation failed, trying regular signup:", adminError);
           
-          // If admin create fails, try regular signup
           const { data: signupData, error: signupError } = await supabase.auth.signUp({
             email: data.email,
             password: data.password,
@@ -264,7 +254,6 @@ const SubscriptionInfo = () => {
           
           if (signupError) throw signupError;
           
-          // Create profile entry with the new user ID
           const profileId = signupData.user?.id;
           
           if (!profileId) {
@@ -286,11 +275,9 @@ const SubscriptionInfo = () => {
         }
       }
       
-      // Reset form and close dialog
       staffForm.reset();
       setDialogOpen(false);
       
-      // Refresh the staff list
       fetchSubscriptionInfo();
       
     } catch (error: any) {
@@ -310,11 +297,13 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      // Call stored procedure to create school and update profile in one transaction
-      const { error } = await supabase.rpc('create_school_and_update_profile', {
-        school_name: data.name,
-        license_number: data.license_number
-      });
+      const { error } = await supabase.rpc(
+        'create_school_and_update_profile',
+        {
+          school_name: data.name,
+          license_number: data.license_number
+        }
+      );
       
       if (error) {
         console.error("Error creating school:", error);
@@ -326,7 +315,6 @@ const SubscriptionInfo = () => {
       schoolForm.reset();
       setSchoolDialogOpen(false);
       
-      // Refresh to show the new school info
       fetchSubscriptionInfo();
       
     } catch (error: any) {
@@ -390,7 +378,6 @@ const SubscriptionInfo = () => {
     return !staff.first_name || !staff.last_name;
   };
 
-  // No school found view
   if (noSchoolFound && !isLoading) {
     return (
       <Card className="text-center">

@@ -178,6 +178,10 @@ export type Database = {
           license_id: string
         }[]
       }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_user_in_school: {
         Args: {
           user_id_param: string
