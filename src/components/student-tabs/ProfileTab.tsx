@@ -23,11 +23,22 @@ import {
   Phone, 
   User,
   MessageCircle,
-  Send
+  Send,
+  Users,
+  Baby,
+  Book,
+  BarChart
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from "@/components/ui/select";
 
 interface ProfileTabProps {
   studentData: Partial<Student>;
@@ -38,7 +49,10 @@ const profileSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
   phone: z.string().optional(),
-  subject: z.string().min(1, { message: "Please specify a subject" }),
+  lessonType: z.enum(["individual", "group"]),
+  ageGroup: z.enum(["kid", "adult"]),
+  courseName: z.string().min(1, { message: "Please specify a course name" }),
+  level: z.enum(["beginner", "intermediate", "advanced", "fluent"]),
   facebook: z.string().optional(),
   twitter: z.string().optional(),
   instagram: z.string().optional(),
@@ -60,14 +74,17 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
       name: studentData.name || "",
       email: studentData.email || "",
       phone: "",
-      subject: studentData.subject || "",
-      facebook: "",
-      twitter: "",
-      instagram: "",
-      linkedin: "",
-      telegram: "",
-      whatsapp: "",
-      notes: "",
+      lessonType: studentData.lessonType || "individual",
+      ageGroup: studentData.ageGroup || "adult",
+      courseName: studentData.courseName || "",
+      level: studentData.level || "beginner",
+      facebook: studentData.facebook || "",
+      twitter: studentData.twitter || "",
+      instagram: studentData.instagram || "",
+      linkedin: studentData.linkedin || "",
+      telegram: studentData.telegram || "",
+      whatsapp: studentData.whatsapp || "",
+      notes: studentData.notes || "",
       image: null
     },
   });
@@ -135,7 +152,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
       <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
         <div className="flex flex-col items-center gap-2">
           <Avatar className="h-24 w-24">
-            <AvatarImage src={photoPreview || ""} alt={studentData.name} />
+            <AvatarImage src={photoPreview || studentData.image || ""} alt={studentData.name} />
             <AvatarFallback className="text-xl">
               {studentData.name ? getInitials(studentData.name) : <User />}
             </AvatarFallback>
@@ -208,13 +225,102 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData }) 
                 
                 <FormField
                   control={form.control}
-                  name="subject"
+                  name="lessonType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Subject*</FormLabel>
+                      <FormLabel>Lesson Type*</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <SelectValue placeholder="Select lesson type" />
+                            </div>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="individual">Individual</SelectItem>
+                          <SelectItem value="group">Group</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="ageGroup"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age Group*</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <div className="flex items-center gap-2">
+                              <Baby className="h-4 w-4 text-muted-foreground" />
+                              <SelectValue placeholder="Select age group" />
+                            </div>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="kid">Kid</SelectItem>
+                          <SelectItem value="adult">Adult</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="courseName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Course Name*</FormLabel>
                       <FormControl>
-                        <Input placeholder="Mathematics" {...field} />
+                        <div className="relative">
+                          <Book className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input className="pl-10" placeholder="English Conversation" {...field} />
+                        </div>
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="level"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Level*</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <div className="flex items-center gap-2">
+                              <BarChart className="h-4 w-4 text-muted-foreground" />
+                              <SelectValue placeholder="Select level" />
+                            </div>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                          <SelectItem value="fluent">Fluent</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

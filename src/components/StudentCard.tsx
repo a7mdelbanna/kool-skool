@@ -11,7 +11,10 @@ export type Student = {
   name: string;
   image?: string;
   email: string;
-  subject: string;
+  lessonType: 'individual' | 'group';
+  ageGroup: 'kid' | 'adult';
+  courseName: string;
+  level: 'beginner' | 'intermediate' | 'advanced' | 'fluent';
   lessonsCompleted: number;
   nextLesson?: string;
   paymentStatus: 'paid' | 'pending' | 'overdue';
@@ -43,6 +46,21 @@ const StudentCard = ({ student, className }: StudentCardProps) => {
     }
   };
 
+  const getLevelColor = (level: Student['level']) => {
+    switch (level) {
+      case 'beginner':
+        return 'bg-blue-100 text-blue-800';
+      case 'intermediate':
+        return 'bg-purple-100 text-purple-800';
+      case 'advanced':
+        return 'bg-orange-100 text-orange-800';
+      case 'fluent':
+        return 'bg-green-100 text-green-800';
+      default:
+        return '';
+    }
+  };
+
   return (
     <Card className={cn("overflow-hidden transition-all duration-300 hover:shadow-md", className)}>
       <CardContent className="p-6">
@@ -57,12 +75,22 @@ const StudentCard = ({ student, className }: StudentCardProps) => {
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base truncate">{student.name}</h3>
             <p className="text-sm text-muted-foreground truncate">{student.email}</p>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge variant="outline" className={cn("text-xs", getLevelColor(student.level))}>
+                {student.level}
+              </Badge>
               <Badge variant="outline" className="text-xs bg-secondary">
-                {student.subject}
+                {student.lessonType}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {student.ageGroup}
               </Badge>
             </div>
           </div>
+        </div>
+        
+        <div className="mt-3">
+          <p className="text-sm font-medium">{student.courseName}</p>
         </div>
         
         <div className="grid grid-cols-3 gap-4 mt-4">
