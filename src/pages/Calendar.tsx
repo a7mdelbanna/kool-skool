@@ -8,7 +8,15 @@ import {
   User,
   BookOpen,
   Plus,
-  Search
+  Search,
+  CreditCard,
+  DollarSign,
+  Calendar as CalendarLucide,
+  MessageSquare,
+  CheckCircle,
+  XCircle,
+  Clock4,
+  Info
 } from 'lucide-react';
 import { format, addDays, startOfWeek, addWeeks, subWeeks, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -18,6 +26,11 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { usePayments } from '@/contexts/PaymentContext';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerClose, DrawerFooter } from '@/components/ui/drawer';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useMediaQuery } from '@/hooks/use-mobile';
 
 // Constants
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 AM to 7 PM
@@ -45,6 +58,10 @@ const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(today);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSession, setSelectedSession] = useState<(Session & { subject: string }) | null>(null);
+  const [open, setOpen] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 640px)");
+  
   const { sessions } = usePayments();
   
   // Convert session dates from string to Date objects
@@ -99,6 +116,146 @@ const Calendar = () => {
   // Get color for a subject
   const getSubjectColors = (subject: string) => {
     return subjectColorMap[subject] || subjectColorMap.default;
+  };
+
+  // Handle session click to show details
+  const handleSessionClick = (session: Session & { subject: string }) => {
+    setSelectedSession(session);
+    setOpen(true);
+  };
+
+  // Get status badge details
+  const getStatusBadge = (status: Session['status']) => {
+    switch (status) {
+      case 'completed':
+        return { label: 'Completed', variant: 'success' as const, icon: <CheckCircle className="w-4 h-4 mr-1" /> };
+      case 'canceled':
+        return { label: 'Canceled', variant: 'destructive' as const, icon: <XCircle className="w-4 h-4 mr-1" /> };
+      case 'missed':
+        return { label: 'Missed', variant: 'destructive' as const, icon: <XCircle className="w-4 h-4 mr-1" /> };
+      default:
+        return { label: 'Scheduled', variant: 'outline' as const, icon: <CalendarLucide className="w-4 h-4 mr-1" /> };
+    }
+  };
+
+  // Get payment status badge details
+  const getPaymentBadge = (status: Session['paymentStatus']) => {
+    if (status === 'paid') {
+      return { label: 'Paid', variant: 'success' as const, icon: <DollarSign className="w-4 h-4 mr-1" /> };
+    }
+    return { label: 'Unpaid', variant: 'destructive' as const, icon: <CreditCard className="w-4 h-4 mr-1" /> };
+  };
+
+  // Session details component based on device
+  const SessionDetails = () => {
+    if (!selectedSession) return null;
+    
+    const statusBadge = getStatusBadge(selectedSession.status);
+    const paymentBadge = getPaymentBadge(selectedSession.paymentStatus);
+    const colors = getSubjectColors(selectedSession.subject);
+    
+    const content = (
+      <>
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Avatar className="h-10 w-10 border">
+                <AvatarFallback className={cn("text-sm", colors.text)}>
+                  {selectedSession.id.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="text-lg font-medium">{selectedSession.notes?.split(' ')[0] || 'Lesson'}</h3>
+                <Badge className={cn("mt-1", colors.bg, colors.border, colors.text, "border")}>
+                  {selectedSession.subject}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <Badge variant={statusBadge.variant} className="flex items-center">
+                {statusBadge.icon} {statusBadge.label}
+              </Badge>
+              <Badge variant={paymentBadge.variant} className="flex items-center">
+                {paymentBadge.icon} {paymentBadge.label}
+              </Badge>
+            </div>
+          </div>
+          
+          <Separator />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center space-x-2">
+              <CalendarLucide className="w-5 h-5 text-muted-foreground" />
+              <span>{format(selectedSession.dateObj, 'EEEE, MMMM d, yyyy')}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Clock className="w-5 h-5 text-muted-foreground" />
+              <span>{selectedSession.time} ({selectedSession.duration})</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <User className="w-5 h-5 text-muted-foreground" />
+              <span>{`Student ${parseInt(selectedSession.id.split('-')[1]) % 5 + 1}`}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <DollarSign className="w-5 h-5 text-muted-foreground" />
+              <span>${selectedSession.cost}</span>
+            </div>
+          </div>
+          
+          {selectedSession.notes && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                  <h4 className="font-medium">Notes</h4>
+                </div>
+                <p className="text-muted-foreground text-sm pl-7">{selectedSession.notes}</p>
+              </div>
+            </>
+          )}
+        </div>
+        
+        <div className="flex justify-end space-x-2 mt-6">
+          {isMobile ? (
+            <DrawerClose asChild>
+              <Button variant="outline">Close</Button>
+            </DrawerClose>
+          ) : (
+            <SheetClose asChild>
+              <Button variant="outline">Close</Button>
+            </SheetClose>
+          )}
+          <Button>
+            Edit Session
+          </Button>
+        </div>
+      </>
+    );
+    
+    if (isMobile) {
+      return (
+        <DrawerContent className="px-4 pb-6">
+          <DrawerHeader>
+            <DrawerTitle>Session Details</DrawerTitle>
+            <DrawerDescription>View or edit this session</DrawerDescription>
+          </DrawerHeader>
+          {content}
+        </DrawerContent>
+      );
+    }
+    
+    return (
+      <SheetContent className="sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Session Details</SheetTitle>
+          <SheetDescription>View or edit this session</SheetDescription>
+        </SheetHeader>
+        <div className="py-6">
+          {content}
+        </div>
+      </SheetContent>
+    );
   };
 
   return (
@@ -210,6 +367,7 @@ const Calendar = () => {
                               "mb-2 cursor-pointer hover:shadow-md transition-shadow",
                               colors.bg, colors.border, "border"
                             )}
+                            onClick={() => handleSessionClick(session)}
                           >
                             <CardContent className="p-2.5">
                               <div className="flex items-center gap-2">
@@ -250,6 +408,17 @@ const Calendar = () => {
           </div>
         </div>
       </div>
+
+      {/* Session Details UI */}
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={setOpen}>
+          <SessionDetails />
+        </Drawer>
+      ) : (
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SessionDetails />
+        </Sheet>
+      )}
     </div>
   );
 };
