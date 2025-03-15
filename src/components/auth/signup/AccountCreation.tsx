@@ -68,7 +68,9 @@ const AccountCreation: React.FC = () => {
 
       await completeSignUp(data.email, data.password, userData);
       toast.success("Account created successfully!");
-      navigate("/");
+      
+      // Redirect to the onboarding flow instead of dashboard
+      navigate("/onboarding");
     } catch (error: any) {
       console.error("Account creation error:", error);
       toast.error(error.message || "An error occurred during account creation");

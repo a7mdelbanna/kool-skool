@@ -15,6 +15,7 @@ import StatesReports from "./pages/StatesReports";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AccountCreation from "./components/auth/signup/AccountCreation";
+import OnboardingFlow from "./components/auth/signup/OnboardingFlow";
 import { PaymentProvider } from "./contexts/PaymentContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -32,6 +33,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/create-account/:licenseId" element={<AccountCreation />} />
+              <Route path="/onboarding" element={<ProtectedRoute><OnboardingFlow /></ProtectedRoute>} />
               <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route path="/" element={<Index />} />
                 <Route path="/students" element={<Students />} />
