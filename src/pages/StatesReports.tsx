@@ -78,6 +78,10 @@ import {
   CircleDollarSign
 } from 'lucide-react';
 import { format, subDays, subMonths, subWeeks, subYears } from 'date-fns';
+import StudentAcquisitionChart, { StudentMetricsData, generateStudentMetricsData } from '@/components/StudentAcquisitionChart';
+import StudentsOverviewCards from '@/components/StudentsOverviewCards';
+import SubjectPerformanceCard from '@/components/SubjectPerformanceCard';
+import ROIByLessonTypeCard from '@/components/ROIByLessonTypeCard';
 
 // Mock data for teachers
 const teachers = [
@@ -98,11 +102,11 @@ const groups = [
 
 // Mock data for subjects
 const subjects = [
-  { id: "1", name: "Mathematics" },
-  { id: "2", name: "English" },
-  { id: "3", name: "Science" },
-  { id: "4", name: "Physics" },
-  { id: "5", name: "Chemistry" }
+  { id: "1", name: "Mathematics", retentionRate: 90 },
+  { id: "2", name: "English", retentionRate: 85 },
+  { id: "3", name: "Science", retentionRate: 80 },
+  { id: "4", name: "Physics", retentionRate: 75 },
+  { id: "5", name: "Chemistry", retentionRate: 70 }
 ];
 
 // Mock data for lesson categories
@@ -130,12 +134,6 @@ interface ExpensesData {
   income: number;
 }
 
-interface StudentMetricsData {
-  date: string;
-  newStudents: number;
-  lostStudents: number;
-}
-
 interface CashFlowData {
   date: string;
   income: number;
@@ -143,7 +141,17 @@ interface CashFlowData {
   profit: number;
 }
 
-type DataType = 'teacherIncome' | 'expenses' | 'students' | 'cashFlow';
+interface LessonStatusData {
+  name: string;
+  value: number;
+}
+
+interface BalanceCurrencyData {
+  name: string;
+  value: number;
+}
+
+type DateRangeFilter = "day" | "week" | "month" | "year";
 
 const StatesReports = () => {
   const { payments, expenses, sessions } = usePayments();
@@ -153,7 +161,7 @@ const StatesReports = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
-  const [dateRangeFilter, setDateRangeFilter] = useState("month");
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>("month");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currencyFilter, setCurrencyFilter] = useState("USD");
   
@@ -182,18 +190,6 @@ const StatesReports = () => {
     });
   };
   
-  // Generate mock data for student metrics
-  const generateStudentMetricsData = (days = 30): StudentMetricsData[] => {
-    return Array.from({ length: days }).map((_, i) => {
-      const date = subDays(new Date(), days - i - 1);
-      return {
-        date: format(date, 'MMM dd'),
-        newStudents: Math.floor(Math.random() * 5),
-        lostStudents: Math.floor(Math.random() * 3),
-      };
-    });
-  };
-  
   // Generate mock data for cash flow
   const generateCashFlowData = (days = 30): CashFlowData[] => {
     return Array.from({ length: days }).map((_, i) => {
@@ -210,7 +206,7 @@ const StatesReports = () => {
   };
   
   // Generate mock data for lesson status distribution
-  const generateLessonStatusData = () => {
+  const generateLessonStatusData = (): LessonStatusData[] => {
     return [
       { name: 'Attended', value: 65 },
       { name: 'Cancelled', value: 15 },
@@ -220,7 +216,7 @@ const StatesReports = () => {
   };
   
   // Generate balance by currency data
-  const generateBalanceByCurrencyData = () => {
+  const generateBalanceByCurrencyData = (): BalanceCurrencyData[] => {
     return [
       { name: 'USD', value: 5800 },
       { name: 'EUR', value: 3200 },
@@ -229,61 +225,72 @@ const StatesReports = () => {
     ];
   };
   
+  // Generate ROI data by lesson type
+  const generateROIData = () => {
+    return lessonCategories.map(cat => ({
+      name: cat.name,
+      roi: 200 + Math.floor(Math.random() * 300)
+    }));
+  };
+  
   // Get appropriate data based on date range with proper typing
-  const getDataByDateRange = (type: DataType): TeacherIncomeData[] | ExpensesData[] | StudentMetricsData[] | CashFlowData[] => {
-    switch (type) {
-      case 'teacherIncome':
-        switch (dateRangeFilter) {
-          case 'day': return generateTeacherIncomeData(1);
-          case 'week': return generateTeacherIncomeData(7);
-          case 'month': return generateTeacherIncomeData(30);
-          case 'year': return generateTeacherIncomeData(365).filter((_, i) => i % 30 === 0);
-          default: return generateTeacherIncomeData();
-        }
-      case 'expenses':
-        switch (dateRangeFilter) {
-          case 'day': return generateExpensesData(1);
-          case 'week': return generateExpensesData(7);
-          case 'month': return generateExpensesData(30);
-          case 'year': return generateExpensesData(365).filter((_, i) => i % 30 === 0);
-          default: return generateExpensesData();
-        }
-      case 'students':
-        switch (dateRangeFilter) {
-          case 'day': return generateStudentMetricsData(1);
-          case 'week': return generateStudentMetricsData(7);
-          case 'month': return generateStudentMetricsData(30);
-          case 'year': return generateStudentMetricsData(365).filter((_, i) => i % 30 === 0);
-          default: return generateStudentMetricsData();
-        }
-      case 'cashFlow':
-        switch (dateRangeFilter) {
-          case 'day': return generateCashFlowData(1);
-          case 'week': return generateCashFlowData(7);
-          case 'month': return generateCashFlowData(30);
-          case 'year': return generateCashFlowData(365).filter((_, i) => i % 30 === 0);
-          default: return generateCashFlowData();
-        }
-      default:
-        return [];
+  const getTeacherIncomeData = (range: DateRangeFilter): TeacherIncomeData[] => {
+    switch (range) {
+      case 'day': return generateTeacherIncomeData(1);
+      case 'week': return generateTeacherIncomeData(7);
+      case 'month': return generateTeacherIncomeData(30);
+      case 'year': return generateTeacherIncomeData(365).filter((_, i) => i % 30 === 0);
+      default: return generateTeacherIncomeData();
     }
   };
   
+  const getExpensesData = (range: DateRangeFilter): ExpensesData[] => {
+    switch (range) {
+      case 'day': return generateExpensesData(1);
+      case 'week': return generateExpensesData(7);
+      case 'month': return generateExpensesData(30);
+      case 'year': return generateExpensesData(365).filter((_, i) => i % 30 === 0);
+      default: return generateExpensesData();
+    }
+  };
+  
+  const getStudentMetricsData = (range: DateRangeFilter): StudentMetricsData[] => {
+    switch (range) {
+      case 'day': return generateStudentMetricsData(1);
+      case 'week': return generateStudentMetricsData(7);
+      case 'month': return generateStudentMetricsData(30);
+      case 'year': return generateStudentMetricsData(365).filter((_, i) => i % 30 === 0);
+      default: return generateStudentMetricsData();
+    }
+  };
+  
+  const getCashFlowData = (range: DateRangeFilter): CashFlowData[] => {
+    switch (range) {
+      case 'day': return generateCashFlowData(1);
+      case 'week': return generateCashFlowData(7);
+      case 'month': return generateCashFlowData(30);
+      case 'year': return generateCashFlowData(365).filter((_, i) => i % 30 === 0);
+      default: return generateCashFlowData();
+    }
+  };
+  
+  // Get data with correct typing
+  const teacherIncomeData = getTeacherIncomeData(dateRangeFilter);
+  const expensesData = getExpensesData(dateRangeFilter);
+  const studentMetricsData = getStudentMetricsData(dateRangeFilter);
+  const cashFlowData = getCashFlowData(dateRangeFilter);
+  
   // Calculate totals with proper typing
-  const teacherIncomeData = getDataByDateRange('teacherIncome') as TeacherIncomeData[];
   const totalTeacherIncome = teacherIncomeData.reduce((sum, item) => sum + item.income, 0);
   const totalTeacherHours = teacherIncomeData.reduce((sum, item) => sum + item.hours, 0);
   const totalTeacherLessons = teacherIncomeData.reduce((sum, item) => sum + item.lessons, 0);
   
-  const expensesData = getDataByDateRange('expenses') as ExpensesData[];
   const totalExpenses = expensesData.reduce((sum, item) => sum + item.expenses, 0);
   const totalIncome = expensesData.reduce((sum, item) => sum + item.income, 0);
   
-  const studentMetricsData = getDataByDateRange('students') as StudentMetricsData[];
   const totalNewStudents = studentMetricsData.reduce((sum, item) => sum + item.newStudents, 0);
   const totalLostStudents = studentMetricsData.reduce((sum, item) => sum + item.lostStudents, 0);
   
-  const cashFlowData = getDataByDateRange('cashFlow') as CashFlowData[];
   const netCashFlow = cashFlowData.reduce((sum, item) => sum + item.profit, 0);
   
   // Calculate upcoming data (next period)
@@ -315,16 +322,16 @@ const StatesReports = () => {
               <DropdownMenuLabel>Select Date Range</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onSelect={() => setDateRangeFilter('day')}>
+                <DropdownMenuItem onSelect={() => setDateRangeFilter("day")}>
                   Day
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setDateRangeFilter('week')}>
+                <DropdownMenuItem onSelect={() => setDateRangeFilter("week")}>
                   Week
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setDateRangeFilter('month')}>
+                <DropdownMenuItem onSelect={() => setDateRangeFilter("month")}>
                   Month
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setDateRangeFilter('year')}>
+                <DropdownMenuItem onSelect={() => setDateRangeFilter("year")}>
                   Year
                 </DropdownMenuItem>
               </DropdownMenuGroup>
@@ -836,174 +843,26 @@ const StatesReports = () => {
         
         {/* Students Tab */}
         <TabsContent value="students" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="glass glass-hover">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center text-sm font-medium text-muted-foreground gap-2">
-                  <UserPlus className="h-4 w-4 text-green-500" />
-                  New Students
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalNewStudents}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  This {dateRangeFilter}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="glass glass-hover">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center text-sm font-medium text-muted-foreground gap-2">
-                  <UserMinus className="h-4 w-4 text-red-500" />
-                  Lost Students
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalLostStudents}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  This {dateRangeFilter}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="glass glass-hover">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center text-sm font-medium text-muted-foreground gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  New Student Income
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${totalNewStudents * 300}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  This {dateRangeFilter}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="glass glass-hover">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center text-sm font-medium text-muted-foreground gap-2">
-                  <TrendingDown className="h-4 w-4 text-red-500" />
-                  Lost ROI
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${totalLostStudents * 250}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  This {dateRangeFilter}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <StudentsOverviewCards
+            newStudents={totalNewStudents}
+            lostStudents={totalLostStudents}
+            newStudentIncome={totalNewStudents * 300}
+            lostROI={totalLostStudents * 250}
+            period={dateRangeFilter}
+          />
           
-          <div className="grid grid-cols-1 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Student Acquisition & Attrition</CardTitle>
-                <CardDescription>
-                  New vs lost students over time
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[350px]">
-                  <ChartContainer
-                    config={{
-                      newStudents: { theme: { light: "#0088FE", dark: "#0088FE" } },
-                      lostStudents: { theme: { light: "#FF8042", dark: "#FF8042" } },
-                    }}
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart 
-                        data={studentMetricsData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Legend />
-                        <Bar dataKey="newStudents" name="New Students" fill="#0088FE" />
-                        <Bar dataKey="lostStudents" name="Lost Students" fill="#FF8042" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <StudentAcquisitionChart
+            data={studentMetricsData}
+          />
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Performing Subjects</CardTitle>
-                <CardDescription>
-                  Subjects with highest student retention
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {subjects.map((subject, index) => (
-                    <div key={subject.id} className="flex items-center">
-                      <div className="w-[40%]">
-                        <div className="text-sm font-medium">{subject.name}</div>
-                      </div>
-                      <div className="w-[60%] space-y-1">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Retention Rate</span>
-                          <span>{90 - index * 5}%</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                          <div 
-                            className="h-full bg-primary" 
-                            style={{ width: `${90 - index * 5}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <SubjectPerformanceCard 
+              subjects={subjects}
+            />
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Student ROI by Category</CardTitle>
-                <CardDescription>
-                  Return on investment by lesson type
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ChartContainer
-                    config={{
-                      Individual: { theme: { light: "#0088FE", dark: "#0088FE" } },
-                      Group: { theme: { light: "#00C49F", dark: "#00C49F" } },
-                      "Speaking Club": { theme: { light: "#FFBB28", dark: "#FFBB28" } },
-                      Workshop: { theme: { light: "#FF8042", dark: "#FF8042" } },
-                    }}
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart 
-                        data={lessonCategories.map(cat => ({
-                          name: cat.name,
-                          roi: 200 + Math.floor(Math.random() * 300)
-                        }))}
-                        layout="vertical"
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
-                        <YAxis type="category" dataKey="name" />
-                        <ChartTooltip content={<ChartTooltipContent />} formatter={(value) => [`$${value}`, 'ROI']} />
-                        <Bar dataKey="roi" name="ROI" fill="#0088FE" barSize={20} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
+            <ROIByLessonTypeCard
+              data={generateROIData()}
+            />
           </div>
         </TabsContent>
       </Tabs>

@@ -5,13 +5,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { format, subDays } from 'date-fns';
 
-interface StudentMetricsData {
+export interface StudentMetricsData {
   date: string;
   newStudents: number;
   lostStudents: number;
 }
 
-const generateStudentMetricsData = (days = 30): StudentMetricsData[] => {
+export const generateStudentMetricsData = (days = 30): StudentMetricsData[] => {
   return Array.from({ length: days }).map((_, i) => {
     const date = subDays(new Date(), days - i - 1);
     return {
