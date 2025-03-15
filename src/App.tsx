@@ -13,31 +13,37 @@ import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
 import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
 import { PaymentProvider } from "./contexts/PaymentContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <PaymentProvider>
-        <BrowserRouter>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/students" element={<Students />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/payments" element={<Payments />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/school-setup" element={<SchoolSetup />} />
-              <Route path="/reports" element={<StatesReports />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </PaymentProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <PaymentProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+                <Route path="/" element={<Index />} />
+                <Route path="/students" element={<Students />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/payments" element={<Payments />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/school-setup" element={<SchoolSetup />} />
+                <Route path="/reports" element={<StatesReports />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </PaymentProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );

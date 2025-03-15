@@ -9,13 +9,139 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      licenses: {
+        Row: {
+          created_at: string | null
+          duration_days: number
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          license_number: string
+          school_name: string | null
+          used_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_days: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_number: string
+          school_name?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_days?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_number?: string
+          school_name?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          profile_picture: string | null
+          role: string
+          school_id: string | null
+          telegram: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          phone?: string | null
+          profile_picture?: string | null
+          role: string
+          school_id?: string | null
+          telegram?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          profile_picture?: string | null
+          role?: string
+          school_id?: string | null
+          telegram?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_profiles_schools"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schools: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          license_id: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          license_id?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          license_id?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schools_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      handle_license_signup: {
+        Args: {
+          license_number: string
+        }
+        Returns: {
+          valid: boolean
+          message: string
+          license_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
