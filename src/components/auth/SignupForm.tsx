@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,11 +149,9 @@ const SignupForm = () => {
         toast.success(result.message || "License validated successfully");
         console.log("Setting step to 2");
         
-        // Important: Force step change with a small delay to ensure the state is updated
-        setTimeout(() => {
-          setStep(2);
-          console.log("Step should now be 2");
-        }, 100);
+        // Important: Set step immediately and don't rely on timeouts
+        setStep(2);
+        console.log("Step should now be 2");
       } else {
         toast.error(result.message || "License verification failed");
       }
@@ -259,7 +257,10 @@ const SignupForm = () => {
       case 1:
         return (
           <Form {...licenseForm}>
-            <form onSubmit={licenseForm.handleSubmit(handleLicenseSubmit)} className="space-y-4">
+            <form onSubmit={(e) => {
+              e.preventDefault(); // Prevent form submission
+              licenseForm.handleSubmit(handleLicenseSubmit)(e);
+            }} className="space-y-4">
               <FormField
                 control={licenseForm.control}
                 name="licenseNumber"
@@ -704,6 +705,11 @@ const SignupForm = () => {
         return null;
     }
   };
+
+  // Log when step changes to help with debugging
+  useEffect(() => {
+    console.log("Current step is now:", step);
+  }, [step]);
 
   return (
     <div className="space-y-4">
