@@ -53,12 +53,17 @@ const subjectColorMap: Record<string, { bg: string, border: string, text: string
   'default': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' }
 };
 
+// Define the extended Session type with subject
+interface SessionWithSubject extends Session {
+  subject: string;
+}
+
 const Calendar = () => {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSession, setSelectedSession] = useState<(Session & { subject: string }) | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionWithSubject | null>(null);
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
   
@@ -67,7 +72,6 @@ const Calendar = () => {
   // Convert session dates from string to Date objects
   const formattedSessions = sessions.map(session => ({
     ...session,
-    dateObj: new Date(session.date),
     subject: getRandomSubject() // This is just for demonstration, replace with actual subject data
   }));
 
@@ -96,7 +100,7 @@ const Calendar = () => {
   // Get lessons for a specific day and hour
   const getLessonsForTimeSlot = (day: Date, hour: number) => {
     const filtered = formattedSessions.filter(session => {
-      const sessionDate = session.dateObj;
+      const sessionDate = new Date(session.date);
       const timeMatch = sessionDate.getHours() === hour;
       const dateMatch = 
         sessionDate.getDate() === day.getDate() &&
@@ -119,7 +123,7 @@ const Calendar = () => {
   };
 
   // Handle session click to show details
-  const handleSessionClick = (session: Session & { subject: string }) => {
+  const handleSessionClick = (session: SessionWithSubject) => {
     setSelectedSession(session);
     setOpen(true);
   };
@@ -186,7 +190,7 @@ const Calendar = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center space-x-2">
               <CalendarLucide className="w-5 h-5 text-muted-foreground" />
-              <span>{format(selectedSession.dateObj, 'EEEE, MMMM d, yyyy')}</span>
+              <span>{format(new Date(selectedSession.date), 'EEEE, MMMM d, yyyy')}</span>
             </div>
             <div className="flex items-center space-x-2">
               <Clock className="w-5 h-5 text-muted-foreground" />
