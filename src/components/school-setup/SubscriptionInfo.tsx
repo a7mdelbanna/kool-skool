@@ -27,20 +27,27 @@ const SubscriptionInfo = () => {
   const fetchSubscriptionInfo = async () => {
     try {
       setIsLoading(true);
-
-      // First get the school ID directly from the RPC function
+      
+      // First get the school ID from the RPC function
       const { data: schoolIdData, error: schoolIdError } = await supabase
         .rpc('get_user_school_id', { user_id_param: user?.id });
 
-      if (schoolIdError) throw schoolIdError;
+      if (schoolIdError) {
+        console.error("Error fetching school ID:", schoolIdError);
+        toast.error(`Error fetching school ID: ${schoolIdError.message}`);
+        setIsLoading(false);
+        return;
+      }
       
-      if (!schoolIdData || schoolIdData.length === 0 || !schoolIdData[0]?.school_id) {
+      if (!schoolIdData || !Array.isArray(schoolIdData) || schoolIdData.length === 0 || !schoolIdData[0]?.school_id) {
+        console.log("No school ID found:", schoolIdData);
         toast.error("No school associated with this account");
         setIsLoading(false);
         return;
       }
       
       const schoolId = schoolIdData[0].school_id;
+      console.log("Found school ID:", schoolId);
 
       // Get school info
       const { data: schoolData, error: schoolError } = await supabase
@@ -49,8 +56,14 @@ const SubscriptionInfo = () => {
         .eq('id', schoolId)
         .single();
 
-      if (schoolError) throw schoolError;
+      if (schoolError) {
+        console.error("Error fetching school:", schoolError);
+        toast.error(`Error fetching school: ${schoolError.message}`);
+        setIsLoading(false);
+        return;
+      }
       
+      console.log("School data:", schoolData);
       setSchool(schoolData);
       
       // Get license info using license_id from school
@@ -61,8 +74,13 @@ const SubscriptionInfo = () => {
           .eq('id', schoolData.license_id)
           .single();
           
-        if (licenseError) throw licenseError;
-        setLicense(licenseData);
+        if (licenseError) {
+          console.error("Error fetching license:", licenseError);
+          toast.error(`Error fetching license: ${licenseError.message}`);
+        } else {
+          console.log("License data:", licenseData);
+          setLicense(licenseData);
+        }
       }
       
       // Fetch staff members (profiles with the same school_id)
@@ -71,10 +89,16 @@ const SubscriptionInfo = () => {
         .select('*')
         .eq('school_id', schoolId);
         
-      if (staffError) throw staffError;
-      setStaffMembers(staffData || []);
+      if (staffError) {
+        console.error("Error fetching staff:", staffError);
+        toast.error(`Error fetching staff: ${staffError.message}`);
+      } else {
+        console.log("Staff data:", staffData);
+        setStaffMembers(staffData || []);
+      }
       
     } catch (error: any) {
+      console.error("Error in fetchSubscriptionInfo:", error);
       toast.error(`Error fetching subscription info: ${error.message}`);
     } finally {
       setIsLoading(false);
