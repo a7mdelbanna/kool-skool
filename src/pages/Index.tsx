@@ -91,7 +91,7 @@ const samplePayments: Payment[] = [
     id: '1',
     studentName: 'Michael Davis',
     amount: 150,
-    dueDate: new Date(2024, 5, 15), // June 15, 2024
+    dueDate: new Date(),
     subject: 'English Literature',
     status: 'pending'
   },
@@ -99,7 +99,7 @@ const samplePayments: Payment[] = [
     id: '2',
     studentName: 'Noah Martinez',
     amount: 180,
-    dueDate: new Date(2024, 5, 5), // June 5, 2024 (already past)
+    dueDate: new Date(),
     subject: 'Chemistry',
     status: 'overdue'
   },
@@ -107,7 +107,7 @@ const samplePayments: Payment[] = [
     id: '3',
     studentName: 'William Taylor',
     amount: 120,
-    dueDate: new Date(2024, 5, 12), // June 12, 2024
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 1)),
     subject: 'Physics',
     status: 'pending'
   },
@@ -115,8 +115,24 @@ const samplePayments: Payment[] = [
     id: '4',
     studentName: 'Sophia Chen',
     amount: 90,
-    dueDate: new Date(2024, 5, 10), // June 10, 2024
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 1)),
     subject: 'Science',
+    status: 'pending'
+  },
+  {
+    id: '5',
+    studentName: 'Emma Wilson',
+    amount: 135,
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 3)),
+    subject: 'Physics',
+    status: 'pending'
+  },
+  {
+    id: '6',
+    studentName: 'Alex Johnson',
+    amount: 165,
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 4)),
+    subject: 'Mathematics',
     status: 'pending'
   }
 ];
