@@ -6,10 +6,11 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Building2, Image, Phone, MessagesSquare, Instagram } from "lucide-react";
+import { Loader2, Building2, Image, Phone, MessagesSquare, Instagram, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // School details form schema
 const schoolDetailsSchema = z.object({
@@ -120,6 +121,12 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
     onNext();
   };
 
+  // Get first letter of school name for avatar fallback
+  const getSchoolInitial = () => {
+    const schoolName = form.watch('schoolName') || '';
+    return schoolName.charAt(0).toUpperCase() || 'S';
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -150,37 +157,51 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
         <FormItem>
           <FormLabel>School Logo</FormLabel>
           <FormControl>
-            <div className="space-y-4">
-              {/* Logo preview */}
-              {logoPreview && (
-                <div className="flex justify-center">
-                  <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-input">
-                    <img 
-                      src={logoPreview} 
-                      alt="School logo" 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
+            <div className="flex flex-col items-center mb-6">
+              <Avatar className="h-24 w-24 border-2 border-muted mb-4">
+                <AvatarImage src={logoPreview || ""} alt="School Logo" />
+                <AvatarFallback className="text-xl bg-primary/10">
+                  {getSchoolInitial()}
+                </AvatarFallback>
+              </Avatar>
               
-              {/* Upload button */}
-              <div className="flex items-center justify-center">
-                <label htmlFor="logo-upload" className={cn(
-                  "flex items-center gap-2 cursor-pointer px-4 py-2 rounded-md border border-input",
-                  "bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
-                )}>
-                  <Image className="w-4 h-4 text-muted-foreground" />
-                  {uploading ? "Uploading..." : "Upload School Logo"}
-                </label>
-                <input
-                  id="logo-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleLogoUpload}
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="relative"
                   disabled={uploading}
-                />
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handleLogoUpload}
+                    disabled={uploading}
+                  />
+                  {uploading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-2 h-4 w-4" />
+                  )}
+                  Upload Logo
+                </Button>
+                
+                {logoPreview && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setLogoPreview(null);
+                      updateData({ schoolLogo: null });
+                    }}
+                    disabled={uploading}
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             </div>
           </FormControl>
