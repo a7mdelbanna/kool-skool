@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,9 +11,7 @@ import TeamMembersStep from "./onboarding/TeamMembersStep";
 import WelcomeStep from "./onboarding/WelcomeStep";
 import { toast } from "sonner";
 
-// Type for the user's onboarding data
 interface OnboardingData {
-  // Personal details
   firstName: string;
   lastName: string;
   profilePicture: string | null;
@@ -23,7 +20,6 @@ interface OnboardingData {
   whatsapp: string;
   instagram: string;
   
-  // School details
   schoolName: string;
   schoolLogo: string | null;
   schoolPhone: string;
@@ -31,11 +27,9 @@ interface OnboardingData {
   schoolWhatsapp: string;
   schoolInstagram: string;
   
-  // Team members
   teamMembers: { email: string; role: string }[];
 }
 
-// Type definitions for our custom RPC functions
 type UpdateUserProfileParams = {
   user_id: string;
   first_name_param: string;
@@ -62,7 +56,6 @@ const OnboardingFlow = () => {
   const [loading, setLoading] = useState(false);
   const totalSteps = 4;
   
-  // Initialize onboarding data with empty values
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     firstName: "",
     lastName: "",
@@ -82,14 +75,12 @@ const OnboardingFlow = () => {
     teamMembers: []
   });
 
-  // If user is not logged in, redirect to auth page
   useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");
     }
   }, [user, isLoading, navigate]);
 
-  // Update onboarding data with form values
   const updateData = (stepData: Partial<OnboardingData>) => {
     setOnboardingData(prev => ({
       ...prev,
@@ -97,22 +88,17 @@ const OnboardingFlow = () => {
     }));
   };
 
-  // Go to next step
   const nextStep = async (skipSave = false) => {
     if (currentStep < totalSteps) {
-      // If not skipping and we're at a step that requires saving
       if (!skipSave) {
         try {
           setLoading(true);
           
           if (currentStep === 1) {
-            // Save personal details
             await savePersonalDetails();
           } else if (currentStep === 2) {
-            // Save school details
             await saveSchoolDetails();
           } else if (currentStep === 3) {
-            // Save team members
             await saveTeamMembers();
           }
         } catch (error: any) {
@@ -129,19 +115,16 @@ const OnboardingFlow = () => {
     }
   };
 
-  // Go to previous step
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(current => current - 1);
     }
   };
 
-  // Save personal details to database using our custom RPC function
   const savePersonalDetails = async () => {
     if (!user) return;
     
     try {
-      // Correct use of RPC function with proper type parameters
       const { error } = await supabase.rpc(
         'update_user_profile', 
         {
@@ -164,15 +147,11 @@ const OnboardingFlow = () => {
     }
   };
 
-  // Save school details to database
   const saveSchoolDetails = async () => {
     if (!user) return;
     
-    // Skip if no school name is provided
     if (!onboardingData.schoolName.trim()) return;
     
-    // First get the user's profile to get the school_id using our custom function
-    // Correct use of RPC function with proper type parameters
     const { data, error: profileError } = await supabase.rpc(
       'get_user_school_id',
       {
@@ -182,14 +161,10 @@ const OnboardingFlow = () => {
     
     if (profileError) throw profileError;
     
-    // Extract the school_id from the returned data
-    // The function returns a table with a single column 'school_id'
-    // Need to check data properly since it could be various types
     if (!data || !Array.isArray(data) || data.length === 0) {
       throw new Error("No school associated with this account");
     }
     
-    // Type assertion after we've verified it's an array with data
     const schoolData = data as SchoolIdData;
     if (!schoolData[0]?.school_id) {
       throw new Error("No school ID found in profile");
@@ -213,19 +188,13 @@ const OnboardingFlow = () => {
     toast.success("School details saved successfully");
   };
 
-  // Process team member invitations
   const saveTeamMembers = async () => {
-    // Skip if no team members are provided
     if (onboardingData.teamMembers.length === 0) return;
     
-    // Here you would implement the team member invitation logic
-    // This would typically involve creating invitation records and sending emails
-    // For now, we'll just log the invitations
     console.log("Team members to invite:", onboardingData.teamMembers);
     toast.success(`${onboardingData.teamMembers.length} team members will be invited`);
   };
 
-  // Finish onboarding
   const finishOnboarding = () => {
     toast.success("Onboarding completed! Welcome to the platform.");
     navigate("/");

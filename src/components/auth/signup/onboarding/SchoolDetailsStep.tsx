@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -6,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2, Building2, Image, Phone, MessagesSquare, Instagram } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 // School details form schema
 const schoolDetailsSchema = z.object({
   schoolName: z.string().optional(),
-  schoolLogo: z.string().optional().nullable(),
   schoolPhone: z.string().optional(),
   schoolTelegram: z.string().optional(),
   schoolWhatsapp: z.string().optional(),
@@ -28,7 +31,14 @@ interface SchoolDetailsStepProps {
     schoolWhatsapp: string;
     schoolInstagram: string;
   };
-  updateData: (data: Partial<SchoolDetailsFormValues>) => void;
+  updateData: (data: Partial<{
+    schoolName: string;
+    schoolLogo: string | null;
+    schoolPhone: string;
+    schoolTelegram: string;
+    schoolWhatsapp: string;
+    schoolInstagram: string;
+  }>) => void;
   onNext: () => void;
   onPrev: () => void;
   onSkip: () => void;
@@ -43,11 +53,13 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
   onSkip,
   loading 
 }) => {
+  const [uploading, setUploading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(data.schoolLogo);
+  
   const form = useForm<SchoolDetailsFormValues>({
     resolver: zodResolver(schoolDetailsSchema),
     defaultValues: {
       schoolName: data.schoolName || "",
-      schoolLogo: data.schoolLogo || "",
       schoolPhone: data.schoolPhone || "",
       schoolTelegram: data.schoolTelegram || "",
       schoolWhatsapp: data.schoolWhatsapp || "",
@@ -55,8 +67,56 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
     },
   });
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (!event.target.files || event.target.files.length === 0) {
+        return;
+      }
+      
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+      
+      setUploading(true);
+      
+      // Upload file to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('school_logos')
+        .upload(filePath, file);
+        
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('school_logos')
+        .getPublicUrl(filePath);
+        
+      const publicUrl = publicUrlData.publicUrl;
+      
+      // Update logo preview
+      setLogoPreview(publicUrl);
+      
+      // Update form data
+      updateData({ schoolLogo: publicUrl });
+      
+      toast.success("Logo uploaded successfully");
+    } catch (error: any) {
+      console.error("Error uploading logo:", error);
+      toast.error(error.message || "Failed to upload logo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = (values: SchoolDetailsFormValues) => {
-    updateData(values);
+    // Include logo in the update
+    updateData({
+      ...values,
+      schoolLogo: logoPreview,
+    });
     onNext();
   };
 
@@ -87,26 +147,44 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="schoolLogo"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>School Logo</FormLabel>
-              <FormControl>
-                <div className="flex items-center">
-                  <Image className="w-4 h-4 mr-2 text-muted-foreground" />
-                  <Input 
-                    placeholder="URL to your school logo" 
-                    {...field} 
-                    value={field.value || ""} 
-                  />
+        <FormItem>
+          <FormLabel>School Logo</FormLabel>
+          <FormControl>
+            <div className="space-y-4">
+              {/* Logo preview */}
+              {logoPreview && (
+                <div className="flex justify-center">
+                  <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-input">
+                    <img 
+                      src={logoPreview} 
+                      alt="School logo" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              )}
+              
+              {/* Upload button */}
+              <div className="flex items-center justify-center">
+                <label htmlFor="logo-upload" className={cn(
+                  "flex items-center gap-2 cursor-pointer px-4 py-2 rounded-md border border-input",
+                  "bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                )}>
+                  <Image className="w-4 h-4 text-muted-foreground" />
+                  {uploading ? "Uploading..." : "Upload School Logo"}
+                </label>
+                <input
+                  id="logo-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                  disabled={uploading}
+                />
+              </div>
+            </div>
+          </FormControl>
+        </FormItem>
 
         <FormField
           control={form.control}
@@ -183,7 +261,7 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
             type="button" 
             variant="outline" 
             onClick={onPrev}
-            disabled={loading}
+            disabled={loading || uploading}
           >
             Back
           </Button>
@@ -193,19 +271,19 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
               type="button" 
               variant="ghost" 
               onClick={onSkip}
-              disabled={loading}
+              disabled={loading || uploading}
             >
               Skip
             </Button>
             
             <Button 
               type="submit" 
-              disabled={loading}
+              disabled={loading || uploading}
             >
-              {loading ? (
+              {loading || uploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {uploading ? "Uploading..." : "Saving..."}
                 </>
               ) : (
                 "Next"
