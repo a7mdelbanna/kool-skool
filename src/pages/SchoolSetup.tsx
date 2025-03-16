@@ -66,7 +66,6 @@ const SchoolSetup = () => {
         setError(null);
         setIsRetrying(false);
         
-        // Fetch user role using the security definer function
         const { data: roleData, error: roleError } = await supabase
           .rpc('get_current_user_role');
           
@@ -77,7 +76,6 @@ const SchoolSetup = () => {
           setUserRole(roleData || null);
         }
         
-        // Get user's school ID
         const { data: schoolId, error: schoolIdError } = await supabase
           .rpc('get_user_school_id');
         
@@ -86,7 +84,6 @@ const SchoolSetup = () => {
           throw schoolIdError;
         }
         
-        // Check if user has a school_id
         if (!schoolId) {
           console.log("No school ID found");
           setNoSchoolFound(true);
@@ -96,7 +93,6 @@ const SchoolSetup = () => {
         
         console.log("Found school ID:", schoolId);
             
-        // Fetch school data using our security definer function
         const { data: schoolData, error: schoolError } = await supabase
           .rpc('get_school_info', { school_id_param: schoolId });
           
@@ -107,7 +103,6 @@ const SchoolSetup = () => {
         
         if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
           console.log("School data:", schoolData[0]);
-          // Type assertion to ensure compatibility with SchoolInfo interface
           setSchoolInfo(schoolData[0] as unknown as SchoolInfo);
           setNoSchoolFound(false);
         } else {
@@ -136,7 +131,6 @@ const SchoolSetup = () => {
         return;
       }
 
-      // Call the function to verify the license first
       const { data: licenseResult, error: licenseError } = await supabase
         .rpc('verify_license', { license_number_param: data.license_number });
       
@@ -151,7 +145,6 @@ const SchoolSetup = () => {
         return;
       }
       
-      // Type assertion for the license result
       const licenseVerification = licenseResult[0] as unknown as LicenseVerificationResult;
       
       if (!licenseVerification.valid) {
@@ -162,7 +155,6 @@ const SchoolSetup = () => {
       
       const licenseId = licenseVerification.license_id;
       
-      // Create or update the school with the verified license
       const { data: schoolId, error: schoolError } = await supabase
         .rpc('create_or_update_school', {
           school_name: data.name,
@@ -184,7 +176,6 @@ const SchoolSetup = () => {
       schoolForm.reset();
       setSchoolDialogOpen(false);
       
-      // Refresh data to show the newly created school
       await fetchUserData();
       
     } catch (error: any) {

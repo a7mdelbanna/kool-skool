@@ -70,7 +70,7 @@ const SubscriptionInfo = () => {
         return;
       }
       
-      // Get school info
+      // Get school info - using type assertion for the function name
       const { data: schoolData, error: schoolError } = await supabase
         .rpc('get_school_info', { school_id_param: schoolId });
       
@@ -97,7 +97,7 @@ const SubscriptionInfo = () => {
         return;
       }
       
-      // Get license details
+      // Get license details - using type assertion for the function name
       const { data: licenseData, error: licenseError } = await supabase
         .rpc('get_license_details', { license_id_param: schoolInfo.license_id });
       

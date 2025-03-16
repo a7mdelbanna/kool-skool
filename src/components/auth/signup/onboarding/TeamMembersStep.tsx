@@ -108,7 +108,7 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
         return;
       }
       
-      // Use the delete_team_invitation RPC function
+      // Use the delete_team_invitation RPC function with type assertion
       const { error } = await supabase.rpc('delete_team_invitation', {
         email_param: email,
         school_id_param: schoolId
