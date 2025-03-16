@@ -28,11 +28,14 @@ import {
   Repeat,
   GraduationCap,
   CheckCircle2,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, createTeamMember } from "@/integrations/supabase/client";
 import LicenseWidget from "@/components/LicenseWidget";
+import { useForm } from "react-hook-form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 interface SchoolInfo {
   name: string;
@@ -51,6 +54,7 @@ interface Teacher {
   telegram: string;
   instagram: string;
   email: string;
+  password: string;
   role: string;
 }
 
@@ -115,7 +119,8 @@ const SchoolSetup = () => {
   const [userSchoolInfo, setUserSchoolInfo] = useState<UserSchoolInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [invitingSent, setInvitingSent] = useState<Record<string, boolean>>({});
+  const [creatingTeamMember, setCreatingTeamMember] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [openSections, setOpenSections] = useState({
     schoolInfo: true,
@@ -134,7 +139,7 @@ const SchoolSetup = () => {
   });
   
   const [teachers, setTeachers] = useState<Teacher[]>([
-    { id: '1', name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', role: 'teacher' }
+    { id: '1', name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', password: '', role: 'teacher' }
   ]);
   
   const [levels, setLevels] = useState<Level[]>([
@@ -227,6 +232,7 @@ const SchoolSetup = () => {
               telegram: '',
               instagram: '',
               email: member.email,
+              password: '',
               role: member.role
             }));
             
@@ -270,7 +276,7 @@ const SchoolSetup = () => {
   const handleAddTeacher = () => {
     setTeachers(prev => [
       ...prev,
-      { id: Date.now().toString(), name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', role: 'teacher' }
+      { id: Date.now().toString(), name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', password: '', role: 'teacher' }
     ]);
   };
   
@@ -280,48 +286,92 @@ const SchoolSetup = () => {
         teacher.id === id ? { ...teacher, [field]: value } : teacher
       )
     );
+    
+    // Clear any validation errors when user changes the field
+    if (errors[`${id}_${field}`]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`${id}_${field}`];
+        return newErrors;
+      });
+    }
   };
   
   const handleRemoveTeacher = (id: string) => {
     setTeachers(prev => prev.filter(teacher => teacher.id !== id));
   };
   
-  const handleInviteTeacher = async (teacher: Teacher) => {
-    if (!teacher.email || !teacher.role) {
-      toast({
-        title: 'Missing information',
-        description: 'Please fill in both email and role for the team member',
-        variant: 'destructive'
-      });
+  const validateTeamMember = (teacher: Teacher) => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!teacher.name) {
+      newErrors[`${teacher.id}_name`] = 'Name is required';
+    }
+    
+    if (!teacher.email) {
+      newErrors[`${teacher.id}_email`] = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(teacher.email)) {
+      newErrors[`${teacher.id}_email`] = 'Invalid email format';
+    }
+    
+    if (!teacher.password) {
+      newErrors[`${teacher.id}_password`] = 'Password is required';
+    } else if (teacher.password.length < 6) {
+      newErrors[`${teacher.id}_password`] = 'Password must be at least 6 characters';
+    }
+    
+    if (!teacher.role) {
+      newErrors[`${teacher.id}_role`] = 'Role is required';
+    }
+    
+    return newErrors;
+  };
+  
+  const handleCreateTeamMember = async (teacher: Teacher) => {
+    const validationErrors = validateTeamMember(teacher);
+    
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...validationErrors }));
       return;
     }
     
     try {
-      setInvitingSent({...invitingSent, [teacher.id]: true});
+      setCreatingTeamMember(prev => ({ ...prev, [teacher.id]: true }));
       
-      const { data, error } = await supabase.rpc('invite_team_member', {
-        email_param: teacher.email,
-        role_param: teacher.role as any,
-        first_name_param: teacher.name.split(' ')[0],
-        last_name_param: teacher.name.split(' ').slice(1).join(' ')
+      // Split the name to get first name and last name
+      const nameParts = teacher.name.split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      
+      await createTeamMember({
+        email: teacher.email,
+        password: teacher.password,
+        role: teacher.role as "director" | "teacher" | "admin" | "staff",
+        firstName,
+        lastName
       });
-      
-      if (error) throw error;
       
       toast({
-        title: 'Invitation sent',
-        description: `An invitation has been sent to ${teacher.email}`,
+        title: 'Team member created',
+        description: `${teacher.name} has been added to your team`,
       });
+      
+      // Reset the password field after successful creation
+      setTeachers(prev => 
+        prev.map(t => 
+          t.id === teacher.id ? { ...t, password: '' } : t
+        )
+      );
       
     } catch (error: any) {
-      console.error('Error inviting team member:', error);
+      console.error('Error creating team member:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to send invitation',
+        description: error.message || 'Failed to create team member',
         variant: 'destructive'
       });
     } finally {
-      setInvitingSent({...invitingSent, [teacher.id]: false});
+      setCreatingTeamMember(prev => ({ ...prev, [teacher.id]: false }));
     }
   };
   
@@ -730,7 +780,11 @@ const SchoolSetup = () => {
                       value={teacher.name} 
                       onChange={(e) => handleTeacherChange(teacher.id, 'name', e.target.value)}
                       placeholder="Team member name" 
+                      className={errors[`${teacher.id}_name`] ? 'border-destructive' : ''}
                     />
+                    {errors[`${teacher.id}_name`] && (
+                      <p className="text-sm text-destructive">{errors[`${teacher.id}_name`]}</p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -741,44 +795,67 @@ const SchoolSetup = () => {
                       value={teacher.email}
                       onChange={(e) => handleTeacherChange(teacher.id, 'email', e.target.value)}
                       placeholder="team.member@example.com" 
+                      className={errors[`${teacher.id}_email`] ? 'border-destructive' : ''}
                     />
+                    {errors[`${teacher.id}_email`] && (
+                      <p className="text-sm text-destructive">{errors[`${teacher.id}_email`]}</p>
+                    )}
                   </div>
                 </div>
                 
                 <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={`teacher-password-${teacher.id}`}>Password</Label>
+                    <Input 
+                      id={`teacher-password-${teacher.id}`}
+                      type="password"
+                      value={teacher.password}
+                      onChange={(e) => handleTeacherChange(teacher.id, 'password', e.target.value)}
+                      placeholder="Minimum 6 characters" 
+                      className={errors[`${teacher.id}_password`] ? 'border-destructive' : ''}
+                    />
+                    {errors[`${teacher.id}_password`] && (
+                      <p className="text-sm text-destructive">{errors[`${teacher.id}_password`]}</p>
+                    )}
+                  </div>
+                  
                   <div className="space-y-2">
                     <Label htmlFor={`teacher-role-${teacher.id}`}>Role</Label>
                     <select
                       id={`teacher-role-${teacher.id}`}
                       value={teacher.role}
                       onChange={(e) => handleTeacherChange(teacher.id, 'role', e.target.value)}
-                      className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
+                      className={`w-full rounded-md border h-10 px-3 py-2 bg-background text-sm ${
+                        errors[`${teacher.id}_role`] ? 'border-destructive' : ''
+                      }`}
                     >
                       <option value="teacher">Teacher</option>
                       <option value="admin">Admin</option>
                       <option value="staff">Staff</option>
                     </select>
+                    {errors[`${teacher.id}_role`] && (
+                      <p className="text-sm text-destructive">{errors[`${teacher.id}_role`]}</p>
+                    )}
                   </div>
-                  
-                  <div className="flex items-end">
-                    <Button 
-                      type="button" 
-                      onClick={() => handleInviteTeacher(teacher)}
-                      disabled={invitingSent[teacher.id] || !teacher.email || !teacher.role}
-                      className="w-full"
-                    >
-                      {invitingSent[teacher.id] ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
-                          <span>Sending...</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>Send Invitation</span>
-                        </div>
-                      )}
-                    </Button>
-                  </div>
+                </div>
+                
+                <div className="flex justify-end mt-4">
+                  <Button 
+                    type="button" 
+                    onClick={() => handleCreateTeamMember(teacher)}
+                    disabled={creatingTeamMember[teacher.id]}
+                  >
+                    {creatingTeamMember[teacher.id] ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                        <span>Creating...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>Create User</span>
+                      </div>
+                    )}
+                  </Button>
                 </div>
                 
                 <div className="grid md:grid-cols-3 gap-4">

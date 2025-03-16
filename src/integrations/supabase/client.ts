@@ -78,3 +78,29 @@ export const updateUserProfile = async (
   
   return data;
 };
+
+// Helper function to create a team member with direct authentication
+export const createTeamMember = async (
+  userData: {
+    email: string;
+    password: string;
+    role: "director" | "teacher" | "admin" | "staff";
+    firstName?: string;
+    lastName?: string;
+  }
+) => {
+  const { data, error } = await supabase.rpc('create_team_member', {
+    email_param: userData.email,
+    password_param: userData.password,
+    role_param: userData.role,
+    first_name_param: userData.firstName || null,
+    last_name_param: userData.lastName || null
+  });
+  
+  if (error) {
+    console.error("Error creating team member:", error);
+    throw error;
+  }
+  
+  return data;
+};
