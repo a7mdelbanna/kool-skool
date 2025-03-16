@@ -79,6 +79,34 @@ export const updateUserProfile = async (
   return data;
 };
 
+// Helper function to check if an email exists in auth system
+const checkEmailExists = async (email: string) => {
+  try {
+    // We can use the signIn method with a wrong password to check if the email exists
+    // If the response contains a 'user' object but login fails, it means the email exists
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: 'dummy-password-for-checking-only'
+    });
+    
+    if (error) {
+      // If the error message indicates invalid credentials but not invalid email, the email exists
+      if (error.message.includes('Invalid login credentials')) {
+        return true; // Email exists
+      }
+      
+      if (error.message.includes('Email not confirmed')) {
+        return true; // Email exists but not confirmed
+      }
+    }
+    
+    return false; // Email doesn't exist
+  } catch (error) {
+    console.error("Error checking email existence:", error);
+    return false;
+  }
+};
+
 // Helper function to create a team member with direct authentication
 export const createTeamMember = async (
   userData: {
@@ -90,6 +118,16 @@ export const createTeamMember = async (
   }
 ) => {
   try {
+    // First check if the email already exists
+    const emailExists = await checkEmailExists(userData.email);
+    
+    if (emailExists) {
+      throw new Error(`The email ${userData.email} is already registered. Please use a different email address.`);
+    }
+    
+    // Proceed with creating the team member
+    console.log("Creating team member with validated email:", userData.email);
+    
     // Call the stored procedure with proper parameters
     const { data, error } = await supabase.rpc('create_team_member', {
       email_param: userData.email,
