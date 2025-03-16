@@ -55,7 +55,7 @@ const Login = () => {
         description: `Welcome back, ${response.first_name}!`,
       });
       
-      // Redirect to dashboard
+      // Redirect to dashboard immediately
       navigate('/');
       
     } catch (error) {
