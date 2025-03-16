@@ -102,7 +102,13 @@ export interface Session {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  global: {
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY
+    }
+  }
+});
 
 // Helper function to manually set auth from user data
 export const refreshSupabaseAuth = async (userId: string, schoolId?: string, role?: string) => {
@@ -222,7 +228,7 @@ export async function createStudent(
       role: userData.role
     });
     
-    // Make the request to create a student
+    // Make the request to create a student with proper authentication headers
     const { data, error } = await supabase.functions.invoke('create_student', {
       body: {
         student_email: email,
@@ -239,7 +245,9 @@ export async function createStudent(
         'x-user-id': userData.id,
         'x-school-id': userData.schoolId,
         'x-user-role': userData.role,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
       }
     });
 

@@ -14,12 +14,32 @@ serve(async (req) => {
   }
   
   try {
+    // Verify API key is present
+    const apiKey = req.headers.get('apikey') || req.headers.get('Authorization')?.split('Bearer ')[1];
+    
+    if (!apiKey) {
+      console.error("No API key found in request headers");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "No API key found in request",
+          hint: "No 'apikey' request header or url param was found."
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      )
+    }
+    
     // Get request headers for admin validation
     const userId = req.headers.get('x-user-id')
     const schoolId = req.headers.get('x-school-id')
     const userRole = req.headers.get('x-user-role')
     
-    console.log("Received headers:", { userId, schoolId, userRole })
+    console.log("Received headers:", { 
+      userId, 
+      schoolId, 
+      userRole,
+      hasApiKey: !!apiKey
+    })
     
     // Validate admin role
     if (!userId || !schoolId || userRole !== 'admin') {
@@ -36,7 +56,19 @@ serve(async (req) => {
     // Create Supabase client with service role key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false
+        },
+        global: {
+          headers: {
+            apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          }
+        }
+      }
     )
     
     // Verify that the user exists and is an admin
