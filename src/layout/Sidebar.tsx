@@ -45,7 +45,10 @@ export function Sidebar() {
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
+        setIsLoading(true);
         const { profile } = await fetchUserProfile();
+        
+        console.log("Sidebar profile data:", profile);
         
         setProfileData({
           firstName: profile?.first_name || '',
@@ -249,7 +252,9 @@ export function Sidebar() {
               <div className="text-sm">
                 <div className="font-medium">
                   {isLoading ? 'Loading...' : 
-                    `${profileData.firstName} ${profileData.lastName}`.trim() || 'Unnamed User'}
+                    (profileData.firstName || profileData.lastName) 
+                      ? `${profileData.firstName} ${profileData.lastName}`.trim() 
+                      : 'Unnamed User'}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {profileData.email || 'No email'}

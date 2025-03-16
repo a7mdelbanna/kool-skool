@@ -33,6 +33,9 @@ export const fetchUserProfile = async () => {
     throw new Error('No user authenticated');
   }
   
+  // Add debug logging to see what data is coming from Supabase
+  console.log("Auth user data:", user);
+  
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -40,8 +43,11 @@ export const fetchUserProfile = async () => {
     .single();
     
   if (error) {
+    console.error("Error fetching profile:", error);
     throw error;
   }
+  
+  console.log("Profile data from database:", data);
   
   return { user, profile: data };
 };
