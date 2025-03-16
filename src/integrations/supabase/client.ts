@@ -136,18 +136,26 @@ export const fetchTeamInviteByEmail = async (email: string) => {
 
 // Helper function to fetch user school information
 export const fetchUserSchoolInfo = async () => {
-  const { data, error } = await supabase
-    .rpc('get_user_school_info');
+  try {
+    const { data, error } = await supabase
+      .rpc('get_user_school_info');
+      
+    if (error) {
+      console.error("Error fetching user school info:", error);
+      if (error.code === 'PGRST116') { // No rows returned
+        return [];
+      }
+      throw error;
+    }
     
-  if (error) {
-    console.error("Error fetching user school info:", error);
-    throw error;
+    // Ensure data is returned as an array
+    const dataArray = safeArray(data);
+    
+    return dataArray;
+  } catch (err) {
+    console.error("Error in fetchUserSchoolInfo:", err);
+    return [];
   }
-  
-  // Ensure data is returned as an array
-  const dataArray = safeArray(data);
-  
-  return dataArray;
 };
 
 // Helper function to fetch license details

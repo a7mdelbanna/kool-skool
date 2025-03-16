@@ -14,7 +14,7 @@ import {
   School,
   ArrowRight
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, fetchUserSchoolInfo } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   Card,
@@ -96,10 +96,10 @@ const TeamMembers = () => {
   });
 
   useEffect(() => {
-    fetchUserSchoolInfo();
+    getUserSchoolInfo();
   }, []);
 
-  const fetchUserSchoolInfo = async () => {
+  const getUserSchoolInfo = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -112,21 +112,9 @@ const TeamMembers = () => {
       }
       
       // Get the user's school_id and school name
-      const { data, error } = await supabase.rpc('get_user_school_info');
+      const schoolInfoData = await fetchUserSchoolInfo();
       
-      if (error) {
-        console.error("Error fetching user school info:", error);
-        if (error.code === 'PGRST116') { // No rows returned
-          setError('You do not belong to any school. Please create or join a school first.');
-        } else {
-          setError(`Error: ${error.message}`);
-        }
-        setLoading(false);
-        setUserCheckComplete(true);
-        return;
-      }
-      
-      if (!data || data.length === 0) {
+      if (!schoolInfoData || schoolInfoData.length === 0) {
         setError('You do not belong to any school. Please create or join a school first.');
         setLoading(false);
         setUserCheckComplete(true);
@@ -134,12 +122,12 @@ const TeamMembers = () => {
       }
       
       setSchoolInfo({
-        id: data[0].school_id,
-        name: data[0].school_name
+        id: schoolInfoData[0].school_id,
+        name: schoolInfoData[0].school_name
       });
       
       // Now fetch team members
-      fetchTeamMembers(data[0].school_id);
+      await fetchTeamMembers(schoolInfoData[0].school_id);
       setUserCheckComplete(true);
       
     } catch (error: any) {
@@ -152,6 +140,8 @@ const TeamMembers = () => {
         description: error.message || 'Failed to load school information',
         variant: 'destructive'
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -168,7 +158,7 @@ const TeamMembers = () => {
         .from('team_members')
         .select(`
           *,
-          profiles:profiles!profile_id(
+          profiles:profile_id(
             first_name,
             last_name,
             email,
