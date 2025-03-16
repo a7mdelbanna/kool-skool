@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -133,40 +134,70 @@ const OnboardingFlow = () => {
     
     if (!onboardingData.schoolName.trim()) return;
     
-    const { data, error: profileError } = await supabase.rpc(
-      'get_user_school_id',
-      {
-        user_id_param: user.id
+    try {
+      // Check if the user already has a school
+      const { data, error: profileError } = await supabase.rpc(
+        'get_user_school_id',
+        {
+          user_id_param: user.id
+        }
+      );
+      
+      if (profileError) throw profileError;
+      
+      // If no school is associated with the user, create a new one
+      if (!data || !Array.isArray(data) || data.length === 0 || !data[0]?.school_id) {
+        console.log("Creating new school during onboarding");
+        
+        const { data: newSchool, error } = await supabase
+          .from('schools')
+          .insert({
+            name: onboardingData.schoolName,
+            logo: onboardingData.schoolLogo,
+            phone: onboardingData.schoolPhone || null,
+            telegram: onboardingData.schoolTelegram || null,
+            whatsapp: onboardingData.schoolWhatsapp || null,
+            instagram: onboardingData.schoolInstagram || null,
+            created_by: user.id
+          })
+          .select('id')
+          .single();
+        
+        if (error) throw error;
+        
+        // Update user profile with the new school ID
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ school_id: newSchool.id })
+          .eq('id', user.id);
+        
+        if (updateError) throw updateError;
+        
+        toast.success("School created successfully");
+        return;
       }
-    );
-    
-    if (profileError) throw profileError;
-    
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      throw new Error("No school associated with this account");
+      
+      // If school exists, update it
+      const schoolId = data[0].school_id;
+      
+      const { error } = await supabase
+        .from('schools')
+        .update({
+          name: onboardingData.schoolName,
+          logo: onboardingData.schoolLogo,
+          phone: onboardingData.schoolPhone || null,
+          telegram: onboardingData.schoolTelegram || null,
+          whatsapp: onboardingData.schoolWhatsapp || null,
+          instagram: onboardingData.schoolInstagram || null
+        })
+        .eq('id', schoolId);
+      
+      if (error) throw error;
+      toast.success("School details saved successfully");
+    } catch (error: any) {
+      console.error("Error saving school details:", error);
+      throw error;
     }
-    
-    const schoolData = data as {school_id: string}[];
-    if (!schoolData[0]?.school_id) {
-      throw new Error("No school ID found in profile");
-    }
-    
-    const schoolId = schoolData[0].school_id;
-    
-    const { error } = await supabase
-      .from('schools')
-      .update({
-        name: onboardingData.schoolName,
-        logo: onboardingData.schoolLogo,
-        phone: onboardingData.schoolPhone || null,
-        telegram: onboardingData.schoolTelegram || null,
-        whatsapp: onboardingData.schoolWhatsapp || null,
-        instagram: onboardingData.schoolInstagram || null
-      })
-      .eq('id', schoolId);
-    
-    if (error) throw error;
-    toast.success("School details saved successfully");
   };
 
   const saveTeamMembers = async () => {
