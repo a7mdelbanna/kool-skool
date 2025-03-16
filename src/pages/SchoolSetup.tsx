@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info, Loader2, School } from "lucide-react";
+import { Info, Loader2, School, RefreshCw } from "lucide-react";
 import SubscriptionInfo from "@/components/school-setup/SubscriptionInfo";
 import LicenseManager from "@/components/school-setup/LicenseManager";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { PlusCircle, RefreshCw } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 
 const schoolSchema = z.object({
   name: z.string().min(1, { message: "School name is required" }),
@@ -61,6 +61,7 @@ const SchoolSetup = () => {
         setError(null);
         setIsRetrying(false);
         
+        // Fetch user role
         const { data: roleData, error: roleError } = await supabase
           .rpc('get_current_user_role');
           
@@ -71,56 +72,53 @@ const SchoolSetup = () => {
           setUserRole(roleData || null);
         }
         
-        try {
-          const { data: isInSchool, error: isInSchoolError } = await supabase
-            .rpc('is_user_in_school', { user_id_param: user.id });
-          
-          if (isInSchoolError) {
-            console.error("Error checking if user is in school:", isInSchoolError);
-            throw isInSchoolError;
-          }
-          
-          if (!isInSchool) {
-            setNoSchoolFound(true);
-            setIsLoading(false);
-            return;
-          }
-          
-          const { data: schoolIds } = await supabase
-            .rpc('get_user_school_id', { user_id_param: user.id });
-          
-          if (!schoolIds || schoolIds.length === 0) {
-            setNoSchoolFound(true);
-          } else {
-            const schoolId = schoolIds[0].school_id;
+        // Directly query the profiles table to get the school_id
+        // This avoids redundant checks and simplifies the data flow
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('school_id')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (profileError) {
+          console.error("Error fetching profile data:", profileError);
+          throw profileError;
+        }
+        
+        // Check if user has a school_id in their profile
+        if (!profileData || !profileData.school_id) {
+          console.log("No school ID found in profile:", profileData);
+          setNoSchoolFound(true);
+          setIsLoading(false);
+          return;
+        }
+        
+        const schoolId = profileData.school_id;
+        console.log("Found school ID in profile:", schoolId);
             
-            const { data: schoolData, error: schoolError } = await supabase
-              .from('schools')
-              .select('*')
-              .eq('id', schoolId)
-              .single();
-              
-            if (schoolError) {
-              console.error("Error fetching school:", schoolError);
-              throw schoolError;
-            }
-            
-            if (schoolData) {
-              console.log("School data:", schoolData);
-              setSchoolInfo(schoolData);
-              setNoSchoolFound(false);
-            } else {
-              setNoSchoolFound(true);
-            }
-          }
-        } catch (err) {
-          console.error("Error fetching school information:", err);
-          setError("Failed to fetch school information. Please try again.");
+        // Fetch school data
+        const { data: schoolData, error: schoolError } = await supabase
+          .from('schools')
+          .select('*')
+          .eq('id', schoolId)
+          .single();
+          
+        if (schoolError) {
+          console.error("Error fetching school:", schoolError);
+          throw schoolError;
+        }
+        
+        if (schoolData) {
+          console.log("School data:", schoolData);
+          setSchoolInfo(schoolData);
+          setNoSchoolFound(false);
+        } else {
           setNoSchoolFound(true);
         }
       } catch (err) {
         console.error("Error in fetchUserData:", err);
         setError("An unexpected error occurred. Please try again.");
+        setNoSchoolFound(true);
       } finally {
         setIsLoading(false);
       }
@@ -140,59 +138,13 @@ const SchoolSetup = () => {
         return;
       }
 
-      // Fetch the license ID first
-      let licenseId = null;
-      
-      if (data.license_number) {
-        const { data: licenseData, error: licenseQueryError } = await supabase
-          .from('licenses')
-          .select('id')
-          .eq('license_number', data.license_number)
-          .single();
-          
-        if (licenseQueryError) {
-          console.error("Error fetching license:", licenseQueryError);
-          toast.error(`Invalid license number: ${licenseQueryError.message}`);
-          setIsCreatingSchool(false);
-          return;
-        }
-        
-        if (licenseData) {
-          licenseId = licenseData.id;
-          
-          // Update the school name in the license
-          const { error: updateError } = await supabase
-            .from('licenses')
-            .update({ school_name: data.name })
-            .eq('id', licenseId);
-            
-          if (updateError) {
-            console.error("Error updating license school name:", updateError);
-            // Continue even if this fails
-          }
-        } else {
-          toast.error("License not found");
-          setIsCreatingSchool(false);
-          return;
-        }
-      } else {
-        toast.error("License number is required");
-        setIsCreatingSchool(false);
-        return;
-      }
-
-      console.log("Creating school with license ID:", licenseId);
-      
-      // Create the school and update profile
-      const { data: result, error } = await supabase
-        .from('schools')
-        .insert({
-          name: data.name,
-          license_id: licenseId,
-          created_by: user.id
-        })
-        .select('id')
-        .single();
+      // Call the RPC function to create a school and update the profile
+      // This ensures all operations happen in a single transaction
+      const { data: schoolId, error } = await supabase
+        .rpc('create_school_and_update_profile_rpc', {
+          school_name: data.name,
+          license_number: data.license_number
+        });
       
       if (error) {
         console.error("Error creating school:", error);
@@ -200,25 +152,12 @@ const SchoolSetup = () => {
         throw error;
       }
       
-      // Now update the user's profile with the school ID
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          school_id: result.id,
-          role: 'admin'
-        })
-        .eq('id', user.id);
-        
-      if (profileError) {
-        console.error("Error updating profile:", profileError);
-        toast.error(`Error updating profile: ${profileError.message}`);
-        throw profileError;
-      }
-      
+      console.log("School created successfully with ID:", schoolId);
       toast.success("School created successfully!");
       schoolForm.reset();
       setSchoolDialogOpen(false);
       
+      // Refresh data to show the newly created school
       await fetchUserData();
       
     } catch (error: any) {

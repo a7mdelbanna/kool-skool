@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -12,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { Loader2, Calendar, UserPlus, Users, Mail, Shield, EyeIcon, EyeOffIcon, PlusCircle, School } from "lucide-react";
+import { Loader2, Calendar, UserPlus, Shield, EyeIcon, EyeOffIcon, PlusCircle, School } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInCalendarDays } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,6 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { 
   Select, 
   SelectContent, 
@@ -95,26 +93,26 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      const { data: schoolIdData, error: schoolIdError } = await supabase
-        .rpc('get_user_school_id', { user_id_param: user.id });
-
-      if (schoolIdError) {
-        console.error("Error fetching school ID:", schoolIdError);
-        toast.error(`Error fetching school ID: ${schoolIdError.message}`);
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('school_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (profileError) {
+        console.error("Error fetching profile data:", profileError);
+        throw profileError;
+      }
+      
+      if (!profileData || !profileData.school_id) {
+        console.log("No school ID found in profile:", profileData);
         setNoSchoolFound(true);
         setIsLoading(false);
         return;
       }
       
-      if (!schoolIdData || !Array.isArray(schoolIdData) || schoolIdData.length === 0 || !schoolIdData[0]?.school_id) {
-        console.log("No school ID found:", schoolIdData);
-        setNoSchoolFound(true);
-        setIsLoading(false);
-        return;
-      }
-      
-      const schoolId = schoolIdData[0].school_id;
-      console.log("Found school ID:", schoolId);
+      const schoolId = profileData.school_id;
+      console.log("Found school ID in profile:", schoolId);
       setNoSchoolFound(false);
 
       const { data: schoolData, error: schoolError } = await supabase
