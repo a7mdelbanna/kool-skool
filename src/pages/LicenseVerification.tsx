@@ -53,7 +53,8 @@ const LicenseVerification = () => {
       
       if (licenseError) throw licenseError;
       
-      if (!licenseData || licenseData.length === 0) {
+      // Check if license data exists and has items
+      if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
         throw new Error('Invalid license number or license has expired');
       }
       

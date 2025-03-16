@@ -28,16 +28,15 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       persistSession: true,
-      // Use dynamic site URL for authentication flows
-      // Corrected property for Supabase v2.x
-      redirectTo: getSiteUrl()
+      // Use dynamic site URL for authentication flows by setting it in options
+      site_url: getSiteUrl()
     }
   }
 );
 
 // Type utility for safely accessing properties
-const safeAccess = <T, K extends keyof T>(obj: T | null | undefined, key: K): T[K] | undefined => {
-  return obj && key in obj ? obj[key] : undefined;
+const safeAccess = <T extends Record<string, any>, K extends string>(obj: T | null | undefined, key: K): T[K & keyof T] | undefined => {
+  return obj && key in obj ? obj[key as keyof T] : undefined;
 };
 
 // Type guard to check if an object has a property
@@ -55,8 +54,8 @@ export const uploadBase64Image = async (
   
   const { data, error } = await supabase
     .from('schools')
-    .update(updateData as any)
-    .eq('id', schoolId as any);
+    .update(updateData)
+    .eq('id', schoolId);
     
   return { data, error };
 };
@@ -75,7 +74,7 @@ export const fetchUserProfile = async () => {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', user.id as any)
+    .eq('id', user.id)
     .single();
     
   if (error) {
@@ -88,14 +87,7 @@ export const fetchUserProfile = async () => {
   // Ensure we have valid data with safe access
   return { 
     user, 
-    profile: data && {
-      first_name: safeAccess(data, 'first_name'),
-      last_name: safeAccess(data, 'last_name'),
-      email: safeAccess(data, 'email'),
-      phone: safeAccess(data, 'phone'),
-      profile_picture: safeAccess(data, 'profile_picture'),
-      id: safeAccess(data, 'id')
-    } 
+    profile: data || null
   };
 };
 
@@ -116,8 +108,8 @@ export const updateUserProfile = async (
   
   const { data, error } = await supabase
     .from('profiles')
-    .update(profileData as any)
-    .eq('id', user.id as any);
+    .update(profileData)
+    .eq('id', user.id);
     
   if (error) {
     throw error;
@@ -137,7 +129,7 @@ const checkEmailExists = async (email: string) => {
     const { count: profileCount, error: countError } = await supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .eq('email', email as any);
+      .eq('email', email);
     
     if (countError) {
       console.error("Error checking profiles count for email:", countError);
@@ -150,7 +142,7 @@ const checkEmailExists = async (email: string) => {
     const { count: teamMemberCount, error: teamMemberError } = await supabase
       .from('team_members')
       .select('id', { count: 'exact', head: true })
-      .eq('email', email as any);
+      .eq('email', email);
       
     if (teamMemberError) {
       console.error("Error checking team_members for email:", teamMemberError);
@@ -266,7 +258,7 @@ export const createTeamMember = async (
     const { data: adminProfile, error: profileError } = await supabase
       .from('profiles')
       .select('school_id')
-      .eq('id', user.id as any)
+      .eq('id', user.id)
       .single();
       
     if (profileError) {
@@ -274,12 +266,12 @@ export const createTeamMember = async (
       throw new Error('Could not fetch admin school information');
     }
     
-    // Safe access to school_id property
-    const schoolId = safeAccess(adminProfile, 'school_id');
-    if (!schoolId) {
+    // Check if school_id exists on adminProfile
+    if (!adminProfile || !('school_id' in adminProfile) || !adminProfile.school_id) {
       throw new Error('Admin does not have a school assigned');
     }
     
+    const schoolId = adminProfile.school_id;
     console.log("Admin school ID:", schoolId);
     
     // Proceed with creating the team member
@@ -312,7 +304,7 @@ export const createTeamMember = async (
     // Now call the stored procedure to set up the team member
     // Use type assertion to work around TypeScript limitations with RPC functions
     const { data, error } = await supabase.rpc(
-      'finalize_team_member' as any, 
+      'finalize_team_member', 
       {
         user_id_param: authData.user.id,
         role_param: userData.role,
