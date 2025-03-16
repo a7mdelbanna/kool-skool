@@ -150,6 +150,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_if_profile_owner: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       create_school_and_update_profile_rpc: {
         Args: {
           school_name: string

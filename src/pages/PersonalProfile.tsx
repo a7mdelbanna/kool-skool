@@ -54,13 +54,19 @@ const PersonalProfile = () => {
       
       try {
         setIsLoading(true);
+        
+        // Use a safe query that won't trigger RLS recursion
+        // This was the issue - direct query to profiles table
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to avoid errors if record doesn't exist
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching profile:', error);
+          throw error;
+        }
         
         if (data) {
           const profileValues = {
@@ -153,7 +159,8 @@ const PersonalProfile = () => {
     try {
       setIsSaving(true);
       
-      // Call the Supabase function to update the profile
+      // Use the Supabase RPC function to update the profile
+      // This avoids the infinite recursion issue
       const { error } = await supabase.rpc('update_user_profile', {
         user_id: user.id,
         first_name_param: values.firstName,
@@ -165,7 +172,10 @@ const PersonalProfile = () => {
         instagram_param: values.instagram
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error from update_user_profile RPC:', error);
+        throw error;
+      }
       
       toast.success('Profile updated successfully');
       setProfileData(values);

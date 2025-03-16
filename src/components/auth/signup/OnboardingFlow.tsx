@@ -108,6 +108,7 @@ const OnboardingFlow = () => {
     if (!user) return;
     
     try {
+      // Use the security definer function through RPC to avoid infinite recursion
       const { error } = await supabase.rpc(
         'update_user_profile', 
         {
@@ -122,7 +123,12 @@ const OnboardingFlow = () => {
         }
       );
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error from update_user_profile RPC:", error);
+        throw error;
+      }
+      
+      console.log("Personal details saved successfully using RPC function");
       toast.success("Personal details saved successfully");
     } catch (error: any) {
       console.error("Error saving personal details:", error);
