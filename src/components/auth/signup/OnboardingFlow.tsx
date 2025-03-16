@@ -132,67 +132,30 @@ const OnboardingFlow = () => {
   const saveSchoolDetails = async () => {
     if (!user) return;
     
+    // If school name is empty, skip this step
     if (!onboardingData.schoolName.trim()) return;
     
     try {
-      // Check if the user already has a school
-      const { data, error: profileError } = await supabase.rpc(
-        'get_user_school_id',
+      // Use our new save_school_details RPC function
+      const { data, error } = await supabase.rpc(
+        'save_school_details',
         {
-          user_id_param: user.id
+          user_id_param: user.id,
+          school_name_param: onboardingData.schoolName,
+          school_logo_param: onboardingData.schoolLogo,
+          school_phone_param: onboardingData.schoolPhone || null,
+          school_telegram_param: onboardingData.schoolTelegram || null,
+          school_whatsapp_param: onboardingData.schoolWhatsapp || null,
+          school_instagram_param: onboardingData.schoolInstagram || null
         }
       );
       
-      if (profileError) throw profileError;
-      
-      // If no school is associated with the user, create a new one
-      if (!data || !Array.isArray(data) || data.length === 0 || !data[0]?.school_id) {
-        console.log("Creating new school during onboarding");
-        
-        const { data: newSchool, error } = await supabase
-          .from('schools')
-          .insert({
-            name: onboardingData.schoolName,
-            logo: onboardingData.schoolLogo,
-            phone: onboardingData.schoolPhone || null,
-            telegram: onboardingData.schoolTelegram || null,
-            whatsapp: onboardingData.schoolWhatsapp || null,
-            instagram: onboardingData.schoolInstagram || null,
-            created_by: user.id
-          })
-          .select('id')
-          .single();
-        
-        if (error) throw error;
-        
-        // Update user profile with the new school ID
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ school_id: newSchool.id })
-          .eq('id', user.id);
-        
-        if (updateError) throw updateError;
-        
-        toast.success("School created successfully");
-        return;
+      if (error) {
+        console.error("Error from save_school_details:", error);
+        throw error;
       }
       
-      // If school exists, update it
-      const schoolId = data[0].school_id;
-      
-      const { error } = await supabase
-        .from('schools')
-        .update({
-          name: onboardingData.schoolName,
-          logo: onboardingData.schoolLogo,
-          phone: onboardingData.schoolPhone || null,
-          telegram: onboardingData.schoolTelegram || null,
-          whatsapp: onboardingData.schoolWhatsapp || null,
-          instagram: onboardingData.schoolInstagram || null
-        })
-        .eq('id', schoolId);
-      
-      if (error) throw error;
+      console.log("School saved successfully with ID:", data);
       toast.success("School details saved successfully");
     } catch (error: any) {
       console.error("Error saving school details:", error);
@@ -203,8 +166,32 @@ const OnboardingFlow = () => {
   const saveTeamMembers = async () => {
     if (onboardingData.teamMembers.length === 0) return;
     
+    // For now, we're just logging the team members
+    // In a real application, you would save this to the database
     console.log("Team members to invite:", onboardingData.teamMembers);
     toast.success(`${onboardingData.teamMembers.length} team members will be invited`);
+    
+    // You could implement a function here to save team members to the database
+    // For example:
+    /*
+    try {
+      const { error } = await supabase
+        .from('team_invitations')
+        .insert(
+          onboardingData.teamMembers.map(member => ({
+            school_id: schoolId, // You would need to get this
+            email: member.email,
+            role: member.role,
+            invited_by: user.id
+          }))
+        );
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error inviting team members:", error);
+      throw error;
+    }
+    */
   };
 
   const finishOnboarding = () => {

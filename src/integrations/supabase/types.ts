@@ -195,6 +195,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      save_school_details: {
+        Args: {
+          user_id_param: string
+          school_name_param: string
+          school_logo_param: string
+          school_phone_param: string
+          school_telegram_param: string
+          school_whatsapp_param: string
+          school_instagram_param: string
+        }
+        Returns: string
+      }
       update_user_profile: {
         Args: {
           user_id: string
