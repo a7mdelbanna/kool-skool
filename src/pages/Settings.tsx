@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchUserProfile, updateUserProfile } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
 const Settings = () => {
@@ -40,42 +40,22 @@ const Settings = () => {
   });
 
   // Fetch user profile data
-  const fetchUserProfile = async () => {
+  const loadUserProfile = async () => {
     try {
       setIsLoading(true);
+      const { profile } = await fetchUserProfile();
       
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      setProfileData({
+        firstName: profile?.first_name || '',
+        lastName: profile?.last_name || '',
+        email: profile?.email || '',
+        phone: profile?.phone || '',
+        location: '', // Location is not in the schema, but keeping it for UI consistency
+        bio: '', // Bio is not in the schema, but keeping it for UI consistency
+        profile_picture: profile?.profile_picture
+      });
       
-      if (!user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please log in to view your profile",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Fetch profile data
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (error) throw error;
-      
-      if (profileData) {
-        setProfileData({
-          firstName: profileData.first_name || '',
-          lastName: profileData.last_name || '',
-          email: profileData.email || '',
-          phone: profileData.phone || '',
-          location: '', // Location is not in the schema, but keeping it for UI consistency
-          bio: '', // Bio is not in the schema, but keeping it for UI consistency
-          profile_picture: profileData.profile_picture
-        });
-      }
+      console.log("Profile data loaded:", profile);
     } catch (error) {
       console.error('Error fetching profile:', error);
       toast({
@@ -93,30 +73,12 @@ const Settings = () => {
     try {
       setIsLoading(true);
       
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast({
-          title: "Authentication Error",
-          description: "Please log in to update your profile",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Update profile
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          first_name: profileData.firstName,
-          last_name: profileData.lastName,
-          phone: profileData.phone,
-          profile_picture: profileData.profile_picture
-        })
-        .eq('id', user.id);
-      
-      if (error) throw error;
+      await updateUserProfile({
+        first_name: profileData.firstName,
+        last_name: profileData.lastName,
+        phone: profileData.phone,
+        profile_picture: profileData.profile_picture
+      });
       
       toast({
         title: "Success",
@@ -166,18 +128,9 @@ const Settings = () => {
             profile_picture: base64String
           }));
           
-          // Get current user
-          const { data: { user } } = await supabase.auth.getUser();
-          
-          if (!user) return;
-          
-          // Update profile picture
-          const { error } = await supabase
-            .from('profiles')
-            .update({ profile_picture: base64String })
-            .eq('id', user.id);
-          
-          if (error) throw error;
+          await updateUserProfile({
+            profile_picture: base64String
+          });
           
           toast({
             title: "Profile picture updated",
@@ -205,18 +158,9 @@ const Settings = () => {
     try {
       setIsLoading(true);
       
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
-      
-      // Update profile with null profile picture
-      const { error } = await supabase
-        .from('profiles')
-        .update({ profile_picture: null })
-        .eq('id', user.id);
-      
-      if (error) throw error;
+      await updateUserProfile({
+        profile_picture: null
+      });
       
       setProfileData(prev => ({
         ...prev,
@@ -241,7 +185,7 @@ const Settings = () => {
 
   // Load profile data when component mounts
   useEffect(() => {
-    fetchUserProfile();
+    loadUserProfile();
   }, []);
 
   // Get initials for avatar fallback

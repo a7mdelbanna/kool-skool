@@ -24,3 +24,51 @@ export const uploadBase64Image = async (
     
   return { data, error };
 };
+
+// Helper function to fetch user profile data
+export const fetchUserProfile = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('No user authenticated');
+  }
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+    
+  if (error) {
+    throw error;
+  }
+  
+  return { user, profile: data };
+};
+
+// Helper function to update user profile
+export const updateUserProfile = async (
+  profileData: {
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    profile_picture?: string | null;
+  }
+) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('No user authenticated');
+  }
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(profileData)
+    .eq('id', user.id);
+    
+  if (error) {
+    throw error;
+  }
+  
+  return data;
+};
