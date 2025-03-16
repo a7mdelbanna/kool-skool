@@ -37,7 +37,7 @@ const App = () => {
     
     // Listen for storage events to handle authentication across tabs
     window.addEventListener('storage', checkAuth);
-    // Also listen for custom storage event we dispatch on login
+    // Also listen for custom event we dispatch on login
     window.addEventListener('storage', checkAuth);
     
     return () => {
@@ -60,11 +60,11 @@ const App = () => {
             <Sonner />
             <Routes>
               {/* Authentication routes */}
-              <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
+              <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
               <Route path="/school-setup" element={<SchoolSetup />} />
               
               {/* Protected routes */}
-              <Route element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" />}>
+              <Route element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>
                 <Route path="/" element={<Index />} />
                 <Route path="/students" element={<Students />} />
                 <Route path="/calendar" element={<Calendar />} />

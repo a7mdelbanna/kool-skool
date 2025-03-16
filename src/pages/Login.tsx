@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,15 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Check if we're already authenticated and redirect if so
+  useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      console.log("User already logged in, redirecting to dashboard...");
+      window.location.href = '/';
+    }
+  }, []);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,13 +72,8 @@ const Login = () => {
       console.log("Login successful, redirecting to dashboard...");
       console.log("User data:", userData);
       
-      // Use a more reliable approach for navigation
-      // First ensure localStorage is updated by using a callback
-      setTimeout(() => {
-        console.log("Navigating to dashboard...");
-        // Force reload the page and navigate to dashboard
-        window.location.href = '/';
-      }, 500);
+      // Force a hard navigation to the root page
+      window.location.href = '/';
       
     } catch (error) {
       console.error('Login error:', error);
