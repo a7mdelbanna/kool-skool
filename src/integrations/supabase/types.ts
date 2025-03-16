@@ -9,16 +9,270 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      licenses: {
+        Row: {
+          created_at: string
+          duration_days: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          license_number: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_days: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          license_number: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration_days?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          license_number?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          profile_picture: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          school_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          phone?: string | null
+          profile_picture?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          school_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          profile_picture?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          school_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schools: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          id: string
+          instagram: string | null
+          license_id: string
+          logo: string | null
+          name: string
+          phone: string | null
+          telegram: string | null
+          updated_at: string
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          instagram?: string | null
+          license_id: string
+          logo?: string | null
+          name: string
+          phone?: string | null
+          telegram?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          instagram?: string | null
+          license_id?: string
+          logo?: string | null
+          name?: string
+          phone?: string | null
+          telegram?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schools_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schools_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invitation_accepted: boolean | null
+          invitation_sent: boolean | null
+          invited_by: string | null
+          profile_id: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invitation_accepted?: boolean | null
+          invitation_sent?: boolean | null
+          invited_by?: string | null
+          profile_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invitation_accepted?: boolean | null
+          invitation_sent?: boolean | null
+          invited_by?: string | null
+          profile_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_members_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      accept_team_invitation: {
+        Args: {
+          email_param: string
+          school_id_param: string
+        }
+        Returns: boolean
+      }
+      create_school_and_associate_director: {
+        Args: {
+          license_id_param: string
+          school_name_param: string
+        }
+        Returns: string
+      }
+      get_license_details: {
+        Args: {
+          license_id_param: string
+        }
+        Returns: {
+          id: string
+          license_number: string
+          is_active: boolean
+          duration_days: number
+          days_remaining: number
+          expires_at: string
+          school_name: string
+        }[]
+      }
+      get_user_school_info: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          user_id: string
+          school_id: string
+          license_id: string
+          role: string
+          school_name: string
+          license_number: string
+          license_is_active: boolean
+          license_days_remaining: number
+          license_expires_at: string
+        }[]
+      }
+      invite_team_member: {
+        Args: {
+          email_param: string
+          role_param: Database["public"]["Enums"]["user_role"]
+          first_name_param?: string
+          last_name_param?: string
+        }
+        Returns: string
+      }
+      verify_license: {
+        Args: {
+          license_number_param: string
+        }
+        Returns: {
+          license_id: string
+          is_active: boolean
+          days_remaining: number
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      user_role: "director" | "teacher" | "admin" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never

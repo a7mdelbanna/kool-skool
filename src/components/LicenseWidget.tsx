@@ -1,27 +1,72 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Clock } from 'lucide-react';
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface LicenseDetails {
+  id: string;
   license_number: string;
   is_active: boolean;
+  duration_days: number;
   days_remaining: number;
   expires_at: string | null;
   school_name: string;
 }
 
 const LicenseWidget: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  
-  // Mock license data for UI display
-  const licenseDetails: LicenseDetails = {
-    license_number: "LIC-2023-0001",
-    is_active: true,
-    days_remaining: 45,
-    expires_at: "2025-06-30T00:00:00.000Z",
-    school_name: "English Gang School"
-  };
+  const [loading, setLoading] = useState(true);
+  const [licenseDetails, setLicenseDetails] = useState<LicenseDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchLicenseDetails = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch the user's school and license info
+        const { data, error: licenseError } = await supabase
+          .rpc('get_user_school_info');
+
+        if (licenseError) throw licenseError;
+        
+        if (!data || data.length === 0) {
+          throw new Error('No license information found');
+        }
+
+        const userInfo = data[0];
+        
+        // Get detailed license information
+        const { data: licenseData, error: detailsError } = await supabase
+          .rpc('get_license_details', {
+            license_id_param: userInfo.license_id
+          });
+
+        if (detailsError) throw detailsError;
+        
+        if (!licenseData || licenseData.length === 0) {
+          throw new Error('License details not found');
+        }
+
+        setLicenseDetails(licenseData[0]);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching license details:', err);
+        setError('Error loading license information');
+        toast({
+          title: "Error",
+          description: "Failed to load license information",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLicenseDetails();
+  }, [toast]);
 
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
@@ -34,7 +79,14 @@ const LicenseWidget: React.FC = () => {
         <div className="flex items-center justify-center h-12">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
         </div>
-      ) : (
+      ) : error ? (
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
+          <AlertDescription className="text-red-500">
+            Please refresh the page or contact support if this issue persists.
+          </AlertDescription>
+        </Alert>
+      ) : licenseDetails ? (
         <div className="space-y-2">
           {licenseDetails.license_number && (
             <p className="text-sm text-gray-500">License: {licenseDetails.license_number}</p>
@@ -56,6 +108,13 @@ const LicenseWidget: React.FC = () => {
             )}
           </div>
         </div>
+      ) : (
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+          <AlertTitle className="text-red-600">No license information available</AlertTitle>
+          <AlertDescription className="text-red-500">
+            Please contact your administrator to setup a license.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );
