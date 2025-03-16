@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Mail, 
@@ -10,7 +10,9 @@ import {
   Bell, 
   Shield, 
   HelpCircle, 
-  Save 
+  Save,
+  UploadCloud,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,8 +24,255 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 const Settings = () => {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [profileData, setProfileData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    location: '',
+    bio: '',
+    profile_picture: null as string | null
+  });
+  
+  // Parse first and last name from full name
+  const getFirstLastName = (fullName: string) => {
+    const names = fullName.trim().split(' ');
+    if (names.length === 1) return { first_name: names[0], last_name: '' };
+    const firstName = names[0];
+    const lastName = names.slice(1).join(' ');
+    return { first_name: firstName, last_name: lastName };
+  };
+  
+  // Combine first and last name into full name
+  const getFullName = (firstName: string | null, lastName: string | null) => {
+    const first = firstName || '';
+    const last = lastName || '';
+    return `${first} ${last}`.trim();
+  };
+
+  // Fetch user profile data
+  const fetchUserProfile = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to view your profile",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Fetch profile data
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      
+      if (profileData) {
+        setProfileData({
+          fullName: getFullName(profileData.first_name, profileData.last_name),
+          email: profileData.email || '',
+          phone: profileData.phone || '',
+          location: '', // Location is not in the schema, but keeping it for UI consistency
+          bio: '', // Bio is not in the schema, but keeping it for UI consistency
+          profile_picture: profileData.profile_picture
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update profile data
+  const updateProfile = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to update your profile",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Parse first and last name
+      const { first_name, last_name } = getFirstLastName(profileData.fullName);
+      
+      // Update profile
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name,
+          last_name,
+          phone: profileData.phone,
+          profile_picture: profileData.profile_picture
+        })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Your profile has been updated successfully"
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle profile picture upload
+  const handleImageUpload = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    
+    fileInput.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Please select an image smaller than 5MB',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      try {
+        setIsLoading(true);
+        // Convert file to base64 for preview and storage
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const base64String = event.target?.result as string;
+          
+          setProfileData(prev => ({
+            ...prev,
+            profile_picture: base64String
+          }));
+          
+          // Get current user
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) return;
+          
+          // Update profile picture
+          const { error } = await supabase
+            .from('profiles')
+            .update({ profile_picture: base64String })
+            .eq('id', user.id);
+          
+          if (error) throw error;
+          
+          toast({
+            title: "Profile picture updated",
+            description: "Your profile picture has been updated successfully"
+          });
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        toast({
+          title: 'Upload failed',
+          description: 'Failed to upload the image',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fileInput.click();
+  };
+
+  // Remove profile picture
+  const handleRemoveImage = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+      
+      // Update profile with null profile picture
+      const { error } = await supabase
+        .from('profiles')
+        .update({ profile_picture: null })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      setProfileData(prev => ({
+        ...prev,
+        profile_picture: null
+      }));
+      
+      toast({
+        title: "Profile picture removed",
+        description: "Your profile picture has been removed"
+      });
+    } catch (error) {
+      console.error('Error removing image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove profile picture',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load profile data when component mounts
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  // Get initials for avatar fallback
+  const getInitials = () => {
+    if (!profileData.fullName) return "U";
+    return profileData.fullName
+      .split(' ')
+      .map(name => name[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -60,13 +309,32 @@ const Settings = () => {
             <CardContent className="space-y-6">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                 <Avatar className="h-20 w-20 border-2 border-white shadow-sm">
-                  <AvatarFallback className="text-2xl">TP</AvatarFallback>
+                  {profileData.profile_picture ? (
+                    <AvatarImage src={profileData.profile_picture} alt="Profile" />
+                  ) : null}
+                  <AvatarFallback className="text-2xl">{getInitials()}</AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="font-medium mb-2">Profile Photo</h3>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">Upload new photo</Button>
-                    <Button variant="ghost" size="sm">Remove</Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleImageUpload}
+                      disabled={isLoading}
+                    >
+                      <UploadCloud className="h-4 w-4 mr-1" />
+                      Upload new photo
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={handleRemoveImage}
+                      disabled={isLoading || !profileData.profile_picture}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Remove
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -76,28 +344,62 @@ const Settings = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
-                  <Input id="fullName" placeholder="John Smith" />
+                  <Input 
+                    id="fullName" 
+                    placeholder="John Smith" 
+                    value={profileData.fullName}
+                    onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" type="email" placeholder="example@email.com" />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="example@email.com" 
+                    value={profileData.email}
+                    disabled={true} // Email should not be editable
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" placeholder="+1 (555) 123-4567" />
+                  <Input 
+                    id="phone" 
+                    placeholder="+1 (555) 123-4567" 
+                    value={profileData.phone}
+                    onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
-                  <Input id="location" placeholder="City, Country" />
+                  <Input 
+                    id="location" 
+                    placeholder="City, Country" 
+                    value={profileData.location}
+                    onChange={(e) => setProfileData({...profileData, location: e.target.value})}
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="bio">Bio</Label>
-                  <Textarea id="bio" placeholder="Tell us about yourself and your tutoring experience" />
+                  <Textarea 
+                    id="bio" 
+                    placeholder="Tell us about yourself and your tutoring experience" 
+                    value={profileData.bio}
+                    onChange={(e) => setProfileData({...profileData, bio: e.target.value})}
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
               
               <div className="flex justify-end">
-                <Button className="gap-2">
+                <Button 
+                  className="gap-2"
+                  onClick={updateProfile}
+                  disabled={isLoading}
+                >
                   <Save className="h-4 w-4" />
                   <span>Save Changes</span>
                 </Button>
