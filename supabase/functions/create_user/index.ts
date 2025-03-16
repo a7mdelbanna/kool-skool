@@ -66,7 +66,7 @@ serve(async (req) => {
       );
     }
     
-    // Initialize Supabase client with the service role key
+    // Initialize Supabase client with the service role key - using simplified approach
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     
