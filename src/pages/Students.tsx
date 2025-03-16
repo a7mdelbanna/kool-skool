@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { useQuery } from '@tanstack/react-query';
 import { getStudentsWithDetails, StudentRecord, createCourse } from '@/integrations/supabase/client';
+import { UserContext } from '@/App';
 import {
   Dialog,
   DialogContent,
@@ -51,14 +52,9 @@ const Students = () => {
   const [savingCourse, setSavingCourse] = useState(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useContext(UserContext);
   
-  const getUserData = () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  };
-
-  const userData = getUserData();
-  const schoolId = userData?.school_id;
+  const schoolId = user?.schoolId;
   
   const { 
     data: studentsData, 
@@ -216,14 +212,13 @@ const Students = () => {
     try {
       setSavingCourse(true);
       
-      const userData = getUserData();
-      if (!userData || !userData.school_id) {
+      if (!user || !user.schoolId) {
         toast.error("User data is missing. Please log in again.");
         return;
       }
       
       const { data, error } = await createCourse(
-        userData.school_id,
+        user.schoolId,
         newCourseName.trim(),
         newCourseType
       );

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +7,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, LogIn, Loader2, School } from 'lucide-react';
 import { supabase, UserLoginResponse } from "@/integrations/supabase/client";
 import { useNavigate, Link } from 'react-router-dom';
+import { UserContext } from '@/App';
 
 const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { setUser } = useContext(UserContext);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -60,6 +61,7 @@ const Login = () => {
       };
       
       localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
       
       // Dispatch a storage event to notify other tabs
       window.dispatchEvent(new Event('storage'));
