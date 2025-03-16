@@ -1,29 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { School, CheckCircle, KeyRound, User, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { supabase, SchoolSetupResponse } from "@/integrations/supabase/client";
 import { useNavigate } from 'react-router-dom';
 import LicenseWidget from '@/components/LicenseWidget';
 
-interface License {
-  id: string;
-  license_key: string;
-  is_used: boolean;
-}
-
 const SchoolSetup = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [availableLicenses, setAvailableLicenses] = useState<License[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [licenseError, setLicenseError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     licenseKey: '',
@@ -44,45 +34,6 @@ const SchoolSetup = () => {
     adminPassword: '',
     confirmPassword: ''
   });
-  
-  useEffect(() => {
-    fetchAvailableLicenses();
-  }, []);
-  
-  const fetchAvailableLicenses = async () => {
-    try {
-      setIsLoading(true);
-      setLicenseError(null);
-      
-      const { data, error } = await supabase
-        .from('licenses')
-        .select('id, license_key, is_used')
-        .eq('is_used', false);
-      
-      if (error) {
-        console.error('Error fetching licenses:', error);
-        setLicenseError(error.message);
-        toast({
-          title: "Error loading licenses",
-          description: error.message || "Please try again later.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setAvailableLicenses(data || []);
-    } catch (error) {
-      console.error('Error fetching licenses:', error);
-      setLicenseError(error.message);
-      toast({
-        title: "Error loading licenses",
-        description: error.message || "Please try again later.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -211,10 +162,6 @@ const SchoolSetup = () => {
     }
   };
   
-  const handleSelectLicense = (licenseKey: string) => {
-    setFormData(prev => ({ ...prev, licenseKey }));
-  };
-  
   return (
     <div className="container mx-auto py-6">
       <div className="flex items-center gap-2 mb-6">
@@ -255,52 +202,6 @@ const SchoolSetup = () => {
                     </p>
                   )}
                 </div>
-                
-                {licenseError ? (
-                  <div className="bg-red-50 p-3 rounded-md border border-red-200">
-                    <p className="text-red-600 text-sm flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" /> {licenseError}
-                    </p>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={fetchAvailableLicenses}
-                    >
-                      Try Again
-                    </Button>
-                  </div>
-                ) : isLoading ? (
-                  <div className="bg-muted p-3 rounded-md flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <p className="text-sm">Loading available licenses...</p>
-                  </div>
-                ) : availableLicenses.length > 0 ? (
-                  <div className="bg-muted p-3 rounded-md">
-                    <p className="text-sm font-medium mb-2">Available Licenses:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {availableLicenses.map(license => (
-                        <Button
-                          key={license.id}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSelectLicense(license.license_key)}
-                          className="text-xs"
-                        >
-                          {license.license_key}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
-                    <p className="text-yellow-600 text-sm flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" /> No available licenses found
-                    </p>
-                  </div>
-                )}
                 
                 <div className="space-y-2">
                   <Label htmlFor="schoolName">School Name</Label>
