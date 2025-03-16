@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { useContext } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -9,11 +9,14 @@ import {
   Settings,
   Menu,
   X,
-  School
+  School,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useToast } from '@/hooks/use-toast';
+import { UserContext } from '@/App';
 
 interface NavItemProps {
   to: string;
@@ -43,10 +46,38 @@ const NavItem = ({ to, icon, label, isActive, onClick }: NavItemProps) => {
 
 const MobileNavbar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, setUser } = useContext(UserContext);
   const [isOpen, setIsOpen] = React.useState(false);
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
+
+  const handleLogout = () => {
+    // Clear user data from localStorage
+    localStorage.removeItem('user');
+    
+    // Update authentication context
+    setUser(null);
+    
+    // Show logout notification
+    toast({
+      title: "Logged out successfully",
+      description: "You have been logged out of your account."
+    });
+    
+    // Trigger storage event to synchronize across tabs
+    window.dispatchEvent(new Event('storage'));
+    
+    // Redirect to login page
+    navigate('/login');
+    
+    // Close menu if open
+    if (isOpen) {
+      closeMenu();
+    }
+  };
 
   return (
     <>
@@ -55,14 +86,26 @@ const MobileNavbar = () => {
           <SidebarTrigger />
           <h1 className="text-xl font-semibold ml-3">TutorPro</h1>
         </div>
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={toggleMenu}
-          className="lg:hidden"
-        >
-          {isOpen ? <X size={20} /> : <Menu size={20} />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="md:flex hidden"
+            onClick={handleLogout}
+            aria-label="Logout"
+          >
+            <LogOut size={18} />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={toggleMenu}
+            className="lg:hidden"
+            aria-label={isOpen ? "Close menu" : "Open menu"}
+          >
+            {isOpen ? <X size={20} /> : <Menu size={20} />}
+          </Button>
+        </div>
       </div>
 
       {/* Mobile menu */}
@@ -115,6 +158,14 @@ const MobileNavbar = () => {
             isActive={location.pathname === "/settings"} 
             onClick={closeMenu}
           />
+          <Button 
+            variant="outline" 
+            className="w-full mt-2 flex items-center justify-center gap-2"
+            onClick={handleLogout}
+          >
+            <LogOut size={16} />
+            <span>Logout</span>
+          </Button>
         </div>
       </div>
 

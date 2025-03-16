@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useContext } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -29,8 +29,40 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { UserContext } from '@/App';
+import { useToast } from '@/hooks/use-toast';
 
 export function Sidebar() {
+  const { user, setUser } = useContext(UserContext);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Clear user data from localStorage
+    localStorage.removeItem('user');
+    
+    // Update authentication context
+    setUser(null);
+    
+    // Show logout notification
+    toast({
+      title: "Logged out successfully",
+      description: "You have been logged out of your account."
+    });
+    
+    // Trigger storage event to synchronize across tabs
+    window.dispatchEvent(new Event('storage'));
+    
+    // Redirect to login page
+    navigate('/login');
+  };
+
+  // Generate avatar fallback from user's name
+  const generateAvatarFallback = () => {
+    if (!user || !user.firstName || !user.lastName) return 'TP';
+    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
+  };
+
   return (
     <SidebarComponent className="hidden lg:flex">
       <SidebarHeader className="p-4">
@@ -194,14 +226,20 @@ export function Sidebar() {
           <div className="flex items-center justify-between p-2 rounded-md border">
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
-                <AvatarFallback>TP</AvatarFallback>
+                <AvatarFallback>{generateAvatarFallback()}</AvatarFallback>
               </Avatar>
               <div className="text-sm">
-                <div className="font-medium">Tutor Name</div>
-                <div className="text-xs text-muted-foreground">tutor@example.com</div>
+                <div className="font-medium">{user ? `${user.firstName} ${user.lastName}` : 'Tutor Name'}</div>
+                <div className="text-xs text-muted-foreground">{user ? `${user.email || 'tutor@example.com'}` : 'tutor@example.com'}</div>
               </div>
             </div>
-            <Button variant="ghost" size="icon">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleLogout}
+              title="Logout"
+              aria-label="Logout from your account"
+            >
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
