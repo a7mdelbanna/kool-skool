@@ -48,7 +48,7 @@ const AccountCreation: React.FC = () => {
           .from('licenses')
           .select('*')
           .eq('id', licenseId)
-          .maybeSingle(); // Using maybeSingle to avoid error when no record is found
+          .maybeSingle(); // Use maybeSingle instead of single to avoid error
         
         if (error) {
           console.error("Error checking license:", error);
