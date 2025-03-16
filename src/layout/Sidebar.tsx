@@ -11,7 +11,8 @@ import {
   PlusCircle,
   GraduationCap,
   School,
-  BarChart2
+  BarChart2,
+  UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -143,6 +144,22 @@ export function Sidebar() {
                   >
                     <School className="h-5 w-5" />
                     <span>School Setup</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/team-access"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    <span>Team Access</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

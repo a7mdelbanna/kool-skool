@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   Collapsible,
@@ -14,8 +15,7 @@ import {
   School, 
   Phone, 
   Instagram, 
-  MessageSquare, 
-  Users,
+  MessageSquare,
   Upload,
   Book,
   BookOpen,
@@ -35,15 +35,6 @@ interface SchoolInfo {
   phone: string;
   telegram: string;
   whatsapp: string;
-  instagram: string;
-}
-
-interface Teacher {
-  id: string;
-  name: string;
-  picture: string;
-  whatsapp: string;
-  telegram: string;
   instagram: string;
 }
 
@@ -81,7 +72,6 @@ const SchoolSetup = () => {
   
   const [openSections, setOpenSections] = useState({
     schoolInfo: true,
-    teachers: false,
     lessons: false,
     finance: false
   });
@@ -94,10 +84,6 @@ const SchoolSetup = () => {
     whatsapp: '',
     instagram: ''
   });
-  
-  const [teachers, setTeachers] = useState<Teacher[]>([
-    { id: '1', name: '', picture: '', whatsapp: '', telegram: '', instagram: '' }
-  ]);
   
   const [levels, setLevels] = useState<Level[]>([
     { id: '1', name: '' }
@@ -132,25 +118,6 @@ const SchoolSetup = () => {
       ...prev,
       [name]: value
     }));
-  };
-  
-  const handleAddTeacher = () => {
-    setTeachers(prev => [
-      ...prev,
-      { id: Date.now().toString(), name: '', picture: '', whatsapp: '', telegram: '', instagram: '' }
-    ]);
-  };
-  
-  const handleTeacherChange = (id: string, field: keyof Teacher, value: string) => {
-    setTeachers(prev => 
-      prev.map(teacher => 
-        teacher.id === id ? { ...teacher, [field]: value } : teacher
-      )
-    );
-  };
-  
-  const handleRemoveTeacher = (id: string) => {
-    setTeachers(prev => prev.filter(teacher => teacher.id !== id));
   };
   
   const handleAddLevel = () => {
@@ -256,7 +223,7 @@ const SchoolSetup = () => {
     });
   };
 
-  const handleImageUpload = (type: 'school' | 'teacher', teacherId?: string) => {
+  const handleImageUpload = (type: 'school') => {
     if (type === 'school') {
       setSchoolInfo(prev => ({
         ...prev,
@@ -266,19 +233,6 @@ const SchoolSetup = () => {
       toast({
         title: "Image uploaded",
         description: "School logo has been uploaded successfully (mock upload - no actual storage).",
-      });
-    } else if (type === 'teacher' && teacherId) {
-      setTeachers(prev => 
-        prev.map(teacher => 
-          teacher.id === teacherId 
-            ? { ...teacher, picture: 'https://placehold.co/200x200?text=Teacher' } 
-            : teacher
-        )
-      );
-      
-      toast({
-        title: "Image uploaded",
-        description: "Teacher profile picture has been uploaded successfully (mock upload - no actual storage).",
       });
     }
   };
@@ -409,134 +363,6 @@ const SchoolSetup = () => {
                 </div>
               </div>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <Collapsible 
-          open={openSections.teachers} 
-          onOpenChange={() => toggleSection('teachers')}
-          className="border rounded-lg overflow-hidden"
-        >
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">Teachers</h2>
-              </div>
-              {openSections.teachers ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="p-4 space-y-4">
-            {teachers.map((teacher, index) => (
-              <div key={teacher.id} className="border rounded-lg p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium">Teacher {index + 1}</h3>
-                  {teachers.length > 1 && (
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleRemoveTeacher(teacher.id)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Remove</span>
-                    </Button>
-                  )}
-                </div>
-                
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`teacher-name-${teacher.id}`}>Name</Label>
-                    <Input 
-                      id={`teacher-name-${teacher.id}`}
-                      value={teacher.name} 
-                      onChange={(e) => handleTeacherChange(teacher.id, 'name', e.target.value)}
-                      placeholder="Teacher name" 
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Profile Picture</Label>
-                    <div className="flex items-center gap-2">
-                      {teacher.picture ? (
-                        <div className="relative h-12 w-12 rounded-full overflow-hidden border">
-                          <img 
-                            src={teacher.picture} 
-                            alt={`${teacher.name || 'Teacher'}'s profile`} 
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-12 w-12 rounded-full border border-dashed flex items-center justify-center bg-muted/50">
-                          <Users className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleImageUpload('teacher', teacher.id)}
-                      >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Upload
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`teacher-telegram-${teacher.id}`}>Telegram</Label>
-                    <div className="flex items-center">
-                      <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <Input 
-                        id={`teacher-telegram-${teacher.id}`}
-                        value={teacher.telegram}
-                        onChange={(e) => handleTeacherChange(teacher.id, 'telegram', e.target.value)}
-                        placeholder="@username" 
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor={`teacher-whatsapp-${teacher.id}`}>WhatsApp</Label>
-                    <div className="flex items-center">
-                      <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <Input 
-                        id={`teacher-whatsapp-${teacher.id}`}
-                        value={teacher.whatsapp}
-                        onChange={(e) => handleTeacherChange(teacher.id, 'whatsapp', e.target.value)}
-                        placeholder="+1234567890" 
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor={`teacher-instagram-${teacher.id}`}>Instagram</Label>
-                    <div className="flex items-center">
-                      <Instagram className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <Input 
-                        id={`teacher-instagram-${teacher.id}`}
-                        value={teacher.instagram}
-                        onChange={(e) => handleTeacherChange(teacher.id, 'instagram', e.target.value)}
-                        placeholder="@username" 
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleAddTeacher}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Teacher
-            </Button>
           </CollapsibleContent>
         </Collapsible>
         
@@ -838,4 +664,3 @@ const SchoolSetup = () => {
 };
 
 export default SchoolSetup;
-
