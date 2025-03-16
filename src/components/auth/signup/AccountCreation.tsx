@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,8 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+// License data type
+interface LicenseData {
+  licenseId: string;
+  licenseNumber: string;
+}
 
 // Account details schema
 const accountSchema = z.object({
@@ -27,19 +32,23 @@ const accountSchema = z.object({
 
 type AccountFormValues = z.infer<typeof accountSchema>;
 
-const AccountCreation: React.FC = () => {
+// Define props interface for AccountCreation
+interface AccountCreationProps {
+  licenseData: LicenseData;
+}
+
+const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
   const { completeSignUp, isLoading } = useAuth();
   const navigate = useNavigate();
-  const { licenseId } = useParams<{ licenseId: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Redirect to auth page if no licenseId is provided
+  // Redirect if no license data is available
   useEffect(() => {
-    if (!licenseId) {
+    if (!licenseData?.licenseId) {
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
     }
-  }, [licenseId, navigate]);
+  }, [licenseData, navigate]);
   
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
@@ -54,7 +63,7 @@ const AccountCreation: React.FC = () => {
   });
 
   const handleSubmit = async (data: AccountFormValues) => {
-    if (!licenseId) {
+    if (!licenseData?.licenseId) {
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
       return;
@@ -62,11 +71,13 @@ const AccountCreation: React.FC = () => {
     
     try {
       setIsSubmitting(true);
-      console.log("Creating account with license ID:", licenseId);
+      console.log("Creating account with license ID:", licenseData.licenseId);
+      console.log("License number:", licenseData.licenseNumber);
       
       // Initial user data for account creation
       const userData = {
-        licenseId: licenseId,
+        licenseId: licenseData.licenseId,
+        licenseNumber: licenseData.licenseNumber,
         firstName: data.firstName,
         lastName: data.lastName,
         schoolName: data.schoolName,
@@ -76,7 +87,7 @@ const AccountCreation: React.FC = () => {
       await completeSignUp(data.email, data.password, userData);
       toast.success("Account created successfully!");
       
-      // Redirect to the onboarding flow instead of dashboard
+      // Redirect to the onboarding flow
       navigate("/onboarding");
     } catch (error: any) {
       console.error("Account creation error:", error);
@@ -86,7 +97,7 @@ const AccountCreation: React.FC = () => {
     }
   };
 
-  if (!licenseId) {
+  if (!licenseData?.licenseId) {
     return null; // Will redirect in useEffect
   }
 

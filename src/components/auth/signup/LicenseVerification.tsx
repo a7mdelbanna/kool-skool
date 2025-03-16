@@ -23,7 +23,7 @@ const LicenseVerification = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [licenseData, setLicenseData] = useState<{
-    licenseId: string | null;
+    licenseId: string;
     licenseNumber: string;
   } | null>(null);
 
@@ -44,7 +44,7 @@ const LicenseVerification = () => {
       if (result.valid) {
         setIsVerified(true);
         setLicenseData({
-          licenseId: result.licenseId,
+          licenseId: result.licenseId || "",
           licenseNumber: values.licenseNumber // Store the license number for later use
         });
       }
