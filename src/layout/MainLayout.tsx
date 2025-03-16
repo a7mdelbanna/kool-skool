@@ -24,19 +24,17 @@ const MainLayout = () => {
           return;
         }
         
-        // Only check school association if not on license-verification or school-setup page
-        if (!location.pathname.includes('/school-setup') && 
-            !location.pathname.includes('/license-verification')) {
-          
+        // Only check school association if not on school setup page
+        if (!location.pathname.includes('/school-setup')) {
           // Check if user has a school association
           const { data, error } = await supabase.rpc('get_user_school_info');
           
-          // If error is "no rows returned" or user has no school
-          if ((error && error.code === 'PGRST116') || (!error && (!data || data.length === 0))) {
+          // If error isn't "no rows returned" or user has no school
+          if ((error && error.code !== 'PGRST116') || (!error && (!data || data.length === 0))) {
             if (location.pathname === '/team-members') {
               // Don't redirect, just let the page handle the no-school state
               console.log('User has no school association, but staying on team members page');
-            } else {
+            } else if (!location.pathname.includes('/license-verification')) {
               // Redirect to school setup for other pages
               console.log('User has no school association, redirecting to school setup');
               toast({

@@ -14,7 +14,7 @@ import {
   School,
   ArrowRight
 } from 'lucide-react';
-import { supabase, fetchUserSchoolInfo } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   Card,
@@ -96,10 +96,10 @@ const TeamMembers = () => {
   });
 
   useEffect(() => {
-    getUserSchoolInfo();
+    fetchUserSchoolInfo();
   }, []);
 
-  const getUserSchoolInfo = async () => {
+  const fetchUserSchoolInfo = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -112,9 +112,21 @@ const TeamMembers = () => {
       }
       
       // Get the user's school_id and school name
-      const schoolInfoData = await fetchUserSchoolInfo();
+      const { data, error } = await supabase.rpc('get_user_school_info');
       
-      if (!schoolInfoData || schoolInfoData.length === 0) {
+      if (error) {
+        console.error("Error fetching user school info:", error);
+        if (error.code === 'PGRST116') { // No rows returned
+          setError('You do not belong to any school. Please create or join a school first.');
+        } else {
+          setError(`Error: ${error.message}`);
+        }
+        setLoading(false);
+        setUserCheckComplete(true);
+        return;
+      }
+      
+      if (!data || data.length === 0) {
         setError('You do not belong to any school. Please create or join a school first.');
         setLoading(false);
         setUserCheckComplete(true);
@@ -122,12 +134,12 @@ const TeamMembers = () => {
       }
       
       setSchoolInfo({
-        id: schoolInfoData[0].school_id,
-        name: schoolInfoData[0].school_name
+        id: data[0].school_id,
+        name: data[0].school_name
       });
       
       // Now fetch team members
-      await fetchTeamMembers(schoolInfoData[0].school_id);
+      fetchTeamMembers(data[0].school_id);
       setUserCheckComplete(true);
       
     } catch (error: any) {
@@ -140,8 +152,6 @@ const TeamMembers = () => {
         description: error.message || 'Failed to load school information',
         variant: 'destructive'
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -153,12 +163,12 @@ const TeamMembers = () => {
         return;
       }
       
-      // Fix: Explicitly specify the relationship column using the profile_id
+      // Fix the query to correctly handle the relationship using explicit foreign key
       const { data, error } = await supabase
         .from('team_members')
         .select(`
           *,
-          profiles:profile_id(
+          profiles:profiles!profile_id(
             first_name,
             last_name,
             email,
@@ -172,8 +182,6 @@ const TeamMembers = () => {
         console.error("Error fetching team members:", error);
         throw error;
       }
-      
-      console.log("Raw team member data:", data);
       
       // Process the data to handle potential null values and ensure type compatibility
       const typedData: TeamMemberData[] = data?.map(member => ({
