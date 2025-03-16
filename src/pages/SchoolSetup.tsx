@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, Loader2, School } from "lucide-react";
@@ -139,6 +140,9 @@ const SchoolSetup = () => {
         return;
       }
 
+      // Fetch the license ID first
+      let licenseId = null;
+      
       if (data.license_number) {
         const { data: licenseData, error: licenseQueryError } = await supabase
           .from('licenses')
@@ -146,30 +150,69 @@ const SchoolSetup = () => {
           .eq('license_number', data.license_number)
           .single();
           
-        if (!licenseQueryError && licenseData) {
+        if (licenseQueryError) {
+          console.error("Error fetching license:", licenseQueryError);
+          toast.error(`Invalid license number: ${licenseQueryError.message}`);
+          setIsCreatingSchool(false);
+          return;
+        }
+        
+        if (licenseData) {
+          licenseId = licenseData.id;
+          
+          // Update the school name in the license
           const { error: updateError } = await supabase
             .from('licenses')
             .update({ school_name: data.name })
-            .eq('id', licenseData.id);
+            .eq('id', licenseId);
             
           if (updateError) {
             console.error("Error updating license school name:", updateError);
+            // Continue even if this fails
           }
+        } else {
+          toast.error("License not found");
+          setIsCreatingSchool(false);
+          return;
         }
+      } else {
+        toast.error("License number is required");
+        setIsCreatingSchool(false);
+        return;
       }
 
-      const { data: result, error } = await supabase.rpc(
-        'create_school_and_update_profile_rpc',
-        {
-          school_name: data.name,
-          license_number: data.license_number
-        }
-      );
+      console.log("Creating school with license ID:", licenseId);
+      
+      // Create the school and update profile
+      const { data: result, error } = await supabase
+        .from('schools')
+        .insert({
+          name: data.name,
+          license_id: licenseId,
+          created_by: user.id
+        })
+        .select('id')
+        .single();
       
       if (error) {
         console.error("Error creating school:", error);
         toast.error(`Error creating school: ${error.message}`);
         throw error;
+      }
+      
+      // Now update the user's profile with the school ID
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          school_id: result.id,
+          role: 'admin'
+        })
+        .eq('id', user.id);
+        
+      if (profileError) {
+        console.error("Error updating profile:", profileError);
+        toast.error(`Error updating profile: ${profileError.message}`);
+        throw profileError;
       }
       
       toast.success("School created successfully!");

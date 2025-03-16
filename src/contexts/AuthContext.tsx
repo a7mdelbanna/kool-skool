@@ -153,12 +153,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // Create school entry
+      // Create school entry with explicit license_id
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
         .insert({
           name: userData.schoolName || "My School",
-          license_id: userData.licenseId,
+          license_id: userData.licenseId, // Explicitly set the license_id
           created_by: authData.user.id,
           logo: userData.schoolLogo,
           phone: userData.schoolPhone,
