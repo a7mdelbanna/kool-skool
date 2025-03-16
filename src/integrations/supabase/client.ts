@@ -65,6 +65,8 @@ export interface StudentRecord {
   email?: string;
   course_name?: string;
   teacher_name?: string;
+  // For UI compatibility
+  lessonType?: 'individual' | 'group';
 }
 
 export interface Subscription {
@@ -95,39 +97,49 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Helper function to get students with joined data
 export async function getStudentsWithDetails(schoolId: string) {
-  const { data, error } = await supabase
+  // First get the students
+  const { data: studentsData, error: studentsError } = await supabase
     .from('students')
-    .select(`
-      *,
-      users!inner(first_name, last_name, email),
-      courses!inner(name)
-    `)
+    .select('*')
     .eq('school_id', schoolId);
 
-  if (error) {
-    console.error('Error fetching students:', error);
-    return { data: null, error };
+  if (studentsError) {
+    console.error('Error fetching students:', studentsError);
+    return { data: null, error: studentsError };
   }
 
-  // Transform the data to match our StudentRecord interface
-  const transformedData = data.map(student => ({
-    id: student.id,
-    school_id: student.school_id,
-    user_id: student.user_id,
-    teacher_id: student.teacher_id,
-    course_id: student.course_id,
-    age_group: student.age_group,
-    level: student.level,
-    phone: student.phone,
-    created_at: student.created_at,
-    // Joined data
-    first_name: student.users.first_name,
-    last_name: student.users.last_name,
-    email: student.users.email,
-    course_name: student.courses.name
-  })) as StudentRecord[];
+  // For each student, get the user and course details
+  const enhancedStudents = await Promise.all(
+    studentsData.map(async (student) => {
+      // Get user details
+      const { data: userData } = await supabase
+        .from('users')
+        .select('first_name, last_name, email')
+        .eq('id', student.user_id)
+        .single();
+      
+      // Get course details
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('name, lesson_type')
+        .eq('id', student.course_id)
+        .single();
 
-  return { data: transformedData, error: null };
+      // Transform the lesson_type to match UI expectations
+      const lessonType = courseData?.lesson_type === 'Individual' ? 'individual' : 'group';
+      
+      return {
+        ...student,
+        first_name: userData?.first_name,
+        last_name: userData?.last_name,
+        email: userData?.email,
+        course_name: courseData?.name,
+        lessonType
+      };
+    })
+  );
+
+  return { data: enhancedStudents as StudentRecord[], error: null };
 }
 
 // Create a student
@@ -154,7 +166,7 @@ export async function createStudent(
     phone: phone || null
   });
 
-  return { data, error };
+  return { data: data as CreateStudentResponse, error };
 }
 
 // Get courses for a school
@@ -164,7 +176,13 @@ export async function getSchoolCourses(schoolId: string) {
     .select('*')
     .eq('school_id', schoolId);
 
-  return { data, error };
+  // Convert string lesson_type to proper enum type
+  const typedData = data?.map(course => ({
+    ...course,
+    lesson_type: course.lesson_type as 'Individual' | 'Group'
+  }));
+
+  return { data: typedData as Course[], error };
 }
 
 // Create a course
@@ -177,7 +195,7 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     .select()
     .single();
 
-  return { data, error };
+  return { data: data as Course, error };
 }
 
 // Get teachers for a school
@@ -262,5 +280,5 @@ export async function rescheduleSession(sessionId: string, newDate: string, mode
     reschedule_mode: mode
   });
 
-  return { data, error };
+  return { data: data as RescheduleSessionResponse, error };
 }

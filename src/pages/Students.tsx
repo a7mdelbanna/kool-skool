@@ -83,8 +83,8 @@ const Students = () => {
       email: record.email || '',
       courseName: record.course_name || '',
       lessonType: record.lessonType || 'individual',
-      ageGroup: record.age_group?.toLowerCase() || 'adult',
-      level: record.level?.toLowerCase() || 'beginner',
+      ageGroup: record.age_group?.toLowerCase() as 'adult' | 'kid',
+      level: record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced',
       phone: record.phone,
       paymentStatus: 'pending', // This would come from subscriptions/payments
       teacherId: record.teacher_id,

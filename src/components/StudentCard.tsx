@@ -7,29 +7,19 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-export type Student = {
+export interface Student {
   id: string;
   firstName: string;
   lastName: string;
-  image?: string;
   email: string;
-  phone?: string;
   lessonType: 'individual' | 'group';
-  ageGroup: 'kid' | 'adult';
+  ageGroup: 'adult' | 'kid';
   courseName: string;
   level: 'beginner' | 'intermediate' | 'advanced' | 'fluent';
-  lessonsCompleted: number;
-  nextLesson?: string;
+  phone?: string;
   paymentStatus: 'paid' | 'pending' | 'overdue';
-  nextPaymentDate?: string;
-  facebook?: string;
-  twitter?: string;
-  instagram?: string;
-  linkedin?: string;
-  telegram?: string;
-  whatsapp?: string;
-  notes?: string;
-};
+  teacherId?: string;
+}
 
 interface StudentCardProps {
   student: Student;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +15,8 @@ import {
   createStudent, 
   createCourse, 
   getSchoolCourses, 
-  getSchoolTeachers 
+  getSchoolTeachers, 
+  CreateStudentResponse
 } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -131,26 +133,27 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
           studentData.phone
         );
         
-        if (error || !data.success) {
-          console.error("Error creating student:", error || data.message);
-          toast.error(data.message || "Failed to create student");
+        if (error || (data && !data.success)) {
+          console.error("Error creating student:", error || (data && data.message));
+          toast.error(data && data.message ? data.message : "Failed to create student");
           setSaving(false);
           return;
         }
         
         toast.success("Student added successfully");
         
-        if (onStudentAdded) {
+        if (onStudentAdded && data && data.student_id) {
           const newStudent: Student = {
-            id: data.student_id as string,
+            id: data.student_id,
             firstName: studentData.firstName as string,
             lastName: studentData.lastName as string,
             email: studentData.email as string,
-            lessonType: studentData.lessonType as string,
-            ageGroup: studentData.ageGroup as string,
+            lessonType: studentData.lessonType as 'individual' | 'group',
+            ageGroup: studentData.ageGroup as 'adult' | 'kid',
             courseName: studentData.courseName as string,
-            level: studentData.level as string,
+            level: studentData.level as 'beginner' | 'intermediate' | 'advanced' | 'fluent',
             paymentStatus: "pending",
+            teacherId: teacher.id
           };
           onStudentAdded(newStudent);
         }
