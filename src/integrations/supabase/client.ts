@@ -390,13 +390,18 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Session verified, proceeding with course creation");
     
+    // Stringify the request body properly
+    const requestBody = JSON.stringify({
+      school_id: schoolId,
+      course_name: name,
+      lesson_type: lessonType
+    });
+    
+    console.log("Request body:", requestBody);
+    
     // Use our Edge Function to create the course with improved error handling
     const response = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
-      body: JSON.stringify({
-        school_id: schoolId,
-        course_name: name,
-        lesson_type: lessonType
-      }),
+      body: requestBody,
       headers: {
         'x-user-id': userData.id,
         'x-school-id': userData.schoolId,
