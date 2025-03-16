@@ -1,9 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Clock, AlertTriangle, CheckCircle, Timer } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,6 +18,7 @@ interface LicenseDetails {
 const LicenseWidget: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [licenseDetails, setLicenseDetails] = useState<LicenseDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,8 +57,10 @@ const LicenseWidget: React.FC = () => {
         }
 
         setLicenseDetails(licenseData[0]);
+        setError(null);
       } catch (error) {
         console.error('Error fetching license details:', error);
+        setError('Error loading license information');
         toast({
           title: "Error",
           description: "Failed to load license information",
@@ -73,98 +74,55 @@ const LicenseWidget: React.FC = () => {
     fetchLicenseDetails();
   }, [toast]);
 
-  const getLicenseStatusColor = () => {
-    if (!licenseDetails) return "bg-gray-100";
-    
-    if (!licenseDetails.is_active) return "bg-red-50";
-    
-    if (licenseDetails.days_remaining <= 7) return "bg-amber-50";
-    
-    return "bg-green-50";
-  };
-
-  const getLicenseIcon = () => {
-    if (!licenseDetails) return <Clock className="h-6 w-6 text-gray-400" />;
-    
-    if (!licenseDetails.is_active) return <AlertTriangle className="h-6 w-6 text-red-500" />;
-    
-    if (licenseDetails.days_remaining <= 7) return <Timer className="h-6 w-6 text-amber-500" />;
-    
-    return <CheckCircle className="h-6 w-6 text-green-500" />;
-  };
-
-  const getLicenseText = () => {
-    if (!licenseDetails) return "Loading license information...";
-    
-    if (!licenseDetails.is_active) return "License is inactive";
-    
-    if (licenseDetails.days_remaining <= 0) return "License has expired";
-    
-    if (licenseDetails.days_remaining === 1) return "1 day remaining";
-    
-    return `${licenseDetails.days_remaining} days remaining`;
-  };
-
   return (
-    <Card className={`${getLicenseStatusColor()} border-0 shadow-sm`}>
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg">License Status</CardTitle>
-          {getLicenseIcon()}
+    <div className="bg-gray-50 p-6 rounded-lg">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">License Status</h2>
+        <Clock className="h-5 w-5 text-gray-400" />
+      </div>
+      
+      {loading ? (
+        <div className="flex items-center justify-center h-12">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
         </div>
-        <CardDescription>
-          {licenseDetails?.license_number && `License: ${licenseDetails.license_number}`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex items-center justify-center h-12">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+      ) : error ? (
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
+          <AlertDescription className="text-red-500">
+            Please refresh the page or contact support if this issue persists.
+          </AlertDescription>
+        </Alert>
+      ) : licenseDetails ? (
+        <div className="space-y-2">
+          {licenseDetails.license_number && (
+            <p className="text-sm text-gray-500">License: {licenseDetails.license_number}</p>
+          )}
+          
+          {licenseDetails.expires_at && (
+            <p className="text-sm text-gray-500">
+              Expires on: {new Date(licenseDetails.expires_at).toLocaleDateString()}
+            </p>
+          )}
+          
+          <div className="mt-2">
+            {licenseDetails.is_active ? (
+              <div className="text-green-600 font-medium">
+                {licenseDetails.days_remaining} days remaining
+              </div>
+            ) : (
+              <div className="text-red-600 font-medium">License is inactive</div>
+            )}
           </div>
-        ) : licenseDetails ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>
-                {licenseDetails.expires_at 
-                  ? `Expires on: ${new Date(licenseDetails.expires_at).toLocaleDateString()}`
-                  : 'No expiration date set'}
-              </span>
-            </div>
-            <Alert className={`border-0 ${
-              licenseDetails.days_remaining <= 7 
-                ? 'bg-amber-100' 
-                : licenseDetails.is_active 
-                  ? 'bg-green-100' 
-                  : 'bg-red-100'
-            }`}>
-              <AlertTitle className="flex items-center gap-2">
-                {getLicenseText()}
-              </AlertTitle>
-              {licenseDetails.days_remaining <= 7 && licenseDetails.is_active && (
-                <AlertDescription>
-                  Your license will expire soon. Please consider renewing.
-                </AlertDescription>
-              )}
-            </Alert>
-          </div>
-        ) : (
-          <Alert variant="destructive">
-            <AlertTitle>Error loading license information</AlertTitle>
-            <AlertDescription>
-              Please refresh the page or contact support if this issue persists.
-            </AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-      {licenseDetails && licenseDetails.days_remaining <= 30 && licenseDetails.is_active && (
-        <CardFooter>
-          <Button variant="outline" className="w-full">
-            Renew License
-          </Button>
-        </CardFooter>
+        </div>
+      ) : (
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
+          <AlertDescription className="text-red-500">
+            Please refresh the page or contact support if this issue persists.
+          </AlertDescription>
+        </Alert>
       )}
-    </Card>
+    </div>
   );
 };
 
