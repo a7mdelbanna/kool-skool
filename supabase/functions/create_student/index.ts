@@ -67,7 +67,6 @@ serve(async (req) => {
           persistSession: false,
           autoRefreshToken: false
         }
-        // Removed custom headers to use the default client configuration
       }
     )
     
