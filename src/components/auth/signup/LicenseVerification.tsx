@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 // License verification schema
 const licenseSchema = z.object({
@@ -38,23 +39,44 @@ const LicenseVerification: React.FC = () => {
       setError(null);
       console.log("Verifying license:", data.licenseNumber);
       
-      const result = await signUp(data.licenseNumber);
+      // Make a direct query instead of using RPC
+      const { data: licenses, error: licenseError } = await supabase
+        .from('licenses')
+        .select('id, is_active, used_by')
+        .eq('license_number', data.licenseNumber)
+        .eq('is_active', true);
       
-      console.log("License verification result:", result);
-      
-      if (result.valid && result.licenseId) {
-        toast.success(result.message || "License validated successfully");
-        
-        // Store complete license info in sessionStorage
-        sessionStorage.setItem('licenseNumber', data.licenseNumber);
-        sessionStorage.setItem('licenseId', result.licenseId);
-        
-        // Navigate to account creation with license ID
-        navigate(`/auth/create-account/${result.licenseId}`);
-      } else {
-        setError(result.message || "License verification failed");
-        toast.error(result.message || "License verification failed");
+      if (licenseError) {
+        console.error("License verification error:", licenseError);
+        setError(licenseError.message || "An error occurred during license verification");
+        toast.error("An error occurred during license verification");
+        return;
       }
+      
+      if (!licenses || licenses.length === 0) {
+        setError("Invalid or already used license number");
+        toast.error("Invalid or already used license number");
+        return;
+      }
+      
+      const license = licenses[0];
+      
+      if (license.used_by && license.used_by !== supabase.auth.getUser()) {
+        setError("This license is already in use");
+        toast.error("This license is already in use");
+        return;
+      }
+      
+      // License is valid
+      toast.success("License validated successfully");
+      
+      // Store complete license info in sessionStorage
+      sessionStorage.setItem('licenseNumber', data.licenseNumber);
+      sessionStorage.setItem('licenseId', license.id);
+      
+      // Navigate to account creation with license ID
+      navigate(`/auth/create-account/${license.id}`);
+      
     } catch (error: any) {
       console.error("License verification error:", error);
       setError(error.message || "An error occurred during license verification");

@@ -12,15 +12,5 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Create a client with type safety
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// Save the original rpc method
-const originalRpc = supabase.rpc;
-
-// Override the rpc method to accept any function name with proper type handling
-supabase.rpc = function(fnName: string, params?: any) {
-  // Log which RPC function is being called (helpful for debugging)
-  console.log(`Calling RPC function: ${fnName}`, params);
-  
-  // Safely call the original method with explicit type assertions
-  // This allows calling any RPC function by name while preserving TypeScript safety
-  return originalRpc(fnName as any, params as any);
-} as typeof supabase.rpc;
+// We no longer need to override the rpc method as it's causing type issues
+// Instead, we should use type assertions at the call sites

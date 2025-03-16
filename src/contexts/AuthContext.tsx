@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -70,43 +69,56 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       console.log("Verifying license:", licenseNumber);
       
-      const { data, error } = await supabase
-        .rpc('handle_license_signup', { license_number: licenseNumber });
+      const { data: licenses, error: licenseError } = await supabase
+        .from('licenses')
+        .select('id, is_active, used_by')
+        .eq('license_number', licenseNumber)
+        .eq('is_active', true);
       
-      console.log("License verification response:", { data, error });
-      
-      if (error) {
-        console.error("License verification error:", error);
-        toast.error(error.message);
-        return { valid: false, message: error.message, licenseId: null };
-      }
-      
-      if (!data || !Array.isArray(data) || data.length === 0 || !data[0].valid) {
-        const errorMessage = data && Array.isArray(data) && data[0] ? data[0].message : "Invalid license";
-        console.error("License validation failed:", errorMessage);
-        toast.error(errorMessage);
+      if (licenseError) {
+        console.error("License verification error:", licenseError);
         return { 
           valid: false, 
-          message: errorMessage, 
+          message: licenseError.message || "An error occurred during license verification", 
           licenseId: null 
         };
       }
       
-      const successMessage = data[0].message || "License validated successfully";
-      console.log("License validated successfully with ID:", data[0].license_id);
-      toast.success(successMessage);
+      if (!licenses || licenses.length === 0) {
+        console.error("License validation failed: Invalid or already used license");
+        return { 
+          valid: false, 
+          message: "Invalid or already used license number", 
+          licenseId: null 
+        };
+      }
+      
+      const license = licenses[0];
+      
+      if (license.used_by && license.used_by !== supabase.auth.getUser()) {
+        console.error("License validation failed: License already in use");
+        return { 
+          valid: false, 
+          message: "This license is already in use", 
+          licenseId: null 
+        };
+      }
+      
+      console.log("License validated successfully with ID:", license.id);
       
       return { 
         valid: true, 
-        message: successMessage, 
-        licenseId: data[0].license_id 
+        message: "License validated successfully", 
+        licenseId: license.id 
       };
       
     } catch (error: any) {
       console.error("License signup error:", error);
-      const errorMessage = error.message || "An error occurred during license verification";
-      toast.error(errorMessage);
-      return { valid: false, message: errorMessage, licenseId: null };
+      return { 
+        valid: false, 
+        message: error.message || "An error occurred during license verification", 
+        licenseId: null 
+      };
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +136,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("CompleteSignUp with licenseId:", userData.licenseId);
       console.log("CompleteSignUp with licenseNumber:", userData.licenseNumber);
       
-      // Use rpc function instead of direct query to get license information
       const { data: licenseData, error: licenseError } = await supabase
         .rpc('get_license_by_id', { license_id_param: userData.licenseId });
       
