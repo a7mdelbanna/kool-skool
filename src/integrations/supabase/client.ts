@@ -6,10 +6,34 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://cfacqfrutwfbfibswckp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmYWNxZnJ1dHdmYmZpYnN3Y2twIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwOTQ2MzMsImV4cCI6MjA1NzY3MDYzM30.QuxaZKXmhvdCLDUlVRA7Pge0JLm2EHl4qRApoGuevcE";
 
+// Get the current URL to use as the site URL for auth redirects
+const getSiteUrl = () => {
+  let url = window.location.origin;
+  // Remove any trailing slash
+  if (url.endsWith('/')) {
+    url = url.slice(0, -1);
+  }
+  return url;
+};
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(
+  SUPABASE_URL, 
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      // Use the actual site URL rather than hardcoded localhost
+      flowType: 'pkce',
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      persistSession: true,
+      // This is critical for making invitation links work with the correct URL
+      site: getSiteUrl()
+    }
+  }
+);
 
 // Helper function to upload base64 image to schools
 export const uploadBase64Image = async (
