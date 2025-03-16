@@ -33,7 +33,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface TeamMemberData {
   id: string;
@@ -77,7 +76,6 @@ const TeamMembers = () => {
   const [addingMember, setAddingMember] = useState(false);
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
-  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<CreateTeamMemberFormValues>({
     resolver: zodResolver(createTeamMemberSchema),
@@ -98,7 +96,6 @@ const TeamMembers = () => {
   const fetchTeamMembers = async () => {
     try {
       setLoading(true);
-      setError(null);
       
       // Get current user's school_id
       const { data: { user } } = await supabase.auth.getUser();
@@ -155,7 +152,6 @@ const TeamMembers = () => {
       setTeamMembers(typedData);
     } catch (error: any) {
       console.error('Error loading team members:', error);
-      setError('Failed to load team members. Please try again.');
       toast({
         title: 'Error',
         description: error.message || 'Failed to load team members',
@@ -169,36 +165,13 @@ const TeamMembers = () => {
   const handleCreateTeamMember = async (values: CreateTeamMemberFormValues) => {
     try {
       setAddingMember(true);
-      setError(null);
       
-      // First register the user directly with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: values.email,
-        password: values.password,
-        options: {
-          data: {
-            first_name: values.firstName,
-            last_name: values.lastName
-          }
-        }
-      });
-      
-      if (authError) {
-        console.error('Error creating user account:', authError);
-        throw authError;
-      }
-      
-      if (!authData.user) {
-        throw new Error('Failed to create user account');
-      }
-      
-      console.log('User account created successfully with ID:', authData.user.id);
-      
-      // Then use create_team_member RPC to associate the user with the school
+      // Create the new team member using RPC
       const { data: teamMemberId, error: rpcError } = await supabase.rpc(
-        'finalize_team_member',
+        'create_team_member',
         {
-          user_id_param: authData.user.id,
+          email_param: values.email,
+          password_param: values.password,
           role_param: values.role,
           first_name_param: values.firstName,
           last_name_param: values.lastName
@@ -222,7 +195,6 @@ const TeamMembers = () => {
       
     } catch (error: any) {
       console.error('Error creating team member:', error);
-      setError(error.message || 'Failed to create team member');
       toast({
         title: 'Error',
         description: error.message || 'Failed to create team member',
@@ -241,7 +213,6 @@ const TeamMembers = () => {
     
     try {
       setDeleting(prev => ({ ...prev, [id]: true }));
-      setError(null);
       
       const { error } = await supabase
         .from('team_members')
@@ -260,7 +231,6 @@ const TeamMembers = () => {
       
     } catch (error: any) {
       console.error('Error deleting team member:', error);
-      setError(error.message || 'Failed to delete team member');
       toast({
         title: 'Error',
         description: error.message || 'Failed to delete team member',
@@ -294,13 +264,6 @@ const TeamMembers = () => {
           {showAddMemberForm ? 'Cancel' : 'Add Team Member'}
         </Button>
       </div>
-      
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
       
       {showAddMemberForm && (
         <Card className="mb-6">
