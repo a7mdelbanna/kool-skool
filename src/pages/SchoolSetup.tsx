@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, RefreshCw } from "lucide-react";
 
 // School schema with license_number validation
 const schoolSchema = z.object({
@@ -45,6 +45,7 @@ const SchoolSetup = () => {
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo | null>(null);
   const [schoolDialogOpen, setSchoolDialogOpen] = useState(false);
   const [isCreatingSchool, setIsCreatingSchool] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   
   const schoolForm = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolSchema),
@@ -54,55 +55,83 @@ const SchoolSetup = () => {
     },
   });
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (user) {
-        try {
-          setIsLoading(true);
-          setError(null);
+  const fetchUserData = async () => {
+    if (user) {
+      try {
+        setIsLoading(true);
+        setError(null);
+        setIsRetrying(false);
+        
+        // Use RPC function to get role safely
+        const { data: roleData, error: roleError } = await supabase
+          .rpc('get_current_user_role');
           
-          // Use RPC function to get role safely
-          const { data: roleData, error: roleError } = await supabase
-            .rpc('get_current_user_role');
-            
-          if (roleError) {
-            console.error("Error fetching user role:", roleError);
-            setError("Failed to fetch user role. Please try again.");
-          } else {
-            setUserRole(roleData || null);
+        if (roleError) {
+          console.error("Error fetching user role:", roleError);
+          setError("Failed to fetch user role. Please try again.");
+        } else {
+          setUserRole(roleData || null);
+        }
+        
+        try {
+          // Fetch school information using is_user_in_school first to avoid potential recursion issues
+          const { data: isInSchool, error: isInSchoolError } = await supabase
+            .rpc('is_user_in_school', { user_id_param: user.id });
+          
+          if (isInSchoolError) {
+            console.error("Error checking if user is in school:", isInSchoolError);
+            throw isInSchoolError;
           }
           
-          // Fetch school information
-          const { data: schoolData, error: schoolError } = await supabase
-            .from('schools')
-            .select('*')
-            .eq('created_by', user.id)
-            .single();
-            
-          if (schoolError) {
-            if (schoolError.code === 'PGRST116') {
-              // No school found
-              setNoSchoolFound(true);
-            } else {
-              console.error("Error fetching school:", schoolError);
-              setError("Failed to fetch school information. Please try again.");
-            }
-          } else if (schoolData) {
-            console.log("School data:", schoolData);
-            setSchoolInfo(schoolData);
-            setNoSchoolFound(false);
-          } else {
+          if (!isInSchool) {
             setNoSchoolFound(true);
+            setIsLoading(false);
+            return;
+          }
+          
+          // If user is in a school, now try to fetch school data
+          const { data: schoolIds } = await supabase
+            .rpc('get_user_school_id', { user_id_param: user.id });
+          
+          if (!schoolIds || schoolIds.length === 0) {
+            setNoSchoolFound(true);
+          } else {
+            const schoolId = schoolIds[0].school_id;
+            
+            const { data: schoolData, error: schoolError } = await supabase
+              .from('schools')
+              .select('*')
+              .eq('id', schoolId)
+              .single();
+              
+            if (schoolError) {
+              console.error("Error fetching school:", schoolError);
+              throw schoolError;
+            }
+            
+            if (schoolData) {
+              console.log("School data:", schoolData);
+              setSchoolInfo(schoolData);
+              setNoSchoolFound(false);
+            } else {
+              setNoSchoolFound(true);
+            }
           }
         } catch (err) {
-          console.error("Error in fetchUserData:", err);
-          setError("An unexpected error occurred. Please try again.");
-        } finally {
-          setIsLoading(false);
+          console.error("Error fetching school information:", err);
+          setError("Failed to fetch school information. Please try again.");
+          setNoSchoolFound(true);
         }
+      } catch (err) {
+        console.error("Error in fetchUserData:", err);
+        setError("An unexpected error occurred. Please try again.");
+      } finally {
+        setIsLoading(false);
       }
-    };
-    
+    }
+  };
+  
+  useEffect(() => {
     fetchUserData();
   }, [user]);
 
@@ -130,21 +159,11 @@ const SchoolSetup = () => {
       }
       
       toast.success("School created successfully!");
-      
-      // Refresh school information
-      const { data: schoolData } = await supabase
-        .from('schools')
-        .select('*')
-        .eq('created_by', user.id)
-        .single();
-        
-      if (schoolData) {
-        setSchoolInfo(schoolData);
-        setNoSchoolFound(false);
-      }
-      
       schoolForm.reset();
       setSchoolDialogOpen(false);
+      
+      // Refresh school information
+      await fetchUserData();
       
     } catch (error: any) {
       console.error("Error creating school:", error);
@@ -152,6 +171,11 @@ const SchoolSetup = () => {
     } finally {
       setIsCreatingSchool(false);
     }
+  };
+
+  const handleRetry = () => {
+    setIsRetrying(true);
+    fetchUserData();
   };
 
   if (isLoading) {
@@ -162,30 +186,47 @@ const SchoolSetup = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="container py-10">
+  return (
+    <div className="container space-y-6 py-6">
+      <h1 className="text-3xl font-bold">School Setup</h1>
+      
+      <Alert className="bg-blue-50 text-blue-800 border-blue-200">
+        <Info className="h-4 w-4" />
+        <AlertTitle>School Administration</AlertTitle>
+        <AlertDescription>
+          View your school subscription and manage staff members.
+        </AlertDescription>
+      </Alert>
+
+      {error && (
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (noSchoolFound) {
-    return (
-      <div className="container py-10 space-y-6">
-        <h1 className="text-3xl font-bold">School Setup</h1>
-        
-        <Alert className="bg-blue-50 text-blue-800 border-blue-200">
-          <Info className="h-4 w-4" />
-          <AlertTitle>School Administration</AlertTitle>
-          <AlertDescription>
-            View your school subscription and manage staff members.
+          <AlertDescription className="flex flex-col gap-2">
+            <p>{error}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-fit" 
+              onClick={handleRetry}
+              disabled={isRetrying}
+            >
+              {isRetrying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry
+                </>
+              )}
+            </Button>
           </AlertDescription>
         </Alert>
-        
+      )}
+
+      {noSchoolFound && (
         <Card className="text-center">
           <CardHeader>
             <CardTitle>No School Found</CardTitle>
@@ -262,24 +303,10 @@ const SchoolSetup = () => {
             </Dialog>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container space-y-6 py-6">
-      <h1 className="text-3xl font-bold">School Setup</h1>
-      
-      <Alert className="bg-blue-50 text-blue-800 border-blue-200">
-        <Info className="h-4 w-4" />
-        <AlertTitle>School Administration</AlertTitle>
-        <AlertDescription>
-          View your school subscription and manage staff members.
-        </AlertDescription>
-      </Alert>
+      )}
 
       {/* Display School Information */}
-      {schoolInfo && (
+      {schoolInfo && !error && (
         <Card>
           <CardHeader>
             <CardTitle>School Information</CardTitle>
