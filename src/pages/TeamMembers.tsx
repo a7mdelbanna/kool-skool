@@ -142,7 +142,13 @@ const TeamMembers = () => {
         throw error;
       }
       
-      setTeamMembers(data || []);
+      // Convert the data to ensure it matches the expected type
+      const typedData: TeamMemberData[] = data?.map(member => ({
+        ...member,
+        profiles: member.profiles || null
+      })) || [];
+      
+      setTeamMembers(typedData);
     } catch (error: any) {
       console.error('Error loading team members:', error);
       toast({

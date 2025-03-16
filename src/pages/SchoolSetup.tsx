@@ -198,6 +198,7 @@ const SchoolSetup = () => {
             });
           }
           
+          // Just log team data but don't try to set it to a teachers state
           const { data: teamData, error: teamError } = await supabase
             .from('team_members')
             .select('*')
@@ -206,20 +207,8 @@ const SchoolSetup = () => {
           if (teamError) throw teamError;
           
           if (teamData && teamData.length > 0) {
-            const formattedTeachers = teamData.map((member: TeamMemberData) => ({
-              id: member.id,
-              name: member.email.split('@')[0],
-              picture: '',
-              whatsapp: '',
-              telegram: '',
-              instagram: '',
-              email: member.email,
-              role: member.role
-            }));
-            
-            if (formattedTeachers.length > 0) {
-              setTeachers(formattedTeachers);
-            }
+            console.log("Team members data:", teamData);
+            // Remove reference to setTeachers
           }
         } else {
           navigate('/license-verification');
@@ -910,4 +899,3 @@ const SchoolSetup = () => {
 };
 
 export default SchoolSetup;
-
