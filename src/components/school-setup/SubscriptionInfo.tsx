@@ -295,7 +295,7 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      const { data: result, error } = await supabase.rpc(
+      const { error } = await supabase.rpc(
         'create_school_and_update_profile',
         {
           school_name: data.name,

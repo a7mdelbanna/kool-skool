@@ -9,4 +9,14 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Create a client with type safety but allow any RPC function name
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Create a type-safe wrapper for RPC calls that allows any function name
+type RPCFunction = typeof supabase.rpc;
+const originalRpc = supabase.rpc.bind(supabase);
+
+// Override the rpc method to accept any string as function name
+supabase.rpc = ((functionName: string, ...args: any[]) => {
+  return originalRpc(functionName as any, ...args);
+}) as RPCFunction;
