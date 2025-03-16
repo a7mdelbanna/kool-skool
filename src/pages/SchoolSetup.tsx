@@ -94,7 +94,7 @@ const SchoolSetup = () => {
         console.log("Found school ID:", schoolId);
             
         const { data: schoolData, error: schoolError } = await supabase
-          .rpc('get_school_info', { school_id_param: schoolId });
+          .rpc('get_school_info' as any, { school_id_param: schoolId });
           
         if (schoolError) {
           console.error("Error fetching school:", schoolError);
@@ -132,7 +132,7 @@ const SchoolSetup = () => {
       }
 
       const { data: licenseResult, error: licenseError } = await supabase
-        .rpc('verify_license', { license_number_param: data.license_number });
+        .rpc('verify_license' as any, { license_number_param: data.license_number });
       
       if (licenseError) {
         console.error("Error verifying license:", licenseError);
@@ -156,7 +156,7 @@ const SchoolSetup = () => {
       const licenseId = licenseVerification.license_id;
       
       const { data: schoolId, error: schoolError } = await supabase
-        .rpc('create_or_update_school', {
+        .rpc('create_or_update_school' as any, {
           school_name: data.name,
           school_logo: null,
           school_phone: null,

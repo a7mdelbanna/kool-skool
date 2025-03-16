@@ -70,9 +70,9 @@ const SubscriptionInfo = () => {
         return;
       }
       
-      // Get school info - using type assertion for the function name
+      // Get school info - using explicit type assertion for the function name
       const { data: schoolData, error: schoolError } = await supabase
-        .rpc('get_school_info', { school_id_param: schoolId });
+        .rpc('get_school_info' as any, { school_id_param: schoolId });
       
       if (schoolError) {
         console.error("Error fetching school:", schoolError);
@@ -97,9 +97,9 @@ const SubscriptionInfo = () => {
         return;
       }
       
-      // Get license details - using type assertion for the function name
+      // Get license details - using explicit type assertion for the function name
       const { data: licenseData, error: licenseError } = await supabase
-        .rpc('get_license_details', { license_id_param: schoolInfo.license_id });
+        .rpc('get_license_details' as any, { license_id_param: schoolInfo.license_id });
       
       if (licenseError) {
         console.error("Error fetching license details:", licenseError);

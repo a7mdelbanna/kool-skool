@@ -58,9 +58,9 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
     try {
       setIsAddingMember(true);
       
-      // Create the team invitation in the database using rpc function
+      // Call the RPC function with explicit type assertion
       const { data: invitationId, error } = await supabase
-        .rpc('create_team_invitation', {
+        .rpc('create_team_invitation' as any, {
           email_param: values.email,
           role_param: values.role
         });
@@ -94,7 +94,7 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
 
   const removeTeamMember = async (index: number, email: string) => {
     try {
-      // Get the user's school ID first using our new function
+      // Get the user's school ID first
       const { data: schoolId, error: schoolIdError } = await supabase
         .rpc('get_user_school_id');
       
@@ -108,8 +108,8 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
         return;
       }
       
-      // Use the delete_team_invitation RPC function with type assertion
-      const { error } = await supabase.rpc('delete_team_invitation', {
+      // Use explicit type assertion for the RPC function call
+      const { error } = await supabase.rpc('delete_team_invitation' as any, {
         email_param: email,
         school_id_param: schoolId
       });
