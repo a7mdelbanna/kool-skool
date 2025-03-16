@@ -50,11 +50,11 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
           licenseNumber: values.licenseNumber
         };
         
-        // Display success message before transitioning
+        // Show success toast
         toast.success("License verified successfully! Proceeding to account creation...");
-        console.log("License verified successfully, proceeding to next step with data:", licenseData);
         
-        // Call the callback with the license data - importantly, AFTER the toast
+        // Call the callback with the license data
+        console.log("Calling onLicenseVerified with data:", licenseData);
         onLicenseVerified(licenseData);
       } else {
         toast.error(result.message || "License verification failed. Please try again.");

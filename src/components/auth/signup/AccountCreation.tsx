@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -38,7 +38,10 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  console.log("AccountCreation mounted with license data:", licenseData);
+  // Log component mount with license data
+  useEffect(() => {
+    console.log("AccountCreation component mounted with license data:", licenseData);
+  }, [licenseData]);
   
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
