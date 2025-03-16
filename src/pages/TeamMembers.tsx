@@ -10,9 +10,7 @@ import {
   Trash2,
   CheckCircle2,
   Loader2,
-  Shield,
-  School,
-  ArrowRight
+  Shield
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -80,8 +78,6 @@ const TeamMembers = () => {
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
-  const [schoolInfo, setSchoolInfo] = useState<{ id: string, name: string } | null>(null);
-  const [userCheckComplete, setUserCheckComplete] = useState(false);
 
   const form = useForm<CreateTeamMemberFormValues>({
     resolver: zodResolver(createTeamMemberSchema),
@@ -96,14 +92,15 @@ const TeamMembers = () => {
   });
 
   useEffect(() => {
-    fetchUserSchoolInfo();
+    fetchTeamMembers();
   }, []);
 
-  const fetchUserSchoolInfo = async () => {
+  const fetchTeamMembers = async () => {
     try {
       setLoading(true);
       setError(null);
       
+      // Get current user's school_id
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -111,56 +108,22 @@ const TeamMembers = () => {
         return;
       }
       
-      // Get the user's school_id and school name
-      const { data, error } = await supabase.rpc('get_user_school_info');
-      
-      if (error) {
-        console.error("Error fetching user school info:", error);
-        if (error.code === 'PGRST116') { // No rows returned
-          setError('You do not belong to any school. Please create or join a school first.');
-        } else {
-          setError(`Error: ${error.message}`);
-        }
-        setLoading(false);
-        setUserCheckComplete(true);
-        return;
+      // First get the user's school_id
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('school_id')
+        .eq('id', user.id)
+        .single();
+        
+      if (profileError) {
+        console.error("Error fetching profile for team members:", profileError);
+        throw profileError;
       }
       
-      if (!data || data.length === 0) {
-        setError('You do not belong to any school. Please create or join a school first.');
-        setLoading(false);
-        setUserCheckComplete(true);
-        return;
-      }
+      const schoolId = profileData?.school_id;
       
-      setSchoolInfo({
-        id: data[0].school_id,
-        name: data[0].school_name
-      });
-      
-      // Now fetch team members
-      fetchTeamMembers(data[0].school_id);
-      setUserCheckComplete(true);
-      
-    } catch (error: any) {
-      console.error('Error fetching school info:', error);
-      setError(error.message || 'Failed to load school information');
-      setUserCheckComplete(true);
-      setLoading(false);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to load school information',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const fetchTeamMembers = async (schoolId: string) => {
-    try {
       if (!schoolId) {
-        console.error("No school ID provided for fetching team members");
-        setLoading(false);
-        return;
+        throw new Error('User is not associated with any school');
       }
       
       // Fix the query to correctly handle the relationship using explicit foreign key
@@ -205,16 +168,6 @@ const TeamMembers = () => {
 
   const handleCreateTeamMember = async (values: CreateTeamMemberFormValues) => {
     try {
-      if (!schoolInfo) {
-        setError('User does not belong to a school. Please set up a school first.');
-        toast({
-          title: 'Error',
-          description: 'User does not belong to a school. Please set up a school first.',
-          variant: 'destructive'
-        });
-        return;
-      }
-
       setAddingMember(true);
       setError(null);
       
@@ -241,7 +194,7 @@ const TeamMembers = () => {
       
       console.log('User account created successfully with ID:', authData.user.id);
       
-      // Then use finalize_team_member RPC to associate the user with the school
+      // Then use create_team_member RPC to associate the user with the school
       const { data: teamMemberId, error: rpcError } = await supabase.rpc(
         'finalize_team_member',
         {
@@ -259,13 +212,13 @@ const TeamMembers = () => {
       
       toast({
         title: 'Success',
-        description: `Team member ${values.firstName} ${values.lastName} has been created successfully for ${schoolInfo.name}.`,
+        description: `Team member ${values.firstName} ${values.lastName} has been created successfully.`,
       });
       
       // Reset form and refetch team members
       form.reset();
       setShowAddMemberForm(false);
-      fetchTeamMembers(schoolInfo.id);
+      fetchTeamMembers();
       
     } catch (error: any) {
       console.error('Error creating team member:', error);
@@ -303,9 +256,7 @@ const TeamMembers = () => {
       });
       
       // Refetch team members
-      if (schoolInfo) {
-        fetchTeamMembers(schoolInfo.id);
-      }
+      fetchTeamMembers();
       
     } catch (error: any) {
       console.error('Error deleting team member:', error);
@@ -320,51 +271,13 @@ const TeamMembers = () => {
     }
   };
 
-  if (loading && !userCheckComplete) {
+  if (loading) {
     return (
       <div className="container mx-auto py-6 flex items-center justify-center h-[80vh]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-lg">Loading team members...</p>
         </div>
-      </div>
-    );
-  }
-
-  // If no school association, show setup prompt
-  if (error && error.includes("not belong to any school") && userCheckComplete) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Team Members</h1>
-          </div>
-        </div>
-        
-        <Alert variant="destructive" className="mb-6">
-          <AlertTitle>No School Association</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>School Setup Required</CardTitle>
-            <CardDescription>
-              You need to set up or join a school before you can manage team members.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              Team members can only be added once you have created a school or joined an existing one.
-            </p>
-            <Button onClick={() => navigate('/school-setup')} className="w-full">
-              <School className="mr-2 h-4 w-4" />
-              Set Up School
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -376,30 +289,20 @@ const TeamMembers = () => {
           <Users className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Team Members</h1>
         </div>
-        <Button 
-          onClick={() => setShowAddMemberForm(!showAddMemberForm)}
-          disabled={!schoolInfo}
-        >
+        <Button onClick={() => setShowAddMemberForm(!showAddMemberForm)}>
           <UserPlus className="mr-2 h-4 w-4" />
           {showAddMemberForm ? 'Cancel' : 'Add Team Member'}
         </Button>
       </div>
       
-      {schoolInfo && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <School className="h-4 w-4" />
-          <span>School: <span className="font-medium text-foreground">{schoolInfo.name}</span></span>
-        </div>
-      )}
-      
-      {error && !error.includes("not belong to any school") && (
+      {error && (
         <Alert variant="destructive" className="mb-6">
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       
-      {showAddMemberForm && schoolInfo && (
+      {showAddMemberForm && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>
@@ -410,11 +313,6 @@ const TeamMembers = () => {
             </CardTitle>
             <CardDescription>
               Create a new team member account with direct access to your school's platform.
-              {schoolInfo && (
-                <div className="mt-1 text-sm font-medium">
-                  This user will be added to: {schoolInfo.name}
-                </div>
-              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -522,7 +420,7 @@ const TeamMembers = () => {
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full" disabled={addingMember || !schoolInfo}>
+                <Button type="submit" className="w-full" disabled={addingMember}>
                   {addingMember ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -549,15 +447,13 @@ const TeamMembers = () => {
             <CardContent className="flex flex-col items-center justify-center py-8">
               <Users className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center">No team members added yet</p>
-              {schoolInfo && (
-                <Button 
-                  className="mt-4" 
-                  onClick={() => setShowAddMemberForm(true)}
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Add Your First Team Member
-                </Button>
-              )}
+              <Button 
+                className="mt-4" 
+                onClick={() => setShowAddMemberForm(true)}
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add Your First Team Member
+              </Button>
             </CardContent>
           </Card>
         ) : (
