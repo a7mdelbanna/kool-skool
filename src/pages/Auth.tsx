@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -140,8 +139,7 @@ const Auth = () => {
         throw licenseError;
       }
       
-      // Check if license data exists and has items
-      if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
+      if (!licenseData || licenseData.length === 0) {
         throw new Error('Invalid license number or license has expired');
       }
       
@@ -204,8 +202,7 @@ const Auth = () => {
           throw licenseError;
         }
         
-        // Check if license data exists and has items
-        if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
+        if (!licenseData || licenseData.length === 0) {
           console.error('License validation failed during signup');
           throw new Error('License validation failed');
         }
@@ -230,7 +227,7 @@ const Auth = () => {
           .update({
             first_name: data.firstName,
             last_name: data.lastName
-          } as any)
+          })
           .eq('id', authData.user.id);
           
         if (profileUpdateError) {

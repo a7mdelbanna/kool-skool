@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   User, 
@@ -27,11 +26,6 @@ import { cn } from '@/lib/utils';
 import { fetchUserProfile, updateUserProfile } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
-// Helper to safely access properties
-const safeAccess = <T, K extends keyof T>(obj: T | null | undefined, key: K): T[K] | undefined => {
-  return obj && key in obj ? obj[key] : undefined;
-};
-
 const Settings = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -52,13 +46,13 @@ const Settings = () => {
       const { profile } = await fetchUserProfile();
       
       setProfileData({
-        firstName: safeAccess(profile, 'first_name') || '',
-        lastName: safeAccess(profile, 'last_name') || '',
-        email: safeAccess(profile, 'email') || '',
-        phone: safeAccess(profile, 'phone') || '',
+        firstName: profile?.first_name || '',
+        lastName: profile?.last_name || '',
+        email: profile?.email || '',
+        phone: profile?.phone || '',
         location: '', // Location is not in the schema, but keeping it for UI consistency
         bio: '', // Bio is not in the schema, but keeping it for UI consistency
-        profile_picture: safeAccess(profile, 'profile_picture')
+        profile_picture: profile?.profile_picture
       });
       
       console.log("Profile data loaded:", profile);

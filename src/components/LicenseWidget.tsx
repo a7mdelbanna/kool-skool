@@ -36,8 +36,7 @@ const LicenseWidget: React.FC = () => {
 
         if (licenseError) throw licenseError;
         
-        // Ensure we have data before proceeding
-        if (!data || !Array.isArray(data) || data.length === 0) {
+        if (!data || data.length === 0) {
           // User might not be associated with a school yet
           setLicenseDetails(null);
           setError('No license information found');
@@ -55,8 +54,7 @@ const LicenseWidget: React.FC = () => {
 
         if (detailsError) throw detailsError;
         
-        // Check if we have valid license data
-        if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
+        if (!licenseData || licenseData.length === 0) {
           throw new Error('License details not found');
         }
 

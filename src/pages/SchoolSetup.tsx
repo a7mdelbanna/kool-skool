@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -111,10 +112,6 @@ interface TeamMemberData {
   updated_at: string;
 }
 
-const safeAccess = <T, K extends keyof T>(obj: T | null | undefined, key: K): T[K] | undefined => {
-  return obj && key in obj ? obj[key] : undefined;
-};
-
 const SchoolSetup = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -182,7 +179,7 @@ const SchoolSetup = () => {
         
         if (error) throw error;
         
-        if (data && Array.isArray(data) && data.length > 0) {
+        if (data && data.length > 0) {
           const userInfo = data[0];
           setUserSchoolInfo(userInfo);
           
@@ -209,12 +206,12 @@ const SchoolSetup = () => {
           
           if (schoolData) {
             setSchoolInfo({
-              name: safeAccess(schoolData, 'name') || '',
-              picture: safeAccess(schoolData, 'logo') || '',
-              phone: safeAccess(schoolData, 'phone') || '',
-              telegram: safeAccess(schoolData, 'telegram') || '',
-              whatsapp: safeAccess(schoolData, 'whatsapp') || '',
-              instagram: safeAccess(schoolData, 'instagram') || ''
+              name: schoolData.name || '',
+              picture: schoolData.logo || '',
+              phone: schoolData.phone || '',
+              telegram: schoolData.telegram || '',
+              whatsapp: schoolData.whatsapp || '',
+              instagram: schoolData.instagram || ''
             });
           }
           
@@ -227,15 +224,15 @@ const SchoolSetup = () => {
           if (teamError) throw teamError;
           
           if (teamData && teamData.length > 0) {
-            const formattedTeachers = teamData.map((member: any) => ({
-              id: safeAccess(member, 'id') || Date.now().toString(),
-              name: safeAccess(member, 'email') ? safeAccess(member, 'email').split('@')[0] : '',
+            const formattedTeachers = teamData.map((member: TeamMemberData) => ({
+              id: member.id,
+              name: member.email.split('@')[0],
               picture: '',
               whatsapp: '',
               telegram: '',
               instagram: '',
-              email: safeAccess(member, 'email') || '',
-              role: safeAccess(member, 'role') || 'teacher'
+              email: member.email,
+              role: member.role
             }));
             
             if (formattedTeachers.length > 0) {
@@ -289,6 +286,7 @@ const SchoolSetup = () => {
       )
     );
     
+    // Clear any validation errors when user changes the field
     if (errors[`${id}_${field}`]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -333,10 +331,12 @@ const SchoolSetup = () => {
     try {
       setInvitingTeamMember(prev => ({ ...prev, [teacher.id]: true }));
       
+      // Split the name to get first name and last name
       const nameParts = teacher.name.split(' ');
       const firstName = nameParts[0];
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       
+      // Log the data being sent to the API for debugging
       console.log("Inviting team member with data:", {
         email: teacher.email,
         role: teacher.role,
@@ -474,6 +474,7 @@ const SchoolSetup = () => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
       
+      // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast({
           title: 'File too large',
@@ -484,6 +485,7 @@ const SchoolSetup = () => {
       }
       
       try {
+        // Convert file to base64 for preview
         const reader = new FileReader();
         reader.onload = async (event) => {
           const base64String = event.target?.result as string;
@@ -495,11 +497,10 @@ const SchoolSetup = () => {
             }));
             
             if (userSchoolInfo) {
-              const updateData = { logo: base64String } as any;
               const { error } = await supabase
                 .from('schools')
-                .update(updateData)
-                .eq('id', userSchoolInfo.school_id as any);
+                .update({ logo: base64String })
+                .eq('id', userSchoolInfo.school_id);
               
               if (error) throw error;
               
@@ -552,20 +553,18 @@ const SchoolSetup = () => {
     try {
       setSaving(true);
       
-      const updateData = {
-        name: schoolInfo.name,
-        logo: schoolInfo.picture,
-        phone: schoolInfo.phone,
-        telegram: schoolInfo.telegram,
-        whatsapp: schoolInfo.whatsapp,
-        instagram: schoolInfo.instagram,
-        updated_at: new Date().toISOString()
-      } as any;
-      
       const { error: schoolError } = await supabase
         .from('schools')
-        .update(updateData)
-        .eq('id', userSchoolInfo.school_id as any);
+        .update({
+          name: schoolInfo.name,
+          logo: schoolInfo.picture,
+          phone: schoolInfo.phone,
+          telegram: schoolInfo.telegram,
+          whatsapp: schoolInfo.whatsapp,
+          instagram: schoolInfo.instagram,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userSchoolInfo.school_id);
       
       if (schoolError) throw schoolError;
       
@@ -574,11 +573,12 @@ const SchoolSetup = () => {
         description: "All your changes have been saved successfully.",
       });
       
+      // Refresh school info after save
       const { data, error } = await supabase.rpc('get_user_school_info');
       
       if (error) throw error;
       
-      if (data && Array.isArray(data) && data.length > 0) {
+      if (data && data.length > 0) {
         setUserSchoolInfo(data[0]);
       }
       

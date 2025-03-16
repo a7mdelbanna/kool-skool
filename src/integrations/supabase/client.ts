@@ -6,43 +6,10 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://cfacqfrutwfbfibswckp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmYWNxZnJ1dHdmYmZpYnN3Y2twIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwOTQ2MzMsImV4cCI6MjA1NzY3MDYzM30.QuxaZKXmhvdCLDUlVRA7Pge0JLm2EHl4qRApoGuevcE";
 
-// Get the current URL to use as the site URL for auth redirects
-const getSiteUrl = () => {
-  let url = window.location.origin;
-  // Remove any trailing slash
-  if (url.endsWith('/')) {
-    url = url.slice(0, -1);
-  }
-  return url;
-};
-
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(
-  SUPABASE_URL, 
-  SUPABASE_PUBLISHABLE_KEY,
-  {
-    auth: {
-      flowType: 'pkce',
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      persistSession: true,
-      // Use dynamic site URL for authentication flows by setting it in options
-      site_url: getSiteUrl()
-    }
-  }
-);
-
-// Type utility for safely accessing properties
-const safeAccess = <T extends Record<string, any>, K extends string>(obj: T | null | undefined, key: K): T[K & keyof T] | undefined => {
-  return obj && key in obj ? obj[key as keyof T] : undefined;
-};
-
-// Type guard to check if an object has a property
-const hasProperty = <T>(obj: any, prop: string): obj is T => {
-  return obj && typeof obj === 'object' && prop in obj;
-};
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Helper function to upload base64 image to schools
 export const uploadBase64Image = async (
@@ -50,11 +17,9 @@ export const uploadBase64Image = async (
   schoolId: string, 
   field: 'logo' | 'phone' | 'telegram' | 'whatsapp' | 'instagram'
 ) => {
-  const updateData: Record<string, string> = { [field]: base64String };
-  
   const { data, error } = await supabase
     .from('schools')
-    .update(updateData)
+    .update({ [field]: base64String })
     .eq('id', schoolId);
     
   return { data, error };
@@ -84,11 +49,7 @@ export const fetchUserProfile = async () => {
   
   console.log("Profile data from database:", data);
   
-  // Ensure we have valid data with safe access
-  return { 
-    user, 
-    profile: data || null
-  };
+  return { user, profile: data };
 };
 
 // Helper function to update user profile
@@ -208,9 +169,7 @@ export const inviteTeamMember = async (
         data: {
           invitation: true,
           role: userData.role
-        },
-        // Use the current origin as redirect URL
-        emailRedirectTo: `${getSiteUrl()}/auth?type=invite`
+        }
       }
     });
     
@@ -266,13 +225,11 @@ export const createTeamMember = async (
       throw new Error('Could not fetch admin school information');
     }
     
-    // Check if school_id exists on adminProfile
-    if (!adminProfile || !('school_id' in adminProfile) || !adminProfile.school_id) {
+    if (!adminProfile.school_id) {
       throw new Error('Admin does not have a school assigned');
     }
     
-    const schoolId = adminProfile.school_id;
-    console.log("Admin school ID:", schoolId);
+    console.log("Admin school ID:", adminProfile.school_id);
     
     // Proceed with creating the team member
     console.log("Creating team member with validated email:", userData.email);
@@ -304,7 +261,7 @@ export const createTeamMember = async (
     // Now call the stored procedure to set up the team member
     // Use type assertion to work around TypeScript limitations with RPC functions
     const { data, error } = await supabase.rpc(
-      'finalize_team_member', 
+      'finalize_team_member' as any, 
       {
         user_id_param: authData.user.id,
         role_param: userData.role,
