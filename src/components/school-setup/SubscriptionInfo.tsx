@@ -33,70 +33,66 @@ const SubscriptionInfo = () => {
       }
       
       // First, get the user's school_id
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('school_id')
-        .eq('id', user.id)
-        .maybeSingle();
+      const { data: schoolId, error: schoolIdError } = await supabase
+        .rpc('get_user_school_id');
       
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-        throw profileError;
+      if (schoolIdError) {
+        console.error("Error fetching school ID:", schoolIdError);
+        throw schoolIdError;
       }
       
-      if (!profileData || !profileData.school_id) {
+      if (!schoolId) {
         console.log("No school associated with this user");
         setLicenseInfo(null);
         setIsLoading(false);
         return;
       }
       
-      // Get school info with license details
+      // Get school info
       const { data: schoolData, error: schoolError } = await supabase
-        .from('schools')
-        .select('*, licenses(*)')
-        .eq('id', profileData.school_id)
-        .maybeSingle();
+        .rpc('get_school_info', { school_id_param: schoolId });
       
       if (schoolError) {
         console.error("Error fetching school:", schoolError);
         throw schoolError;
       }
       
-      if (!schoolData || !schoolData.licenses) {
+      if (!schoolData || schoolData.length === 0 || !schoolData[0].license_id) {
         console.log("No license information found");
         setLicenseInfo(null);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Get license details
+      const { data: licenseData, error: licenseError } = await supabase
+        .rpc('get_license_details', { license_id_param: schoolData[0].license_id });
+      
+      if (licenseError) {
+        console.error("Error fetching license details:", licenseError);
+        throw licenseError;
+      }
+      
+      if (!licenseData || licenseData.length === 0) {
+        console.log("License information not found");
+        setLicenseInfo(null);
       } else {
-        const licenseData = schoolData.licenses;
+        const license = licenseData[0];
         
-        // Calculate days remaining
-        let daysRemaining = 0;
+        // Calculate status
         let status = "inactive";
-        
-        if (licenseData.expires_at) {
-          const expiryDate = new Date(licenseData.expires_at);
-          const currentDate = new Date();
-          
-          // Calculate difference in milliseconds
-          const differenceMs = expiryDate.getTime() - currentDate.getTime();
-          
-          // Convert to days
-          daysRemaining = Math.max(0, Math.floor(differenceMs / (1000 * 60 * 60 * 24)));
-          
-          if (daysRemaining > 0 && licenseData.is_active) {
-            status = "active";
-          } else {
-            status = "expired";
-          }
+        if (license.is_active && license.days_remaining > 0) {
+          status = "active";
+        } else if (license.days_remaining <= 0) {
+          status = "expired";
         }
         
         // Set enhanced license info
         setLicenseInfo({
-          ...licenseData,
-          daysRemaining,
+          ...license,
           status,
-          totalDays: licenseData.duration_days,
-          progressPercentage: Math.max(0, Math.min(100, (daysRemaining / licenseData.duration_days) * 100))
+          daysRemaining: Math.max(0, license.days_remaining),
+          progressPercentage: Math.max(0, Math.min(100, (license.days_remaining / license.duration_days) * 100))
         });
       }
     } catch (err: any) {
