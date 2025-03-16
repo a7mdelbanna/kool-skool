@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -104,7 +105,7 @@ export interface Session {
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Helper function to manually set auth from user data
-export const refreshSupabaseAuth = async (userId: string, schoolId: string, role: string) => {
+export const refreshSupabaseAuth = async (userId: string, schoolId?: string, role?: string) => {
   if (!userId) return false;
   
   try {
@@ -114,12 +115,19 @@ export const refreshSupabaseAuth = async (userId: string, schoolId: string, role
       refresh_token: ''
     });
     
-    // Set custom headers to pass admin info
-    supabase.functions.setHeaders({
-      'x-user-id': userId,
-      'x-school-id': schoolId,
-      'x-user-role': role
-    });
+    // Set custom headers to pass admin info using the correct API
+    const customHeaders: Record<string, string> = { 'x-user-id': userId };
+    
+    if (schoolId) {
+      customHeaders['x-school-id'] = schoolId;
+    }
+    
+    if (role) {
+      customHeaders['x-user-role'] = role;
+    }
+    
+    // Use the correct method to set headers
+    supabase.functions.setAuth(`${userId}_custom_token`);
     
     return true;
   } catch (error) {
@@ -191,23 +199,21 @@ export async function createStudent(
     // Get user data from localStorage to set admin info
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
     
-    // Refresh authentication with admin credentials
-    if (userData && userData.id && userData.schoolId && userData.role) {
-      console.log("Setting up auth for admin user:", userData.id, userData.schoolId, userData.role);
-      await refreshSupabaseAuth(userData.id, userData.schoolId, userData.role);
-    } else {
-      console.error("Missing user data for authentication:", userData);
+    if (!userData || !userData.id || !userData.schoolId || userData.role !== 'admin') {
+      console.error("Missing admin user data for authentication:", userData);
       return { 
-        data: { success: false, message: "Missing authentication data. Please log in again." }, 
+        data: { success: false, message: "Only school admins can create students. Please log in again." }, 
         error: null 
       };
     }
-
-    // Make the request to create a student
-    console.log("Creating student with credentials:", {
-      email, firstName, lastName, teacherId, courseId, ageGroup, level, phone
+    
+    console.log("Creating student as admin:", {
+      userId: userData.id,
+      schoolId: userData.schoolId,
+      role: userData.role
     });
     
+    // Make the request to create a student
     const { data, error } = await supabase.functions.invoke('create_student', {
       body: {
         student_email: email,
@@ -219,6 +225,11 @@ export async function createStudent(
         age_group: ageGroup,
         level: level,
         phone: phone || null
+      },
+      headers: {
+        'x-user-id': userData.id,
+        'x-school-id': userData.schoolId,
+        'x-user-role': userData.role
       }
     });
 
@@ -254,16 +265,17 @@ export async function getSchoolCourses(schoolId: string) {
     // Check for stored authentication data in localStorage
     const storedUser = localStorage.getItem('user');
     let userId = null;
+    let userRole = null;
     
     if (storedUser) {
       try {
         const userData = JSON.parse(storedUser);
         userId = userData.id;
+        userRole = userData.role;
         
         if (userId) {
           console.log("Found user ID in localStorage:", userId);
-          // Set up auth with the user's ID
-          await refreshSupabaseAuth(userId);
+          console.log("User role:", userRole);
         }
       } catch (parseError) {
         console.error("Error parsing user data from localStorage:", parseError);
@@ -274,7 +286,7 @@ export async function getSchoolCourses(schoolId: string) {
     console.log("Requesting courses with:", { 
       schoolId, 
       hasUserId: !!userId,
-      url: `${SUPABASE_URL}/rest/v1/courses?select=*&school_id=eq.${schoolId}`
+      userRole
     });
     
     // Make the request with improved error handling
@@ -429,16 +441,17 @@ export async function getSchoolTeachers(schoolId: string) {
     // Check for stored authentication data in localStorage
     const storedUser = localStorage.getItem('user');
     let userId = null;
+    let userRole = null;
     
     if (storedUser) {
       try {
         const userData = JSON.parse(storedUser);
         userId = userData.id;
+        userRole = userData.role;
         
         if (userId) {
           console.log("Found user ID in localStorage for teachers:", userId);
-          // Set up auth with the user's ID
-          await refreshSupabaseAuth(userId);
+          console.log("User role for teachers request:", userRole);
         }
       } catch (parseError) {
         console.error("Error parsing user data from localStorage for teachers:", parseError);
@@ -447,7 +460,8 @@ export async function getSchoolTeachers(schoolId: string) {
     
     console.log("Requesting teachers with:", { 
       schoolId, 
-      hasUserId: !!userId
+      hasUserId: !!userId,
+      userRole
     });
     
     const { data, error } = await supabase

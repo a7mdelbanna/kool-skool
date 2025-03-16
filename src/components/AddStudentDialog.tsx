@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -190,6 +189,8 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
       if (isEditMode) {
         toast.success(`${studentData.firstName} ${studentData.lastName} updated successfully`);
       } else {
+        const userData = getUserData();
+        
         if (!userData || !userData.schoolId || userData.role !== 'admin') {
           toast.error("Only school admins can create students");
           setSaving(false);
@@ -236,6 +237,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
           return;
         }
         
+        console.log("Student created successfully:", data);
         toast.success("Student added successfully");
         
         if (onStudentAdded && data && data.student_id) {

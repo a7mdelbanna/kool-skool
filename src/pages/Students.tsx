@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,8 +13,7 @@ import {
   getStudentsWithDetails, 
   StudentRecord, 
   createCourse, 
-  supabase, 
-  refreshSupabaseAuth 
+  supabase
 } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import { useNavigate } from 'react-router-dom';
@@ -226,12 +224,6 @@ const Students = () => {
         return;
       }
       
-      // Try to refresh the auth session first
-      if (user.id) {
-        await refreshSupabaseAuth(user.id);
-      }
-      
-      // Log authentication state for debugging
       console.log("Creating course with school ID:", user.schoolId);
       
       const { data, error } = await createCourse(
@@ -243,20 +235,17 @@ const Students = () => {
       if (error) {
         console.error("Error creating course:", error);
         
-        // Check if it's an authentication error
         if (error.message?.includes("Authentication required") || 
             error.message?.includes("expired") || 
             error.message?.includes("JWT")) {
           toast.error("Your session has expired. Please log in again.");
           
-          // Clear user data and redirect to login
           localStorage.removeItem('user');
           setUser(null);
           navigate('/login');
           return;
         }
         
-        // Handle other RLS policy violations
         if (error.message?.includes("violates row-level security policy")) {
           toast.error("You don't have permission to create courses for this school.");
           return;

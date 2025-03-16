@@ -25,6 +25,8 @@ serve(async (req) => {
     const schoolId = req.headers.get('x-school-id')
     const userRole = req.headers.get('x-user-role')
     
+    console.log("Received headers:", { userId, schoolId, userRole })
+    
     // Validate admin role
     if (!userId || !schoolId || userRole !== 'admin') {
       console.error("Admin validation failed:", { userId, schoolId, userRole })
@@ -32,6 +34,25 @@ serve(async (req) => {
         JSON.stringify({ 
           success: false, 
           message: "Only school admins can create students" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      )
+    }
+    
+    // Verify that the user exists and is an admin
+    const { data: adminData, error: adminError } = await supabaseClient
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .eq('school_id', schoolId)
+      .single()
+    
+    if (adminError || !adminData || adminData.role !== 'admin') {
+      console.error("Admin verification failed:", { adminError, adminData })
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Admin verification failed" 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
       )
@@ -53,29 +74,65 @@ serve(async (req) => {
     
     console.log(`Creating student ${first_name} ${last_name} for school: ${schoolId}`)
     
-    // Create the user for the student
-    const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
-      email: student_email,
-      password: student_password,
-      email_confirm: true
-    })
+    // Verify the teacher belongs to the same school
+    const { data: teacherData, error: teacherError } = await supabaseClient
+      .from('users')
+      .select('school_id')
+      .eq('id', teacher_id)
+      .single()
     
-    if (authError) {
-      console.error("Error creating student auth:", authError)
+    if (teacherError || !teacherData || teacherData.school_id !== schoolId) {
+      console.error("Teacher verification failed:", { teacherError, teacherData })
       return new Response(
-        JSON.stringify({ success: false, message: authError.message }),
+        JSON.stringify({ 
+          success: false, 
+          message: "Teacher not found or not associated with this school" 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
     
-    const studentUserId = authData.user.id
+    // Verify the course belongs to the same school
+    const { data: courseData, error: courseError } = await supabaseClient
+      .from('courses')
+      .select('school_id')
+      .eq('id', course_id)
+      .single()
     
-    // Insert into users table
+    if (courseError || !courseData || courseData.school_id !== schoolId) {
+      console.error("Course verification failed:", { courseError, courseData })
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Course not found or not associated with this school" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
+    // First, check if a user with this email already exists
+    const { data: existingUserData, error: existingUserError } = await supabaseClient
+      .from('users')
+      .select('id')
+      .eq('email', student_email)
+      .maybeSingle()
+    
+    if (existingUserData) {
+      console.error("User with this email already exists:", student_email)
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "A user with this email already exists" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
+    // Insert into users table first
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .insert([
         {
-          id: studentUserId,
           first_name,
           last_name,
           email: student_email,
@@ -96,6 +153,8 @@ serve(async (req) => {
       )
     }
     
+    const studentUserId = userData.id
+    
     // Create student record
     const { data: studentData, error: studentError } = await supabaseClient
       .from('students')
@@ -115,6 +174,13 @@ serve(async (req) => {
     
     if (studentError) {
       console.error("Error creating student record:", studentError)
+      // Attempt to clean up the user record since student creation failed
+      try {
+        await supabaseClient.from('users').delete().eq('id', studentUserId)
+      } catch (cleanupError) {
+        console.error("Failed to clean up user after student creation error:", cleanupError)
+      }
+      
       return new Response(
         JSON.stringify({ success: false, message: studentError.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
