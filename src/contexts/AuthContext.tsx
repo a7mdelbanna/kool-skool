@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +10,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (licenseNumber: string) => Promise<{valid: boolean; message: string; licenseId: string | null}>;
-  completeSignUp: (email: string, password: string, userData: any) => Promise<void>;
+  completeSignUp: (email: string, password: string, userData: any) => Promise<{success: boolean; error?: string}>;
   signOut: () => Promise<void>;
 };
 
@@ -26,6 +25,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("AuthProvider getSession:", session);
       setSession(session);
       setUser(session?.user || null);
       setIsLoading(false);
@@ -33,7 +33,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        console.log("Auth state change event:", event, "Session:", session);
         setSession(session);
         setUser(session?.user || null);
         setIsLoading(false);
@@ -113,14 +114,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const completeSignUp = async (email: string, password: string, userData: any) => {
+  const completeSignUp = async (email: string, password: string, userData: any): Promise<{success: boolean; error?: string}> => {
     try {
       setIsLoading(true);
       
       // Make sure we have all the required data
       if (!userData.licenseId) {
         toast.error("Missing license ID. Please verify your license first.");
-        return;
+        return { success: false, error: "Missing license ID" };
       }
       
       console.log("CompleteSignUp with licenseId:", userData.licenseId);
@@ -137,7 +138,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error("License not found:", licenseCheckError);
         toast.error("Invalid license. Please verify your license again.");
         navigate("/auth");
-        return;
+        return { success: false, error: "Invalid license" };
       }
       
       // First, update the license record with the school name if provided
@@ -169,12 +170,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (authError) {
         toast.error(authError.message);
-        return;
+        return { success: false, error: authError.message };
       }
 
       if (!authData.user) {
         toast.error("Failed to create user account");
-        return;
+        return { success: false, error: "Failed to create user account" };
       }
 
       // Create school entry with explicit license_id
@@ -197,7 +198,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (schoolError) {
         console.error("Error creating school:", schoolError);
         toast.error(`Error creating school: ${schoolError.message}`);
-        return;
+        return { success: false, error: `Error creating school: ${schoolError.message}` };
       }
 
       // For debugging purposes, verify the school creation
@@ -224,7 +225,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (profileError) {
         console.error("Error creating profile:", profileError);
         toast.error(`Error creating profile: ${profileError.message}`);
-        return;
+        return { success: false, error: `Error creating profile: ${profileError.message}` };
       }
 
       // Process team members if provided
@@ -238,10 +239,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       toast.success("Account created successfully!");
-      navigate("/");
+      return { success: true };
     } catch (error: any) {
       console.error("Complete signup error:", error);
       toast.error(error.message || "An error occurred during signup");
+      return { success: false, error: error.message || "An error occurred during signup" };
     } finally {
       setIsLoading(false);
     }

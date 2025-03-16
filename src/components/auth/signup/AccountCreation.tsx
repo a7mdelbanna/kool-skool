@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,12 +26,20 @@ const accountSchema = z.object({
 type AccountFormValues = z.infer<typeof accountSchema>;
 
 const AccountCreation: React.FC = () => {
-  const { completeSignUp, isLoading } = useAuth();
+  const { completeSignUp, isLoading, user } = useAuth();
   const navigate = useNavigate();
   const { licenseId } = useParams<{ licenseId: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [licenseInfo, setLicenseInfo] = useState<{ license_number: string } | null>(null);
   const [licenseError, setLicenseError] = useState<string | null>(null);
+  
+  // Check if user is already signed in and redirect to onboarding if needed
+  useEffect(() => {
+    if (user) {
+      console.log("User already signed in, redirecting to onboarding");
+      navigate("/onboarding");
+    }
+  }, [user, navigate]);
   
   // Fetch license information when the component mounts
   useEffect(() => {
@@ -126,11 +135,19 @@ const AccountCreation: React.FC = () => {
         schoolName: "New School",
       };
 
-      await completeSignUp(data.email, data.password, userData);
-      toast.success("Account created successfully!");
+      const result = await completeSignUp(data.email, data.password, userData);
       
-      // Redirect to the onboarding flow instead of dashboard
-      navigate("/onboarding");
+      if (result && result.success) {
+        toast.success("Account created successfully!");
+        console.log("Account created successfully, redirecting to onboarding");
+        
+        // Wait a moment for the auth state to update
+        setTimeout(() => {
+          navigate("/onboarding");
+        }, 500);
+      } else {
+        toast.error(result?.error || "Failed to create account");
+      }
     } catch (error: any) {
       console.error("Account creation error:", error);
       toast.error(error.message || "An error occurred during account creation");
