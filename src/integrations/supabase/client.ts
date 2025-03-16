@@ -10,10 +10,3 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-
-// Adding a rest property for custom RPC calls not captured in the TypeScript definitions
-supabase.rest = {
-  rpc: (fn: string, params: any) => {
-    return supabase.rpc(fn as any, params);
-  }
-};

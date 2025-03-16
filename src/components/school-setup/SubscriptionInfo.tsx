@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -297,10 +298,15 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      const { error } = await supabase.rest.rpc('create_school_and_update_profile', {
-        school_name: data.name,
-        license_number: data.license_number
-      });
+      // Use the standard rpc method with type casting to call our stored procedure
+      const { error } = await supabase.rpc(
+        // Cast the procedure name to any to bypass TypeScript checking
+        "create_school_and_update_profile" as any,
+        {
+          school_name: data.name,
+          license_number: data.license_number
+        }
+      );
       
       if (error) {
         console.error("Error creating school:", error);
