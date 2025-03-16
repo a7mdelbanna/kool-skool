@@ -9,6 +9,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Loader2, UserPlus, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // Team member schema
 const teamMemberSchema = z.object({
@@ -43,6 +45,7 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
   loading 
 }) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(data.teamMembers || []);
+  const [isAddingMember, setIsAddingMember] = useState(false);
   
   const form = useForm<TeamMemberFormValues>({
     resolver: zodResolver(teamMemberSchema),
@@ -52,23 +55,87 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
     },
   });
 
-  const addTeamMember = (values: TeamMemberFormValues) => {
-    // Ensure we're adding a complete TeamMember object with required fields
-    const newTeamMember: TeamMember = {
-      email: values.email,
-      role: values.role,
-    };
-    
-    const updatedTeamMembers = [...teamMembers, newTeamMember];
-    setTeamMembers(updatedTeamMembers);
-    updateData({ teamMembers: updatedTeamMembers });
-    form.reset();
+  const addTeamMember = async (values: TeamMemberFormValues) => {
+    try {
+      setIsAddingMember(true);
+      
+      // Create the team invitation in the database
+      const { data: invitationId, error } = await supabase
+        .rpc('create_team_invitation', {
+          email_param: values.email,
+          role_param: values.role
+        });
+      
+      if (error) {
+        console.error("Error creating team invitation:", error);
+        toast.error(`Error adding team member: ${error.message}`);
+        return;
+      }
+      
+      console.log(`Team invitation created with ID: ${invitationId}`);
+      toast.success(`Team member ${values.email} added successfully!`);
+      
+      // Add to local state
+      const newTeamMember: TeamMember = {
+        email: values.email,
+        role: values.role,
+      };
+      
+      const updatedTeamMembers = [...teamMembers, newTeamMember];
+      setTeamMembers(updatedTeamMembers);
+      updateData({ teamMembers: updatedTeamMembers });
+      form.reset();
+    } catch (error: any) {
+      console.error("Error adding team member:", error);
+      toast.error(`Failed to add team member: ${error.message}`);
+    } finally {
+      setIsAddingMember(false);
+    }
   };
 
-  const removeTeamMember = (index: number) => {
-    const updatedTeamMembers = teamMembers.filter((_, i) => i !== index);
-    setTeamMembers(updatedTeamMembers);
-    updateData({ teamMembers: updatedTeamMembers });
+  const removeTeamMember = async (index: number, email: string) => {
+    try {
+      // Get the user's school ID first
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('school_id')
+        .eq('id', supabase.auth.getSession().then(({ data }) => data.session?.user.id))
+        .maybeSingle();
+      
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        throw profileError;
+      }
+      
+      if (!profileData || !profileData.school_id) {
+        toast.error("Could not find your school information");
+        return;
+      }
+      
+      // Delete the invitation from the database
+      const { error } = await supabase
+        .from('team_invitations')
+        .delete()
+        .match({ 
+          email: email,
+          school_id: profileData.school_id
+        });
+      
+      if (error) {
+        console.error("Error removing team invitation:", error);
+        toast.error(`Error removing team member: ${error.message}`);
+        return;
+      }
+      
+      // Update local state
+      const updatedTeamMembers = teamMembers.filter((_, i) => i !== index);
+      setTeamMembers(updatedTeamMembers);
+      updateData({ teamMembers: updatedTeamMembers });
+      toast.success("Team member removed successfully");
+    } catch (error: any) {
+      console.error("Error removing team member:", error);
+      toast.error(`Failed to remove team member: ${error.message}`);
+    }
   };
 
   const handleSubmit = () => {
@@ -134,10 +201,19 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
             type="submit" 
             variant="outline" 
             className="w-full"
-            disabled={loading}
+            disabled={loading || isAddingMember}
           >
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Team Member
+            {isAddingMember ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add Team Member
+              </>
+            )}
           </Button>
         </form>
       </Form>
@@ -160,7 +236,7 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => removeTeamMember(index)}
+                  onClick={() => removeTeamMember(index, member.email)}
                   disabled={loading}
                 >
                   <X className="h-4 w-4" />

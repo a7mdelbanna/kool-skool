@@ -61,7 +61,7 @@ const SchoolSetup = () => {
         setError(null);
         setIsRetrying(false);
         
-        // Fetch user role
+        // Fetch user role using the security definer function
         const { data: roleData, error: roleError } = await supabase
           .rpc('get_current_user_role');
           
@@ -73,7 +73,6 @@ const SchoolSetup = () => {
         }
         
         // Directly query the profiles table to get the school_id
-        // This avoids redundant checks and simplifies the data flow
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('school_id')
@@ -96,21 +95,18 @@ const SchoolSetup = () => {
         const schoolId = profileData.school_id;
         console.log("Found school ID in profile:", schoolId);
             
-        // Fetch school data
+        // Fetch school data using our security definer function
         const { data: schoolData, error: schoolError } = await supabase
-          .from('schools')
-          .select('*')
-          .eq('id', schoolId)
-          .single();
+          .rpc('get_school_info', { school_id_param: schoolId });
           
         if (schoolError) {
           console.error("Error fetching school:", schoolError);
           throw schoolError;
         }
         
-        if (schoolData) {
-          console.log("School data:", schoolData);
-          setSchoolInfo(schoolData);
+        if (schoolData && schoolData.length > 0) {
+          console.log("School data:", schoolData[0]);
+          setSchoolInfo(schoolData[0]);
           setNoSchoolFound(false);
         } else {
           setNoSchoolFound(true);
@@ -138,18 +134,33 @@ const SchoolSetup = () => {
         return;
       }
 
-      // Call the RPC function to create a school and update the profile
-      // This ensures all operations happen in a single transaction
-      const { data: schoolId, error } = await supabase
-        .rpc('create_school_and_update_profile_rpc', {
+      // Call the function to verify the license first
+      const { data: licenseResult, error: licenseError } = await supabase
+        .rpc('verify_license', { license_number_param: data.license_number });
+      
+      if (licenseError || !licenseResult || !licenseResult[0].valid) {
+        console.error("Error verifying license:", licenseError || "Invalid license");
+        toast.error(`Invalid license: ${licenseResult && licenseResult[0] ? licenseResult[0].message : "Please check your license number"}`);
+        return;
+      }
+      
+      const licenseId = licenseResult[0].license_id;
+      
+      // Create or update the school with the verified license
+      const { data: schoolId, error: schoolError } = await supabase
+        .rpc('create_or_update_school', {
           school_name: data.name,
-          license_number: data.license_number
+          school_logo: null,
+          school_phone: null,
+          school_telegram: null,
+          school_whatsapp: null,
+          school_instagram: null
         });
       
-      if (error) {
-        console.error("Error creating school:", error);
-        toast.error(`Error creating school: ${error.message}`);
-        throw error;
+      if (schoolError) {
+        console.error("Error creating school:", schoolError);
+        toast.error(`Error creating school: ${schoolError.message}`);
+        throw schoolError;
       }
       
       console.log("School created successfully with ID:", schoolId);
