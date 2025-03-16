@@ -72,28 +72,24 @@ const SchoolSetup = () => {
           setUserRole(roleData || null);
         }
         
-        // Directly query the profiles table to get the school_id
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('school_id')
-          .eq('id', user.id)
-          .maybeSingle();
+        // Get user's school ID
+        const { data: schoolId, error: schoolIdError } = await supabase
+          .rpc('get_user_school_id');
         
-        if (profileError) {
-          console.error("Error fetching profile data:", profileError);
-          throw profileError;
+        if (schoolIdError) {
+          console.error("Error fetching school ID:", schoolIdError);
+          throw schoolIdError;
         }
         
-        // Check if user has a school_id in their profile
-        if (!profileData || !profileData.school_id) {
-          console.log("No school ID found in profile:", profileData);
+        // Check if user has a school_id
+        if (!schoolId) {
+          console.log("No school ID found");
           setNoSchoolFound(true);
           setIsLoading(false);
           return;
         }
         
-        const schoolId = profileData.school_id;
-        console.log("Found school ID in profile:", schoolId);
+        console.log("Found school ID:", schoolId);
             
         // Fetch school data using our security definer function
         const { data: schoolData, error: schoolError } = await supabase
@@ -104,7 +100,7 @@ const SchoolSetup = () => {
           throw schoolError;
         }
         
-        if (schoolData && schoolData.length > 0) {
+        if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
           console.log("School data:", schoolData[0]);
           setSchoolInfo(schoolData[0]);
           setNoSchoolFound(false);
@@ -138,9 +134,9 @@ const SchoolSetup = () => {
       const { data: licenseResult, error: licenseError } = await supabase
         .rpc('verify_license', { license_number_param: data.license_number });
       
-      if (licenseError || !licenseResult || !licenseResult[0].valid) {
+      if (licenseError || !licenseResult || !Array.isArray(licenseResult) || !licenseResult[0]?.valid) {
         console.error("Error verifying license:", licenseError || "Invalid license");
-        toast.error(`Invalid license: ${licenseResult && licenseResult[0] ? licenseResult[0].message : "Please check your license number"}`);
+        toast.error(`Invalid license: ${licenseResult && Array.isArray(licenseResult) && licenseResult[0] ? licenseResult[0].message : "Please check your license number"}`);
         return;
       }
       

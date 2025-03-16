@@ -95,31 +95,25 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
 
   const removeTeamMember = async (index: number, email: string) => {
     try {
-      // Get the user's school ID first
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('school_id')
-        .eq('id', supabase.auth.getSession().then(({ data }) => data.session?.user.id))
-        .maybeSingle();
+      // Get the user's school ID first using our new function
+      const { data: schoolId, error: schoolIdError } = await supabase
+        .rpc('get_user_school_id');
       
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-        throw profileError;
+      if (schoolIdError) {
+        console.error("Error fetching school ID:", schoolIdError);
+        throw schoolIdError;
       }
       
-      if (!profileData || !profileData.school_id) {
+      if (!schoolId) {
         toast.error("Could not find your school information");
         return;
       }
       
-      // Delete the invitation from the database
-      const { error } = await supabase
-        .from('team_invitations')
+      // We need to manually build the query since team_invitations is not in our types
+      const { error } = await supabase.from('team_invitations')
         .delete()
-        .match({ 
-          email: email,
-          school_id: profileData.school_id
-        });
+        .eq('email', email)
+        .eq('school_id', schoolId);
       
       if (error) {
         console.error("Error removing team invitation:", error);

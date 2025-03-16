@@ -57,7 +57,7 @@ const SubscriptionInfo = () => {
         throw schoolError;
       }
       
-      if (!schoolData || schoolData.length === 0 || !schoolData[0].license_id) {
+      if (!schoolData || !Array.isArray(schoolData) || schoolData.length === 0 || !schoolData[0].license_id) {
         console.log("No license information found");
         setLicenseInfo(null);
         setIsLoading(false);
@@ -73,7 +73,7 @@ const SubscriptionInfo = () => {
         throw licenseError;
       }
       
-      if (!licenseData || licenseData.length === 0) {
+      if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
         console.log("License information not found");
         setLicenseInfo(null);
       } else {
@@ -221,7 +221,7 @@ const SubscriptionInfo = () => {
         </div>
         
         {licenseInfo.daysRemaining < 14 && licenseInfo.status === "active" && (
-          <Alert variant="warning" className="bg-amber-50 text-amber-800 border-amber-200 mt-4">
+          <Alert variant="destructive" className="bg-amber-50 text-amber-800 border-amber-200 mt-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Subscription Expiring Soon</AlertTitle>
             <AlertDescription>
