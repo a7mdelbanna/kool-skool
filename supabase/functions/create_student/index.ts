@@ -210,7 +210,7 @@ serve(async (req) => {
       );
     }
     
-    // Insert into users table first with properly hashed password
+    // Insert into users table first with properly hashed password and explicitly set role
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .insert([
@@ -219,7 +219,7 @@ serve(async (req) => {
           last_name,
           email: student_email,
           password_hash: hashResult,
-          role: 'student', // Make sure this matches the allowed values in the database constraint
+          role: 'student',  // Explicitly set the role string
           school_id: schoolId,
           created_by: userId
         }
@@ -230,7 +230,11 @@ serve(async (req) => {
     if (userError) {
       console.error("Error creating user record:", userError)
       return new Response(
-        JSON.stringify({ success: false, message: userError.message }),
+        JSON.stringify({ 
+          success: false, 
+          message: userError.message,
+          detail: userError.details || userError.hint
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -264,7 +268,11 @@ serve(async (req) => {
       }
       
       return new Response(
-        JSON.stringify({ success: false, message: studentError.message }),
+        JSON.stringify({ 
+          success: false, 
+          message: studentError.message,
+          detail: studentError.details || studentError.hint 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -286,7 +294,11 @@ serve(async (req) => {
   } catch (error) {
     console.error("Unhandled error:", error.message)
     return new Response(
-      JSON.stringify({ success: false, message: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        message: error.message,
+        stack: error.stack
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
