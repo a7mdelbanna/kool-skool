@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       console.log("Creating account with license:", userData.licenseId);
       
-      // Create user account
+      // Create user account with license ID in user metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -153,7 +153,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .from('licenses')
           .select('*')
           .eq('id', userData.licenseId)
-          .maybeSingle(); // Use maybeSingle to avoid errors if no row found
+          .maybeSingle();
         
         if (licenseCheckError) {
           console.error("Error checking license:", licenseCheckError);
@@ -197,7 +197,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return { success: false, message: schoolError.message };
         }
 
-        // Create profile entry
+        // Create profile entry with license ID
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -219,7 +219,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return { success: false, message: profileError.message };
         }
 
-        // Update license with school info if license exists
+        // Update license with school info and mark as used by this user
         const { error: updateLicenseError } = await supabase
           .from('licenses')
           .update({ 
