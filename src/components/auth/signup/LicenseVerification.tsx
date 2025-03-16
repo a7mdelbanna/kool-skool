@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, Key } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { LicenseData } from "../SignupForm"; // Import from parent component
 
 // License verification form schema
 const licenseSchema = z.object({
@@ -17,12 +18,6 @@ const licenseSchema = z.object({
 });
 
 type LicenseFormValues = z.infer<typeof licenseSchema>;
-
-// Define the license data interface
-export interface LicenseData {
-  licenseId: string;
-  licenseNumber: string;
-}
 
 interface LicenseVerificationProps {
   onLicenseVerified: (licenseData: LicenseData) => void;
@@ -48,27 +43,25 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
       const result = await signUp(values.licenseNumber);
       console.log("License verification result:", result);
       
-      if (result.valid) {
-        // Create the license data object with the verified data
+      if (result.valid && result.licenseId) {
+        // Create the license data object
         const licenseData: LicenseData = {
-          licenseId: result.licenseId || "",
+          licenseId: result.licenseId,
           licenseNumber: values.licenseNumber
         };
         
-        toast.success("License verified successfully");
-        console.log("License verified, passing data to parent:", licenseData);
+        // Display success message before transitioning
+        toast.success("License verified successfully! Proceeding to account creation...");
+        console.log("License verified successfully, proceeding to next step with data:", licenseData);
         
-        // Force a small delay to ensure state updates properly
-        setTimeout(() => {
-          // Call the callback with the license data
-          onLicenseVerified(licenseData);
-        }, 100);
+        // Call the callback with the license data - importantly, AFTER the toast
+        onLicenseVerified(licenseData);
       } else {
-        toast.error(result.message || "License verification failed");
+        toast.error(result.message || "License verification failed. Please try again.");
       }
     } catch (error) {
       console.error("License verification error:", error);
-      toast.error("An error occurred during verification");
+      toast.error("An error occurred during verification. Please try again.");
     } finally {
       setIsVerifying(false);
     }

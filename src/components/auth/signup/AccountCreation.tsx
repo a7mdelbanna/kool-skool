@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LicenseData } from "./LicenseVerification";
+import { LicenseData } from "../SignupForm"; // Import from parent component
 
 // Account details schema
 const accountSchema = z.object({
@@ -37,10 +38,7 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Added for debugging
-  useEffect(() => {
-    console.log("AccountCreation component mounted with licenseData:", licenseData);
-  }, [licenseData]);
+  console.log("AccountCreation mounted with license data:", licenseData);
   
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
@@ -88,14 +86,23 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
     }
   };
 
-  // Add a debug check to ensure licenseData is valid
+  // Add a fallback card in case license data is missing
   if (!licenseData || !licenseData.licenseId) {
-    console.error("Invalid licenseData received:", licenseData);
+    console.error("Missing or invalid license data in AccountCreation:", licenseData);
     return (
       <Card className="w-full max-w-md mx-auto">
-        <CardContent className="pt-6">
-          <div className="text-center text-red-500">
-            License data is missing. Please verify your license again.
+        <CardHeader>
+          <CardTitle className="text-xl text-red-500">Error</CardTitle>
+          <CardDescription>
+            License verification data is missing or invalid
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center">
+            <p className="mb-4">Something went wrong with your license verification.</p>
+            <Button onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
           </div>
         </CardContent>
       </Card>
