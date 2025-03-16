@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -192,6 +193,20 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
   console.log("Creating course with:", { schoolId, name, lessonType });
   
   try {
+    // Set auth context for this request using the current session
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (!sessionData.session) {
+      console.error("No active session found when creating course");
+      // Try with the stored user ID to set auth context
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const { id: userId } = JSON.parse(storedUser);
+        // Set auth context to the user ID from localStorage
+        await supabase.auth.updateUser({ data: { id: userId } });
+      }
+    }
+    
     const { data, error } = await supabase
       .from('courses')
       .insert([

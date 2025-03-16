@@ -35,48 +35,111 @@ const Login = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.rpc('user_login', {
-        user_email: email,
-        user_password: password
+      // First authenticate with supabase auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
       
-      if (error) {
-        throw error;
+      // If authentication fails, try the custom login endpoint
+      if (authError || !authData.session) {
+        console.log("Standard auth failed, using custom login:", authError);
+        
+        const { data, error } = await supabase.rpc('user_login', {
+          user_email: email,
+          user_password: password
+        });
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Cast data first to unknown, then to our custom interface
+        const response = (data as unknown) as UserLoginResponse;
+        
+        if (!response.success) {
+          throw new Error(response.message || 'Invalid email or password');
+        }
+        
+        // Store user information in local storage
+        const userData = {
+          id: response.user_id,
+          firstName: response.first_name,
+          lastName: response.last_name,
+          role: response.role,
+          schoolId: response.school_id
+        };
+        
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData);
+        
+        // Set the user for auth context
+        if (response.user_id) {
+          await supabase.auth.updateUser({
+            data: { id: response.user_id }
+          });
+        }
+        
+        // Dispatch a storage event to notify other tabs
+        window.dispatchEvent(new Event('storage'));
+        
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${response.first_name}!`,
+        });
+        
+        console.log("Login successful, redirecting to dashboard...");
+        console.log("User data:", userData);
+        
+        // Force a hard navigation to the root page
+        window.location.href = '/';
+      } else {
+        // If Supabase auth succeeded
+        console.log("Standard auth succeeded:", authData);
+        
+        // We still need to get the user details from our custom endpoint
+        const { data, error } = await supabase.rpc('user_login', {
+          user_email: email,
+          user_password: password
+        });
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Cast data first to unknown, then to our custom interface
+        const response = (data as unknown) as UserLoginResponse;
+        
+        if (!response.success) {
+          throw new Error(response.message || 'Invalid email or password');
+        }
+        
+        // Store user information in local storage
+        const userData = {
+          id: response.user_id,
+          firstName: response.first_name,
+          lastName: response.last_name,
+          role: response.role,
+          schoolId: response.school_id
+        };
+        
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData);
+        
+        // Dispatch a storage event to notify other tabs
+        window.dispatchEvent(new Event('storage'));
+        
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${response.first_name}!`,
+        });
+        
+        console.log("Login successful, redirecting to dashboard...");
+        console.log("User data:", userData);
+        
+        // Force a hard navigation to the root page
+        window.location.href = '/';
       }
-      
-      // Cast data first to unknown, then to our custom interface
-      const response = (data as unknown) as UserLoginResponse;
-      
-      if (!response.success) {
-        throw new Error(response.message || 'Invalid email or password');
-      }
-      
-      // Store user information in local storage
-      const userData = {
-        id: response.user_id,
-        firstName: response.first_name,
-        lastName: response.last_name,
-        role: response.role,
-        schoolId: response.school_id
-      };
-      
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
-      
-      // Dispatch a storage event to notify other tabs
-      window.dispatchEvent(new Event('storage'));
-      
-      toast({
-        title: "Login successful",
-        description: `Welcome back, ${response.first_name}!`,
-      });
-      
-      console.log("Login successful, redirecting to dashboard...");
-      console.log("User data:", userData);
-      
-      // Force a hard navigation to the root page
-      window.location.href = '/';
-      
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'Invalid email or password');

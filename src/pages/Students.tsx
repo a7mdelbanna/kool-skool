@@ -217,6 +217,9 @@ const Students = () => {
         return;
       }
       
+      const { data: authData } = await supabase.auth.getSession();
+      console.log("Current auth session:", authData);
+      
       const { data, error } = await createCourse(
         user.schoolId,
         newCourseName.trim(),
@@ -232,6 +235,8 @@ const Students = () => {
       toast.success(`Course "${newCourseName}" created successfully`);
       setNewCourseName("");
       setIsAddCourseOpen(false);
+      
+      refetchStudents();
       
     } catch (error) {
       console.error("Error adding course:", error);
