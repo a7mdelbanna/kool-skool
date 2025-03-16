@@ -149,12 +149,24 @@ const TeamAccess = () => {
     try {
       setFormLoading(true);
       
+      // Get current user from localStorage
+      const currentUser = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null;
+      
+      if (!currentUser || !currentUser.id) {
+        throw new Error("You must be logged in to add team members");
+      }
+      
+      // Pass in the current user from localStorage to determine if they're an admin
       const { data, error } = await supabase.rpc('add_team_member', {
         member_first_name: formData.firstName,
         member_last_name: formData.lastName,
         member_email: formData.email,
         member_role: formData.role,
         member_password: formData.password
+      }, {
+        headers: {
+          'x-user-id': currentUser.id
+        }
       });
       
       if (error) {
