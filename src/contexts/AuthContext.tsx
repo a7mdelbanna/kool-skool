@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -95,7 +96,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       const license = licenses[0];
       
-      if (license.used_by && license.used_by !== supabase.auth.getUser()) {
+      // Get current user, if any
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user?.id;
+      
+      if (license.used_by && license.used_by !== currentUser) {
         console.error("License validation failed: License already in use");
         return { 
           valid: false, 
