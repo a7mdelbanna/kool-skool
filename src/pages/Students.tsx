@@ -218,9 +218,6 @@ const Students = () => {
         return;
       }
       
-      const { data: authData } = await supabase.auth.getSession();
-      console.log("Current auth session:", authData);
-      
       const { data, error } = await createCourse(
         user.schoolId,
         newCourseName.trim(),
@@ -229,6 +226,15 @@ const Students = () => {
       
       if (error) {
         console.error("Error creating course:", error);
+        
+        // Check if it's an authentication error
+        if (error.message?.includes("Authentication required")) {
+          toast.error("Your session has expired. Please log in again.");
+          // Optionally redirect to login page
+          // window.location.href = "/login";
+          return;
+        }
+        
         toast.error(error.message || "Failed to create course");
         return;
       }

@@ -193,20 +193,33 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
   console.log("Creating course with:", { schoolId, name, lessonType });
   
   try {
-    // Set auth context for this request using the current session
+    // First, try to use JWT auth by getting a token from localStorage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const { id: userId, token } = JSON.parse(storedUser);
+      if (token) {
+        // Set the auth header for this request
+        await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        });
+      }
+    }
+    
+    // Verify we have an active session
     const { data: sessionData } = await supabase.auth.getSession();
     
     if (!sessionData.session) {
       console.error("No active session found when creating course");
-      // Try with the stored user ID to set auth context
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const { id: userId } = JSON.parse(storedUser);
-        // Set auth context to the user ID from localStorage
-        await supabase.auth.updateUser({ data: { id: userId } });
-      }
+      
+      // If using RLS, let the user know authentication is required
+      return { 
+        data: null, 
+        error: new Error("Authentication required. Please sign in again.") 
+      };
     }
     
+    // Now attempt to create the course
     const { data, error } = await supabase
       .from('courses')
       .insert([
