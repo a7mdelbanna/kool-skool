@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -228,7 +227,15 @@ export const useStudentForm = (
         console.log("Student created successfully:", data);
         toast.success("Student added successfully");
         
-        if (onStudentAdded && data && data.student_id) {
+        if (onStudentAdded && data && data.success) {
+          if (!data.student_id) {
+            console.error("No student_id in response:", data);
+            toast.error("Created student but couldn't retrieve student ID");
+            setSaving(false);
+            if (onClose) onClose();
+            return;
+          }
+          
           const newStudent: Student = {
             id: data.student_id,
             firstName: studentData.firstName as string,
