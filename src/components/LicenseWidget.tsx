@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Clock } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 
 interface LicenseDetails {
   id: string;
@@ -85,12 +86,32 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
 };
 
 const LicenseWidget: React.FC = () => {
+  const location = useLocation();
+  const isSchoolSetupPage = location.pathname === '/school-setup';
+  
+  // Only run the query if we're not on the school setup page
   const { data: licenseDetails, isLoading, error, refetch } = useQuery({
     queryKey: ['licenseDetails'],
     queryFn: fetchLicenseDetails,
-    enabled: !!localStorage.getItem('user'), // Only run when user is authenticated
+    enabled: !isSchoolSetupPage && !!localStorage.getItem('user'), // Don't run on setup page
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Show a different version of the widget on the school setup page
+  if (isSchoolSetupPage) {
+    return (
+      <div className="bg-gray-50 p-6 rounded-lg">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">License Status</h2>
+          <Clock className="h-5 w-5 text-gray-400" />
+        </div>
+        <p className="text-sm text-gray-500">Enter your license key to activate your subscription.</p>
+        <div className="mt-3 text-sm text-blue-600">
+          Your license provides access to all features based on your subscription plan.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
