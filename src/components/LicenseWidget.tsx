@@ -90,7 +90,7 @@ const LicenseWidget: React.FC = () => {
   }, [toast, navigate]);
 
   const handleSchoolSetup = () => {
-    navigate('/license-verification');
+    navigate('/school-setup');
   }
 
   return (
@@ -117,7 +117,7 @@ const LicenseWidget: React.FC = () => {
             onClick={handleSchoolSetup} 
             className="w-full"
           >
-            Verify License & Setup School
+            Complete School Setup
           </Button>
         </div>
       ) : licenseDetails ? (

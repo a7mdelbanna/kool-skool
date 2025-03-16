@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, LogIn, UserPlus, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -29,6 +29,8 @@ const signupSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  licenseNumber: z.string().min(1, { message: 'License number is required' }),
+  schoolName: z.string().min(1, { message: 'School name is required' }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -41,6 +43,8 @@ const Auth = () => {
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [verifyingLicense, setVerifyingLicense] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -58,6 +62,8 @@ const Auth = () => {
       email: '',
       password: '',
       confirmPassword: '',
+      licenseNumber: '',
+      schoolName: '',
     },
   });
 
@@ -109,23 +115,93 @@ const Auth = () => {
     }
   };
 
+  const verifyLicense = async () => {
+    const licenseNumber = signupForm.getValues('licenseNumber');
+    if (!licenseNumber) {
+      signupForm.setError('licenseNumber', {
+        type: 'manual',
+        message: 'Please enter a license number',
+      });
+      return;
+    }
+
+    try {
+      setVerifyingLicense(true);
+      
+      // Verify license exists and is valid
+      const { data: licenseData, error: licenseError } = await supabase
+        .rpc('verify_license', { license_number_param: licenseNumber });
+      
+      if (licenseError) throw licenseError;
+      
+      if (!licenseData || licenseData.length === 0) {
+        throw new Error('Invalid license number or license has expired');
+      }
+      
+      setLicenseVerified(true);
+      toast({
+        title: 'License verified',
+        description: 'License is valid. You can proceed with creating your account.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'License verification failed',
+        description: error.message || 'Invalid license number',
+        variant: 'destructive',
+      });
+      setLicenseVerified(false);
+    } finally {
+      setVerifyingLicense(false);
+    }
+  };
+
   const onSignupSubmit = async (data: SignupFormValues) => {
+    if (!licenseVerified) {
+      toast({
+        title: 'License not verified',
+        description: 'Please verify your license before creating an account',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      // 1. Create user account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
       });
 
-      if (error) throw error;
-
-      toast({
-        title: 'Account created',
-        description: 'Please check your email for the confirmation link',
-      });
+      if (authError) throw authError;
       
-      // Switch to login tab after successful signup
-      setTab('login');
+      if (authData.user) {
+        // 2. Associate license and create school
+        const { data: licenseData, error: licenseError } = await supabase
+          .rpc('verify_license', { license_number_param: data.licenseNumber });
+        
+        if (licenseError) throw licenseError;
+        
+        if (!licenseData || licenseData.length === 0) {
+          throw new Error('License validation failed');
+        }
+        
+        // 3. Create school and associate with user
+        const { data: schoolData, error: schoolError } = await supabase
+          .rpc('create_school_and_associate_director', {
+            license_id_param: licenseData[0].license_id,
+            school_name_param: data.schoolName
+          });
+        
+        if (schoolError) throw schoolError;
+        
+        toast({
+          title: 'Account created',
+          description: 'Your account has been created and associated with your school.',
+        });
+        
+        // No need to navigate as the auth state change will handle it
+      }
     } catch (error: any) {
       toast({
         title: 'Signup failed',
@@ -137,6 +213,10 @@ const Auth = () => {
     }
   };
 
+  const handleLicenseChange = () => {
+    setLicenseVerified(false);
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
       <div className="w-full max-w-md">
@@ -144,7 +224,7 @@ const Auth = () => {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">School CRM</CardTitle>
             <CardDescription className="text-center">
-              Login or create an account to manage your school
+              {tab === 'login' ? 'Login to manage your school' : 'Create your school account'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -220,68 +300,136 @@ const Auth = () => {
               <TabsContent value="signup">
                 <Form {...signupForm}>
                   <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
-                    <FormField
-                      control={signupForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="your.email@example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="p-4 border rounded-lg mb-4 bg-gray-50">
+                      <h3 className="font-medium mb-2 flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-primary" />
+                        License Verification
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        <FormField
+                          control={signupForm.control}
+                          name="licenseNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>License Number</FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    placeholder="Enter your license number" 
+                                    {...field} 
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      handleLicenseChange();
+                                    }}
+                                    disabled={licenseVerified}
+                                    className={licenseVerified ? "bg-green-50 border-green-200" : ""}
+                                  />
+                                  <Button 
+                                    type="button" 
+                                    onClick={verifyLicense} 
+                                    disabled={verifyingLicense || licenseVerified}
+                                    size="sm"
+                                  >
+                                    {verifyingLicense ? (
+                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                                    ) : licenseVerified ? "Verified" : "Verify"}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        {licenseVerified && (
+                          <FormField
+                            control={signupForm.control}
+                            name="schoolName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>School Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter your school name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </div>
+                    </div>
                     
-                    <FormField
-                      control={signupForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Input 
-                                type={showPassword ? "text" : "password"} 
-                                placeholder="Password" 
-                                {...field} 
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-0 top-0 h-full px-3"
-                                onClick={() => setShowPassword(!showPassword)}
-                              >
-                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                              </Button>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {licenseVerified && (
+                      <>
+                        <FormField
+                          control={signupForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input placeholder="your.email@example.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={signupForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input 
+                                    type={showPassword ? "text" : "password"} 
+                                    placeholder="Password" 
+                                    {...field} 
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                  >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={signupForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm Password</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type={showPassword ? "text" : "password"} 
+                                  placeholder="Confirm password" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
                     
-                    <FormField
-                      control={signupForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm Password</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type={showPassword ? "text" : "password"} 
-                              placeholder="Confirm password" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button type="submit" className="w-full" disabled={loading}>
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={loading || !licenseVerified}
+                    >
                       {loading ? (
                         <div className="flex items-center gap-2">
                           <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
