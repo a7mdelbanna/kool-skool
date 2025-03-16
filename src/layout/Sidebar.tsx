@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -26,10 +26,29 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export function Sidebar() {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success("Logged out successfully");
+      navigate("/auth");
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred during sign out");
+    }
+  };
+
+  const userInitials = user?.email
+    ? user.email.charAt(0).toUpperCase()
+    : "TP";
+
   return (
     <SidebarComponent className="hidden lg:flex">
       <SidebarHeader className="p-4">
@@ -177,14 +196,19 @@ export function Sidebar() {
           <div className="flex items-center justify-between p-2 rounded-md border">
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
-                <AvatarFallback>TP</AvatarFallback>
+                <AvatarImage src={user?.user_metadata?.profile_picture || ""} />
+                <AvatarFallback>{userInitials}</AvatarFallback>
               </Avatar>
               <div className="text-sm">
-                <div className="font-medium">Tutor Name</div>
-                <div className="text-xs text-muted-foreground">tutor@example.com</div>
+                <div className="font-medium">
+                  {user?.user_metadata?.first_name 
+                    ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
+                    : "Tutor Name"}
+                </div>
+                <div className="text-xs text-muted-foreground">{user?.email || "tutor@example.com"}</div>
               </div>
             </div>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
