@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -963,3 +964,252 @@ const SchoolSetup = () => {
                     <span className="sr-only">Remove</span>
                   </Button>
                 </div>
+              ))}
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleAddLevel}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Level
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <h3 className="font-medium">Courses</h3>
+              </div>
+              
+              {courses.map(course => (
+                <div key={course.id} className="flex items-center gap-2">
+                  <Input 
+                    value={course.name}
+                    onChange={(e) => handleCourseChange(course.id, e.target.value)}
+                    placeholder="Course name (e.g., English, Math, Science)" 
+                  />
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleRemoveCourse(course.id)}
+                    disabled={courses.length <= 1}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove</span>
+                  </Button>
+                </div>
+              ))}
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleAddCourse}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Course
+              </Button>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+        
+        <Collapsible 
+          open={openSections.finance} 
+          onOpenChange={() => toggleSection('finance')}
+          className="border rounded-lg overflow-hidden"
+        >
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-medium">Finance</h2>
+              </div>
+              {openSections.finance ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="p-4 space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <h3 className="font-medium">Bank Accounts</h3>
+              </div>
+              
+              {accounts.map(account => (
+                <div key={account.id} className="grid grid-cols-3 gap-2 items-center">
+                  <Input 
+                    value={account.name}
+                    onChange={(e) => handleAccountChange(account.id, 'name', e.target.value)}
+                    placeholder="Account name (e.g., Main Account, Cash)" 
+                  />
+                  <Input 
+                    value={account.currency}
+                    onChange={(e) => handleAccountChange(account.id, 'currency', e.target.value)}
+                    placeholder="Currency (e.g., USD, EUR)" 
+                  />
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleRemoveAccount(account.id)}
+                    disabled={accounts.length <= 1}
+                    className="text-destructive justify-self-end"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove</span>
+                  </Button>
+                </div>
+              ))}
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleAddAccount}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Account
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                <h3 className="font-medium">Expense Categories</h3>
+              </div>
+              
+              {expenseCategories.map(category => (
+                <div key={category.id} className="flex items-center gap-2">
+                  <Input 
+                    value={category.name}
+                    onChange={(e) => handleExpenseCategoryChange(category.id, e.target.value)}
+                    placeholder="Category name (e.g., Rent, Utilities, Salaries)" 
+                  />
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleRemoveExpenseCategory(category.id)}
+                    disabled={expenseCategories.length <= 1}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove</span>
+                  </Button>
+                </div>
+              ))}
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleAddExpenseCategory}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Category
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Repeat className="h-5 w-5 text-primary" />
+                <h3 className="font-medium">Recurring Expenses</h3>
+              </div>
+              
+              {recurringExpenses.map(expense => (
+                <div key={expense.id} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-4">
+                    <Input 
+                      value={expense.name}
+                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'name', e.target.value)}
+                      placeholder="Expense name" 
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <select
+                      value={expense.categoryId}
+                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'categoryId', e.target.value)}
+                      className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
+                    >
+                      <option value="">Select Category</option>
+                      {expenseCategories.map(category => (
+                        <option key={category.id} value={category.id}>
+                          {category.name || `Category ${category.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <select
+                      value={expense.frequency}
+                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'frequency', e.target.value)}
+                      className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <Input 
+                      type="number"
+                      value={expense.amount}
+                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'amount', parseFloat(e.target.value))}
+                      placeholder="Amount" 
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => handleRemoveRecurringExpense(expense.id)}
+                      disabled={recurringExpenses.length <= 1}
+                      className="text-destructive justify-self-end"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Remove</span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleAddRecurringExpense}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Recurring Expense
+              </Button>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+        
+        <div className="flex justify-end">
+          <Button type="submit" disabled={saving}>
+            {saving ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Saving...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Save Settings</span>
+              </div>
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default SchoolSetup;
