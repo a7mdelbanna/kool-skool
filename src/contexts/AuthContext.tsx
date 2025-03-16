@@ -11,7 +11,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (licenseNumber: string) => Promise<{valid: boolean; message: string; licenseId: string | null}>;
-  completeSignUp: (email: string, password: string, userData: any) => Promise<void>;
+  completeSignUp: (email: string, password: string, userData: any) => Promise<{success: boolean; message: string}>;
   signOut: () => Promise<void>;
 };
 
@@ -113,9 +113,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const completeSignUp = async (email: string, password: string, userData: any) => {
+  const completeSignUp = async (email: string, password: string, userData: any): Promise<{success: boolean; message: string}> => {
     try {
       setIsLoading(true);
+      
+      if (!userData.licenseId) {
+        console.error("Missing license ID during account creation");
+        return { success: false, message: "Missing license ID" };
+      }
+      
+      console.log("Creating account with license:", userData.licenseId);
       
       // Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -131,15 +138,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (authError) {
-        toast.error(authError.message);
-        return;
+        console.error("Auth signup error:", authError);
+        return { success: false, message: authError.message };
       }
 
       if (!authData.user) {
-        toast.error("Failed to create user account");
-        return;
+        console.error("No user data returned from signup");
+        return { success: false, message: "Failed to create user account" };
       }
 
+      // Get the license record to associate with the school
+      const { data: licenseData, error: licenseError } = await supabase
+        .from('licenses')
+        .select('*')
+        .eq('id', userData.licenseId)
+        .single();
+        
+      if (licenseError) {
+        console.error("Error fetching license data:", licenseError);
+        return { success: false, message: licenseError.message };
+      }
+      
       // Create school entry
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
@@ -157,8 +176,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
 
       if (schoolError) {
-        toast.error(schoolError.message);
-        return;
+        console.error("School creation error:", schoolError);
+        return { success: false, message: schoolError.message };
       }
 
       // Create profile entry
@@ -169,7 +188,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           email: email,
           first_name: userData.firstName,
           last_name: userData.lastName,
-          role: userData.role,
+          role: "admin", // Default role for new users
           phone: userData.phone,
           whatsapp: userData.whatsapp,
           telegram: userData.telegram,
@@ -179,8 +198,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
       if (profileError) {
-        toast.error(profileError.message);
-        return;
+        console.error("Profile creation error:", profileError);
+        return { success: false, message: profileError.message };
+      }
+
+      // Update license with school info if not already set
+      if (!licenseData.school_name) {
+        const { error: updateLicenseError } = await supabase
+          .from('licenses')
+          .update({ 
+            school_name: userData.schoolName || "My School",
+            used_by: authData.user.id
+          })
+          .eq('id', userData.licenseId);
+          
+        if (updateLicenseError) {
+          console.error("License update error:", updateLicenseError);
+          // Non-critical error, continue anyway
+        }
       }
 
       // Process team members if provided
@@ -193,10 +228,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         toast.success(`${userData.teamMembers.length} team members will be invited`);
       }
 
-      toast.success("Account created successfully!");
-      navigate("/");
+      console.log("Account created successfully");
+      return { success: true, message: "Account created successfully!" };
     } catch (error: any) {
-      toast.error(error.message || "An error occurred during signup");
+      console.error("Complete signup error:", error);
+      return { success: false, message: error.message || "An error occurred during signup" };
     } finally {
       setIsLoading(false);
     }

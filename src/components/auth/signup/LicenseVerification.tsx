@@ -41,7 +41,7 @@ const LicenseVerification: React.FC = () => {
       
       if (result.valid && result.licenseId) {
         toast.success(result.message || "License validated successfully");
-        // Use direct navigation to the account creation page with licenseId as URL parameter
+        // Navigate to the account creation page with licenseId in URL
         navigate(`/auth/create-account/${result.licenseId}`);
       } else {
         toast.error(result.message || "License verification failed");

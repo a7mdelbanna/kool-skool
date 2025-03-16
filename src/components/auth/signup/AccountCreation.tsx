@@ -33,8 +33,11 @@ const AccountCreation: React.FC = () => {
   // Redirect to auth page if no licenseId is provided
   useEffect(() => {
     if (!licenseId) {
+      console.error("No license ID provided in URL params");
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
+    } else {
+      console.log("License ID from URL:", licenseId);
     }
   }, [licenseId, navigate]);
   
@@ -49,6 +52,7 @@ const AccountCreation: React.FC = () => {
 
   const handleSubmit = async (data: AccountFormValues) => {
     if (!licenseId) {
+      console.error("Missing license ID during account creation");
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
       return;
@@ -66,11 +70,17 @@ const AccountCreation: React.FC = () => {
         schoolName: "New School",
       };
 
-      await completeSignUp(data.email, data.password, userData);
-      toast.success("Account created successfully!");
+      // Call the completeSignUp function with the form data and license info
+      const result = await completeSignUp(data.email, data.password, userData);
       
-      // Redirect to the onboarding flow instead of dashboard
-      navigate("/onboarding");
+      if (result && result.success) {
+        toast.success("Account created successfully!");
+        // Redirect to the onboarding flow
+        navigate("/onboarding");
+      } else {
+        const errorMessage = result?.message || "Failed to create account";
+        toast.error(errorMessage);
+      }
     } catch (error: any) {
       console.error("Account creation error:", error);
       toast.error(error.message || "An error occurred during account creation");
