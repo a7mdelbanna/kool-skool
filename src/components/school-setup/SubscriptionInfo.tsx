@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -296,7 +297,7 @@ const SubscriptionInfo = () => {
       }
 
       const { error } = await supabase.rpc(
-        'create_school_and_update_profile',
+        'create_school_and_update_profile' as any,
         {
           school_name: data.name,
           license_number: data.license_number
