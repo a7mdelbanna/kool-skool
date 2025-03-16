@@ -11,7 +11,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (licenseNumber: string) => Promise<{valid: boolean; message: string; licenseId: string | null}>;
-  completeSignUp: (email: string, password: string, userData: any) => Promise<{success: boolean; message: string}>;
+  completeSignUp: (email: string, password: string, userData: any) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -113,18 +113,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const completeSignUp = async (email: string, password: string, userData: any): Promise<{success: boolean; message: string}> => {
+  const completeSignUp = async (email: string, password: string, userData: any) => {
     try {
       setIsLoading(true);
+      console.log("Starting account creation with data:", { email, userData });
       
-      if (!userData.licenseId) {
-        console.error("Missing license ID during account creation");
-        return { success: false, message: "Missing license ID" };
-      }
-      
-      console.log("Creating account with license:", userData.licenseId);
-      
-      // Create user account
+      // 1. Create user account with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -133,106 +127,77 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             license_id: userData.licenseId,
             first_name: userData.firstName,
             last_name: userData.lastName,
+            role: userData.role || "admin"
           }
         }
       });
 
       if (authError) {
-        console.error("Auth signup error:", authError);
-        return { success: false, message: authError.message };
+        console.error("Auth error:", authError);
+        toast.error(authError.message);
+        return;
       }
 
       if (!authData.user) {
-        console.error("No user data returned from signup");
-        return { success: false, message: "Failed to create user account" };
-      }
-
-      // Get the license record to associate with the school
-      const { data: licenseData, error: licenseError } = await supabase
-        .from('licenses')
-        .select('*')
-        .eq('id', userData.licenseId)
-        .single();
-        
-      if (licenseError) {
-        console.error("Error fetching license data:", licenseError);
-        return { success: false, message: licenseError.message };
+        console.error("No user data returned");
+        toast.error("Failed to create user account");
+        return;
       }
       
-      // Create school entry
-      const { data: schoolData, error: schoolError } = await supabase
-        .from('schools')
-        .insert({
-          name: userData.schoolName || "My School",
-          license_id: userData.licenseId,
-          created_by: authData.user.id,
-          logo: userData.schoolLogo,
-          phone: userData.schoolPhone,
-          telegram: userData.schoolTelegram,
-          whatsapp: userData.schoolWhatsapp,
-          instagram: userData.schoolInstagram
-        })
-        .select('id')
-        .single();
-
-      if (schoolError) {
-        console.error("School creation error:", schoolError);
-        return { success: false, message: schoolError.message };
+      console.log("User created successfully:", authData.user.id);
+      
+      // 2. Create school using the RPC procedure
+      try {
+        console.log("Creating school with name:", userData.schoolName, "license:", userData.licenseId);
+        const { error: schoolError } = await supabase.rpc(
+          'create_school_and_update_profile',
+          {
+            school_name: userData.schoolName,
+            license_number: userData.licenseNumber
+          }
+        );
+        
+        if (schoolError) {
+          console.error("School creation error:", schoolError);
+          throw schoolError;
+        }
+        
+        console.log("School created successfully");
+      } catch (error: any) {
+        console.error("Error in create_school_and_update_profile:", error);
+        toast.error(`Failed to set up school: ${error.message}`);
+        // Continue anyway since we've already created the user account
       }
 
-      // Create profile entry
+      // 3. Create or update profile
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           id: authData.user.id,
           email: email,
           first_name: userData.firstName,
           last_name: userData.lastName,
-          role: "admin", // Default role for new users
-          phone: userData.phone,
-          whatsapp: userData.whatsapp,
-          telegram: userData.telegram,
-          instagram: userData.instagram,
-          profile_picture: userData.profilePicture,
-          school_id: schoolData.id
+          role: userData.role || "admin",
+          phone: userData.phone || null,
+          whatsapp: userData.whatsapp || null,
+          telegram: userData.telegram || null,
+          instagram: userData.instagram || null,
+          profile_picture: userData.profilePicture || null
         });
 
       if (profileError) {
-        console.error("Profile creation error:", profileError);
-        return { success: false, message: profileError.message };
+        console.error("Error updating profile:", profileError);
+        toast.error(`Profile error: ${profileError.message}`);
+        // Continue anyway, we'll handle this in onboarding
       }
 
-      // Update license with school info if not already set
-      if (!licenseData.school_name) {
-        const { error: updateLicenseError } = await supabase
-          .from('licenses')
-          .update({ 
-            school_name: userData.schoolName || "My School",
-            used_by: authData.user.id
-          })
-          .eq('id', userData.licenseId);
-          
-        if (updateLicenseError) {
-          console.error("License update error:", updateLicenseError);
-          // Non-critical error, continue anyway
-        }
-      }
-
-      // Process team members if provided
-      if (userData.teamMembers && userData.teamMembers.length > 0) {
-        // In a real app, you would create invitations for team members
-        // This would typically involve sending emails with signup links
-        console.log("Team members to invite:", userData.teamMembers);
-        
-        // For now, just log the information
-        toast.success(`${userData.teamMembers.length} team members will be invited`);
-      }
-
-      console.log("Account created successfully");
-      return { success: true, message: "Account created successfully!" };
+      toast.success("Account created successfully!");
+      
+      // No need to navigate here as the component will handle it
     } catch (error: any) {
-      console.error("Complete signup error:", error);
-      return { success: false, message: error.message || "An error occurred during signup" };
+      console.error("Signup error:", error);
+      toast.error(error.message || "An error occurred during signup");
+      throw error; // Re-throw to let calling component handle it
     } finally {
       setIsLoading(false);
     }
