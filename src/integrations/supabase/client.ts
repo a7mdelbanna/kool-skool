@@ -147,8 +147,9 @@ export const fetchUserSchoolInfo = async () => {
       throw error;
     }
     
-    // Ensure data is returned as an array
-    const dataArray = safeArray(data);
+    // Ensure data is returned as an array and add debugging
+    console.log("School info data:", data);
+    const dataArray = Array.isArray(data) ? data : data ? [data] : [];
     
     return dataArray;
   } catch (err) {
@@ -173,7 +174,7 @@ export const fetchLicenseDetails = async (licenseId: string) => {
   return dataArray;
 };
 
-// Helper function to fetch team members - updated to explicitly specify relationship
+// Helper function to fetch team members - fixed to explicitly specify the foreign key relationship
 export const fetchTeamMembers = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   
@@ -193,18 +194,28 @@ export const fetchTeamMembers = async () => {
     throw profileError;
   }
   
-  const schoolId = safeGet(profileData, 'school_id');
+  const schoolId = profileData?.school_id;
   
   if (!schoolId) {
     throw new Error('User is not associated with any school');
   }
   
-  // Fixed the relationship specification here
+  // Explicitly specify the relationship column in the select query
+  console.log("Fetching team members for school ID:", schoolId);
   const { data, error } = await supabase
     .from('team_members')
     .select(`
-      *,
-      profiles:profile_id (
+      id,
+      email,
+      role,
+      profile_id,
+      invitation_accepted,
+      invitation_sent,
+      invited_by,
+      school_id,
+      created_at,
+      updated_at,
+      profiles:profile_id(
         first_name,
         last_name,
         email,
@@ -219,5 +230,6 @@ export const fetchTeamMembers = async () => {
     throw error;
   }
   
-  return data;
+  console.log("Team members data:", data);
+  return data || [];
 };

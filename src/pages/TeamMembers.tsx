@@ -153,11 +153,20 @@ const TeamMembers = () => {
         return;
       }
       
-      // Fix: Explicitly specify the relationship column using the profile_id
+      // Fix the relationship by explicitly specifying the foreign key column
       const { data, error } = await supabase
         .from('team_members')
         .select(`
-          *,
+          id,
+          email,
+          role,
+          profile_id,
+          invitation_accepted,
+          invitation_sent,
+          invited_by,
+          school_id,
+          created_at,
+          updated_at,
           profiles:profile_id(
             first_name,
             last_name,
@@ -176,10 +185,10 @@ const TeamMembers = () => {
       console.log("Raw team member data:", data);
       
       // Process the data to handle potential null values and ensure type compatibility
-      const typedData: TeamMemberData[] = data?.map(member => ({
+      const typedData: TeamMemberData[] = (data || []).map(member => ({
         ...member,
         profiles: member.profiles || null
-      })) || [];
+      }));
       
       setTeamMembers(typedData);
     } catch (error: any) {
