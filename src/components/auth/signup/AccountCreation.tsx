@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,12 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-// License data type
-interface LicenseData {
-  licenseId: string;
-  licenseNumber: string;
-}
+import { LicenseData } from "./LicenseVerification";
 
 // Account details schema
 const accountSchema = z.object({
@@ -33,7 +29,7 @@ const accountSchema = z.object({
 type AccountFormValues = z.infer<typeof accountSchema>;
 
 // Define props interface for AccountCreation
-interface AccountCreationProps {
+export interface AccountCreationProps {
   licenseData: LicenseData;
 }
 
@@ -44,6 +40,7 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
   
   // Redirect if no license data is available
   useEffect(() => {
+    console.log("AccountCreation loaded with licenseData:", licenseData);
     if (!licenseData?.licenseId) {
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");

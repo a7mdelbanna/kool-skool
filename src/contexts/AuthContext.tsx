@@ -149,7 +149,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // 2. Create school using the RPC procedure
       try {
         console.log("Creating school with name:", userData.schoolName, "license:", userData.licenseNumber);
-        // Use the overridden rpc method that accepts any string
+        
+        // Use the RPC method with type assertion
         const { error: schoolError } = await supabase.rpc(
           'create_school_and_update_profile' as any,
           {

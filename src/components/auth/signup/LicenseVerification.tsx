@@ -6,10 +6,11 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Key } from "lucide-react";
 import AccountCreation from "./AccountCreation";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 // License verification form schema
 const licenseSchema = z.object({
@@ -18,14 +19,17 @@ const licenseSchema = z.object({
 
 type LicenseFormValues = z.infer<typeof licenseSchema>;
 
+// Define the license data interface
+export interface LicenseData {
+  licenseId: string;
+  licenseNumber: string;
+}
+
 const LicenseVerification = () => {
   const { signUp } = useAuth();
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
-  const [licenseData, setLicenseData] = useState<{
-    licenseId: string;
-    licenseNumber: string;
-  } | null>(null);
+  const [licenseData, setLicenseData] = useState<LicenseData | null>(null);
 
   const form = useForm<LicenseFormValues>({
     resolver: zodResolver(licenseSchema),
@@ -39,23 +43,37 @@ const LicenseVerification = () => {
       setIsVerifying(true);
       
       // Call the license verification function
+      console.log("Submitting license:", values.licenseNumber);
       const result = await signUp(values.licenseNumber);
+      console.log("License verification result:", result);
       
       if (result.valid) {
-        setIsVerified(true);
-        setLicenseData({
+        // Create the license data object
+        const newLicenseData: LicenseData = {
           licenseId: result.licenseId || "",
-          licenseNumber: values.licenseNumber // Store the license number for later use
-        });
+          licenseNumber: values.licenseNumber
+        };
+        
+        // Store the license data
+        setLicenseData(newLicenseData);
+        setIsVerified(true);
+        
+        toast.success("License verified successfully");
+        console.log("License verified, data set:", newLicenseData);
+      } else {
+        toast.error(result.message || "License verification failed");
       }
     } catch (error) {
       console.error("License verification error:", error);
+      toast.error("An error occurred during verification");
     } finally {
       setIsVerifying(false);
     }
   };
 
+  // Render the account creation component if verified
   if (isVerified && licenseData) {
+    console.log("Rendering AccountCreation with data:", licenseData);
     return <AccountCreation licenseData={licenseData} />;
   }
 
