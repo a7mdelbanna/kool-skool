@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, Loader2, School, RefreshCw } from "lucide-react";
@@ -147,20 +146,21 @@ const SchoolSetup = () => {
         return;
       }
       
-      if (!licenseResult || !Array.isArray(licenseResult) || licenseResult.length === 0 || 
-          !(licenseResult[0] as LicenseVerificationResult).valid) {
-        const errorMessage = licenseResult && 
-                            Array.isArray(licenseResult) && 
-                            licenseResult.length > 0 ? 
-                            (licenseResult[0] as LicenseVerificationResult).message : 
-                            "Please check your license number";
-        
-        console.error("Invalid license:", errorMessage);
-        toast.error(`Invalid license: ${errorMessage}`);
+      if (!licenseResult || !Array.isArray(licenseResult) || licenseResult.length === 0) {
+        toast.error("Invalid license. Please check your license number.");
         return;
       }
       
-      const licenseId = (licenseResult[0] as LicenseVerificationResult).license_id;
+      // Type assertion for the license result
+      const licenseVerification = licenseResult[0] as unknown as LicenseVerificationResult;
+      
+      if (!licenseVerification.valid) {
+        console.error("Invalid license:", licenseVerification.message);
+        toast.error(`Invalid license: ${licenseVerification.message}`);
+        return;
+      }
+      
+      const licenseId = licenseVerification.license_id;
       
       // Create or update the school with the verified license
       const { data: schoolId, error: schoolError } = await supabase

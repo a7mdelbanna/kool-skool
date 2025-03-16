@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -88,7 +87,8 @@ const SubscriptionInfo = () => {
         return;
       }
       
-      const schoolInfo = schoolData[0] as SchoolData;
+      // Type assertion to ensure SchoolData type
+      const schoolInfo = schoolData[0] as unknown as SchoolData;
       
       if (!schoolInfo.license_id) {
         console.log("No license information found for this school");
@@ -110,7 +110,8 @@ const SubscriptionInfo = () => {
         console.log("License information not found");
         setLicenseInfo(null);
       } else {
-        const license = licenseData[0] as LicenseInfo;
+        // Use type assertion to ensure LicenseInfo type
+        const license = licenseData[0] as unknown as LicenseInfo;
         
         // Calculate status
         let status = "inactive";
@@ -189,7 +190,7 @@ const SubscriptionInfo = () => {
           <CardDescription>Your current license information</CardDescription>
         </CardHeader>
         <CardContent>
-          <Alert className="bg-amber-50 text-amber-800 border-amber-200">
+          <Alert variant="default" className="bg-amber-50 text-amber-800 border-amber-200">
             <Info className="h-4 w-4" />
             <AlertTitle>No License Found</AlertTitle>
             <AlertDescription>

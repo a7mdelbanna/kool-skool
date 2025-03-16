@@ -15,6 +15,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Override rpc method to accept any function name
 // This will allow calling any RPC function without TypeScript errors
 const originalRpc = supabase.rpc;
-supabase.rpc = ((...args: any[]) => {
-  return originalRpc(...args);
+
+// Use type assertion to make TypeScript happy
+supabase.rpc = ((functionName: string, ...args: any[]) => {
+  return originalRpc(functionName as any, ...(args as any[]));
 }) as typeof supabase.rpc;
