@@ -11,9 +11,9 @@ import DashboardStats from '@/components/DashboardStats';
 import StudentCard, { Student } from '@/components/StudentCard';
 import UpcomingLessons, { Lesson } from '@/components/UpcomingLessons';
 import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
-import PaymentProvider from '@/components/PaymentProvider';
 import AddStudentDialog from '@/components/AddStudentDialog';
-import { toast } from 'react-toastify';
+import { toast } from '@/components/ui/use-toast';
+import { PaymentProvider } from '@/contexts/PaymentContext';
 
 // Sample data for demonstration
 const sampleStudents: Student[] = [
@@ -263,7 +263,10 @@ const Index = () => {
           onOpenChange={setIsAddStudentOpen}
           onStudentAdded={(student) => {
             setIsAddStudentOpen(false);
-            toast.success(`Student ${student.firstName} ${student.lastName} added successfully`);
+            toast({
+              title: "Success",
+              description: `Student ${student.firstName} ${student.lastName} added successfully`,
+            });
           }}
         />
       </PaymentProvider>
