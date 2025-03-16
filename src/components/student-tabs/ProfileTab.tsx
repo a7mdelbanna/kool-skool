@@ -113,18 +113,22 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     }
   };
 
-  // Use watch to update parent component's state without submitting the form
+  // Use debounced form watching to update parent component's state
   useEffect(() => {
     const subscription = form.watch((values) => {
-      // Only update if we have valid values to prevent partial updates
-      if (values.firstName !== undefined && values.lastName !== undefined) {
-        onFormChange(values as z.infer<typeof formSchema>);
-      }
+      // We want to update the parent component less frequently to prevent focus issues
+      const timeoutId = setTimeout(() => {
+        if (values.firstName !== undefined && values.lastName !== undefined) {
+          onFormChange(values as z.infer<typeof formSchema>);
+        }
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
     });
     
     // Cleanup subscription on component unmount
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  }, []);
 
   return (
     <Form {...form}>
