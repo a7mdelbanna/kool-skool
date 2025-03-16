@@ -30,6 +30,8 @@ const signupSchema = z.object({
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
   licenseNumber: z.string().min(1, { message: 'License number is required' }),
   schoolName: z.string().min(1, { message: 'School name is required' }),
+  firstName: z.string().min(1, { message: 'First name is required' }),
+  lastName: z.string().min(1, { message: 'Last name is required' }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -63,6 +65,8 @@ const Auth = () => {
       confirmPassword: '',
       licenseNumber: '',
       schoolName: '',
+      firstName: '',
+      lastName: '',
     },
   });
 
@@ -127,7 +131,6 @@ const Auth = () => {
     try {
       setVerifyingLicense(true);
       
-      // Verify license exists and is valid
       const { data: licenseData, error: licenseError } = await supabase
         .rpc('verify_license', { license_number_param: licenseNumber });
       
@@ -172,10 +175,15 @@ const Auth = () => {
       setLoading(true);
       console.log('Starting signup process...');
       
-      // 1. Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
+        options: {
+          data: {
+            first_name: data.firstName,
+            last_name: data.lastName
+          }
+        }
       });
 
       if (authError) {
@@ -186,7 +194,6 @@ const Auth = () => {
       console.log('User account created successfully:', authData.user?.id);
       
       if (authData.user) {
-        // 2. Associate license and create school
         const { data: licenseData, error: licenseError } = await supabase
           .rpc('verify_license', { license_number_param: data.licenseNumber });
         
@@ -202,7 +209,6 @@ const Auth = () => {
         
         console.log('License verified successfully:', licenseData[0].license_id);
         
-        // 3. Create school and associate with user
         const { data: schoolData, error: schoolError } = await supabase
           .rpc('create_school_and_associate_director', {
             license_id_param: licenseData[0].license_id,
@@ -216,12 +222,24 @@ const Auth = () => {
         
         console.log('School created successfully with ID:', schoolData);
         
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .update({
+            first_name: data.firstName,
+            last_name: data.lastName
+          })
+          .eq('id', authData.user.id);
+          
+        if (profileUpdateError) {
+          console.error("Profile update error:", profileUpdateError);
+        }
+        
         toast({
           title: 'Account created',
           description: 'Your account has been created and associated with your school.',
         });
         
-        // No need to navigate as the auth state change will handle it
+        navigate('/');
       }
     } catch (error: any) {
       console.error("Signup error:", error);
@@ -384,6 +402,36 @@ const Auth = () => {
                     
                     {licenseVerified && (
                       <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={signupForm.control}
+                            name="firstName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>First Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="First name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={signupForm.control}
+                            name="lastName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Last Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Last name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
                         <FormField
                           control={signupForm.control}
                           name="email"
