@@ -153,7 +153,7 @@ const TeamMembers = () => {
         return;
       }
       
-      // Fix the query to correctly handle the relationship using explicit foreign key
+      // Fix: Explicitly specify the relationship column using the profile_id
       const { data, error } = await supabase
         .from('team_members')
         .select(`
@@ -172,6 +172,8 @@ const TeamMembers = () => {
         console.error("Error fetching team members:", error);
         throw error;
       }
+      
+      console.log("Raw team member data:", data);
       
       // Process the data to handle potential null values and ensure type compatibility
       const typedData: TeamMemberData[] = data?.map(member => ({
