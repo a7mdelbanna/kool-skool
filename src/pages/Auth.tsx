@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -132,7 +131,10 @@ const Auth = () => {
       const { data: licenseData, error: licenseError } = await supabase
         .rpc('verify_license', { license_number_param: licenseNumber });
       
-      if (licenseError) throw licenseError;
+      if (licenseError) {
+        console.error('License verification error:', licenseError);
+        throw licenseError;
+      }
       
       if (!licenseData || licenseData.length === 0) {
         throw new Error('Invalid license number or license has expired');
@@ -144,6 +146,7 @@ const Auth = () => {
         description: 'License is valid. You can proceed with creating your account.',
       });
     } catch (error: any) {
+      console.error('License verification failed:', error);
       toast({
         title: 'License verification failed',
         description: error.message || 'Invalid license number',
@@ -167,24 +170,37 @@ const Auth = () => {
 
     try {
       setLoading(true);
+      console.log('Starting signup process...');
+      
       // 1. Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        console.error('Auth error during signup:', authError);
+        throw authError;
+      }
+      
+      console.log('User account created successfully:', authData.user?.id);
       
       if (authData.user) {
         // 2. Associate license and create school
         const { data: licenseData, error: licenseError } = await supabase
           .rpc('verify_license', { license_number_param: data.licenseNumber });
         
-        if (licenseError) throw licenseError;
+        if (licenseError) {
+          console.error('License verification error during signup:', licenseError);
+          throw licenseError;
+        }
         
         if (!licenseData || licenseData.length === 0) {
+          console.error('License validation failed during signup');
           throw new Error('License validation failed');
         }
+        
+        console.log('License verified successfully:', licenseData[0].license_id);
         
         // 3. Create school and associate with user
         const { data: schoolData, error: schoolError } = await supabase
@@ -197,6 +213,8 @@ const Auth = () => {
           console.error("School creation error:", schoolError);
           throw schoolError;
         }
+        
+        console.log('School created successfully with ID:', schoolData);
         
         toast({
           title: 'Account created',
