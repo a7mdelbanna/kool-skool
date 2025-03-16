@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -110,42 +109,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Helper function to manually set auth from user data
-export const refreshSupabaseAuth = async (userId: string, schoolId?: string, role?: string) => {
-  if (!userId) return false;
-  
-  try {
-    // Set a custom session for authentication
-    await supabase.auth.setSession({
-      access_token: `${userId}_custom_token`,
-      refresh_token: ''
-    });
-    
-    // Set custom headers to pass admin info using the correct API
-    const customHeaders: Record<string, string> = { 
-      'x-user-id': userId,
-      'apikey': SUPABASE_PUBLISHABLE_KEY,
-      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
-    };
-    
-    if (schoolId) {
-      customHeaders['x-school-id'] = schoolId;
-    }
-    
-    if (role) {
-      customHeaders['x-user-role'] = role;
-    }
-    
-    // Use the correct method to set headers
-    supabase.functions.setAuth(`${userId}_custom_token`);
-    
-    return true;
-  } catch (error) {
-    console.error("Error refreshing auth:", error);
-    return false;
-  }
-};
-
 // Helper function to get students with details
 export async function getStudentsWithDetails(schoolId: string) {
   // First get the students
@@ -232,45 +195,82 @@ export async function createStudent(
       role: userData.role
     });
     
-    // Prepare request body
-    const requestBody = {
-      student_email: email,
-      student_password: password,
-      first_name: firstName,
-      last_name: lastName,
-      teacher_id: teacherId,
-      course_id: courseId,
-      age_group: ageGroup,
-      level: level,
-      phone: phone || null
-    };
-    
-    console.log("Student creation request body:", requestBody);
-    
-    // Make the request to create a student with proper authentication headers
-    const { data, error } = await supabase.functions.invoke<CreateStudentResponse>('create_student', {
-      body: JSON.stringify(requestBody), // Ensure proper stringification
+    // First, create the user account
+    const createUserResult = await supabase.functions.invoke<{
+      success: boolean;
+      message?: string;
+      user_id?: string;
+    }>('create_user', {
+      body: JSON.stringify({
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName,
+        role: 'student',
+        school_id: userData.schoolId,
+      }),
       headers: {
         'x-user-id': userData.id,
         'x-school-id': userData.schoolId,
         'x-user-role': userData.role,
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_PUBLISHABLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+        'Content-Type': 'application/json'
       }
     });
-
-    if (error) {
-      console.error("Error from createStudent function:", error);
-      return { 
-        data: { success: false, message: error.message }, 
-        error 
+    
+    if (createUserResult.error || !createUserResult.data?.success) {
+      console.error("Error creating user:", createUserResult.error || createUserResult.data?.message);
+      return {
+        data: {
+          success: false,
+          message: createUserResult.data?.message || "Failed to create user account"
+        },
+        error: createUserResult.error || null
       };
     }
-
-    console.log("Student creation response:", data);
-    // Ensure data has the correct shape for CreateStudentResponse
-    return { data: data || { success: false, message: "No data returned" }, error: null };
+    
+    const userId = createUserResult.data.user_id;
+    if (!userId) {
+      return {
+        data: { success: false, message: "User created but no user ID returned" },
+        error: null
+      };
+    }
+    
+    // Now create the student record
+    const createStudentResult = await supabase
+      .from('students')
+      .insert({
+        user_id: userId,
+        school_id: userData.schoolId,
+        teacher_id: teacherId,
+        course_id: courseId,
+        age_group: ageGroup,
+        level: level,
+        phone: phone || null
+      })
+      .select()
+      .single();
+    
+    if (createStudentResult.error) {
+      console.error("Error creating student record:", createStudentResult.error);
+      return {
+        data: { success: false, message: createStudentResult.error.message },
+        error: createStudentResult.error
+      };
+    }
+    
+    console.log("Student record created successfully:", createStudentResult.data);
+    
+    return {
+      data: {
+        success: true,
+        user_id: userId,
+        student_id: createStudentResult.data.id,
+        message: "Student created successfully"
+      },
+      error: null
+    };
+    
   } catch (error) {
     console.error("Exception in createStudent:", error);
     return { 
