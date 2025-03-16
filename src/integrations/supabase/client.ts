@@ -193,33 +193,57 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
   console.log("Creating course with:", { schoolId, name, lessonType });
   
   try {
-    // First, try to use JWT auth by getting a token from localStorage
+    // Check for stored authentication data in localStorage
     const storedUser = localStorage.getItem('user');
+    let userId = null;
+    let token = null;
+    
     if (storedUser) {
-      const { id: userId, token } = JSON.parse(storedUser);
-      if (token) {
-        // Set the auth header for this request
-        await supabase.auth.setSession({
-          access_token: token,
-          refresh_token: ''
-        });
+      try {
+        const userData = JSON.parse(storedUser);
+        userId = userData.id;
+        token = userData.token;
+        
+        if (token) {
+          console.log("Found token in localStorage, setting session");
+          // Set the auth session with the stored token
+          await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: ''
+          });
+        }
+      } catch (parseError) {
+        console.error("Error parsing user data from localStorage:", parseError);
       }
     }
     
     // Verify we have an active session
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error("Error getting session:", sessionError);
+      return { data: null, error: sessionError };
+    }
     
     if (!sessionData.session) {
       console.error("No active session found when creating course");
       
-      // If using RLS, let the user know authentication is required
+      // Try JWT auth or custom auth header approach
+      if (userId) {
+        console.log("Using userId for authorization:", userId);
+        // You could set a custom header here if your middleware supports it
+        // Or use a JWT approach if available
+      }
+      
       return { 
         data: null, 
         error: new Error("Authentication required. Please sign in again.") 
       };
     }
     
-    // Now attempt to create the course
+    console.log("Session verified, proceeding with course creation");
+    
+    // Now attempt to create the course with the authenticated session
     const { data, error } = await supabase
       .from('courses')
       .insert([
@@ -230,9 +254,10 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
 
     if (error) {
       console.error("Error creating course:", error);
+      return { data: null, error };
     }
     
-    return { data: data as Course, error };
+    return { data: data as Course, error: null };
   } catch (error) {
     console.error("Exception creating course:", error);
     return { data: null, error: error as Error };

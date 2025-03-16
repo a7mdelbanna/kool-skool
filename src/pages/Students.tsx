@@ -218,6 +218,9 @@ const Students = () => {
         return;
       }
       
+      // Log authentication state for debugging
+      console.log("Creating course with school ID:", user.schoolId);
+      
       const { data, error } = await createCourse(
         user.schoolId,
         newCourseName.trim(),
@@ -230,8 +233,13 @@ const Students = () => {
         // Check if it's an authentication error
         if (error.message?.includes("Authentication required")) {
           toast.error("Your session has expired. Please log in again.");
-          // Optionally redirect to login page
-          // window.location.href = "/login";
+          // You might want to redirect to login
+          return;
+        }
+        
+        // Handle other RLS policy violations
+        if (error.message?.includes("violates row-level security policy")) {
+          toast.error("You don't have permission to create courses for this school.");
           return;
         }
         
