@@ -5,7 +5,8 @@ import {
   createStudent, 
   getSchoolCourses, 
   getSchoolTeachers, 
-  Course
+  Course,
+  CreateStudentResponse 
 } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -217,7 +218,7 @@ export const useStudentForm = (
         
         toast.dismiss();
         
-        if (error || (data && !data.success)) {
+        if (error || !data || !data.success) {
           console.error("Error creating student:", error || (data && data.message));
           toast.error(data && data.message ? data.message : "Failed to create student");
           setSaving(false);
@@ -227,7 +228,7 @@ export const useStudentForm = (
         console.log("Student created successfully:", data);
         toast.success("Student added successfully");
         
-        if (onStudentAdded && data && data.success) {
+        if (onStudentAdded && data.success) {
           if (!data.student_id) {
             console.error("No student_id in response:", data);
             toast.error("Created student but couldn't retrieve student ID");

@@ -260,7 +260,7 @@ serve(async (req) => {
       studentId: studentData.id 
     });
     
-    // Return success response
+    // Return success response with explicit student_id field
     return new Response(
       JSON.stringify({
         success: true,

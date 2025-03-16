@@ -28,6 +28,7 @@ export interface TeamMemberResponse {
   member_id?: string;
 }
 
+// Update the CreateStudentResponse interface to ensure student_id is properly typed
 export interface CreateStudentResponse {
   success: boolean;
   message?: string;
