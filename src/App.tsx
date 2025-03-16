@@ -15,9 +15,9 @@ import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
 import TeamMembers from "./pages/TeamMembers";
-import TeamAccess from "./pages/TeamAccess";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import LicenseVerification from "./pages/LicenseVerification";
 import { PaymentProvider } from "./contexts/PaymentContext";
 
 const queryClient = new QueryClient();
@@ -132,9 +132,9 @@ const App = () => {
                 <Route path="/payments" element={<Payments />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/school-setup" element={<SchoolSetup />} />
+                <Route path="/license-verification" element={<LicenseVerification />} />
                 <Route path="/reports" element={<StatesReports />} />
                 <Route path="/team-members" element={<TeamMembers />} />
-                <Route path="/team-access" element={<TeamAccess />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />

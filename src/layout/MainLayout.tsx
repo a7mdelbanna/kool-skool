@@ -1,97 +1,76 @@
 
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import MobileNavbar from '@/components/Navbar';
 import Sidebar from './Sidebar';
-import { supabase, fetchUserSchoolInfo } from '@/integrations/supabase/client';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 const MainLayout = () => {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [schoolInfo, setSchoolInfo] = useState<any>(null);
-
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+  
   useEffect(() => {
-    const checkSchoolAssociation = async () => {
+    const checkAuth = async () => {
       try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (!user) {
+        if (!session) {
           navigate('/auth');
           return;
         }
         
-        // First get the user's school_id
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('school_id, role')
-          .eq('id', user.id)
-          .single();
+        // Only check school association if not on license-verification or school-setup page
+        if (!location.pathname.includes('/school-setup') && 
+            !location.pathname.includes('/license-verification')) {
           
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          setError("Failed to load user profile. Please try again.");
-          setLoading(false);
-          return;
+          // Check if user has a school association
+          const { data, error } = await supabase.rpc('get_user_school_info');
+          
+          // If error is "no rows returned" or user has no school
+          if ((error && error.code === 'PGRST116') || (!error && (!data || data.length === 0))) {
+            if (location.pathname === '/team-members') {
+              // Don't redirect, just let the page handle the no-school state
+              console.log('User has no school association, but staying on team members page');
+            } else {
+              // Redirect to school setup for other pages
+              console.log('User has no school association, redirecting to school setup');
+              toast({
+                title: "School Setup Required",
+                description: "Please set up your school before continuing",
+              });
+              navigate('/school-setup');
+              return;
+            }
+          }
         }
         
-        if (!profileData.school_id) {
-          console.log("User has no school_id:", profileData);
-          setError("User is not associated with any school");
-          setLoading(false);
-          return;
-        }
-        
-        // Try to get school info
-        try {
-          const schoolInfo = await fetchUserSchoolInfo();
-          console.log("School info fetched:", schoolInfo);
-          setSchoolInfo(schoolInfo);
-        } catch (schoolInfoError) {
-          console.error("Error fetching school info:", schoolInfoError);
-          // We continue even if this fails
-        }
-        
+        // Session exists and school check passed if needed, continue rendering
         setLoading(false);
-      } catch (err) {
-        console.error("Error checking school association:", err);
-        setError("Failed to check school association. Please try again.");
+      } catch (error) {
+        console.error('Auth check error:', error);
         setLoading(false);
       }
     };
     
-    checkSchoolAssociation();
-  }, [navigate]);
-
+    checkAuth();
+  }, [navigate, location.pathname, toast]);
+  
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading application...</p>
+        </div>
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <Alert variant="destructive" className="max-w-md mb-4">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        {error === "User is not associated with any school" && (
-          <Button onClick={() => navigate('/school-setup')}>
-            Set Up Your School
-          </Button>
-        )}
-      </div>
-    );
-  }
-
+  
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full overflow-hidden">
