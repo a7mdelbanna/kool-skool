@@ -150,13 +150,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_school_and_update_profile_rpc: {
-        Args: {
-          school_name: string
-          license_number: string
-        }
-        Returns: undefined
-      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
