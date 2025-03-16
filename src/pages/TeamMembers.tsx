@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -35,6 +34,14 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
+interface ProfileData {
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  profile_picture: string | null;
+}
+
 interface TeamMemberData {
   id: string;
   email: string;
@@ -46,13 +53,7 @@ interface TeamMemberData {
   school_id: string;
   created_at: string;
   updated_at: string;
-  profiles?: {
-    first_name: string | null;
-    last_name: string | null;
-    email: string | null;
-    phone: string | null;
-    profile_picture: string | null;
-  } | null;
+  profiles?: ProfileData | null;
 }
 
 const createTeamMemberSchema = z.object({
@@ -111,7 +112,7 @@ const TeamMembers = () => {
       // First get the user's school_id
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('school_id')
+        .select('school_id, role')
         .eq('id', user.id)
         .single();
         
@@ -126,36 +127,47 @@ const TeamMembers = () => {
         throw new Error('User is not associated with any school');
       }
       
-      // Fix the query to correctly handle the relationship using explicit foreign key
-      const { data, error } = await supabase
+      console.log("Fetching team members for school:", schoolId);
+      
+      // First get the team members
+      const { data: teamMembersData, error: teamMembersError } = await supabase
         .from('team_members')
-        .select(`
-          *,
-          profiles:profiles!profile_id(
-            first_name,
-            last_name,
-            email,
-            phone,
-            profile_picture
-          )
-        `)
+        .select('*')
         .eq('school_id', schoolId);
         
-      if (error) {
-        console.error("Error fetching team members:", error);
-        throw error;
+      if (teamMembersError) {
+        console.error("Error fetching team members:", teamMembersError);
+        throw teamMembersError;
       }
       
-      // Process the data to handle potential null values and ensure type compatibility
-      const typedData: TeamMemberData[] = data?.map(member => ({
-        ...member,
-        profiles: member.profiles || null
-      })) || [];
+      // Then fetch the corresponding profiles if needed
+      const teamMembersWithProfiles: TeamMemberData[] = await Promise.all(
+        teamMembersData.map(async (member) => {
+          if (member.profile_id) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, email, phone, profile_picture')
+              .eq('id', member.profile_id)
+              .single();
+              
+            if (profileError) {
+              console.warn(`Could not fetch profile for member ${member.id}:`, profileError);
+              return { ...member, profiles: null };
+            }
+            
+            return { ...member, profiles: profileData };
+          }
+          
+          return { ...member, profiles: null };
+        })
+      );
       
-      setTeamMembers(typedData);
+      console.log("Team members with profiles:", teamMembersWithProfiles);
+      setTeamMembers(teamMembersWithProfiles);
+      
     } catch (error: any) {
       console.error('Error loading team members:', error);
-      setError('Failed to load team members. Please try again.');
+      setError(error.message || 'Failed to load team members. Please try again.');
       toast({
         title: 'Error',
         description: error.message || 'Failed to load team members',
