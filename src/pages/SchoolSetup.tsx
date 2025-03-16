@@ -171,7 +171,8 @@ const SchoolSetup = () => {
         throw error;
       }
       
-      const response = data as SchoolSetupResponse;
+      // Cast data first to unknown, then to our custom interface
+      const response = (data as unknown) as SchoolSetupResponse;
       
       if (!response.success) {
         throw new Error(response.message || 'Failed to verify license');

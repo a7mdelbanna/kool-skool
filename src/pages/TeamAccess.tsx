@@ -161,7 +161,8 @@ const TeamAccess = () => {
         throw error;
       }
       
-      const response = data as TeamMemberResponse;
+      // Cast data first to unknown, then to our custom interface
+      const response = (data as unknown) as TeamMemberResponse;
       
       if (!response.success) {
         throw new Error(response.message || "Failed to add team member");

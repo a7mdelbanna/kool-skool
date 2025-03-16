@@ -34,7 +34,8 @@ const Login = () => {
         throw error;
       }
       
-      const response = data as UserLoginResponse;
+      // Cast data first to unknown, then to our custom interface
+      const response = (data as unknown) as UserLoginResponse;
       
       if (!response.success) {
         throw new Error(response.message || 'Invalid email or password');
