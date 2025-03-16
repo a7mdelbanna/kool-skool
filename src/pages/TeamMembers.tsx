@@ -123,6 +123,7 @@ const TeamMembers = () => {
         throw new Error('User is not associated with any school');
       }
       
+      // Update the query to specify the profile_id column explicitly
       const { data, error } = await supabase
         .from('team_members')
         .select(`
