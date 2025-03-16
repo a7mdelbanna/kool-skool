@@ -133,6 +133,7 @@ export const createTeamMember = async (
 ) => {
   try {
     // Log the attempted creation for debugging
+    console.log("Creating team member with data:", userData);
     console.log("Attempting to create team member with email:", userData.email);
     
     // First check if the email already exists
@@ -146,17 +147,40 @@ export const createTeamMember = async (
     // Proceed with creating the team member
     console.log("Creating team member with validated email:", userData.email);
     
-    // Call the stored procedure with proper parameters
-    const { data, error } = await supabase.rpc('create_team_member', {
-      email_param: userData.email,
-      password_param: userData.password,
+    // First, let's directly create the user with the auth API
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      email: userData.email,
+      password: userData.password,
+      options: {
+        data: {
+          first_name: userData.firstName || null,
+          last_name: userData.lastName || null
+        }
+      }
+    });
+    
+    if (signUpError) {
+      console.error("Error creating auth user:", signUpError);
+      throw signUpError;
+    }
+    
+    if (!authData.user || !authData.user.id) {
+      console.error("Failed to create user account");
+      throw new Error("Failed to create user account");
+    }
+    
+    console.log("Auth user created with ID:", authData.user.id);
+    
+    // Now call the stored procedure to set up the team member
+    const { data, error } = await supabase.rpc('finalize_team_member', {
+      user_id_param: authData.user.id,
       role_param: userData.role,
       first_name_param: userData.firstName || null,
       last_name_param: userData.lastName || null
     });
     
     if (error) {
-      console.error("Error creating team member:", error);
+      console.error("Error finalizing team member:", error);
       throw error;
     }
     
@@ -168,3 +192,4 @@ export const createTeamMember = async (
     throw error;
   }
 };
+
