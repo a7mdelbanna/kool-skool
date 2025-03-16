@@ -81,12 +81,15 @@ const Students = () => {
       lastName: record.last_name || '',
       email: record.email || '',
       courseName: record.course_name || '',
-      lessonType: record.lessonType as 'individual' | 'group' || 'individual',
-      ageGroup: record.age_group?.toLowerCase() as 'adult' | 'kid' || 'adult',
-      level: record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' || 'beginner',
+      lessonType: (record.lessonType as 'individual' | 'group') || 'individual',
+      ageGroup: (record.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
+      level: (record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
       phone: record.phone,
       paymentStatus: 'pending', // This would come from subscriptions/payments
       teacherId: record.teacher_id,
+      lessonsCompleted: 0,
+      nextLesson: 'Not scheduled',
+      nextPaymentDate: undefined
     };
   };
   

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -149,12 +148,14 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
             firstName: studentData.firstName as string,
             lastName: studentData.lastName as string,
             email: studentData.email as string,
-            lessonType: studentData.lessonType as 'individual' | 'group',
-            ageGroup: studentData.ageGroup as 'adult' | 'kid',
+            lessonType: (studentData.lessonType as 'individual' | 'group') || 'individual',
+            ageGroup: (studentData.ageGroup as 'adult' | 'kid') || 'adult',
             courseName: studentData.courseName as string,
-            level: studentData.level as 'beginner' | 'intermediate' | 'advanced' | 'fluent',
+            level: (studentData.level as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
             paymentStatus: "pending",
-            teacherId: teacher.id
+            teacherId: teacher.id,
+            lessonsCompleted: 0,
+            nextLesson: 'Not scheduled'
           };
           onStudentAdded(newStudent);
         }

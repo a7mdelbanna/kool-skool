@@ -25,7 +25,8 @@ const sampleStudents: Student[] = [
     level: 'beginner',
     lessonsCompleted: 12,
     nextLesson: 'Today, 4 PM',
-    paymentStatus: 'paid'
+    paymentStatus: 'paid',
+    nextPaymentDate: '2023-10-15'
   },
   {
     id: '2',
@@ -38,7 +39,8 @@ const sampleStudents: Student[] = [
     level: 'intermediate',
     lessonsCompleted: 8,
     nextLesson: 'Tomorrow, 3 PM',
-    paymentStatus: 'pending'
+    paymentStatus: 'pending',
+    nextPaymentDate: '2023-10-20'
   },
   {
     id: '3',
@@ -51,7 +53,8 @@ const sampleStudents: Student[] = [
     level: 'advanced',
     lessonsCompleted: 15,
     nextLesson: 'Friday, 5 PM',
-    paymentStatus: 'overdue'
+    paymentStatus: 'overdue',
+    nextPaymentDate: '2023-10-05'
   },
   {
     id: '4',
@@ -64,7 +67,8 @@ const sampleStudents: Student[] = [
     level: 'advanced',
     lessonsCompleted: 6,
     nextLesson: 'Today, 6 PM',
-    paymentStatus: 'paid'
+    paymentStatus: 'paid',
+    nextPaymentDate: '2023-10-25'
   },
 ];
 
