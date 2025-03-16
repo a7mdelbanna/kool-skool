@@ -117,8 +117,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setIsLoading(true);
       
-      // First, update the license record with the school name
+      // Make sure we have all the required data
+      if (!userData.licenseId) {
+        toast.error("Missing license ID. Please verify your license first.");
+        return;
+      }
+      
+      // First, update the license record with the school name if provided
       if (userData.licenseId && userData.schoolName) {
+        console.log("Updating license with school name:", userData.schoolName);
         const { error: licenseUpdateError } = await supabase
           .from('licenses')
           .update({ school_name: userData.schoolName })
@@ -154,6 +161,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Create school entry with explicit license_id
+      console.log("Creating school with license ID:", userData.licenseId);
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
         .insert({
@@ -170,9 +178,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
 
       if (schoolError) {
-        toast.error(schoolError.message);
+        console.error("Error creating school:", schoolError);
+        toast.error(`Error creating school: ${schoolError.message}`);
         return;
       }
+
+      // For debugging purposes, verify the school creation
+      console.log("School created with ID:", schoolData.id);
+      console.log("School data full:", schoolData);
 
       // Create profile entry
       const { error: profileError } = await supabase
@@ -182,17 +195,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           email: email,
           first_name: userData.firstName,
           last_name: userData.lastName,
-          role: userData.role,
+          role: userData.role || 'admin', // Default to admin for new users
           phone: userData.phone,
           whatsapp: userData.whatsapp,
           telegram: userData.telegram,
           instagram: userData.instagram,
           profile_picture: userData.profilePicture,
-          school_id: schoolData.id
+          school_id: schoolData.id // Use the school ID we just created
         });
 
       if (profileError) {
-        toast.error(profileError.message);
+        console.error("Error creating profile:", profileError);
+        toast.error(`Error creating profile: ${profileError.message}`);
         return;
       }
 
@@ -209,6 +223,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       toast.success("Account created successfully!");
       navigate("/");
     } catch (error: any) {
+      console.error("Complete signup error:", error);
       toast.error(error.message || "An error occurred during signup");
     } finally {
       setIsLoading(false);

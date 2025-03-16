@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -58,8 +57,38 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
   const [saving, setSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(data.schoolLogo);
   const { user } = useAuth();
+  const [licenseId, setLicenseId] = useState<string | null>(null);
   
-  const form = useForm<SchoolDetailsFormValues>({
+  useEffect(() => {
+    const fetchLicenseId = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+          
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          return;
+        }
+        
+        if (user.user_metadata && user.user_metadata.license_id) {
+          setLicenseId(user.user_metadata.license_id);
+          console.log("Found license ID in user metadata:", user.user_metadata.license_id);
+          return;
+        }
+      } catch (error) {
+        console.error("Error fetching license ID:", error);
+      }
+    };
+    
+    fetchLicenseId();
+  }, [user]);
+  
+  const form = useForm<any>({
     resolver: zodResolver(schoolDetailsSchema),
     defaultValues: {
       schoolName: data.schoolName || "",
@@ -83,7 +112,6 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
       
       setUploading(true);
       
-      // Upload file to Supabase storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('school_logos')
         .upload(filePath, file);
@@ -92,17 +120,14 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
         throw uploadError;
       }
       
-      // Get public URL
       const { data: publicUrlData } = supabase.storage
         .from('school_logos')
         .getPublicUrl(filePath);
         
       const publicUrl = publicUrlData.publicUrl;
       
-      // Update logo preview
       setLogoPreview(publicUrl);
       
-      // Update form data
       updateData({ schoolLogo: publicUrl });
       
       toast.success("Logo uploaded successfully");
@@ -114,7 +139,7 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
     }
   };
 
-  const handleSubmit = async (values: SchoolDetailsFormValues) => {
+  const handleSubmit = async (values: any) => {
     if (!user) {
       toast.error("User not authenticated");
       return;
@@ -123,18 +148,15 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
     try {
       setSaving(true);
       
-      // Include logo in the update
       const schoolData = {
         ...values,
         schoolLogo: logoPreview,
       };
       
-      // Update data in the onboarding state
       updateData(schoolData);
       
       try {
-        // Use the security definer function we created to save school details
-        const { data, error } = await supabase.rpc(
+        const { data: schoolResult, error } = await supabase.rpc(
           'save_school_details',
           {
             user_id_param: user.id,
@@ -152,15 +174,42 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
           throw error;
         }
 
-        console.log("School saved successfully with ID:", data);
+        console.log("School saved successfully with ID:", schoolResult);
+        
+        if (licenseId && values.schoolName) {
+          console.log("Updating license with school name:", values.schoolName);
+          const { error: licenseUpdateError } = await supabase
+            .from('licenses')
+            .update({ school_name: values.schoolName })
+            .eq('id', licenseId);
+            
+          if (licenseUpdateError) {
+            console.error("Error updating license school name:", licenseUpdateError);
+          } else {
+            console.log("License updated successfully with school name");
+          }
+        }
+        
+        if (licenseId) {
+          console.log("Updating school with license ID:", licenseId);
+          const { error: schoolUpdateError } = await supabase
+            .from('schools')
+            .update({ license_id: licenseId })
+            .eq('id', schoolResult);
+            
+          if (schoolUpdateError) {
+            console.error("Error updating school with license ID:", schoolUpdateError);
+          } else {
+            console.log("School updated successfully with license ID");
+          }
+        }
+
         toast.success("School details saved successfully");
       } catch (error: any) {
-        // If the save fails, we continue anyway since we've updated the local state
         console.error("Error saving to database:", error);
         toast.error("Could not save to database, but your changes have been saved locally");
       }
       
-      // Proceed to next step even if the database update fails
       onNext();
     } catch (error: any) {
       console.error("Error in submit handler:", error);
@@ -170,7 +219,6 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
     }
   };
 
-  // Get first letter of school name for avatar fallback
   const getSchoolInitial = () => {
     const schoolName = form.watch('schoolName') || '';
     return schoolName.charAt(0).toUpperCase() || 'S';

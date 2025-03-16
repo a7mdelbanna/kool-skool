@@ -41,6 +41,8 @@ const LicenseVerification: React.FC = () => {
       
       if (result.valid && result.licenseId) {
         toast.success(result.message || "License validated successfully");
+        // Store license info in sessionStorage for account creation step
+        sessionStorage.setItem('licenseNumber', data.licenseNumber);
         // Use direct navigation to the account creation page with licenseId as URL parameter
         navigate(`/auth/create-account/${result.licenseId}`);
       } else {

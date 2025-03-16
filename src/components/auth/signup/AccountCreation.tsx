@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 // Account details schema
 const accountSchema = z.object({
@@ -29,6 +30,46 @@ const AccountCreation: React.FC = () => {
   const navigate = useNavigate();
   const { licenseId } = useParams<{ licenseId: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [licenseInfo, setLicenseInfo] = useState<{ license_number: string } | null>(null);
+  
+  // Fetch license information when the component mounts
+  useEffect(() => {
+    if (!licenseId) {
+      toast.error("Invalid license. Please verify your license first.");
+      navigate("/auth");
+      return;
+    }
+    
+    const fetchLicenseInfo = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('licenses')
+          .select('license_number')
+          .eq('id', licenseId)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching license:", error);
+          toast.error("Could not fetch license information. Please try again.");
+          navigate("/auth");
+          return;
+        }
+        
+        if (data) {
+          setLicenseInfo(data);
+        } else {
+          toast.error("License not found. Please verify your license first.");
+          navigate("/auth");
+        }
+      } catch (err) {
+        console.error("Error in fetchLicenseInfo:", err);
+        toast.error("An unexpected error occurred. Please try again.");
+        navigate("/auth");
+      }
+    };
+    
+    fetchLicenseInfo();
+  }, [licenseId, navigate]);
   
   // Redirect to auth page if no licenseId is provided
   useEffect(() => {
@@ -48,7 +89,7 @@ const AccountCreation: React.FC = () => {
   });
 
   const handleSubmit = async (data: AccountFormValues) => {
-    if (!licenseId) {
+    if (!licenseId || !licenseInfo) {
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
       return;
@@ -61,6 +102,7 @@ const AccountCreation: React.FC = () => {
       // Simple user data for initial account creation
       const userData = {
         licenseId: licenseId,
+        licenseNumber: licenseInfo.license_number, // Pass the license number as well
         firstName: "New",
         lastName: "User",
         schoolName: "New School",
@@ -79,7 +121,7 @@ const AccountCreation: React.FC = () => {
     }
   };
 
-  if (!licenseId) {
+  if (!licenseId || !licenseInfo) {
     return null; // Will redirect in useEffect
   }
 
