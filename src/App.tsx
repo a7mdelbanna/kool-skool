@@ -13,45 +13,31 @@ import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
 import NotFound from "./pages/NotFound";
-import Auth from "./pages/Auth";
-import AccountCreation from "./components/auth/signup/AccountCreation";
-import OnboardingFlow from "./components/auth/signup/OnboardingFlow";
 import { PaymentProvider } from "./contexts/PaymentContext";
-import { AuthProvider } from "./contexts/AuthContext";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
-import PersonalProfile from "./pages/PersonalProfile";
-import Access from "./pages/Access";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <PaymentProvider>
-            <Toaster />
-            <Sonner />
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/create-account/:licenseId" element={<AccountCreation />} />
-              <Route path="/onboarding" element={<ProtectedRoute><OnboardingFlow /></ProtectedRoute>} />
-              <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-                <Route path="/" element={<Index />} />
-                <Route path="/students" element={<Students />} />
-                <Route path="/calendar" element={<Calendar />} />
-                <Route path="/payments" element={<Payments />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/school-setup" element={<SchoolSetup />} />
-                <Route path="/reports" element={<StatesReports />} />
-                <Route path="/profile" element={<PersonalProfile />} />
-                <Route path="/access" element={<Access />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </PaymentProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      <PaymentProvider>
+        <BrowserRouter>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/students" element={<Students />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/payments" element={<Payments />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/school-setup" element={<SchoolSetup />} />
+              <Route path="/reports" element={<StatesReports />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </PaymentProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
