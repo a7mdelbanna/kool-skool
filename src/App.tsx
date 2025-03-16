@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,6 +39,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         console.log("Auth state change event:", event);
         setAuthenticated(!!session);
         
+        // Redirect to school setup if coming from an invitation
         if (event === 'SIGNED_IN' && window.location.href.includes('type=invite')) {
           window.location.href = '/school-setup';
         }

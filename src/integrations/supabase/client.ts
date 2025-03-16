@@ -28,11 +28,22 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       persistSession: true,
-      // This is critical for making invitation links work with the correct URL
+      // Use dynamic site URL for authentication flows
+      // Corrected property for Supabase v2.x
       redirectTo: getSiteUrl()
     }
   }
 );
+
+// Type utility for safely accessing properties
+const safeAccess = <T, K extends keyof T>(obj: T | null | undefined, key: K): T[K] | undefined => {
+  return obj && key in obj ? obj[key] : undefined;
+};
+
+// Type guard to check if an object has a property
+const hasProperty = <T>(obj: any, prop: string): obj is T => {
+  return obj && typeof obj === 'object' && prop in obj;
+};
 
 // Helper function to upload base64 image to schools
 export const uploadBase64Image = async (
@@ -40,10 +51,12 @@ export const uploadBase64Image = async (
   schoolId: string, 
   field: 'logo' | 'phone' | 'telegram' | 'whatsapp' | 'instagram'
 ) => {
+  const updateData: Record<string, string> = { [field]: base64String };
+  
   const { data, error } = await supabase
     .from('schools')
-    .update({ [field]: base64String })
-    .eq('id', schoolId);
+    .update(updateData as any)
+    .eq('id', schoolId as any);
     
   return { data, error };
 };
@@ -62,7 +75,7 @@ export const fetchUserProfile = async () => {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', user.id as any)
     .single();
     
   if (error) {
@@ -72,7 +85,18 @@ export const fetchUserProfile = async () => {
   
   console.log("Profile data from database:", data);
   
-  return { user, profile: data };
+  // Ensure we have valid data with safe access
+  return { 
+    user, 
+    profile: data && {
+      first_name: safeAccess(data, 'first_name'),
+      last_name: safeAccess(data, 'last_name'),
+      email: safeAccess(data, 'email'),
+      phone: safeAccess(data, 'phone'),
+      profile_picture: safeAccess(data, 'profile_picture'),
+      id: safeAccess(data, 'id')
+    } 
+  };
 };
 
 // Helper function to update user profile
@@ -92,8 +116,8 @@ export const updateUserProfile = async (
   
   const { data, error } = await supabase
     .from('profiles')
-    .update(profileData)
-    .eq('id', user.id);
+    .update(profileData as any)
+    .eq('id', user.id as any);
     
   if (error) {
     throw error;
@@ -113,7 +137,7 @@ const checkEmailExists = async (email: string) => {
     const { count: profileCount, error: countError } = await supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .eq('email', email);
+      .eq('email', email as any);
     
     if (countError) {
       console.error("Error checking profiles count for email:", countError);
@@ -126,7 +150,7 @@ const checkEmailExists = async (email: string) => {
     const { count: teamMemberCount, error: teamMemberError } = await supabase
       .from('team_members')
       .select('id', { count: 'exact', head: true })
-      .eq('email', email);
+      .eq('email', email as any);
       
     if (teamMemberError) {
       console.error("Error checking team_members for email:", teamMemberError);
@@ -194,7 +218,7 @@ export const inviteTeamMember = async (
           role: userData.role
         },
         // Use the current origin as redirect URL
-        emailRedirectTo: `${getSiteUrl()}/auth`
+        emailRedirectTo: `${getSiteUrl()}/auth?type=invite`
       }
     });
     
@@ -242,7 +266,7 @@ export const createTeamMember = async (
     const { data: adminProfile, error: profileError } = await supabase
       .from('profiles')
       .select('school_id')
-      .eq('id', user.id)
+      .eq('id', user.id as any)
       .single();
       
     if (profileError) {
@@ -250,11 +274,13 @@ export const createTeamMember = async (
       throw new Error('Could not fetch admin school information');
     }
     
-    if (!adminProfile.school_id) {
+    // Safe access to school_id property
+    const schoolId = safeAccess(adminProfile, 'school_id');
+    if (!schoolId) {
       throw new Error('Admin does not have a school assigned');
     }
     
-    console.log("Admin school ID:", adminProfile.school_id);
+    console.log("Admin school ID:", schoolId);
     
     // Proceed with creating the team member
     console.log("Creating team member with validated email:", userData.email);
