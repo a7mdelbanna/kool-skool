@@ -55,8 +55,12 @@ const Login = () => {
         description: `Welcome back, ${response.first_name}!`,
       });
       
-      // Redirect to dashboard immediately
-      navigate('/');
+      console.log("Login successful, redirecting to dashboard...");
+      
+      // Force a small delay to ensure localStorage is updated
+      setTimeout(() => {
+        navigate('/');
+      }, 100);
       
     } catch (error) {
       console.error('Login error:', error);

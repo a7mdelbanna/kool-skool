@@ -26,9 +26,21 @@ const App = () => {
 
   useEffect(() => {
     // Check if user is authenticated
-    const user = localStorage.getItem('user');
-    setIsAuthenticated(!!user);
-    setLoading(false);
+    const checkAuth = () => {
+      const user = localStorage.getItem('user');
+      console.log("Auth check:", !!user, user ? JSON.parse(user) : null);
+      setIsAuthenticated(!!user);
+      setLoading(false);
+    };
+    
+    checkAuth();
+    
+    // Listen for storage events to handle authentication across tabs
+    window.addEventListener('storage', checkAuth);
+    
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+    };
   }, []);
 
   if (loading) {
