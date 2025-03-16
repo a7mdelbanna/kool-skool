@@ -116,7 +116,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const completeSignUp = async (email: string, password: string, userData: any) => {
     try {
       setIsLoading(true);
-      console.log("Starting account creation with data:", { email, userData });
       
       // 1. Create user account with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -133,43 +132,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (authError) {
-        console.error("Auth error:", authError);
         toast.error(authError.message);
         return;
       }
 
       if (!authData.user) {
-        console.error("No user data returned");
         toast.error("Failed to create user account");
         return;
       }
       
-      console.log("User created successfully:", authData.user.id);
-      
-      // 2. Create school using the RPC procedure
+      // 2. Create school entry using RPC instead of direct insert
+      // This handles license validation, expiry date calculation, and user-school connection
       try {
-        console.log("Creating school with name:", userData.schoolName, "license:", userData.licenseId);
         const { error: schoolError } = await supabase.rpc(
           'create_school_and_update_profile',
           {
             school_name: userData.schoolName,
-            license_number: userData.licenseNumber
+            license_number: userData.licenseId
           }
         );
         
-        if (schoolError) {
-          console.error("School creation error:", schoolError);
-          throw schoolError;
-        }
-        
-        console.log("School created successfully");
+        if (schoolError) throw schoolError;
       } catch (error: any) {
         console.error("Error in create_school_and_update_profile:", error);
         toast.error(`Failed to set up school: ${error.message}`);
         // Continue anyway since we've already created the user account
       }
 
-      // 3. Create or update profile
+      // 3. Create or update profile - this might be redundant with the RPC function
+      // but included as a fallback to ensure profile data is set
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
