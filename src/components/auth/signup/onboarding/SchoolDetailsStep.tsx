@@ -6,11 +6,11 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Building2, Image, Phone, MessagesSquare, Instagram, Upload } from "lucide-react";
+import { Loader2, Building2, Upload, Phone, MessagesSquare, Instagram } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 
 // School details form schema
 const schoolDetailsSchema = z.object({
@@ -55,7 +55,9 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
   loading 
 }) => {
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(data.schoolLogo);
+  const { user } = useAuth();
   
   const form = useForm<SchoolDetailsFormValues>({
     resolver: zodResolver(schoolDetailsSchema),
@@ -112,13 +114,72 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
     }
   };
 
-  const handleSubmit = (values: SchoolDetailsFormValues) => {
-    // Include logo in the update
-    updateData({
-      ...values,
-      schoolLogo: logoPreview,
-    });
-    onNext();
+  const handleSubmit = async (values: SchoolDetailsFormValues) => {
+    if (!user) {
+      toast.error("User not authenticated");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      // Include logo in the update
+      const schoolData = {
+        ...values,
+        schoolLogo: logoPreview,
+      };
+      
+      // Get the user's school ID first
+      const { data: profileData, error: profileError } = await supabase.rpc(
+        'get_user_school_id',
+        {
+          user_id_param: user.id
+        }
+      );
+      
+      if (profileError) {
+        throw profileError;
+      }
+      
+      if (!profileData || !Array.isArray(profileData) || profileData.length === 0) {
+        throw new Error("No school associated with this account");
+      }
+      
+      const schoolId = profileData[0]?.school_id;
+      
+      if (!schoolId) {
+        throw new Error("No school ID found in profile");
+      }
+      
+      // Update school in database
+      const { error: updateError } = await supabase
+        .from('schools')
+        .update({
+          name: values.schoolName || "My School",
+          logo: logoPreview,
+          phone: values.schoolPhone || null,
+          telegram: values.schoolTelegram || null,
+          whatsapp: values.schoolWhatsapp || null,
+          instagram: values.schoolInstagram || null
+        })
+        .eq('id', schoolId);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Update data in the onboarding state
+      updateData(schoolData);
+      toast.success("School details saved successfully");
+      
+      // Proceed to next step
+      onNext();
+    } catch (error: any) {
+      console.error("Error saving school details:", error);
+      toast.error(error.message || "Failed to save school details");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Get first letter of school name for avatar fallback
@@ -282,7 +343,7 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
             type="button" 
             variant="outline" 
             onClick={onPrev}
-            disabled={loading || uploading}
+            disabled={loading || uploading || saving}
           >
             Back
           </Button>
@@ -292,19 +353,19 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
               type="button" 
               variant="ghost" 
               onClick={onSkip}
-              disabled={loading || uploading}
+              disabled={loading || uploading || saving}
             >
               Skip
             </Button>
             
             <Button 
               type="submit" 
-              disabled={loading || uploading}
+              disabled={loading || uploading || saving}
             >
-              {loading || uploading ? (
+              {loading || uploading || saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {uploading ? "Uploading..." : "Saving..."}
+                  {uploading ? "Uploading..." : saving ? "Saving..." : "Loading..."}
                 </>
               ) : (
                 "Next"

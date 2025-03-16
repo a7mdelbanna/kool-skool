@@ -30,25 +30,6 @@ interface OnboardingData {
   teamMembers: { email: string; role: string }[];
 }
 
-type UpdateUserProfileParams = {
-  user_id: string;
-  first_name_param: string;
-  last_name_param: string;
-  phone_param: string;
-  profile_picture_param: string | null;
-  telegram_param: string | null;
-  whatsapp_param: string | null;
-  instagram_param: string | null;
-};
-
-type GetUserSchoolIdParams = {
-  user_id_param: string;
-};
-
-type SchoolIdData = {
-  school_id: string;
-}[];
-
 const OnboardingFlow = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -165,7 +146,7 @@ const OnboardingFlow = () => {
       throw new Error("No school associated with this account");
     }
     
-    const schoolData = data as SchoolIdData;
+    const schoolData = data as {school_id: string}[];
     if (!schoolData[0]?.school_id) {
       throw new Error("No school ID found in profile");
     }
