@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -123,19 +124,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("CompleteSignUp with licenseId:", userData.licenseId);
       console.log("CompleteSignUp with licenseNumber:", userData.licenseNumber);
       
+      // Use rpc function instead of direct query to get license information
       const { data: licenseData, error: licenseError } = await supabase
-        .from('licenses')
-        .select('license_number, id, is_active, used_by')
-        .eq('id', userData.licenseId)
-        .single();
+        .rpc('get_license_by_id', { license_id_param: userData.licenseId });
       
-      if (licenseError || !licenseData) {
+      console.log("License data from RPC:", licenseData);
+      
+      if (licenseError || !licenseData || licenseData.length === 0) {
         console.error("License verification failed:", licenseError || "No license data");
         toast.error("License verification failed. Please verify your license again.");
         return { success: false, error: "License verification failed" };
       }
       
-      console.log("License verification succeeded:", licenseData);
+      const licenseInfo = licenseData[0];
+      console.log("License verification succeeded:", licenseInfo);
       
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
