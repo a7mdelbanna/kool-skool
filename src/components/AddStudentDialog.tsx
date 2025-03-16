@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -88,6 +89,14 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
       setCreatePassword(true);
     }
   }, [student, open]);
+
+  // This function now only updates the local state without causing re-renders
+  const handleUpdateStudentData = (data: Partial<Student>) => {
+    setStudentData(prevData => ({
+      ...prevData,
+      ...data
+    }));
+  };
 
   const handleSave = async () => {
     if (!studentData.firstName || !studentData.lastName || !studentData.email || !studentData.courseName) {
@@ -209,7 +218,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
             <TabsContent value="profile">
               <ProfileTab 
                 studentData={studentData} 
-                setStudentData={setStudentData} 
+                setStudentData={handleUpdateStudentData} 
                 isViewMode={false}
                 password={password}
                 setPassword={setPassword}
@@ -223,15 +232,15 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
             </TabsContent>
             
             <TabsContent value="subscriptions">
-              <SubscriptionsTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
+              <SubscriptionsTab studentData={studentData} setStudentData={handleUpdateStudentData} isViewMode={false} />
             </TabsContent>
             
             <TabsContent value="payments">
-              <PaymentsTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
+              <PaymentsTab studentData={studentData} setStudentData={handleUpdateStudentData} isViewMode={false} />
             </TabsContent>
             
             <TabsContent value="sessions">
-              <SessionsTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
+              <SessionsTab studentData={studentData} setStudentData={handleUpdateStudentData} isViewMode={false} />
             </TabsContent>
           </Tabs>
         </PaymentProvider>

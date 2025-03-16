@@ -72,25 +72,41 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     },
   });
 
-  // Update form values when studentData changes
+  // Update form values when studentData changes from parent
   useEffect(() => {
-    form.reset({
-      firstName: studentData.firstName || "",
-      lastName: studentData.lastName || "",
-      email: studentData.email || "",
-      phone: studentData.phone || "",
-      lessonType: studentData.lessonType || "individual",
-      ageGroup: studentData.ageGroup || "adult",
-      courseName: studentData.courseName || "",
-      level: studentData.level || "beginner",
-      teacherId: studentData.teacherId || "",
-      password: password || "",
-      createPassword: createPassword,
-    });
+    // Only reset the form when studentData changes from the parent
+    // and not due to local form changes
+    if (
+      studentData.firstName !== form.getValues().firstName ||
+      studentData.lastName !== form.getValues().lastName ||
+      studentData.email !== form.getValues().email ||
+      studentData.phone !== form.getValues().phone ||
+      studentData.lessonType !== form.getValues().lessonType ||
+      studentData.ageGroup !== form.getValues().ageGroup ||
+      studentData.courseName !== form.getValues().courseName ||
+      studentData.level !== form.getValues().level ||
+      studentData.teacherId !== form.getValues().teacherId ||
+      password !== form.getValues().password ||
+      createPassword !== form.getValues().createPassword
+    ) {
+      form.reset({
+        firstName: studentData.firstName || "",
+        lastName: studentData.lastName || "",
+        email: studentData.email || "",
+        phone: studentData.phone || "",
+        lessonType: studentData.lessonType || "individual",
+        ageGroup: studentData.ageGroup || "adult",
+        courseName: studentData.courseName || "",
+        level: studentData.level || "beginner",
+        teacherId: studentData.teacherId || "",
+        password: password || "",
+        createPassword: createPassword,
+      });
+    }
   }, [studentData, password, createPassword]);
 
-  // Update parent component when form values change
-  const onFormChange = (values: z.infer<typeof formSchema>) => {
+  // Handle form submission when the save button is clicked
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
     setStudentData({
       ...studentData,
       firstName: values.firstName,
@@ -113,26 +129,34 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     }
   };
 
-  // Use debounced form watching to update parent component's state
+  // Use form.watch only to handle explicit form submission
+  // We don't want to update parent state on every keystroke
   useEffect(() => {
-    const subscription = form.watch((values) => {
-      // We want to update the parent component less frequently to prevent focus issues
-      const timeoutId = setTimeout(() => {
-        if (values.firstName !== undefined && values.lastName !== undefined) {
-          onFormChange(values as z.infer<typeof formSchema>);
-        }
-      }, 500);
-      
-      return () => clearTimeout(timeoutId);
-    });
-    
-    // Cleanup subscription on component unmount
+    const subscription = form.watch(() => {});
     return () => subscription.unsubscribe();
-  }, []);
+  }, [form]);
+
+  // Only update parent component when form is blurred or submitted
+  const handleFormBlur = () => {
+    const values = form.getValues();
+    const isValid = form.formState.isValid;
+    
+    // Only update if the form is valid to prevent validation errors
+    if (isValid) {
+      onSubmit(values);
+    }
+  };
 
   return (
     <Form {...form}>
-      <form className="space-y-6">
+      <form 
+        className="space-y-6" 
+        onSubmit={(e) => {
+          e.preventDefault();
+          form.handleSubmit(onSubmit)(e);
+        }}
+        onBlur={handleFormBlur}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Personal Information Section */}
           <div className="space-y-4">
