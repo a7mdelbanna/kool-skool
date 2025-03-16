@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useSidebarContext } from '@/components/ui/sidebar';
+import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard,
@@ -54,7 +54,7 @@ const NavItem = ({ to, icon: Icon, label, onClick }: {
 };
 
 const Sidebar = () => {
-  const { expanded } = useSidebarContext();
+  const { expanded } = useSidebar();
   const navigate = useNavigate();
   const [userRole, setUserRole] = useState<string | null>(null);
   
