@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -157,7 +156,7 @@ export async function getStudentsWithDetails(schoolId: string) {
   return { data: enhancedStudents as StudentRecord[], error: null };
 }
 
-// Create a student - Simplified version using the default client without custom headers
+// Create a student - Use Edge Function instead of direct client operations
 export async function createStudent(
   email: string,
   password: string,
@@ -196,70 +195,46 @@ export async function createStudent(
       role: userData.role
     });
     
-    // First, create the user account - use the simplified client approach
-    const { data: userResult, error: userError } = await supabase
-      .from('users')
-      .insert({
-        email,
-        password_hash: password, // Note: In production, this should be properly hashed
+    // Use the Edge Function to create the student
+    const { data, error } = await supabase.functions.invoke<CreateStudentResponse>('create_student', {
+      body: {
+        student_email: email,
+        student_password: password,
         first_name: firstName,
         last_name: lastName,
-        role: 'student', // This value must match exactly what's allowed in the database constraints
-        school_id: userData.schoolId,
-        created_by: userData.id
-      })
-      .select('id')
-      .single();
-      
-    if (userError) {
-      console.error("Error creating user:", userError);
-      return {
-        data: { success: false, message: userError.message },
-        error: userError
-      };
-    }
-    
-    const userId = userResult.id;
-    
-    // Now create the student record - use the simplified client approach
-    const { data: studentResult, error: studentError } = await supabase
-      .from('students')
-      .insert({
-        user_id: userId,
-        school_id: userData.schoolId,
         teacher_id: teacherId,
         course_id: courseId,
         age_group: ageGroup,
         level: level,
         phone: phone || null
-      })
-      .select()
-      .single();
-    
-    if (studentError) {
-      console.error("Error creating student record:", studentError);
-      // If student creation fails, try to clean up the user
-      try {
-        await supabase.from('users').delete().eq('id', userId);
-      } catch (cleanupError) {
-        console.error("Failed to clean up user after student creation error:", cleanupError);
+      },
+      headers: {
+        'x-user-id': userData.id,
+        'x-school-id': userData.schoolId,
+        'x-user-role': userData.role
       }
-      
+    });
+    
+    if (error) {
+      console.error("Error calling create_student function:", error);
       return {
-        data: { success: false, message: studentError.message },
-        error: studentError
+        data: { success: false, message: error.message },
+        error: error
       };
     }
     
-    console.log("Student record created successfully:", studentResult);
+    if (!data) {
+      console.error("No data returned from create_student function");
+      return {
+        data: { success: false, message: "No data returned from server" },
+        error: new Error("No data returned from server")
+      };
+    }
+    
+    console.log("Student created successfully:", data);
     
     return {
-      data: {
-        success: true,
-        user_id: userId,
-        student_id: studentResult.id,
-        message: "Student created successfully"
-      },
+      data: data,
       error: null
     };
     
