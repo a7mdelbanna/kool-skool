@@ -14,7 +14,6 @@ import Payments from "./pages/Payments";
 import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
-import TeamMembers from "./pages/TeamMembers";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { PaymentProvider } from "./contexts/PaymentContext";
@@ -132,7 +131,6 @@ const App = () => {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/school-setup" element={<SchoolSetup />} />
                 <Route path="/reports" element={<StatesReports />} />
-                <Route path="/team-members" element={<TeamMembers />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />

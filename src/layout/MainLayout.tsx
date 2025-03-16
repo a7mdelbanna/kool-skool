@@ -3,7 +3,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import MobileNavbar from '@/components/Navbar';
-import Sidebar from './Sidebar';
+import { Sidebar } from './Sidebar';
 
 const MainLayout = () => {
   return (

@@ -1,131 +1,278 @@
-import React, { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  GraduationCap,
-  CalendarRange,
-  DollarSign,
-  BarChart3,
+
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { 
+  Home, 
+  Users, 
+  Calendar, 
+  DollarSign, 
   Settings,
-  Users,
-  School2
-} from "lucide-react";
+  LogOut,
+  PlusCircle,
+  GraduationCap,
+  School,
+  BarChart2
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from 'react-router-dom';
+  Sidebar as SidebarComponent,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from '@/components/ui/sidebar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { supabase, fetchUserProfile } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-const Sidebar = () => {
-  const location = useLocation();
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const { toast } = useToast();
+export function Sidebar() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [profileData, setProfileData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    profilePicture: null as string | null
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        setIsLoading(true);
+        const { profile } = await fetchUserProfile();
+        
+        console.log("Sidebar profile data:", profile);
+        
+        setProfileData({
+          firstName: profile?.first_name || '',
+          lastName: profile?.last_name || '',
+          email: profile?.email || '',
+          profilePicture: profile?.profile_picture
+        });
+      } catch (error) {
+        console.error('Error fetching profile for sidebar:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const handleSignOut = async () => {
+    loadUserProfile();
+  }, []);
+
+  const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      
+      if (error) {
+        throw error;
+      }
+      
       toast({
-        title: "Signed out",
-        description: "You have been successfully signed out.",
+        title: "Logged out",
+        description: "You have been successfully logged out",
       });
+      
       navigate('/auth');
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Error logging out:', error);
       toast({
-        title: "Error signing out",
-        description: error.message,
+        title: "Error",
+        description: "There was a problem logging out",
         variant: "destructive",
       });
     }
   };
 
+  // Get initials for avatar fallback
+  const getInitials = () => {
+    const firstInitial = profileData.firstName ? profileData.firstName[0] : '';
+    const lastInitial = profileData.lastName ? profileData.lastName[0] : '';
+    return (firstInitial + lastInitial).toUpperCase() || 'TP';
+  };
+
   return (
-    <div className="flex flex-col h-full border-r bg-secondary">
-      <div className="flex-1 flex flex-col py-4">
-        <div className="px-3 py-2 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">
-            <School2 className="inline-block mr-2 h-6 w-6" />
-            School CRM
-          </h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="outline-none focus:outline-none rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://github.com/shadcn.png" alt="Avatar" />
-                  <AvatarFallback>SC</AvatarFallback>
-                </Avatar>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut}>
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <SidebarComponent className="hidden lg:flex">
+      <SidebarHeader className="p-4">
+        <div className="flex items-center gap-2">
+          <GraduationCap className="h-6 w-6 text-primary" />
+          <h1 className="text-xl font-semibold">TutorPro</h1>
         </div>
+      </SidebarHeader>
+      
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Main</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Home className="h-5 w-5" />
+                    <span>Dashboard</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/students"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Users className="h-5 w-5" />
+                    <span>Students</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/calendar"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Calendar className="h-5 w-5" />
+                    <span>Calendar</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/payments"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <DollarSign className="h-5 w-5" />
+                    <span>Payments</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/reports"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <BarChart2 className="h-5 w-5" />
+                    <span>States & Reports</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        
+        <SidebarGroup>
+          <SidebarGroupLabel>Account</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/school-setup"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <School className="h-5 w-5" />
+                    <span>School Setup</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-        {/* Main section */}
-        <div className="px-3 py-2">
-          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
-            Menu
-          </h2>
-          <div className="space-y-1">
-            <NavLink to="/">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
-            </NavLink>
-            <NavLink to="/students">
-              <GraduationCap className="mr-2 h-4 w-4" />
-              Students
-            </NavLink>
-            <NavLink to="/calendar">
-              <CalendarRange className="mr-2 h-4 w-4" />
-              Calendar
-            </NavLink>
-            <NavLink to="/payments">
-              <DollarSign className="mr-2 h-4 w-4" />
-              Payments
-            </NavLink>
-            <NavLink to="/reports">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Reports
-            </NavLink>
-            <NavLink to="/team-members">
-              <Users className="mr-2 h-4 w-4" />
-              Team Members
-            </NavLink>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/settings"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Settings className="h-5 w-5" />
+                    <span>Settings</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      
+      <SidebarFooter>
+        <div className="p-4 flex flex-col gap-4">
+          <Button className="gap-2 w-full">
+            <PlusCircle className="h-4 w-4" />
+            <span>New Lesson</span>
+          </Button>
+          
+          <div className="flex items-center justify-between p-2 rounded-md border">
+            <div className="flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                {profileData.profilePicture ? (
+                  <AvatarImage src={profileData.profilePicture} alt="Profile" />
+                ) : null}
+                <AvatarFallback>{getInitials()}</AvatarFallback>
+              </Avatar>
+              <div className="text-sm">
+                <div className="font-medium">
+                  {isLoading ? 'Loading...' : 
+                    (profileData.firstName || profileData.lastName) 
+                      ? `${profileData.firstName} ${profileData.lastName}`.trim() 
+                      : 'Unnamed User'}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {profileData.email || 'No email'}
+                </div>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleLogout}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-
-        {/* Settings section */}
-        <div className="mt-auto px-3 py-2">
-          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
-            Settings
-          </h2>
-          <div className="space-y-1">
-            <NavLink to="/school-setup">
-              <Settings className="mr-2 h-4 w-4" />
-              School Setup
-            </NavLink>
-          </div>
-        </div>
-      </div>
-    </div>
+      </SidebarFooter>
+    </SidebarComponent>
   );
-};
-
-export default Sidebar;
+}
