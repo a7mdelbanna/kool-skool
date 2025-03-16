@@ -1,8 +1,6 @@
 
 import React from "react";
 import {
-  FormControl,
-  FormField,
   FormItem,
   FormLabel,
   FormMessage,
@@ -60,15 +58,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <div>
           <FormItem>
             <FormLabel>First Name</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="John"
-                value={studentData.firstName || ""}
-                onChange={(e) => handleChange("firstName", e.target.value)}
-                readOnly={isViewMode}
-                className={isViewMode ? "bg-muted" : ""}
-              />
-            </FormControl>
+            <Input
+              placeholder="John"
+              value={studentData.firstName || ""}
+              onChange={(e) => handleChange("firstName", e.target.value)}
+              readOnly={isViewMode}
+              className={isViewMode ? "bg-muted" : ""}
+            />
             <FormMessage />
           </FormItem>
         </div>
@@ -76,15 +72,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <div>
           <FormItem>
             <FormLabel>Last Name</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="Doe"
-                value={studentData.lastName || ""}
-                onChange={(e) => handleChange("lastName", e.target.value)}
-                readOnly={isViewMode}
-                className={isViewMode ? "bg-muted" : ""}
-              />
-            </FormControl>
+            <Input
+              placeholder="Doe"
+              value={studentData.lastName || ""}
+              onChange={(e) => handleChange("lastName", e.target.value)}
+              readOnly={isViewMode}
+              className={isViewMode ? "bg-muted" : ""}
+            />
             <FormMessage />
           </FormItem>
         </div>
@@ -93,16 +87,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
       <div>
         <FormItem>
           <FormLabel>Email</FormLabel>
-          <FormControl>
-            <Input
-              type="email"
-              placeholder="student@example.com"
-              value={studentData.email || ""}
-              onChange={(e) => handleChange("email", e.target.value)}
-              readOnly={isViewMode || !isNewStudent}
-              className={isViewMode || !isNewStudent ? "bg-muted" : ""}
-            />
-          </FormControl>
+          <Input
+            type="email"
+            placeholder="student@example.com"
+            value={studentData.email || ""}
+            onChange={(e) => handleChange("email", e.target.value)}
+            readOnly={isViewMode || !isNewStudent}
+            className={isViewMode || !isNewStudent ? "bg-muted" : ""}
+          />
           <FormMessage />
         </FormItem>
       </div>
@@ -128,16 +120,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             <div>
               <FormItem>
                 <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    placeholder="Password for student"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isViewMode}
-                    className={isViewMode ? "bg-muted" : ""}
-                  />
-                </FormControl>
+                <Input
+                  type="password"
+                  placeholder="Password for student"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isViewMode}
+                  className={isViewMode ? "bg-muted" : ""}
+                />
                 <FormDescription>
                   This password will be used for the student to log in
                 </FormDescription>
@@ -152,15 +142,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <div>
           <FormItem>
             <FormLabel>Phone</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="+1 234 567 8900"
-                value={studentData.phone || ""}
-                onChange={(e) => handleChange("phone", e.target.value)}
-                readOnly={isViewMode}
-                className={isViewMode ? "bg-muted" : ""}
-              />
-            </FormControl>
+            <Input
+              placeholder="+1 234 567 8900"
+              value={studentData.phone || ""}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              readOnly={isViewMode}
+              className={isViewMode ? "bg-muted" : ""}
+            />
             <FormMessage />
           </FormItem>
         </div>
@@ -222,27 +210,25 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <div>
           <FormItem className="space-y-3">
             <FormLabel>Age Group</FormLabel>
-            <FormControl>
-              <RadioGroup 
-                value={studentData.ageGroup} 
-                onValueChange={(value) => handleChange("ageGroup", value)}
-                className="flex space-x-4"
-                disabled={isViewMode}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="adult" id="adult" />
-                  <label htmlFor="adult" className="text-sm font-medium leading-none cursor-pointer">
-                    Adult
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="kid" id="kid" />
-                  <label htmlFor="kid" className="text-sm font-medium leading-none cursor-pointer">
-                    Kid
-                  </label>
-                </div>
-              </RadioGroup>
-            </FormControl>
+            <RadioGroup 
+              value={studentData.ageGroup} 
+              onValueChange={(value) => handleChange("ageGroup", value)}
+              className="flex space-x-4"
+              disabled={isViewMode}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="adult" id="adult" />
+                <label htmlFor="adult" className="text-sm font-medium leading-none cursor-pointer">
+                  Adult
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="kid" id="kid" />
+                <label htmlFor="kid" className="text-sm font-medium leading-none cursor-pointer">
+                  Kid
+                </label>
+              </div>
+            </RadioGroup>
             <FormMessage />
           </FormItem>
         </div>
@@ -252,27 +238,25 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <div>
           <FormItem className="space-y-3">
             <FormLabel>Lesson Type</FormLabel>
-            <FormControl>
-              <RadioGroup 
-                value={studentData.lessonType} 
-                onValueChange={(value) => handleChange("lessonType", value)}
-                className="flex space-x-4"
-                disabled={isViewMode}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="individual" id="individual" />
-                  <label htmlFor="individual" className="text-sm font-medium leading-none cursor-pointer">
-                    Individual
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="group" id="group" />
-                  <label htmlFor="group" className="text-sm font-medium leading-none cursor-pointer">
-                    Group
-                  </label>
-                </div>
-              </RadioGroup>
-            </FormControl>
+            <RadioGroup 
+              value={studentData.lessonType} 
+              onValueChange={(value) => handleChange("lessonType", value)}
+              className="flex space-x-4"
+              disabled={isViewMode}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="individual" id="individual" />
+                <label htmlFor="individual" className="text-sm font-medium leading-none cursor-pointer">
+                  Individual
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="group" id="group" />
+                <label htmlFor="group" className="text-sm font-medium leading-none cursor-pointer">
+                  Group
+                </label>
+              </div>
+            </RadioGroup>
             <FormMessage />
           </FormItem>
         </div>

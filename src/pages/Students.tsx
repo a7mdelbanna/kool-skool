@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -82,9 +81,9 @@ const Students = () => {
       lastName: record.last_name || '',
       email: record.email || '',
       courseName: record.course_name || '',
-      lessonType: record.lessonType || 'individual',
-      ageGroup: record.age_group?.toLowerCase() as 'adult' | 'kid',
-      level: record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced',
+      lessonType: record.lessonType as 'individual' | 'group' || 'individual',
+      ageGroup: record.age_group?.toLowerCase() as 'adult' | 'kid' || 'adult',
+      level: record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' || 'beginner',
       phone: record.phone,
       paymentStatus: 'pending', // This would come from subscriptions/payments
       teacherId: record.teacher_id,

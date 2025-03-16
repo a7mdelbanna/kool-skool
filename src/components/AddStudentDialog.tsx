@@ -16,7 +16,8 @@ import {
   createCourse, 
   getSchoolCourses, 
   getSchoolTeachers, 
-  CreateStudentResponse
+  CreateStudentResponse,
+  Course
 } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -214,7 +215,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
                 createPassword={createPassword}
                 setCreatePassword={setCreatePassword}
                 isNewStudent={!isEditMode}
-                courses={coursesData?.data || []}
+                courses={coursesData?.data as Course[] || []}
                 teachers={teachersData?.data || []}
                 isLoading={coursesLoading || teachersLoading}
               />

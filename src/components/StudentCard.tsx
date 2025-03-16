@@ -19,6 +19,10 @@ export interface Student {
   phone?: string;
   paymentStatus: 'paid' | 'pending' | 'overdue';
   teacherId?: string;
+  image?: string;
+  lessonsCompleted?: number;
+  nextLesson?: string;
+  nextPaymentDate?: string;
 }
 
 interface StudentCardProps {

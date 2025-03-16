@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -95,7 +94,7 @@ export interface Session {
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// Helper function to get students with joined data
+// Helper function to get students with details
 export async function getStudentsWithDetails(schoolId: string) {
   // First get the students
   const { data: studentsData, error: studentsError } = await supabase
@@ -166,7 +165,10 @@ export async function createStudent(
     phone: phone || null
   });
 
-  return { data: data as CreateStudentResponse, error };
+  return { 
+    data: data as unknown as CreateStudentResponse, 
+    error 
+  };
 }
 
 // Get courses for a school
@@ -280,5 +282,8 @@ export async function rescheduleSession(sessionId: string, newDate: string, mode
     reschedule_mode: mode
   });
 
-  return { data: data as RescheduleSessionResponse, error };
+  return { 
+    data: data as unknown as RescheduleSessionResponse, 
+    error 
+  };
 }
