@@ -10,3 +10,17 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Helper function to upload base64 image to schools
+export const uploadBase64Image = async (
+  base64String: string, 
+  schoolId: string, 
+  field: 'logo' | 'phone' | 'telegram' | 'whatsapp' | 'instagram'
+) => {
+  const { data, error } = await supabase
+    .from('schools')
+    .update({ [field]: base64String })
+    .eq('id', schoolId);
+    
+  return { data, error };
+};

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -420,48 +421,76 @@ const SchoolSetup = () => {
   };
   
   const handleImageUpload = async (type: 'school' | 'teacher', teacherId?: string) => {
-    if (type === 'school') {
-      setSchoolInfo(prev => ({
-        ...prev,
-        picture: 'https://placehold.co/200x200?text=School+Logo'
-      }));
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    
+    fileInput.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
       
-      if (userSchoolInfo) {
-        try {
-          const { error } = await supabase
-            .from('schools')
-            .update({ logo: 'https://placehold.co/200x200?text=School+Logo' })
-            .eq('id', userSchoolInfo.school_id);
-          
-          if (error) throw error;
-          
-          toast({
-            title: "Image uploaded",
-            description: "School logo has been updated successfully.",
-          });
-        } catch (error) {
-          console.error('Error updating school logo:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to update school logo',
-            variant: 'destructive'
-          });
-        }
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Please select an image smaller than 5MB',
+          variant: 'destructive'
+        });
+        return;
       }
-    } else if (type === 'teacher' && teacherId) {
-      setTeachers(prev => 
-        prev.map(teacher => 
-          teacher.id === teacherId 
-            ? { ...teacher, picture: 'https://placehold.co/200x200?text=Teacher' } 
-            : teacher
-        )
-      );
       
-      toast({
-        title: "Image uploaded",
-        description: "Teacher profile picture has been uploaded successfully.",
-      });
-    }
+      try {
+        // Convert file to base64 for preview
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const base64String = event.target?.result as string;
+          
+          if (type === 'school') {
+            setSchoolInfo(prev => ({
+              ...prev,
+              picture: base64String
+            }));
+            
+            if (userSchoolInfo) {
+              const { error } = await supabase
+                .from('schools')
+                .update({ logo: base64String })
+                .eq('id', userSchoolInfo.school_id);
+              
+              if (error) throw error;
+              
+              toast({
+                title: "Logo uploaded",
+                description: "School logo has been updated successfully.",
+              });
+            }
+          } else if (type === 'teacher' && teacherId) {
+            setTeachers(prev => 
+              prev.map(teacher => 
+                teacher.id === teacherId 
+                  ? { ...teacher, picture: base64String } 
+                  : teacher
+              )
+            );
+            
+            toast({
+              title: "Image uploaded",
+              description: "Teacher profile picture has been uploaded successfully.",
+            });
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        toast({
+          title: 'Upload failed',
+          description: 'Failed to upload the image',
+          variant: 'destructive'
+        });
+      }
+    };
+    
+    fileInput.click();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -499,6 +528,7 @@ const SchoolSetup = () => {
         description: "All your changes have been saved successfully.",
       });
       
+      // Refresh school info after save
       const { data, error } = await supabase.rpc('get_user_school_info');
       
       if (error) throw error;
