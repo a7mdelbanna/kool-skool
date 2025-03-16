@@ -193,7 +193,10 @@ const Auth = () => {
             school_name_param: data.schoolName
           });
         
-        if (schoolError) throw schoolError;
+        if (schoolError) {
+          console.error("School creation error:", schoolError);
+          throw schoolError;
+        }
         
         toast({
           title: 'Account created',
@@ -203,6 +206,7 @@ const Auth = () => {
         // No need to navigate as the auth state change will handle it
       }
     } catch (error: any) {
+      console.error("Signup error:", error);
       toast({
         title: 'Signup failed',
         description: error.message || 'Please try again with different credentials',
