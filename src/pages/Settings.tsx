@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   User, 
@@ -31,29 +30,14 @@ const Settings = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [profileData, setProfileData] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     location: '',
     bio: '',
     profile_picture: null as string | null
   });
-  
-  // Parse first and last name from full name
-  const getFirstLastName = (fullName: string) => {
-    const names = fullName.trim().split(' ');
-    if (names.length === 1) return { first_name: names[0], last_name: '' };
-    const firstName = names[0];
-    const lastName = names.slice(1).join(' ');
-    return { first_name: firstName, last_name: lastName };
-  };
-  
-  // Combine first and last name into full name
-  const getFullName = (firstName: string | null, lastName: string | null) => {
-    const first = firstName || '';
-    const last = lastName || '';
-    return `${first} ${last}`.trim();
-  };
 
   // Fetch user profile data
   const fetchUserProfile = async () => {
@@ -83,7 +67,8 @@ const Settings = () => {
       
       if (profileData) {
         setProfileData({
-          fullName: getFullName(profileData.first_name, profileData.last_name),
+          firstName: profileData.first_name || '',
+          lastName: profileData.last_name || '',
           email: profileData.email || '',
           phone: profileData.phone || '',
           location: '', // Location is not in the schema, but keeping it for UI consistency
@@ -120,15 +105,12 @@ const Settings = () => {
         return;
       }
       
-      // Parse first and last name
-      const { first_name, last_name } = getFirstLastName(profileData.fullName);
-      
       // Update profile
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name,
-          last_name,
+          first_name: profileData.firstName,
+          last_name: profileData.lastName,
           phone: profileData.phone,
           profile_picture: profileData.profile_picture
         })
@@ -264,13 +246,9 @@ const Settings = () => {
 
   // Get initials for avatar fallback
   const getInitials = () => {
-    if (!profileData.fullName) return "U";
-    return profileData.fullName
-      .split(' ')
-      .map(name => name[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
+    const firstInitial = profileData.firstName ? profileData.firstName[0] : '';
+    const lastInitial = profileData.lastName ? profileData.lastName[0] : '';
+    return (firstInitial + lastInitial).toUpperCase();
   };
 
   return (
@@ -343,12 +321,22 @@ const Settings = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
+                  <Label htmlFor="firstName">First Name</Label>
                   <Input 
-                    id="fullName" 
-                    placeholder="John Smith" 
-                    value={profileData.fullName}
-                    onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+                    id="firstName" 
+                    placeholder="John" 
+                    value={profileData.firstName}
+                    onChange={(e) => setProfileData({...profileData, firstName: e.target.value})}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input 
+                    id="lastName" 
+                    placeholder="Smith" 
+                    value={profileData.lastName}
+                    onChange={(e) => setProfileData({...profileData, lastName: e.target.value})}
                     disabled={isLoading}
                   />
                 </div>
