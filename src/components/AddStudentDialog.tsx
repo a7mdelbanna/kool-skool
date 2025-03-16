@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -51,13 +52,24 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   const [createPassword, setCreatePassword] = useState(false);
   
   const getUserData = () => {
-    const user = localStorage.getItem('user');
-    console.log("User data from localStorage:", user);
-    return user ? JSON.parse(user) : null;
+    try {
+      const user = localStorage.getItem('user');
+      console.log("User data from localStorage:", user);
+      if (!user) return null;
+      
+      const userData = JSON.parse(user);
+      // Make sure we're using the schoolId property correctly
+      console.log("Parsed user data:", userData);
+      return userData;
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return null;
+    }
   };
 
   const userData = getUserData();
-  const schoolId = userData?.school_id;
+  // Fix: Correctly access schoolId from userData
+  const schoolId = userData?.schoolId || null;
   console.log("School ID for queries:", schoolId);
   
   const { 

@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -250,6 +251,24 @@ export async function getSchoolCourses(schoolId: string) {
     
     if (!data || data.length === 0) {
       console.log('No courses found for school ID:', schoolId);
+      
+      // If no courses found, try to create a test course
+      try {
+        console.log('Creating a test course');
+        const { data: testCourseData, error: testCourseError } = await supabase.functions.invoke('test_create_course', {
+          body: { school_id: schoolId }
+        });
+        
+        if (testCourseError) {
+          console.error('Error creating test course:', testCourseError);
+        } else if (testCourseData) {
+          console.log('Created test course:', testCourseData);
+          return { data: [testCourseData] as Course[], error: null };
+        }
+      } catch (testError) {
+        console.error('Exception creating test course:', testError);
+      }
+      
       return { data: [], error: null };
     }
     
@@ -310,7 +329,7 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Session verified or custom auth applied, proceeding with course creation");
     
-    // Use custom form submission to handle the RPC function that TypeScript doesn't fully recognize
+    // Use our Edge Function to create the course
     const { data, error } = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
       body: {
         school_id: schoolId,

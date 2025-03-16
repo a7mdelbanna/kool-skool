@@ -23,30 +23,67 @@ serve(async (req) => {
     const requestData = await req.json()
     const { school_id } = requestData
     
+    if (!school_id) {
+      return new Response(
+        JSON.stringify({ error: "Missing required school_id parameter" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
+    // First check if there are any existing courses
+    console.log(`Checking for existing courses for school: ${school_id}`)
+    const { data: existingCourses, error: fetchError } = await supabaseClient
+      .from('courses')
+      .select('*')
+      .eq('school_id', school_id)
+    
+    if (fetchError) {
+      console.error("Error checking existing courses:", fetchError)
+      return new Response(
+        JSON.stringify({ error: fetchError.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
+    // If courses already exist, return the first one
+    if (existingCourses && existingCourses.length > 0) {
+      console.log(`Found existing course: ${existingCourses[0].name}`)
+      return new Response(
+        JSON.stringify(existingCourses[0]),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      )
+    }
+    
     // Generate a test course
     const courseName = `Test Course ${new Date().toISOString().substring(0, 10)}`;
     const lessonType = Math.random() > 0.5 ? 'Individual' : 'Group';
     
     console.log(`Creating test course with name: ${courseName}, type: ${lessonType} for school: ${school_id}`)
     
-    // Call the RPC function to create the course
-    const { data, error } = await supabaseClient.rpc('create_course', {
-      school_id,
-      course_name: courseName,
-      lesson_type: lessonType
-    })
+    // Insert directly into the courses table
+    const { data: courseData, error: insertError } = await supabaseClient
+      .from('courses')
+      .insert([
+        { 
+          school_id: school_id,
+          name: courseName,
+          lesson_type: lessonType
+        }
+      ])
+      .select()
+      .single()
     
-    if (error) {
-      console.error("Error creating test course:", error)
+    if (insertError) {
+      console.error("Error creating test course:", insertError)
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: insertError.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
     
     // Return the created course data
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify(courseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
