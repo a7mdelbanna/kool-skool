@@ -200,9 +200,11 @@ export const fetchTeamMembers = async () => {
     throw new Error('User is not associated with any school');
   }
   
-  // Explicitly specify the relationship column in the select query
+  // Fully specify the query with a better join technique
   console.log("Fetching team members for school ID:", schoolId);
-  const { data, error } = await supabase
+  
+  // First get all team members
+  const { data: teamMembersData, error: teamMembersError } = await supabase
     .from('team_members')
     .select(`
       id,
@@ -214,22 +216,41 @@ export const fetchTeamMembers = async () => {
       invited_by,
       school_id,
       created_at,
-      updated_at,
-      profiles:profile_id(
-        first_name,
-        last_name,
-        email,
-        phone,
-        profile_picture
-      )
+      updated_at
     `)
     .eq('school_id', schoolId);
     
-  if (error) {
-    console.error("Error fetching team members:", error);
-    throw error;
+  if (teamMembersError) {
+    console.error("Error fetching team members:", teamMembersError);
+    throw teamMembersError;
   }
   
-  console.log("Team members data:", data);
-  return data || [];
+  // Now fetch profiles separately for those that have a profile_id
+  const teamMembers = await Promise.all((teamMembersData || []).map(async (member) => {
+    if (member.profile_id) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select(`
+          first_name,
+          last_name,
+          email,
+          phone,
+          profile_picture
+        `)
+        .eq('id', member.profile_id)
+        .single();
+        
+      if (profileError) {
+        console.error(`Error fetching profile for member ${member.id}:`, profileError);
+        return { ...member, profiles: null };
+      }
+      
+      return { ...member, profiles: profileData };
+    }
+    
+    return { ...member, profiles: null };
+  }));
+  
+  console.log("Processed team members data:", teamMembers);
+  return teamMembers;
 };
