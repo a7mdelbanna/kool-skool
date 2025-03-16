@@ -108,11 +108,6 @@ export const refreshSupabaseAuth = async (userId: string) => {
   if (!userId) return false;
   
   try {
-    const { data: { session }, error } = await supabase.auth.signInWithPassword({
-      email: 'temp@example.com', // This is just a placeholder
-      password: 'temporary',     // This is just a placeholder
-    });
-    
     // Even if the signin fails, we can still create a custom session
     await supabase.auth.setSession({
       access_token: `${userId}_custom_token`,
@@ -210,11 +205,37 @@ export async function getSchoolCourses(schoolId: string) {
   try {
     // Ensure schoolId is valid
     if (!schoolId) {
-      console.error('Invalid school ID provided:', schoolId);
+      console.error('Invalid school ID provided');
       return { data: [], error: new Error('Invalid school ID') };
     }
     
-    // Improved error logging
+    // Check for stored authentication data in localStorage
+    const storedUser = localStorage.getItem('user');
+    let userId = null;
+    
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        userId = userData.id;
+        
+        if (userId) {
+          console.log("Found user ID in localStorage:", userId);
+          // Set up auth with the user's ID
+          await refreshSupabaseAuth(userId);
+        }
+      } catch (parseError) {
+        console.error("Error parsing user data from localStorage:", parseError);
+      }
+    }
+    
+    // Log all the request details before making the request
+    console.log("Requesting courses with:", { 
+      schoolId, 
+      hasUserId: !!userId,
+      url: `${SUPABASE_URL}/rest/v1/courses?select=*&school_id=eq.${schoolId}`
+    });
+    
+    // Make the request with improved error handling
     const { data, error } = await supabase
       .from('courses')
       .select('*')
@@ -225,12 +246,14 @@ export async function getSchoolCourses(schoolId: string) {
       return { data: [], error };
     }
     
+    console.log('Raw courses data:', data);
+    
     if (!data || data.length === 0) {
       console.log('No courses found for school ID:', schoolId);
       return { data: [], error: null };
     }
     
-    console.log('Courses retrieved successfully:', data);
+    console.log('Courses retrieved successfully, count:', data.length);
 
     // Convert string lesson_type to proper enum type
     const typedData = data.map(course => ({
@@ -334,13 +357,64 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
 
 // Get teachers for a school
 export async function getSchoolTeachers(schoolId: string) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, first_name, last_name')
-    .eq('school_id', schoolId)
-    .eq('role', 'teacher');
-
-  return { data, error };
+  console.log('Fetching teachers for school ID:', schoolId);
+  
+  try {
+    // Ensure schoolId is valid
+    if (!schoolId) {
+      console.error('Invalid school ID provided for teachers');
+      return { data: [], error: new Error('Invalid school ID') };
+    }
+    
+    // Check for stored authentication data in localStorage
+    const storedUser = localStorage.getItem('user');
+    let userId = null;
+    
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        userId = userData.id;
+        
+        if (userId) {
+          console.log("Found user ID in localStorage for teachers:", userId);
+          // Set up auth with the user's ID
+          await refreshSupabaseAuth(userId);
+        }
+      } catch (parseError) {
+        console.error("Error parsing user data from localStorage for teachers:", parseError);
+      }
+    }
+    
+    console.log("Requesting teachers with:", { 
+      schoolId, 
+      hasUserId: !!userId
+    });
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, first_name, last_name')
+      .eq('school_id', schoolId)
+      .eq('role', 'teacher');
+    
+    if (error) {
+      console.error('Supabase error fetching teachers:', error);
+      return { data: [], error };
+    }
+    
+    console.log('Raw teachers data:', data);
+    
+    if (!data || data.length === 0) {
+      console.log('No teachers found for school ID:', schoolId);
+      return { data: [], error: null };
+    }
+    
+    console.log('Teachers retrieved successfully, count:', data.length);
+    
+    return { data, error: null };
+  } catch (error) {
+    console.error('Exception fetching teachers:', error);
+    return { data: [], error: error as Error };
+  }
 }
 
 // Create a subscription

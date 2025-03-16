@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,13 +52,14 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   
   const getUserData = () => {
     const user = localStorage.getItem('user');
+    console.log("User data from localStorage:", user);
     return user ? JSON.parse(user) : null;
   };
 
   const userData = getUserData();
   const schoolId = userData?.school_id;
+  console.log("School ID for queries:", schoolId);
   
-  // Improve course fetching by ensuring proper refetching and debugging
   const { 
     data: coursesData, 
     isLoading: coursesLoading,
@@ -68,40 +68,74 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   } = useQuery({
     queryKey: ['courses', schoolId],
     queryFn: async () => {
-      console.log('Fetching courses for school ID:', schoolId);
+      console.log('Executing course query function with schoolId:', schoolId);
+      if (!schoolId) {
+        console.warn('No school ID available for fetching courses');
+        return { data: [] as Course[] };
+      }
+      
       const result = await getSchoolCourses(schoolId);
-      console.log('Courses fetched:', result);
+      console.log('Courses query result:', result);
+      
+      if (!result.data) {
+        console.warn('No data returned from getSchoolCourses');
+        return { data: [] as Course[] };
+      }
+      
       return result;
     },
+    staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!schoolId && open,
+    retry: 3,
   });
 
   const { 
     data: teachersData, 
     isLoading: teachersLoading,
-    error: teachersError 
+    error: teachersError,
+    refetch: refetchTeachers
   } = useQuery({
     queryKey: ['teachers', schoolId],
-    queryFn: () => getSchoolTeachers(schoolId),
+    queryFn: async () => {
+      console.log('Executing teacher query function with schoolId:', schoolId);
+      if (!schoolId) {
+        console.warn('No school ID available for fetching teachers');
+        return { data: [] };
+      }
+      
+      const result = await getSchoolTeachers(schoolId);
+      console.log('Teachers query result:', result);
+      
+      if (!result.data) {
+        console.warn('No data returned from getSchoolTeachers');
+        return { data: [] };
+      }
+      
+      return result;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!schoolId && open,
+    retry: 3,
   });
   
-  // Log any errors for debugging
   useEffect(() => {
     if (coursesError) {
       console.error('Error fetching courses:', coursesError);
+      toast.error("Failed to load courses. Please try again.");
     }
     if (teachersError) {
       console.error('Error fetching teachers:', teachersError);
+      toast.error("Failed to load teachers. Please try again.");
     }
   }, [coursesError, teachersError]);
   
-  // Force refetch when dialog opens
   useEffect(() => {
     if (open && schoolId) {
+      console.log("Dialog opened - triggering data refetch");
       refetchCourses();
+      refetchTeachers();
     }
-  }, [open, schoolId, refetchCourses]);
+  }, [open, schoolId, refetchCourses, refetchTeachers]);
   
   useEffect(() => {
     if (student) {
@@ -122,7 +156,6 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     }
   }, [student, open]);
 
-  // This function now only updates the local state without causing re-renders
   const handleUpdateStudentData = (data: Partial<Student>) => {
     setStudentData(prevData => ({
       ...prevData,
@@ -210,6 +243,9 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
       setSaving(false);
     }
   };
+
+  console.log("Courses data available:", !!coursesData?.data, "count:", coursesData?.data?.length || 0);
+  console.log("Teachers data available:", !!teachersData?.data, "count:", teachersData?.data?.length || 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
