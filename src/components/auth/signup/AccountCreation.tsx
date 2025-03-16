@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,52 +30,70 @@ const AccountCreation: React.FC = () => {
   const { licenseId } = useParams<{ licenseId: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [licenseInfo, setLicenseInfo] = useState<{ license_number: string } | null>(null);
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   
   // Fetch license information when the component mounts
   useEffect(() => {
+    // First check if we have a valid licenseId from params
     if (!licenseId) {
+      setLicenseError("Invalid license. Please verify your license first.");
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
       return;
     }
     
+    // Try to get stored license number from session storage first
+    const storedLicenseNumber = sessionStorage.getItem('licenseNumber');
+    const storedLicenseId = sessionStorage.getItem('licenseId');
+    
+    if (storedLicenseNumber && storedLicenseId === licenseId) {
+      console.log("Using stored license info:", { number: storedLicenseNumber, id: storedLicenseId });
+      setLicenseInfo({ license_number: storedLicenseNumber });
+      return;
+    }
+    
+    // Otherwise fetch from database
     const fetchLicenseInfo = async () => {
       try {
+        setLicenseError(null);
+        
+        // Get just the license number for this license ID
         const { data, error } = await supabase
           .from('licenses')
           .select('license_number')
           .eq('id', licenseId)
-          .single();
+          .maybeSingle();
           
         if (error) {
           console.error("Error fetching license:", error);
+          setLicenseError("Could not fetch license information. Please try again.");
           toast.error("Could not fetch license information. Please try again.");
+          return;
+        }
+        
+        if (!data) {
+          console.error("License not found");
+          setLicenseError("License not found. Please verify your license first.");
+          toast.error("License not found. Please verify your license first.");
           navigate("/auth");
           return;
         }
         
-        if (data) {
-          setLicenseInfo(data);
-        } else {
-          toast.error("License not found. Please verify your license first.");
-          navigate("/auth");
-        }
+        console.log("Successfully fetched license info:", data);
+        setLicenseInfo(data);
+        
+        // Store in session storage for future use
+        sessionStorage.setItem('licenseNumber', data.license_number);
+        sessionStorage.setItem('licenseId', licenseId);
       } catch (err) {
         console.error("Error in fetchLicenseInfo:", err);
+        setLicenseError("An unexpected error occurred. Please try again.");
         toast.error("An unexpected error occurred. Please try again.");
         navigate("/auth");
       }
     };
     
     fetchLicenseInfo();
-  }, [licenseId, navigate]);
-  
-  // Redirect to auth page if no licenseId is provided
-  useEffect(() => {
-    if (!licenseId) {
-      toast.error("Invalid license. Please verify your license first.");
-      navigate("/auth");
-    }
   }, [licenseId, navigate]);
   
   const accountForm = useForm<AccountFormValues>({
@@ -98,11 +115,12 @@ const AccountCreation: React.FC = () => {
     try {
       setIsSubmitting(true);
       console.log("Creating account with license ID:", licenseId);
+      console.log("License number:", licenseInfo.license_number);
       
       // Simple user data for initial account creation
       const userData = {
         licenseId: licenseId,
-        licenseNumber: licenseInfo.license_number, // Pass the license number as well
+        licenseNumber: licenseInfo.license_number,
         firstName: "New",
         lastName: "User",
         schoolName: "New School",
@@ -121,8 +139,38 @@ const AccountCreation: React.FC = () => {
     }
   };
 
-  if (!licenseId || !licenseInfo) {
-    return null; // Will redirect in useEffect
+  if (licenseError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-muted">
+        <div className="p-4 w-full max-w-md">
+          <Card className="shadow-lg">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-bold">License Error</CardTitle>
+              <CardDescription>{licenseError}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                className="w-full" 
+                onClick={() => navigate("/auth")}
+              >
+                Go Back to Sign Up
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!licenseInfo) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-muted">
+        <div className="p-4 w-full max-w-md text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <p className="mt-4">Loading license information...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

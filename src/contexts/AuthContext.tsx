@@ -123,6 +123,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       
+      console.log("CompleteSignUp with licenseId:", userData.licenseId);
+      console.log("CompleteSignUp with licenseNumber:", userData.licenseNumber);
+      
+      // Verify license exists before proceeding
+      const { data: licenseData, error: licenseCheckError } = await supabase
+        .from('licenses')
+        .select('*')
+        .eq('id', userData.licenseId)
+        .single();
+        
+      if (licenseCheckError || !licenseData) {
+        console.error("License not found:", licenseCheckError);
+        toast.error("Invalid license. Please verify your license again.");
+        navigate("/auth");
+        return;
+      }
+      
       // First, update the license record with the school name if provided
       if (userData.licenseId && userData.schoolName) {
         console.log("Updating license with school name:", userData.schoolName);
