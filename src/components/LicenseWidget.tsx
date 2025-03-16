@@ -88,6 +88,7 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
 const LicenseWidget: React.FC = () => {
   const location = useLocation();
   const isSchoolSetupPage = location.pathname === '/school-setup';
+  const isLicensePage = location.pathname === '/license';
   
   // Only run the query if we're not on the school setup page
   const { data: licenseDetails, isLoading, error, refetch } = useQuery({
@@ -113,6 +114,63 @@ const LicenseWidget: React.FC = () => {
     );
   }
 
+  // Expanded view for the license management page
+  if (isLicensePage && licenseDetails) {
+    return (
+      <div className="bg-white p-6 rounded-lg border border-gray-200 w-full">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">License Key</h3>
+            <p className="font-mono bg-gray-50 p-2 rounded mt-1 text-sm border border-gray-100">
+              {licenseDetails.license_number}
+            </p>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">Status</h3>
+            <div className={`flex items-center mt-1 ${licenseDetails.is_active ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`w-3 h-3 rounded-full mr-2 ${licenseDetails.is_active ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <p className="font-medium">{licenseDetails.is_active ? 'Active' : 'Inactive'}</p>
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">Expiration Date</h3>
+            <p className="font-medium mt-1">
+              {licenseDetails.expires_at 
+                ? new Date(licenseDetails.expires_at).toLocaleDateString() 
+                : 'Not set'}
+            </p>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">Time Remaining</h3>
+            <p className={`font-medium mt-1 ${
+              licenseDetails.days_remaining > 30 
+                ? 'text-green-600' 
+                : licenseDetails.days_remaining > 7 
+                  ? 'text-amber-600' 
+                  : 'text-red-600'
+            }`}>
+              {licenseDetails.days_remaining} days
+            </p>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">License Duration</h3>
+            <p className="font-medium mt-1">{licenseDetails.duration_days} days</p>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">School</h3>
+            <p className="font-medium mt-1">{licenseDetails.school_name}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard widget view for other pages
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
       <div className="flex justify-between items-center mb-4">

@@ -16,6 +16,7 @@ import StatesReports from "./pages/StatesReports";
 import TeamAccess from "./pages/TeamAccess";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import LicenseManagement from "./pages/LicenseManagement";
 import { PaymentProvider } from "./contexts/PaymentContext";
 
 const queryClient = new QueryClient();
@@ -61,7 +62,8 @@ const App = () => {
             <Routes>
               {/* Authentication routes */}
               <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
-              <Route path="/school-setup" element={<SchoolSetup />} />
+              {/* School setup is only accessible if user is NOT authenticated */}
+              <Route path="/school-setup" element={isAuthenticated ? <Navigate to="/license" replace /> : <SchoolSetup />} />
               
               {/* Protected routes */}
               <Route element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>
@@ -72,6 +74,7 @@ const App = () => {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/reports" element={<StatesReports />} />
                 <Route path="/team-access" element={<TeamAccess />} />
+                <Route path="/license" element={<LicenseManagement />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
