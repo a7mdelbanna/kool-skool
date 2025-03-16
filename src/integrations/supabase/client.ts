@@ -390,13 +390,13 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Session verified, proceeding with course creation");
     
-    // Use our Edge Function to create the course
-    const { data, error } = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
-      body: {
+    // Use our Edge Function to create the course with improved error handling
+    const response = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
+      body: JSON.stringify({
         school_id: schoolId,
         course_name: name,
         lesson_type: lessonType
-      },
+      }),
       headers: {
         'x-user-id': userData.id,
         'x-school-id': userData.schoolId,
@@ -407,19 +407,21 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
       }
     });
 
-    if (error) {
-      console.error("Error creating course:", error);
+    if (response.error) {
+      console.error("Error creating course:", response.error);
       
       // Handle auth errors
-      if (error.message?.includes('JWT') || error.message?.includes('401')) {
+      if (response.error.message?.includes('JWT') || response.error.message?.includes('401')) {
         return { 
           data: null, 
           error: new Error("Your session has expired. Please sign in again.") 
         };
       }
       
-      return { data: null, error };
+      return { data: null, error: response.error };
     }
+    
+    const data = response.data;
     
     if (!data) {
       return { 

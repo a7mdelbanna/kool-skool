@@ -8,8 +8,11 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log("Create course function called");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS request");
     return new Response(null, { headers: corsHeaders })
   }
   
@@ -40,6 +43,32 @@ serve(async (req) => {
       hasApiKey: !!apiKey
     })
     
+    // Parse request body with error handling
+    let requestData;
+    try {
+      const text = await req.text();
+      console.log("Raw request body:", text);
+      
+      if (!text || text.trim() === '') {
+        return new Response(
+          JSON.stringify({ error: "Empty request body" }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+      }
+      
+      requestData = JSON.parse(text);
+      console.log("Parsed request data:", requestData);
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid JSON in request body", 
+          detail: parseError.message 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
     // Create Supabase client with service role key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -58,8 +87,6 @@ serve(async (req) => {
       }
     )
     
-    // Get request body
-    const requestData = await req.json()
     const { school_id, course_name, lesson_type } = requestData
     
     console.log(`Creating course with name: ${course_name}, type: ${lesson_type} for school: ${school_id}`)
@@ -94,7 +121,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Unhandled error:", error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
