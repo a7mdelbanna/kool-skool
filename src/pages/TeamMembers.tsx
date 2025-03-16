@@ -10,7 +10,8 @@ import {
   Trash2,
   CheckCircle2,
   Loader2,
-  Shield
+  Shield,
+  School
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -78,6 +79,7 @@ const TeamMembers = () => {
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [schoolInfo, setSchoolInfo] = useState<{ id: string, name: string } | null>(null);
 
   const form = useForm<CreateTeamMemberFormValues>({
     resolver: zodResolver(createTeamMemberSchema),
@@ -92,8 +94,51 @@ const TeamMembers = () => {
   });
 
   useEffect(() => {
-    fetchTeamMembers();
+    fetchUserSchoolInfo().then(() => {
+      fetchTeamMembers();
+    });
   }, []);
+
+  const fetchUserSchoolInfo = async () => {
+    try {
+      setError(null);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+      
+      // Get the user's school_id and school name
+      const { data, error } = await supabase.rpc('get_user_school_info');
+      
+      if (error) {
+        console.error("Error fetching user school info:", error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        setError('You do not belong to any school. Please create or join a school first.');
+        setLoading(false);
+        return;
+      }
+      
+      setSchoolInfo({
+        id: data[0].school_id,
+        name: data[0].school_name
+      });
+      
+    } catch (error: any) {
+      console.error('Error fetching school info:', error);
+      setError(error.message || 'Failed to load school information');
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to load school information',
+        variant: 'destructive'
+      });
+    }
+  };
 
   const fetchTeamMembers = async () => {
     try {
@@ -123,7 +168,9 @@ const TeamMembers = () => {
       const schoolId = profileData?.school_id;
       
       if (!schoolId) {
-        throw new Error('User is not associated with any school');
+        setError('User is not associated with any school');
+        setLoading(false);
+        return;
       }
       
       // Fix the query to correctly handle the relationship using explicit foreign key
@@ -168,6 +215,16 @@ const TeamMembers = () => {
 
   const handleCreateTeamMember = async (values: CreateTeamMemberFormValues) => {
     try {
+      if (!schoolInfo) {
+        setError('User does not belong to a school. Please set up a school first.');
+        toast({
+          title: 'Error',
+          description: 'User does not belong to a school. Please set up a school first.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
       setAddingMember(true);
       setError(null);
       
@@ -194,7 +251,7 @@ const TeamMembers = () => {
       
       console.log('User account created successfully with ID:', authData.user.id);
       
-      // Then use create_team_member RPC to associate the user with the school
+      // Then use finalize_team_member RPC to associate the user with the school
       const { data: teamMemberId, error: rpcError } = await supabase.rpc(
         'finalize_team_member',
         {
@@ -212,7 +269,7 @@ const TeamMembers = () => {
       
       toast({
         title: 'Success',
-        description: `Team member ${values.firstName} ${values.lastName} has been created successfully.`,
+        description: `Team member ${values.firstName} ${values.lastName} has been created successfully for ${schoolInfo.name}.`,
       });
       
       // Reset form and refetch team members
@@ -295,6 +352,13 @@ const TeamMembers = () => {
         </Button>
       </div>
       
+      {schoolInfo && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <School className="h-4 w-4" />
+          <span>School: <span className="font-medium text-foreground">{schoolInfo.name}</span></span>
+        </div>
+      )}
+      
       {error && (
         <Alert variant="destructive" className="mb-6">
           <AlertTitle>Error</AlertTitle>
@@ -313,6 +377,11 @@ const TeamMembers = () => {
             </CardTitle>
             <CardDescription>
               Create a new team member account with direct access to your school's platform.
+              {schoolInfo && (
+                <div className="mt-1 text-sm font-medium">
+                  This user will be added to: {schoolInfo.name}
+                </div>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -420,7 +489,7 @@ const TeamMembers = () => {
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full" disabled={addingMember}>
+                <Button type="submit" className="w-full" disabled={addingMember || !schoolInfo}>
                   {addingMember ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
