@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, LogIn, Loader2, School } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, UserLoginResponse } from "@/integrations/supabase/client";
 import { useNavigate, Link } from 'react-router-dom';
 
 const Login = () => {
@@ -34,22 +34,24 @@ const Login = () => {
         throw error;
       }
       
-      if (!data.success) {
-        throw new Error(data.message || 'Invalid email or password');
+      const response = data as UserLoginResponse;
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Invalid email or password');
       }
       
       // Store user information in local storage
       localStorage.setItem('user', JSON.stringify({
-        id: data.user_id,
-        firstName: data.first_name,
-        lastName: data.last_name,
-        role: data.role,
-        schoolId: data.school_id
+        id: response.user_id,
+        firstName: response.first_name,
+        lastName: response.last_name,
+        role: response.role,
+        schoolId: response.school_id
       }));
       
       toast({
         title: "Login successful",
-        description: `Welcome back, ${data.first_name}!`,
+        description: `Welcome back, ${response.first_name}!`,
       });
       
       // Redirect to dashboard

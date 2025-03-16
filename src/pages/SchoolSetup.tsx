@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { School, CheckCircle, KeyRound, User, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SchoolSetupResponse } from "@/integrations/supabase/client";
 import { useNavigate } from 'react-router-dom';
 import LicenseWidget from '@/components/LicenseWidget';
 
@@ -171,8 +171,10 @@ const SchoolSetup = () => {
         throw error;
       }
       
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to verify license');
+      const response = data as SchoolSetupResponse;
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to verify license');
       }
       
       toast({

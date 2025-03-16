@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Users, UserPlus, Mail, Key, User, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, TeamMemberResponse } from "@/integrations/supabase/client";
 
 interface TeamMember {
   id: string;
@@ -161,8 +161,10 @@ const TeamAccess = () => {
         throw error;
       }
       
-      if (!data.success) {
-        throw new Error(data.message || "Failed to add team member");
+      const response = data as TeamMemberResponse;
+      
+      if (!response.success) {
+        throw new Error(response.message || "Failed to add team member");
       }
       
       // Reset form
