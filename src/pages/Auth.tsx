@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, LogIn, UserPlus, Shield } from 'lucide-react';
-import { supabase, safeArray } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   Form,
@@ -82,9 +83,7 @@ const Auth = () => {
     
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log("Auth state change event:", event);
         if (session) {
-          console.log("Session detected, redirecting to dashboard");
           navigate('/');
         }
       }
@@ -109,8 +108,6 @@ const Auth = () => {
         title: 'Login successful',
         description: 'Welcome back!',
       });
-      
-      // Navigate should happen automatically due to the auth state change listener
     } catch (error: any) {
       toast({
         title: 'Login failed',
@@ -143,9 +140,7 @@ const Auth = () => {
         throw licenseError;
       }
       
-      const licenseDataArray = safeArray(licenseData);
-      
-      if (!licenseDataArray || licenseDataArray.length === 0) {
+      if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
         throw new Error('Invalid license number or license has expired');
       }
       
@@ -189,7 +184,8 @@ const Auth = () => {
             first_name: data.firstName,
             last_name: data.lastName
           },
-          emailRedirectTo: `${window.location.origin}/auth`
+          // Disable email confirmation for development
+          emailRedirectTo: window.location.origin
         }
       });
 
@@ -209,18 +205,16 @@ const Auth = () => {
           throw licenseError;
         }
         
-        const licenseDataArray = safeArray(licenseData);
-        
-        if (!licenseDataArray || licenseDataArray.length === 0) {
+        if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
           console.error('License validation failed during signup');
           throw new Error('License validation failed');
         }
         
-        console.log('License verified successfully:', licenseDataArray[0].license_id);
+        console.log('License verified successfully:', licenseData[0].license_id);
         
         const { data: schoolData, error: schoolError } = await supabase
           .rpc('create_school_and_associate_director', {
-            license_id_param: licenseDataArray[0].license_id,
+            license_id_param: licenseData[0].license_id,
             school_name_param: data.schoolName
           });
         
@@ -231,6 +225,24 @@ const Auth = () => {
         
         console.log('School created successfully with ID:', schoolData);
         
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .update({
+            first_name: data.firstName,
+            last_name: data.lastName
+          })
+          .eq('id', authData.user.id);
+          
+        if (profileUpdateError) {
+          console.error("Profile update error:", profileUpdateError);
+        }
+        
+        toast({
+          title: 'Account created',
+          description: 'Your account has been created and associated with your school.',
+        });
+        
+        // Auto sign-in after successful signup
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
@@ -238,24 +250,13 @@ const Auth = () => {
         
         if (signInError) {
           console.error("Auto sign-in error:", signInError);
-          
-          if (signInError.message === "Email not confirmed") {
-            toast({
-              title: 'Email verification required',
-              description: 'Please check your email to verify your account before logging in.',
-            });
-          } else {
-            toast({
-              title: 'Please sign in',
-              description: 'Your account has been created. Please sign in with your credentials.',
-            });
-          }
-        } else {
-          console.log("Auto sign-in successful, should redirect to dashboard");
           toast({
-            title: 'Account created',
-            description: 'Your account has been created and you have been signed in.',
+            title: 'Please sign in',
+            description: 'Your account has been created. Please sign in with your credentials.',
           });
+        } else {
+          // Navigate should happen automatically due to the auth state change listener
+          console.log("Auto sign-in successful");
         }
       }
     } catch (error: any) {
@@ -546,4 +547,3 @@ const Auth = () => {
 };
 
 export default Auth;
-

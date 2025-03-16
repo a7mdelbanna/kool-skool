@@ -22,9 +22,9 @@ export const supabase = createClient<Database>(
 );
 
 // Helper function for safe property access
-export function safeGet<T, K extends keyof T>(obj: T | null | undefined, key: K): T[K] | null {
+export function safeGet<T, K extends string>(obj: T | null | undefined, key: K): any {
   if (!obj) return null;
-  return obj[key];
+  return (obj as any)[key];
 }
 
 // Helper function for safe array access
