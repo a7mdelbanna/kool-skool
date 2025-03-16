@@ -14,12 +14,6 @@ serve(async (req) => {
   }
   
   try {
-    // Create Supabase client with service role key
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-    
     // Get request headers for admin validation
     const userId = req.headers.get('x-user-id')
     const schoolId = req.headers.get('x-school-id')
@@ -38,6 +32,12 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
       )
     }
+    
+    // Create Supabase client with service role key
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
     
     // Verify that the user exists and is an admin
     const { data: adminData, error: adminError } = await supabaseClient

@@ -197,7 +197,16 @@ export async function createStudent(
 ) {
   try {
     // Get user data from localStorage to set admin info
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    const userDataStr = localStorage.getItem('user');
+    if (!userDataStr) {
+      console.error("No user data found in localStorage");
+      return { 
+        data: { success: false, message: "Authentication required. Please log in again." }, 
+        error: null 
+      };
+    }
+    
+    const userData = JSON.parse(userDataStr);
     
     if (!userData || !userData.id || !userData.schoolId || userData.role !== 'admin') {
       console.error("Missing admin user data for authentication:", userData);
@@ -212,9 +221,6 @@ export async function createStudent(
       schoolId: userData.schoolId,
       role: userData.role
     });
-    
-    // Hash the password - this should be done on the server in a real application
-    // For this demo, we'll send the plain password to our edge function
     
     // Make the request to create a student
     const { data, error } = await supabase.functions.invoke('create_student', {
@@ -232,7 +238,8 @@ export async function createStudent(
       headers: {
         'x-user-id': userData.id,
         'x-school-id': userData.schoolId,
-        'x-user-role': userData.role
+        'x-user-role': userData.role,
+        'Content-Type': 'application/json'
       }
     });
 
@@ -244,6 +251,7 @@ export async function createStudent(
       };
     }
 
+    console.log("Student creation response:", data);
     return { data, error: null };
   } catch (error) {
     console.error("Exception in createStudent:", error);
