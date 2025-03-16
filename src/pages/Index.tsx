@@ -11,6 +11,9 @@ import DashboardStats from '@/components/DashboardStats';
 import StudentCard, { Student } from '@/components/StudentCard';
 import UpcomingLessons, { Lesson } from '@/components/UpcomingLessons';
 import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
+import PaymentProvider from '@/components/PaymentProvider';
+import AddStudentDialog from '@/components/AddStudentDialog';
+import { toast } from 'react-toastify';
 
 // Sample data for demonstration
 const sampleStudents: Student[] = [
@@ -165,6 +168,7 @@ const samplePayments: Payment[] = [
 const Index = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<'standard' | 'enhanced'>('enhanced');
+  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   
   return (
     <div className="space-y-8">
@@ -213,7 +217,7 @@ const Index = () => {
             </PopoverContent>
           </Popover>
           
-          <Button className="gap-2" variant="default">
+          <Button className="gap-2" variant="default" onClick={() => setIsAddStudentOpen(true)}>
             <PlusCircle className="h-4 w-4" />
             <span>New Student</span>
           </Button>
@@ -252,6 +256,17 @@ const Index = () => {
           <UpcomingPayments payments={samplePayments} className="glass glass-hover" />
         </div>
       </div>
+      
+      <PaymentProvider>
+        <AddStudentDialog 
+          open={isAddStudentOpen} 
+          onOpenChange={setIsAddStudentOpen}
+          onStudentAdded={(student) => {
+            setIsAddStudentOpen(false);
+            toast.success(`Student ${student.firstName} ${student.lastName} added successfully`);
+          }}
+        />
+      </PaymentProvider>
     </div>
   );
 };
