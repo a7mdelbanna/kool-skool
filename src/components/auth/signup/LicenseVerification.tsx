@@ -56,8 +56,8 @@ const LicenseVerification: React.FC = () => {
       console.log("License query results:", licenses);
       
       if (!licenses || licenses.length === 0) {
-        setError("Invalid or already used license number");
-        toast.error("Invalid or already used license number");
+        setError("License not found or not active");
+        toast.error("License not found or not active");
         return;
       }
       
@@ -67,15 +67,15 @@ const LicenseVerification: React.FC = () => {
       const { data: userData } = await supabase.auth.getUser();
       const currentUser = userData?.user?.id;
       
-      // For a new license, used_by will be null
-      // For an existing license, check if it's already used by another user
+      // Check if license is already used by someone else
+      // If used_by is null, it means it's a new unused license
       if (license.used_by && license.used_by !== currentUser) {
         setError("This license is already in use by another account");
         toast.error("This license is already in use by another account");
         return;
       }
       
-      // License is valid
+      // License is valid - either new or belongs to current user
       toast.success("License validated successfully");
       
       // Store complete license info in sessionStorage
