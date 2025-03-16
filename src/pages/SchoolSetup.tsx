@@ -17,12 +17,24 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { PlusCircle } from "lucide-react";
 
+// School schema with license_number validation
 const schoolSchema = z.object({
   name: z.string().min(1, { message: "School name is required" }),
-  license_number: z.string().min(1, { message: "License number is required" }),
+  license_number: z.string().min(4, { message: "License number is required and must be at least 4 characters" }),
 });
 
 type SchoolFormValues = z.infer<typeof schoolSchema>;
+
+interface SchoolInfo {
+  id: string;
+  name: string;
+  logo: string | null;
+  license_id: string | null;
+  phone: string | null;
+  telegram: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+}
 
 const SchoolSetup = () => {
   const { user } = useAuth();
@@ -30,6 +42,7 @@ const SchoolSetup = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noSchoolFound, setNoSchoolFound] = useState(false);
+  const [schoolInfo, setSchoolInfo] = useState<SchoolInfo | null>(null);
   const [schoolDialogOpen, setSchoolDialogOpen] = useState(false);
   const [isCreatingSchool, setIsCreatingSchool] = useState(false);
   
@@ -42,7 +55,7 @@ const SchoolSetup = () => {
   });
 
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchUserData = async () => {
       if (user) {
         try {
           setIsLoading(true);
@@ -59,23 +72,30 @@ const SchoolSetup = () => {
             setUserRole(roleData || null);
           }
           
-          // Check if the user has a school
-          const { data: schoolIdData, error: schoolIdError } = await supabase
-            .rpc('get_user_school_id', { user_id_param: user.id });
+          // Fetch school information
+          const { data: schoolData, error: schoolError } = await supabase
+            .from('schools')
+            .select('*')
+            .eq('created_by', user.id)
+            .single();
             
-          if (schoolIdError) {
-            console.error("Error checking for school:", schoolIdError);
-            setError("Failed to check for school. Please try again.");
-          } else {
-            console.log("School ID data:", schoolIdData);
-            if (!schoolIdData || schoolIdData.length === 0 || !schoolIdData[0]?.school_id) {
+          if (schoolError) {
+            if (schoolError.code === 'PGRST116') {
+              // No school found
               setNoSchoolFound(true);
             } else {
-              setNoSchoolFound(false);
+              console.error("Error fetching school:", schoolError);
+              setError("Failed to fetch school information. Please try again.");
             }
+          } else if (schoolData) {
+            console.log("School data:", schoolData);
+            setSchoolInfo(schoolData);
+            setNoSchoolFound(false);
+          } else {
+            setNoSchoolFound(true);
           }
         } catch (err) {
-          console.error("Error in fetchUserRole:", err);
+          console.error("Error in fetchUserData:", err);
           setError("An unexpected error occurred. Please try again.");
         } finally {
           setIsLoading(false);
@@ -83,7 +103,7 @@ const SchoolSetup = () => {
       }
     };
     
-    fetchUserRole();
+    fetchUserData();
   }, [user]);
 
   const onSubmitSchoolForm = async (data: SchoolFormValues) => {
@@ -95,7 +115,7 @@ const SchoolSetup = () => {
         return;
       }
 
-      const { error } = await supabase.rpc(
+      const { data: result, error } = await supabase.rpc(
         'create_school_and_update_profile_rpc',
         {
           school_name: data.name,
@@ -110,9 +130,21 @@ const SchoolSetup = () => {
       }
       
       toast.success("School created successfully!");
+      
+      // Refresh school information
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('created_by', user.id)
+        .single();
+        
+      if (schoolData) {
+        setSchoolInfo(schoolData);
+        setNoSchoolFound(false);
+      }
+      
       schoolForm.reset();
       setSchoolDialogOpen(false);
-      setNoSchoolFound(false);
       
     } catch (error: any) {
       console.error("Error creating school:", error);
@@ -245,6 +277,46 @@ const SchoolSetup = () => {
           View your school subscription and manage staff members.
         </AlertDescription>
       </Alert>
+
+      {/* Display School Information */}
+      {schoolInfo && (
+        <Card>
+          <CardHeader>
+            <CardTitle>School Information</CardTitle>
+            <CardDescription>
+              Basic information about your school
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-4">
+              {schoolInfo.logo ? (
+                <img 
+                  src={schoolInfo.logo} 
+                  alt={schoolInfo.name} 
+                  className="h-16 w-16 rounded-md object-cover"
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                  <School className="h-8 w-8 text-muted-foreground" />
+                </div>
+              )}
+              <div>
+                <h3 className="text-xl font-semibold">{schoolInfo.name}</h3>
+                <div className="text-sm text-muted-foreground">
+                  {schoolInfo.phone && <p>Phone: {schoolInfo.phone}</p>}
+                  {(schoolInfo.telegram || schoolInfo.whatsapp || schoolInfo.instagram) && (
+                    <p className="space-x-2">
+                      {schoolInfo.telegram && <span>Telegram: {schoolInfo.telegram}</span>}
+                      {schoolInfo.whatsapp && <span>WhatsApp: {schoolInfo.whatsapp}</span>}
+                      {schoolInfo.instagram && <span>Instagram: {schoolInfo.instagram}</span>}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       <div className="space-y-6">
         <SubscriptionInfo />
