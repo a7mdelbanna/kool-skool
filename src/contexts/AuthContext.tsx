@@ -89,10 +89,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("License query results:", licenses);
       
       if (!licenses || licenses.length === 0) {
-        console.error("License validation failed: Invalid or already used license");
+        console.error("License validation failed: Invalid or expired license");
         return { 
           valid: false, 
-          message: "Invalid or already used license number", 
+          message: "Invalid or expired license number", 
           licenseId: null 
         };
       }
@@ -103,11 +103,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data: userData } = await supabase.auth.getUser();
       const currentUser = userData?.user?.id;
       
+      // For a new license, used_by will be null
+      // For an existing license, check if it's already used by another user
       if (license.used_by && license.used_by !== currentUser) {
-        console.error("License validation failed: License already in use");
+        console.error("License validation failed: License already in use by another account");
         return { 
           valid: false, 
-          message: "This license is already in use", 
+          message: "This license is already in use by another account", 
           licenseId: null 
         };
       }

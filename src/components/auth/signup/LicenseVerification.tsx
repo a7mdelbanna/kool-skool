@@ -67,9 +67,11 @@ const LicenseVerification: React.FC = () => {
       const { data: userData } = await supabase.auth.getUser();
       const currentUser = userData?.user?.id;
       
+      // For a new license, used_by will be null
+      // For an existing license, check if it's already used by another user
       if (license.used_by && license.used_by !== currentUser) {
-        setError("This license is already in use");
-        toast.error("This license is already in use");
+        setError("This license is already in use by another account");
+        toast.error("This license is already in use by another account");
         return;
       }
       
