@@ -59,17 +59,49 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   const userData = getUserData();
   const schoolId = userData?.school_id;
   
-  const { data: coursesData, isLoading: coursesLoading } = useQuery({
+  // Improve course fetching by ensuring proper refetching and debugging
+  const { 
+    data: coursesData, 
+    isLoading: coursesLoading,
+    error: coursesError,
+    refetch: refetchCourses 
+  } = useQuery({
     queryKey: ['courses', schoolId],
-    queryFn: () => getSchoolCourses(schoolId),
+    queryFn: async () => {
+      console.log('Fetching courses for school ID:', schoolId);
+      const result = await getSchoolCourses(schoolId);
+      console.log('Courses fetched:', result);
+      return result;
+    },
     enabled: !!schoolId && open,
   });
 
-  const { data: teachersData, isLoading: teachersLoading } = useQuery({
+  const { 
+    data: teachersData, 
+    isLoading: teachersLoading,
+    error: teachersError 
+  } = useQuery({
     queryKey: ['teachers', schoolId],
     queryFn: () => getSchoolTeachers(schoolId),
     enabled: !!schoolId && open,
   });
+  
+  // Log any errors for debugging
+  useEffect(() => {
+    if (coursesError) {
+      console.error('Error fetching courses:', coursesError);
+    }
+    if (teachersError) {
+      console.error('Error fetching teachers:', teachersError);
+    }
+  }, [coursesError, teachersError]);
+  
+  // Force refetch when dialog opens
+  useEffect(() => {
+    if (open && schoolId) {
+      refetchCourses();
+    }
+  }, [open, schoolId, refetchCourses]);
   
   useEffect(() => {
     if (student) {
@@ -225,7 +257,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
                 createPassword={createPassword}
                 setCreatePassword={setCreatePassword}
                 isNewStudent={!isEditMode}
-                courses={coursesData?.data as Course[] || []}
+                courses={coursesData?.data || []}
                 teachers={teachersData?.data || []}
                 isLoading={coursesLoading || teachersLoading}
               />

@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -206,18 +205,44 @@ export async function createStudent(
 
 // Get courses for a school
 export async function getSchoolCourses(schoolId: string) {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('school_id', schoolId);
+  console.log('Fetching courses for school ID:', schoolId);
+  
+  try {
+    // Ensure schoolId is valid
+    if (!schoolId) {
+      console.error('Invalid school ID provided:', schoolId);
+      return { data: [], error: new Error('Invalid school ID') };
+    }
+    
+    // Improved error logging
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('school_id', schoolId);
+    
+    if (error) {
+      console.error('Supabase error fetching courses:', error);
+      return { data: [], error };
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('No courses found for school ID:', schoolId);
+      return { data: [], error: null };
+    }
+    
+    console.log('Courses retrieved successfully:', data);
 
-  // Convert string lesson_type to proper enum type
-  const typedData = data?.map(course => ({
-    ...course,
-    lesson_type: course.lesson_type as 'Individual' | 'Group'
-  }));
+    // Convert string lesson_type to proper enum type
+    const typedData = data.map(course => ({
+      ...course,
+      lesson_type: course.lesson_type as 'Individual' | 'Group'
+    }));
 
-  return { data: typedData as Course[], error };
+    return { data: typedData as Course[], error: null };
+  } catch (error) {
+    console.error('Exception fetching courses:', error);
+    return { data: [], error: error as Error };
+  }
 }
 
 // Create a course
@@ -394,4 +419,3 @@ export async function rescheduleSession(sessionId: string, newDate: string, mode
     error 
   };
 }
-
