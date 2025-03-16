@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, UserPlus, Mail, Key, User, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Mail, Key, User, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TeamMember {
   id: string;
@@ -19,30 +20,15 @@ interface TeamMember {
 
 const TeamAccess = () => {
   const { toast } = useToast();
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
-    {
-      id: '1',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
-      role: 'Teacher',
-      createdAt: new Date('2023-10-15')
-    },
-    {
-      id: '2',
-      firstName: 'Jane',
-      lastName: 'Smith',
-      email: 'jane.smith@example.com',
-      role: 'Manager',
-      createdAt: new Date('2023-11-20')
-    }
-  ]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
-    role: 'Teacher',
+    role: 'teacher',
     password: '',
     confirmPassword: ''
   });
@@ -54,6 +40,43 @@ const TeamAccess = () => {
     password: '',
     confirmPassword: ''
   });
+  
+  useEffect(() => {
+    fetchTeamMembers();
+  }, []);
+  
+  const fetchTeamMembers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, email, role, created_at');
+      
+      if (error) {
+        throw error;
+      }
+      
+      const formattedMembers = data.map(member => ({
+        id: member.id,
+        firstName: member.first_name,
+        lastName: member.last_name,
+        email: member.email,
+        role: member.role,
+        createdAt: new Date(member.created_at)
+      }));
+      
+      setTeamMembers(formattedMembers);
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      toast({
+        title: "Error fetching team members",
+        description: error.message || "Please try again later.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -116,39 +139,60 @@ const TeamAccess = () => {
     return isValid;
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validate()) {
       return;
     }
     
-    // Add new team member to the list
-    const newMember: TeamMember = {
-      id: (teamMembers.length + 1).toString(),
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      role: formData.role,
-      createdAt: new Date()
-    };
-    
-    setTeamMembers(prev => [...prev, newMember]);
-    
-    // Reset form
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      role: 'Teacher',
-      password: '',
-      confirmPassword: ''
-    });
-    
-    toast({
-      title: "Team member added",
-      description: `${formData.firstName} ${formData.lastName} has been added successfully.`,
-    });
+    try {
+      setFormLoading(true);
+      
+      const { data, error } = await supabase.rpc('add_team_member', {
+        member_first_name: formData.firstName,
+        member_last_name: formData.lastName,
+        member_email: formData.email,
+        member_role: formData.role,
+        member_password: formData.password
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (!data.success) {
+        throw new Error(data.message || "Failed to add team member");
+      }
+      
+      // Reset form
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        role: 'teacher',
+        password: '',
+        confirmPassword: ''
+      });
+      
+      toast({
+        title: "Team member added",
+        description: `${formData.firstName} ${formData.lastName} has been added successfully.`,
+      });
+      
+      // Refresh the team members list
+      fetchTeamMembers();
+      
+    } catch (error) {
+      console.error('Error adding team member:', error);
+      toast({
+        title: "Error adding team member",
+        description: error.message || "Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setFormLoading(false);
+    }
   };
   
   return (
@@ -181,6 +225,7 @@ const TeamAccess = () => {
                     onChange={handleChange}
                     placeholder="Enter first name"
                     className={errors.firstName ? "border-red-500" : ""}
+                    disabled={formLoading}
                   />
                   {errors.firstName && (
                     <p className="text-red-500 text-sm flex items-center gap-1">
@@ -198,6 +243,7 @@ const TeamAccess = () => {
                     onChange={handleChange}
                     placeholder="Enter last name"
                     className={errors.lastName ? "border-red-500" : ""}
+                    disabled={formLoading}
                   />
                   {errors.lastName && (
                     <p className="text-red-500 text-sm flex items-center gap-1">
@@ -219,6 +265,7 @@ const TeamAccess = () => {
                     onChange={handleChange}
                     placeholder="email@example.com"
                     className={errors.email ? "border-red-500" : ""}
+                    disabled={formLoading}
                   />
                 </div>
                 {errors.email && (
@@ -236,10 +283,11 @@ const TeamAccess = () => {
                   value={formData.role}
                   onChange={handleChange}
                   className="w-full rounded-md border border-input h-10 px-3 py-2 bg-background text-sm"
+                  disabled={formLoading}
                 >
-                  <option value="Teacher">Teacher</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Administrator">Administrator</option>
+                  <option value="teacher">Teacher</option>
+                  <option value="admin">Administrator</option>
+                  <option value="staff">Staff</option>
                 </select>
               </div>
               
@@ -255,6 +303,7 @@ const TeamAccess = () => {
                     onChange={handleChange}
                     placeholder="Create password"
                     className={errors.password ? "border-red-500" : ""}
+                    disabled={formLoading}
                   />
                 </div>
                 {errors.password && (
@@ -276,6 +325,7 @@ const TeamAccess = () => {
                     onChange={handleChange}
                     placeholder="Confirm password"
                     className={errors.confirmPassword ? "border-red-500" : ""}
+                    disabled={formLoading}
                   />
                 </div>
                 {errors.confirmPassword && (
@@ -285,9 +335,18 @@ const TeamAccess = () => {
                 )}
               </div>
               
-              <Button type="submit" className="w-full mt-4">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Team Member
+              <Button type="submit" className="w-full mt-4" disabled={formLoading}>
+                {formLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Team Member
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>
@@ -305,7 +364,11 @@ const TeamAccess = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {teamMembers.length > 0 ? (
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : teamMembers.length > 0 ? (
                 <div className="space-y-4">
                   {teamMembers.map(member => (
                     <div 

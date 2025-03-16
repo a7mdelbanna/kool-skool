@@ -1,242 +1,206 @@
 
-import React, { useState } from 'react';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { 
-  ChevronDown, 
-  ChevronUp, 
-  School, 
-  Phone, 
-  Instagram, 
-  MessageSquare,
-  Upload,
-  Book,
-  BookOpen,
-  DollarSign,
-  CreditCard,
-  Plus,
-  Trash2,
-  Repeat,
-  GraduationCap
-} from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { School, CheckCircle, KeyRound, User, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import LicenseWidget from "@/components/LicenseWidget";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from 'react-router-dom';
+import LicenseWidget from '@/components/LicenseWidget';
 
-interface SchoolInfo {
-  name: string;
-  picture: string;
-  phone: string;
-  telegram: string;
-  whatsapp: string;
-  instagram: string;
-}
-
-interface Level {
+interface License {
   id: string;
-  name: string;
-}
-
-interface Course {
-  id: string;
-  name: string;
-}
-
-interface ExpenseCategory {
-  id: string;
-  name: string;
-}
-
-interface RecurringExpense {
-  id: string;
-  name: string;
-  categoryId: string;
-  frequency: "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
-  amount: number;
-}
-
-interface Account {
-  id: string;
-  name: string;
-  currency: string;
+  license_key: string;
+  is_used: boolean;
 }
 
 const SchoolSetup = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [availableLicenses, setAvailableLicenses] = useState<License[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [openSections, setOpenSections] = useState({
-    schoolInfo: true,
-    lessons: false,
-    finance: false
+  const [formData, setFormData] = useState({
+    licenseKey: '',
+    schoolName: '',
+    adminFirstName: '',
+    adminLastName: '',
+    adminEmail: '',
+    adminPassword: '',
+    confirmPassword: ''
   });
   
-  const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({
-    name: '',
-    picture: '',
-    phone: '',
-    telegram: '',
-    whatsapp: '',
-    instagram: ''
+  const [errors, setErrors] = useState({
+    licenseKey: '',
+    schoolName: '',
+    adminFirstName: '',
+    adminLastName: '',
+    adminEmail: '',
+    adminPassword: '',
+    confirmPassword: ''
   });
   
-  const [levels, setLevels] = useState<Level[]>([
-    { id: '1', name: '' }
-  ]);
+  useEffect(() => {
+    fetchAvailableLicenses();
+  }, []);
   
-  const [courses, setCourses] = useState<Course[]>([
-    { id: '1', name: '' }
-  ]);
-  
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([
-    { id: '1', name: '' }
-  ]);
-  
-  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([
-    { id: '1', name: '', categoryId: '', frequency: 'monthly', amount: 0 }
-  ]);
-  
-  const [accounts, setAccounts] = useState<Account[]>([
-    { id: '1', name: '', currency: '' }
-  ]);
-  
-  const toggleSection = (section: keyof typeof openSections) => {
-    setOpenSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-  
-  const handleSchoolInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setSchoolInfo(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  const handleAddLevel = () => {
-    setLevels(prev => [
-      ...prev,
-      { id: Date.now().toString(), name: '' }
-    ]);
-  };
-  
-  const handleLevelChange = (id: string, value: string) => {
-    setLevels(prev => 
-      prev.map(level => 
-        level.id === id ? { ...level, name: value } : level
-      )
-    );
-  };
-  
-  const handleRemoveLevel = (id: string) => {
-    setLevels(prev => prev.filter(level => level.id !== id));
-  };
-  
-  const handleAddCourse = () => {
-    setCourses(prev => [
-      ...prev,
-      { id: Date.now().toString(), name: '' }
-    ]);
-  };
-  
-  const handleCourseChange = (id: string, value: string) => {
-    setCourses(prev => 
-      prev.map(course => 
-        course.id === id ? { ...course, name: value } : course
-      )
-    );
-  };
-  
-  const handleRemoveCourse = (id: string) => {
-    setCourses(prev => prev.filter(course => course.id !== id));
-  };
-  
-  const handleAddExpenseCategory = () => {
-    setExpenseCategories(prev => [
-      ...prev,
-      { id: Date.now().toString(), name: '' }
-    ]);
-  };
-  
-  const handleExpenseCategoryChange = (id: string, value: string) => {
-    setExpenseCategories(prev => 
-      prev.map(category => 
-        category.id === id ? { ...category, name: value } : category
-      )
-    );
-  };
-  
-  const handleRemoveExpenseCategory = (id: string) => {
-    setExpenseCategories(prev => prev.filter(category => category.id !== id));
-  };
-  
-  const handleAddRecurringExpense = () => {
-    setRecurringExpenses(prev => [
-      ...prev,
-      { id: Date.now().toString(), name: '', categoryId: '', frequency: 'monthly', amount: 0 }
-    ]);
-  };
-  
-  const handleRecurringExpenseChange = (id: string, field: keyof RecurringExpense, value: any) => {
-    setRecurringExpenses(prev => 
-      prev.map(expense => 
-        expense.id === id ? { ...expense, [field]: value } : expense
-      )
-    );
-  };
-  
-  const handleRemoveRecurringExpense = (id: string) => {
-    setRecurringExpenses(prev => prev.filter(expense => expense.id !== id));
-  };
-  
-  const handleAddAccount = () => {
-    setAccounts(prev => [
-      ...prev,
-      { id: Date.now().toString(), name: '', currency: '' }
-    ]);
-  };
-  
-  const handleAccountChange = (id: string, field: keyof Account, value: string) => {
-    setAccounts(prev => 
-      prev.map(account => 
-        account.id === id ? { ...account, [field]: value } : account
-      )
-    );
-  };
-  
-  const handleRemoveAccount = (id: string) => {
-    setAccounts(prev => prev.filter(account => account.id !== id));
-  };
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "School settings saved",
-      description: "All your changes have been saved (locally only - no database connection).",
-    });
-  };
-
-  const handleImageUpload = (type: 'school') => {
-    if (type === 'school') {
-      setSchoolInfo(prev => ({
-        ...prev,
-        picture: 'https://placehold.co/200x200?text=School+Logo'
-      }));
+  const fetchAvailableLicenses = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('licenses')
+        .select('id, license_key, is_used')
+        .eq('is_used', false);
       
+      if (error) {
+        throw error;
+      }
+      
+      setAvailableLicenses(data || []);
+    } catch (error) {
+      console.error('Error fetching licenses:', error);
       toast({
-        title: "Image uploaded",
-        description: "School logo has been uploaded successfully (mock upload - no actual storage).",
+        title: "Error loading licenses",
+        description: error.message || "Please try again later.",
+        variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
-
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error on change
+    if (name in errors) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+  
+  const validate = () => {
+    const newErrors = {
+      licenseKey: '',
+      schoolName: '',
+      adminFirstName: '',
+      adminLastName: '',
+      adminEmail: '',
+      adminPassword: '',
+      confirmPassword: ''
+    };
+    
+    let isValid = true;
+    
+    // Validate license key
+    if (!formData.licenseKey.trim()) {
+      newErrors.licenseKey = 'License key is required';
+      isValid = false;
+    }
+    
+    // Validate school name
+    if (!formData.schoolName.trim()) {
+      newErrors.schoolName = 'School name is required';
+      isValid = false;
+    }
+    
+    // Validate admin first name
+    if (!formData.adminFirstName.trim()) {
+      newErrors.adminFirstName = 'First name is required';
+      isValid = false;
+    }
+    
+    // Validate admin last name
+    if (!formData.adminLastName.trim()) {
+      newErrors.adminLastName = 'Last name is required';
+      isValid = false;
+    }
+    
+    // Validate admin email
+    if (!formData.adminEmail.trim()) {
+      newErrors.adminEmail = 'Email is required';
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(formData.adminEmail)) {
+      newErrors.adminEmail = 'Email is invalid';
+      isValid = false;
+    }
+    
+    // Validate admin password
+    if (!formData.adminPassword) {
+      newErrors.adminPassword = 'Password is required';
+      isValid = false;
+    } else if (formData.adminPassword.length < 8) {
+      newErrors.adminPassword = 'Password must be at least 8 characters';
+      isValid = false;
+    }
+    
+    // Validate password confirmation
+    if (formData.adminPassword !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+      isValid = false;
+    }
+    
+    setErrors(newErrors);
+    return isValid;
+  };
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validate()) {
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      const { data, error } = await supabase.rpc('verify_license_and_create_school', {
+        license_key: formData.licenseKey,
+        school_name: formData.schoolName,
+        admin_first_name: formData.adminFirstName,
+        admin_last_name: formData.adminLastName,
+        admin_email: formData.adminEmail,
+        admin_password: formData.adminPassword
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to verify license');
+      }
+      
+      toast({
+        title: "School setup complete",
+        description: `${formData.schoolName} has been successfully set up!`,
+      });
+      
+      // Redirect to dashboard
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error during school setup:', error);
+      toast({
+        title: "School setup failed",
+        description: error.message || "Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleSelectLicense = (licenseKey: string) => {
+    setFormData(prev => ({ ...prev, licenseKey }));
+  };
+  
   return (
     <div className="container mx-auto py-6">
       <div className="flex items-center gap-2 mb-6">
@@ -244,421 +208,258 @@ const SchoolSetup = () => {
         <h1 className="text-2xl font-bold">School Setup</h1>
       </div>
       
-      <div className="mb-6">
-        <LicenseWidget />
-      </div>
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Collapsible 
-          open={openSections.schoolInfo} 
-          onOpenChange={() => toggleSection('schoolInfo')}
-          className="border rounded-lg overflow-hidden"
-        >
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
-              <div className="flex items-center gap-2">
-                <School className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">School Information</h2>
-              </div>
-              {openSections.schoolInfo ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="p-4 space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="school-name">School Name</Label>
-                <Input 
-                  id="school-name" 
-                  name="name" 
-                  value={schoolInfo.name} 
-                  onChange={handleSchoolInfoChange} 
-                  placeholder="Enter school name" 
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="school-phone">Phone Number</Label>
-                <div className="flex items-center">
-                  <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <Input 
-                    id="school-phone" 
-                    name="phone" 
-                    value={schoolInfo.phone} 
-                    onChange={handleSchoolInfoChange} 
-                    placeholder="Enter phone number" 
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>School Logo</Label>
-              <div className="flex items-center gap-4">
-                {schoolInfo.picture ? (
-                  <div className="relative h-24 w-24 rounded-md overflow-hidden border">
-                    <img 
-                      src={schoolInfo.picture} 
-                      alt="School Logo" 
-                      className="h-full w-full object-cover"
-                    />
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Set Up Your School</CardTitle>
+              <CardDescription>
+                Verify your license and create your administrator account
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="licenseKey">License Key</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-grow flex items-center">
+                      <KeyRound className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <Input
+                        id="licenseKey"
+                        name="licenseKey"
+                        value={formData.licenseKey}
+                        onChange={handleChange}
+                        placeholder="Enter your license key"
+                        className={errors.licenseKey ? "border-red-500" : ""}
+                        disabled={isSubmitting}
+                      />
+                    </div>
                   </div>
-                ) : (
-                  <div className="h-24 w-24 rounded-md border border-dashed flex items-center justify-center bg-muted/50">
-                    <School className="h-8 w-8 text-muted-foreground" />
+                  {errors.licenseKey && (
+                    <p className="text-red-500 text-sm flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {errors.licenseKey}
+                    </p>
+                  )}
+                </div>
+                
+                {availableLicenses.length > 0 && (
+                  <div className="bg-muted p-3 rounded-md">
+                    <p className="text-sm font-medium mb-2">Available Licenses:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableLicenses.map(license => (
+                        <Button
+                          key={license.id}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSelectLicense(license.license_key)}
+                          className="text-xs"
+                        >
+                          {license.license_key}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => handleImageUpload('school')}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Logo
-                </Button>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="school-telegram">Telegram</Label>
-                <div className="flex items-center">
-                  <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <Input 
-                    id="school-telegram" 
-                    name="telegram" 
-                    value={schoolInfo.telegram} 
-                    onChange={handleSchoolInfoChange} 
-                    placeholder="@yourschool" 
+                
+                <div className="space-y-2">
+                  <Label htmlFor="schoolName">School Name</Label>
+                  <Input
+                    id="schoolName"
+                    name="schoolName"
+                    value={formData.schoolName}
+                    onChange={handleChange}
+                    placeholder="Enter school name"
+                    className={errors.schoolName ? "border-red-500" : ""}
+                    disabled={isSubmitting}
                   />
+                  {errors.schoolName && (
+                    <p className="text-red-500 text-sm flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {errors.schoolName}
+                    </p>
+                  )}
                 </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="school-whatsapp">WhatsApp</Label>
-                <div className="flex items-center">
-                  <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <Input 
-                    id="school-whatsapp" 
-                    name="whatsapp" 
-                    value={schoolInfo.whatsapp} 
-                    onChange={handleSchoolInfoChange} 
-                    placeholder="+1234567890" 
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="school-instagram">Instagram</Label>
-                <div className="flex items-center">
-                  <Instagram className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <Input 
-                    id="school-instagram" 
-                    name="instagram" 
-                    value={schoolInfo.instagram} 
-                    onChange={handleSchoolInfoChange} 
-                    placeholder="@yourschool" 
-                  />
-                </div>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <Collapsible 
-          open={openSections.lessons} 
-          onOpenChange={() => toggleSection('lessons')}
-          className="border rounded-lg overflow-hidden"
-        >
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">Lessons</h2>
-              </div>
-              {openSections.lessons ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="p-4 space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Book className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Levels</h3>
-              </div>
-              
-              {levels.map(level => (
-                <div key={level.id} className="flex items-center gap-2">
-                  <Input 
-                    value={level.name}
-                    onChange={(e) => handleLevelChange(level.id, e.target.value)}
-                    placeholder="Level name (e.g., Beginner, Intermediate, Advanced)" 
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveLevel(level.id)}
-                    disabled={levels.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddLevel}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Level
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Courses</h3>
-              </div>
-              
-              {courses.map(course => (
-                <div key={course.id} className="flex items-center gap-2">
-                  <Input 
-                    value={course.name}
-                    onChange={(e) => handleCourseChange(course.id, e.target.value)}
-                    placeholder="Course name (e.g., Grammar, Conversation, IELTS)" 
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveCourse(course.id)}
-                    disabled={courses.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddCourse}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Course
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <Collapsible 
-          open={openSections.finance} 
-          onOpenChange={() => toggleSection('finance')}
-          className="border rounded-lg overflow-hidden"
-        >
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">Income & Expenses</h2>
-              </div>
-              {openSections.finance ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="p-4 space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Expense Categories</h3>
-              </div>
-              
-              {expenseCategories.map(category => (
-                <div key={category.id} className="flex items-center gap-2">
-                  <Input 
-                    value={category.name}
-                    onChange={(e) => handleExpenseCategoryChange(category.id, e.target.value)}
-                    placeholder="Category name (e.g., Rent, Utilities, Supplies)" 
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveExpenseCategory(category.id)}
-                    disabled={expenseCategories.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddExpenseCategory}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Repeat className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Recurring Expenses</h3>
-              </div>
-              
-              {recurringExpenses.map(expense => (
-                <div key={expense.id} className="grid md:grid-cols-4 gap-3 items-center">
-                  <Input 
-                    value={expense.name}
-                    onChange={(e) => handleRecurringExpenseChange(expense.id, 'name', e.target.value)}
-                    placeholder="Expense name" 
-                    className="md:col-span-1"
-                  />
+                
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-medium mb-4">Administrator Account</h3>
                   
-                  <select 
-                    value={expense.categoryId}
-                    onChange={(e) => handleRecurringExpenseChange(expense.id, 'categoryId', e.target.value)}
-                    className="rounded-md border h-10 px-3 py-2 bg-background text-sm"
-                  >
-                    <option value="">Select category</option>
-                    {expenseCategories.map(category => (
-                      <option key={category.id} value={category.id}>
-                        {category.name || `Category ${category.id}`}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  <div className="flex gap-2 md:col-span-1">
-                    <select 
-                      value={expense.frequency}
-                      onChange={(e) => handleRecurringExpenseChange(
-                        expense.id, 
-                        'frequency', 
-                        e.target.value as RecurringExpense['frequency']
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="adminFirstName">First Name</Label>
+                      <div className="flex items-center">
+                        <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <Input
+                          id="adminFirstName"
+                          name="adminFirstName"
+                          value={formData.adminFirstName}
+                          onChange={handleChange}
+                          placeholder="First name"
+                          className={errors.adminFirstName ? "border-red-500" : ""}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      {errors.adminFirstName && (
+                        <p className="text-red-500 text-sm flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> {errors.adminFirstName}
+                        </p>
                       )}
-                      className="rounded-md border h-10 px-3 py-2 bg-background text-sm flex-1"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                    </div>
                     
-                    <Input 
-                      type="number"
-                      min="0"
-                      value={expense.amount > 0 ? expense.amount : ''}
-                      onChange={(e) => handleRecurringExpenseChange(
-                        expense.id, 
-                        'amount',
-                        parseFloat(e.target.value) || 0
+                    <div className="space-y-2">
+                      <Label htmlFor="adminLastName">Last Name</Label>
+                      <div className="flex items-center">
+                        <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <Input
+                          id="adminLastName"
+                          name="adminLastName"
+                          value={formData.adminLastName}
+                          onChange={handleChange}
+                          placeholder="Last name"
+                          className={errors.adminLastName ? "border-red-500" : ""}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      {errors.adminLastName && (
+                        <p className="text-red-500 text-sm flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> {errors.adminLastName}
+                        </p>
                       )}
-                      placeholder="Amount" 
-                      className="w-24"
-                    />
+                    </div>
                   </div>
                   
-                  <div className="flex justify-end">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleRemoveRecurringExpense(expense.id)}
-                      disabled={recurringExpenses.length <= 1}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Remove</span>
-                    </Button>
+                  <div className="space-y-2 mt-4">
+                    <Label htmlFor="adminEmail">Email Address</Label>
+                    <div className="flex items-center">
+                      <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <Input
+                        id="adminEmail"
+                        name="adminEmail"
+                        type="email"
+                        value={formData.adminEmail}
+                        onChange={handleChange}
+                        placeholder="admin@school.com"
+                        className={errors.adminEmail ? "border-red-500" : ""}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    {errors.adminEmail && (
+                      <p className="text-red-500 text-sm flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> {errors.adminEmail}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="adminPassword">Password</Label>
+                      <div className="flex items-center">
+                        <Lock className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <Input
+                          id="adminPassword"
+                          name="adminPassword"
+                          type="password"
+                          value={formData.adminPassword}
+                          onChange={handleChange}
+                          placeholder="Create password"
+                          className={errors.adminPassword ? "border-red-500" : ""}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      {errors.adminPassword && (
+                        <p className="text-red-500 text-sm flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> {errors.adminPassword}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <div className="flex items-center">
+                        <Lock className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <Input
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          type="password"
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          placeholder="Confirm password"
+                          className={errors.confirmPassword ? "border-red-500" : ""}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      {errors.confirmPassword && (
+                        <p className="text-red-500 text-sm flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> {errors.confirmPassword}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddRecurringExpense}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Recurring Expense
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Accounts</h3>
-              </div>
-              
-              {accounts.map(account => (
-                <div key={account.id} className="flex items-center gap-3">
-                  <Input 
-                    value={account.name}
-                    onChange={(e) => handleAccountChange(account.id, 'name', e.target.value)}
-                    placeholder="Account name (e.g., PayPal, Bank Account)" 
-                    className="flex-1"
-                  />
-                  
-                  <Input 
-                    value={account.currency}
-                    onChange={(e) => handleAccountChange(account.id, 'currency', e.target.value)}
-                    placeholder="Currency (USD, EUR, etc.)" 
-                    className="w-32"
-                  />
-                  
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveAccount(account.id)}
-                    disabled={accounts.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddAccount}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Account
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <div className="pt-4 flex justify-end">
-          <Button type="submit" className="px-8">
-            Save Changes
-          </Button>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full mt-6" 
+                  size="lg"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Complete School Setup
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
-      </form>
+        
+        <div className="space-y-6">
+          <LicenseWidget />
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Setup Instructions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    1
+                  </div>
+                  <p className="text-sm">Enter your license key to verify your subscription</p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    2
+                  </div>
+                  <p className="text-sm">Set up your school information</p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    3
+                  </div>
+                  <p className="text-sm">Create your administrator account</p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    4
+                  </div>
+                  <p className="text-sm">You can add team members afterward from the Team Access page</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };

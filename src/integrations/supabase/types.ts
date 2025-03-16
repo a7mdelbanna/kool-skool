@@ -9,13 +9,148 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      licenses: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_used: boolean | null
+          license_key: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          license_key: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          license_key?: string
+        }
+        Relationships: []
+      }
+      schools: {
+        Row: {
+          contact_info: Json | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          license_id: string | null
+          logo: string | null
+          name: string
+        }
+        Insert: {
+          contact_info?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          license_id?: string | null
+          logo?: string | null
+          name: string
+        }
+        Update: {
+          contact_info?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          license_id?: string | null
+          logo?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schools_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: true
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          password_hash: string
+          role: string | null
+          school_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          email: string
+          first_name: string
+          id?: string
+          last_name: string
+          password_hash: string
+          role?: string | null
+          school_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          email?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          password_hash?: string
+          role?: string | null
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "users_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      add_team_member: {
+        Args: {
+          member_first_name: string
+          member_last_name: string
+          member_email: string
+          member_role: string
+          member_password: string
+        }
+        Returns: Json
+      }
+      hash_password: {
+        Args: {
+          password: string
+        }
+        Returns: string
+      }
+      user_login: {
+        Args: {
+          user_email: string
+          user_password: string
+        }
+        Returns: Json
+      }
+      verify_license_and_create_school: {
+        Args: {
+          license_key: string
+          school_name: string
+          admin_first_name: string
+          admin_last_name: string
+          admin_email: string
+          admin_password: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

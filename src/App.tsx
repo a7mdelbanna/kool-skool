@@ -3,7 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from 'react';
 import MainLayout from "./layout/MainLayout";
 import Index from "./pages/Index";
 import Students from "./pages/Students";
@@ -14,34 +15,55 @@ import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
 import TeamAccess from "./pages/TeamAccess";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
 import { PaymentProvider } from "./contexts/PaymentContext";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <PaymentProvider>
-        <BrowserRouter>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/students" element={<Students />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/payments" element={<Payments />} />
-              <Route path="/settings" element={<Settings />} />
+const App = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Check if user is authenticated
+    const user = localStorage.getItem('user');
+    setIsAuthenticated(!!user);
+    setLoading(false);
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <PaymentProvider>
+          <BrowserRouter>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              {/* Authentication routes */}
+              <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
               <Route path="/school-setup" element={<SchoolSetup />} />
-              <Route path="/reports" element={<StatesReports />} />
-              <Route path="/team-access" element={<TeamAccess />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </PaymentProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+              
+              {/* Protected routes */}
+              <Route element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/students" element={<Students />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/payments" element={<Payments />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/reports" element={<StatesReports />} />
+                <Route path="/team-access" element={<TeamAccess />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </PaymentProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
