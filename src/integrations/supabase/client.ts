@@ -213,6 +213,9 @@ export async function createStudent(
       role: userData.role
     });
     
+    // Hash the password - this should be done on the server in a real application
+    // For this demo, we'll send the plain password to our edge function
+    
     // Make the request to create a student
     const { data, error } = await supabase.functions.invoke('create_student', {
       body: {

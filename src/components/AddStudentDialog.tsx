@@ -217,6 +217,9 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
           role: userData.role
         });
         
+        console.log("Using course:", course);
+        console.log("Using teacher:", teacher);
+        
         const { data, error } = await createStudent(
           studentData.email as string,
           password,

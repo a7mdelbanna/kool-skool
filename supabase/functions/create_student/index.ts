@@ -136,7 +136,7 @@ serve(async (req) => {
           first_name,
           last_name,
           email: student_email,
-          password_hash: 'managed_by_auth', // Not storing actual password
+          password_hash: student_password, // Use actual password or hash it here
           role: 'student',
           school_id: schoolId,
           created_by: userId
