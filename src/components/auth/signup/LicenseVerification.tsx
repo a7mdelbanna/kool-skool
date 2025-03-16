@@ -1,113 +1,108 @@
 
 import React, { useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Key } from "lucide-react";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { LicenseData } from "../SignupForm"; // Import from parent component
+import { useNavigate } from "react-router-dom";
 
-// License verification form schema
+// License verification schema
 const licenseSchema = z.object({
-  licenseNumber: z.string().min(6, { message: "License number must be at least 6 characters" }),
+  licenseNumber: z.string().min(4, { message: "License number is required" }),
 });
 
 type LicenseFormValues = z.infer<typeof licenseSchema>;
 
-interface LicenseVerificationProps {
-  onLicenseVerified: (licenseData: LicenseData) => void;
-}
-
-const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVerified }) => {
+const LicenseVerification: React.FC = () => {
   const { signUp } = useAuth();
   const [isVerifying, setIsVerifying] = useState(false);
-
-  const form = useForm<LicenseFormValues>({
+  const navigate = useNavigate();
+  
+  const licenseForm = useForm<LicenseFormValues>({
     resolver: zodResolver(licenseSchema),
     defaultValues: {
       licenseNumber: "",
     },
   });
 
-  const onSubmit = async (values: LicenseFormValues) => {
+  const verifyLicense = async (data: LicenseFormValues) => {
     try {
       setIsVerifying(true);
+      console.log("Verifying license:", data.licenseNumber);
       
-      // Call the license verification function
-      console.log("Submitting license:", values.licenseNumber);
-      const result = await signUp(values.licenseNumber);
+      const result = await signUp(data.licenseNumber);
+      
       console.log("License verification result:", result);
       
       if (result.valid && result.licenseId) {
-        // Create the license data object
-        const licenseData: LicenseData = {
-          licenseId: result.licenseId,
-          licenseNumber: values.licenseNumber
-        };
-        
-        // Show success toast
-        toast.success("License verified successfully! Proceeding to account creation...");
-        
-        // Call the callback with the license data
-        console.log("Calling onLicenseVerified with data:", licenseData);
-        onLicenseVerified(licenseData);
+        toast.success(result.message || "License validated successfully");
+        // Use direct navigation to the account creation page with licenseId as URL parameter
+        navigate(`/auth/create-account/${result.licenseId}`);
       } else {
-        toast.error(result.message || "License verification failed. Please try again.");
+        toast.error(result.message || "License verification failed");
       }
     } catch (error) {
       console.error("License verification error:", error);
-      toast.error("An error occurred during verification. Please try again.");
+      toast.error("An error occurred during license verification");
     } finally {
       setIsVerifying(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-xl">Verify Your License</CardTitle>
-        <CardDescription>
-          Enter your license number to activate your school account
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="licenseNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>License Number</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center">
-                      <Key className="w-4 h-4 mr-2 text-muted-foreground" />
-                      <Input placeholder="Enter your license number" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isVerifying}>
-              {isVerifying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                "Verify License"
-              )}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold">License Verification</h1>
+        <p className="text-muted-foreground">Enter your license number to get started</p>
+      </div>
+
+      <Form {...licenseForm}>
+        <form 
+          onSubmit={licenseForm.handleSubmit(verifyLicense)} 
+          className="space-y-4"
+        >
+          <FormField
+            control={licenseForm.control}
+            name="licenseNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>License Number</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Enter your license number"
+                    {...field}
+                    disabled={isVerifying}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Enter the license number provided to your school
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isVerifying}
+          >
+            {isVerifying ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify License"
+            )}
+          </Button>
+        </form>
+      </Form>
+    </div>
   );
 };
 

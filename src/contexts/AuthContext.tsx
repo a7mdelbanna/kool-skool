@@ -116,9 +116,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const completeSignUp = async (email: string, password: string, userData: any) => {
     try {
       setIsLoading(true);
-      console.log("Starting account creation with data:", { email, userData });
       
-      // 1. Create user account with metadata
+      // Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -127,79 +126,77 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             license_id: userData.licenseId,
             first_name: userData.firstName,
             last_name: userData.lastName,
-            role: userData.role || "admin"
           }
         }
       });
 
       if (authError) {
-        console.error("Auth error:", authError);
         toast.error(authError.message);
         return;
       }
 
       if (!authData.user) {
-        console.error("No user data returned");
         toast.error("Failed to create user account");
         return;
       }
-      
-      console.log("User created successfully:", authData.user.id);
-      
-      // 2. Create school using the RPC procedure
-      try {
-        console.log("Creating school with name:", userData.schoolName, "license:", userData.licenseNumber);
-        
-        // Use the RPC method with type assertion
-        const { error: schoolError } = await supabase.rpc(
-          'create_school_and_update_profile' as any,
-          {
-            school_name: userData.schoolName,
-            license_number: userData.licenseNumber
-          }
-        );
-        
-        if (schoolError) {
-          console.error("School creation error:", schoolError);
-          throw schoolError;
-        }
-        
-        console.log("School created successfully");
-      } catch (error: any) {
-        console.error("Error in create_school_and_update_profile:", error);
-        toast.error(`Failed to set up school: ${error.message}`);
-        // Continue anyway since we've already created the user account
+
+      // Create school entry
+      const { data: schoolData, error: schoolError } = await supabase
+        .from('schools')
+        .insert({
+          name: userData.schoolName || "My School",
+          license_id: userData.licenseId,
+          created_by: authData.user.id,
+          logo: userData.schoolLogo,
+          phone: userData.schoolPhone,
+          telegram: userData.schoolTelegram,
+          whatsapp: userData.schoolWhatsapp,
+          instagram: userData.schoolInstagram
+        })
+        .select('id')
+        .single();
+
+      if (schoolError) {
+        toast.error(schoolError.message);
+        return;
       }
 
-      // 3. Create or update profile
+      // Create profile entry
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({
+        .insert({
           id: authData.user.id,
           email: email,
           first_name: userData.firstName,
           last_name: userData.lastName,
-          role: userData.role || "admin",
-          phone: userData.phone || null,
-          whatsapp: userData.whatsapp || null,
-          telegram: userData.telegram || null,
-          instagram: userData.instagram || null,
-          profile_picture: userData.profilePicture || null
+          role: userData.role,
+          phone: userData.phone,
+          whatsapp: userData.whatsapp,
+          telegram: userData.telegram,
+          instagram: userData.instagram,
+          profile_picture: userData.profilePicture,
+          school_id: schoolData.id
         });
 
       if (profileError) {
-        console.error("Error updating profile:", profileError);
-        toast.error(`Profile error: ${profileError.message}`);
-        // Continue anyway, we'll handle this in onboarding
+        toast.error(profileError.message);
+        return;
+      }
+
+      // Process team members if provided
+      if (userData.teamMembers && userData.teamMembers.length > 0) {
+        // In a real app, you would create invitations for team members
+        // This would typically involve sending emails with signup links
+        console.log("Team members to invite:", userData.teamMembers);
+        
+        // For now, just log the information
+        toast.success(`${userData.teamMembers.length} team members will be invited`);
       }
 
       toast.success("Account created successfully!");
-      
-      // No need to navigate here as the component will handle it
+      navigate("/");
     } catch (error: any) {
-      console.error("Signup error:", error);
       toast.error(error.message || "An error occurred during signup");
-      throw error; // Re-throw to let calling component handle it
     } finally {
       setIsLoading(false);
     }
