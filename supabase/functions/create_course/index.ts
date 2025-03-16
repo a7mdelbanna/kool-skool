@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-id, x-school-id, x-user-role',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
@@ -43,45 +44,41 @@ serve(async (req) => {
       hasApiKey: !!apiKey
     })
     
-    // Get request body and content type
-    const contentType = req.headers.get('content-type') || '';
-    console.log("Content type:", contentType);
+    if (!userId || !schoolId) {
+      console.error("Missing required headers:", { userId, schoolId });
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing required headers",
+          detail: "x-user-id and x-school-id headers are required"
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
     
-    // Parse request body with extensive error handling
+    // Get request body and create a copy to log (to avoid consuming the body)
+    const clonedRequest = req.clone();
+    const rawBody = await clonedRequest.text();
+    console.log("Raw request body:", rawBody);
+    
+    // Parse the raw body into JSON with error handling
     let requestData;
     try {
-      // Read the request body as text to log it first
-      const text = await req.text();
-      console.log("Raw request body:", text);
-      
-      if (!text || text.trim() === '') {
+      if (!rawBody || rawBody.trim() === '') {
+        console.error("Empty request body");
         return new Response(
           JSON.stringify({ error: "Empty request body" }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
       }
       
-      // Parse the text into JSON
-      try {
-        requestData = JSON.parse(text);
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Invalid JSON in request body", 
-            detail: parseError.message 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
-      }
-      
+      requestData = JSON.parse(rawBody);
       console.log("Parsed request data:", requestData);
-    } catch (bodyError) {
-      console.error("Error reading request body:", bodyError);
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
       return new Response(
         JSON.stringify({ 
-          error: "Error reading request body", 
-          detail: bodyError.message 
+          error: "Invalid JSON in request body", 
+          detail: parseError.message 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
@@ -106,13 +103,17 @@ serve(async (req) => {
     )
     
     // Extract data from request body
-    const { school_id, course_name, lesson_type } = requestData
+    const { school_id, course_name, lesson_type } = requestData;
     
-    console.log(`Creating course with name: ${course_name}, type: ${lesson_type} for school: ${school_id}`)
+    console.log(`Creating course with name: ${course_name}, type: ${lesson_type} for school: ${school_id}`);
     
     // Validate request data
     if (!school_id || !course_name || !lesson_type) {
-      console.error("Missing required fields in request body");
+      console.error("Missing required fields in request body:", {
+        hasSchoolId: !!school_id,
+        hasCourseName: !!course_name,
+        hasLessonType: !!lesson_type
+      });
       return new Response(
         JSON.stringify({ 
           error: "Missing required fields",
@@ -126,12 +127,16 @@ serve(async (req) => {
       )
     }
     
-    // Call the RPC function to create the course
-    const { data, error } = await supabaseClient.rpc('create_course', {
-      school_id,
-      course_name,
-      lesson_type
-    })
+    // Insert directly into courses table instead of using RPC
+    const { data, error } = await supabaseClient
+      .from('courses')
+      .insert({
+        school_id,
+        name: course_name,
+        lesson_type
+      })
+      .select()
+      .single();
     
     if (error) {
       console.error("Error creating course:", error);
@@ -141,13 +146,20 @@ serve(async (req) => {
       )
     }
     
+    console.log("Course created successfully:", data);
+    
     // Return the created course data
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({
+        id: data.id,
+        school_id: data.school_id,
+        name: data.name,
+        lesson_type: data.lesson_type
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
-    console.error("Unhandled error:", error.message);
+    console.error("Unhandled error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

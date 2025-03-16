@@ -201,6 +201,8 @@ export const useStudentForm = (
         console.log("Using course:", course);
         console.log("Using teacher:", teacher);
         
+        toast.loading("Creating student...");
+        
         const { data, error } = await createStudent(
           studentData.email as string,
           password,
@@ -213,6 +215,8 @@ export const useStudentForm = (
             studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
           studentData.phone
         );
+        
+        toast.dismiss();
         
         if (error || (data && !data.success)) {
           console.error("Error creating student:", error || (data && data.message));

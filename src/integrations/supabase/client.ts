@@ -231,19 +231,24 @@ export async function createStudent(
       role: userData.role
     });
     
+    // Prepare request body
+    const requestBody = {
+      student_email: email,
+      student_password: password,
+      first_name: firstName,
+      last_name: lastName,
+      teacher_id: teacherId,
+      course_id: courseId,
+      age_group: ageGroup,
+      level: level,
+      phone: phone || null
+    };
+    
+    console.log("Student creation request body:", requestBody);
+    
     // Make the request to create a student with proper authentication headers
-    const { data, error } = await supabase.functions.invoke('create_student', {
-      body: {
-        student_email: email,
-        student_password: password,
-        first_name: firstName,
-        last_name: lastName,
-        teacher_id: teacherId,
-        course_id: courseId,
-        age_group: ageGroup,
-        level: level,
-        phone: phone || null
-      },
+    const { data, error } = await supabase.functions.invoke<CreateStudentResponse>('create_student', {
+      body: JSON.stringify(requestBody), // Ensure proper stringification
       headers: {
         'x-user-id': userData.id,
         'x-school-id': userData.schoolId,
@@ -413,7 +418,7 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     // Use our Edge Function to create the course with improved error handling
     const response = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
-      body: requestBody,
+      body: JSON.stringify(requestBody), // Ensure proper stringification
       headers: headers
     });
 

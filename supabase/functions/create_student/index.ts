@@ -5,11 +5,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-id, x-school-id, x-user-role',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
+  console.log("Create student function called");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS request");
     return new Response(null, { headers: corsHeaders })
   }
   
@@ -47,7 +51,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Only school admins can create students" 
+          message: "Only school admins can create students",
+          detail: { userId, schoolId, userRole }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
       )
@@ -71,27 +76,36 @@ serve(async (req) => {
       }
     )
     
-    // Verify that the user exists and is an admin
-    const { data: adminData, error: adminError } = await supabaseClient
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .eq('school_id', schoolId)
-      .single()
+    // Get request body - Create a copy of the request to avoid consuming it
+    const clonedRequest = req.clone();
+    const rawBody = await clonedRequest.text();
+    console.log("Raw request body:", rawBody);
     
-    if (adminError || !adminData || adminData.role !== 'admin') {
-      console.error("Admin verification failed:", { adminError, adminData })
+    // Parse the raw body into JSON with error handling
+    let requestData;
+    try {
+      if (!rawBody || rawBody.trim() === '') {
+        console.error("Empty request body");
+        return new Response(
+          JSON.stringify({ success: false, message: "Empty request body" }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+      }
+      
+      requestData = JSON.parse(rawBody);
+      console.log("Parsed request data:", requestData);
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Admin verification failed" 
+          message: "Invalid JSON in request body",
+          detail: parseError.message 
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
     
-    // Get request body
-    const requestData = await req.json()
     const { 
       student_email, 
       student_password,
@@ -105,6 +119,28 @@ serve(async (req) => {
     } = requestData
     
     console.log(`Creating student ${first_name} ${last_name} for school: ${schoolId}`)
+    
+    // Verify all required fields are present
+    if (!student_email || !student_password || !first_name || !last_name || !teacher_id || !course_id || !age_group || !level) {
+      console.error("Missing required fields:", { 
+        hasEmail: !!student_email, 
+        hasPassword: !!student_password,
+        hasFirstName: !!first_name,
+        hasLastName: !!last_name,
+        hasTeacherId: !!teacher_id,
+        hasCourseId: !!course_id,
+        hasAgeGroup: !!age_group,
+        hasLevel: !!level
+      });
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Missing required fields for student creation" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
     
     // Verify the teacher belongs to the same school
     const { data: teacherData, error: teacherError } = await supabaseClient
@@ -218,6 +254,11 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
+    
+    console.log("Student created successfully:", { 
+      userId: studentUserId, 
+      studentId: studentData.id 
+    });
     
     // Return success response
     return new Response(
