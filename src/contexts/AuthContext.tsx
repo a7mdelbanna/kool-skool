@@ -147,63 +147,79 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { success: false, message: "Failed to create user account" };
       }
 
-      // Get the license record to associate with the school
-      const { data: licenseData, error: licenseError } = await supabase
-        .from('licenses')
-        .select('*')
-        .eq('id', userData.licenseId)
-        .single();
+      // Verify that license exists before continuing
+      try {
+        const { data: licenseData, error: licenseCheckError } = await supabase
+          .from('licenses')
+          .select('*')
+          .eq('id', userData.licenseId)
+          .maybeSingle(); // Use maybeSingle to avoid errors if no row found
         
-      if (licenseError) {
-        console.error("Error fetching license data:", licenseError);
-        return { success: false, message: licenseError.message };
+        if (licenseCheckError) {
+          console.error("Error checking license:", licenseCheckError);
+          return { 
+            success: false, 
+            message: "Error verifying license: " + licenseCheckError.message 
+          };
+        }
+        
+        if (!licenseData) {
+          console.error("License not found during account creation");
+          return { 
+            success: false, 
+            message: "License not found. Please verify your license." 
+          };
+        }
+      } catch (error: any) {
+        console.error("License check error:", error);
+        return { success: false, message: "Error verifying license" };
       }
       
       // Create school entry
-      const { data: schoolData, error: schoolError } = await supabase
-        .from('schools')
-        .insert({
-          name: userData.schoolName || "My School",
-          license_id: userData.licenseId,
-          created_by: authData.user.id,
-          logo: userData.schoolLogo,
-          phone: userData.schoolPhone,
-          telegram: userData.schoolTelegram,
-          whatsapp: userData.schoolWhatsapp,
-          instagram: userData.schoolInstagram
-        })
-        .select('id')
-        .single();
+      try {
+        const { data: schoolData, error: schoolError } = await supabase
+          .from('schools')
+          .insert({
+            name: userData.schoolName || "My School",
+            license_id: userData.licenseId,
+            created_by: authData.user.id,
+            logo: userData.schoolLogo,
+            phone: userData.schoolPhone,
+            telegram: userData.schoolTelegram,
+            whatsapp: userData.schoolWhatsapp,
+            instagram: userData.schoolInstagram
+          })
+          .select('id')
+          .single();
 
-      if (schoolError) {
-        console.error("School creation error:", schoolError);
-        return { success: false, message: schoolError.message };
-      }
+        if (schoolError) {
+          console.error("School creation error:", schoolError);
+          return { success: false, message: schoolError.message };
+        }
 
-      // Create profile entry
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email: email,
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          role: "admin", // Default role for new users
-          phone: userData.phone,
-          whatsapp: userData.whatsapp,
-          telegram: userData.telegram,
-          instagram: userData.instagram,
-          profile_picture: userData.profilePicture,
-          school_id: schoolData.id
-        });
+        // Create profile entry
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email: email,
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            role: "admin", // Default role for new users
+            phone: userData.phone,
+            whatsapp: userData.whatsapp,
+            telegram: userData.telegram,
+            instagram: userData.instagram,
+            profile_picture: userData.profilePicture,
+            school_id: schoolData.id
+          });
 
-      if (profileError) {
-        console.error("Profile creation error:", profileError);
-        return { success: false, message: profileError.message };
-      }
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+          return { success: false, message: profileError.message };
+        }
 
-      // Update license with school info if not already set
-      if (!licenseData.school_name) {
+        // Update license with school info if license exists
         const { error: updateLicenseError } = await supabase
           .from('licenses')
           .update({ 
@@ -216,16 +232,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.error("License update error:", updateLicenseError);
           // Non-critical error, continue anyway
         }
-      }
-
-      // Process team members if provided
-      if (userData.teamMembers && userData.teamMembers.length > 0) {
-        // In a real app, you would create invitations for team members
-        // This would typically involve sending emails with signup links
-        console.log("Team members to invite:", userData.teamMembers);
-        
-        // For now, just log the information
-        toast.success(`${userData.teamMembers.length} team members will be invited`);
+      } catch (error: any) {
+        console.error("Data creation error:", error);
+        return { success: false, message: error.message || "Error creating school/profile data" };
       }
 
       console.log("Account created successfully");
