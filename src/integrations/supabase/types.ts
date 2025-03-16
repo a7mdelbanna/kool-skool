@@ -127,6 +127,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_user_license_id: {
+        Args: {
+          user_id: string
+        }
+        Returns: string
+      }
+      get_user_school_id: {
+        Args: {
+          user_id: string
+        }
+        Returns: string
+      }
       hash_password: {
         Args: {
           password: string

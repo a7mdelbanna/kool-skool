@@ -23,6 +23,7 @@ const SchoolSetup = () => {
   const [availableLicenses, setAvailableLicenses] = useState<License[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     licenseKey: '',
@@ -51,18 +52,28 @@ const SchoolSetup = () => {
   const fetchAvailableLicenses = async () => {
     try {
       setIsLoading(true);
+      setLicenseError(null);
+      
       const { data, error } = await supabase
         .from('licenses')
         .select('id, license_key, is_used')
         .eq('is_used', false);
       
       if (error) {
-        throw error;
+        console.error('Error fetching licenses:', error);
+        setLicenseError(error.message);
+        toast({
+          title: "Error loading licenses",
+          description: error.message || "Please try again later.",
+          variant: "destructive"
+        });
+        return;
       }
       
       setAvailableLicenses(data || []);
     } catch (error) {
       console.error('Error fetching licenses:', error);
+      setLicenseError(error.message);
       toast({
         title: "Error loading licenses",
         description: error.message || "Please try again later.",
@@ -245,7 +256,27 @@ const SchoolSetup = () => {
                   )}
                 </div>
                 
-                {availableLicenses.length > 0 && (
+                {licenseError ? (
+                  <div className="bg-red-50 p-3 rounded-md border border-red-200">
+                    <p className="text-red-600 text-sm flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" /> {licenseError}
+                    </p>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={fetchAvailableLicenses}
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : isLoading ? (
+                  <div className="bg-muted p-3 rounded-md flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <p className="text-sm">Loading available licenses...</p>
+                  </div>
+                ) : availableLicenses.length > 0 ? (
                   <div className="bg-muted p-3 rounded-md">
                     <p className="text-sm font-medium mb-2">Available Licenses:</p>
                     <div className="flex flex-wrap gap-2">
@@ -262,6 +293,12 @@ const SchoolSetup = () => {
                         </Button>
                       ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
+                    <p className="text-yellow-600 text-sm flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" /> No available licenses found
+                    </p>
                   </div>
                 )}
                 
