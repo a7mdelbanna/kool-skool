@@ -17,9 +17,25 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 
+interface LicenseInfo {
+  id: string;
+  license_number: string;
+  is_active: boolean;
+  duration_days: number;
+  max_users: number;
+  created_at: string;
+  expires_at: string;
+  days_remaining: number;
+  school_name: string;
+  school_id: string;
+  status?: string;
+  daysRemaining?: number;
+  progressPercentage?: number;
+}
+
 const SubscriptionInfo = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [licenseInfo, setLicenseInfo] = useState<any>(null);
+  const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
@@ -77,7 +93,7 @@ const SubscriptionInfo = () => {
         console.log("License information not found");
         setLicenseInfo(null);
       } else {
-        const license = licenseData[0];
+        const license = licenseData[0] as LicenseInfo;
         
         // Calculate status
         let status = "inactive";
@@ -221,7 +237,7 @@ const SubscriptionInfo = () => {
         </div>
         
         {licenseInfo.daysRemaining < 14 && licenseInfo.status === "active" && (
-          <Alert variant="destructive" className="bg-amber-50 text-amber-800 border-amber-200 mt-4">
+          <Alert variant="default" className="bg-amber-50 text-amber-800 border-amber-200 mt-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Subscription Expiring Soon</AlertTitle>
             <AlertDescription>

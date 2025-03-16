@@ -109,11 +109,12 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
         return;
       }
       
-      // We need to manually build the query since team_invitations is not in our types
-      const { error } = await supabase.from('team_invitations')
-        .delete()
-        .eq('email', email)
-        .eq('school_id', schoolId);
+      // We need to use a custom query here since team_invitations is not in our types
+      // Use a raw query instead of strongly typed query since the table is not in our types
+      const { error } = await supabase.rpc('delete_team_invitation', {
+        email_param: email,
+        school_id_param: schoolId
+      });
       
       if (error) {
         console.error("Error removing team invitation:", error);

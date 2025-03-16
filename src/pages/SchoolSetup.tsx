@@ -102,7 +102,7 @@ const SchoolSetup = () => {
         
         if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
           console.log("School data:", schoolData[0]);
-          setSchoolInfo(schoolData[0]);
+          setSchoolInfo(schoolData[0] as SchoolInfo);
           setNoSchoolFound(false);
         } else {
           setNoSchoolFound(true);
