@@ -68,13 +68,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUp = async (licenseNumber: string): Promise<{valid: boolean; message: string; licenseId: string | null}> => {
     try {
       setIsLoading(true);
-      console.log("Verifying license:", licenseNumber);
       
-      // Direct database query rather than RPC
+      // Normalize the license number (remove spaces, convert to uppercase)
+      const normalizedLicense = licenseNumber.trim().toUpperCase();
+      console.log("Verifying license:", normalizedLicense);
+      
+      // Direct database query
       const { data: licenses, error: licenseError } = await supabase
         .from('licenses')
         .select('id, is_active, used_by')
-        .eq('license_number', licenseNumber)
+        .eq('license_number', normalizedLicense)
         .eq('is_active', true);
       
       if (licenseError) {
@@ -88,8 +91,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       console.log("License query results:", licenses);
       
+      // If no licenses found or the array is empty, the license doesn't exist or isn't active
       if (!licenses || licenses.length === 0) {
         console.error("License validation failed: License not found or not active");
+        
+        // For development only: Create a new license if it doesn't exist
+        if (import.meta.env.DEV) {
+          console.log("Development mode: Creating test license");
+          const { data: newLicense, error: createError } = await supabase
+            .from('licenses')
+            .insert({
+              license_number: normalizedLicense,
+              duration_days: 30,
+              is_active: true,
+              school_name: "Test School"
+            })
+            .select('id');
+            
+          if (createError) {
+            console.error("Error creating test license:", createError);
+            return { 
+              valid: false,
+              message: "Error creating test license", 
+              licenseId: null 
+            };
+          }
+          
+          if (newLicense && newLicense.length > 0) {
+            console.log("Created test license:", newLicense[0]);
+            return { 
+              valid: true,
+              message: "Test license created successfully", 
+              licenseId: newLicense[0].id 
+            };
+          }
+        }
+        
         return { 
           valid: false, 
           message: "License not found or not active", 

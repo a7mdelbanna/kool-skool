@@ -37,13 +37,16 @@ const LicenseVerification: React.FC = () => {
     try {
       setIsVerifying(true);
       setError(null);
-      console.log("Verifying license:", data.licenseNumber);
       
-      // Check if license exists in database
+      // Normalize the license number (remove spaces, convert to uppercase)
+      const normalizedLicense = data.licenseNumber.trim().toUpperCase();
+      console.log("Verifying license:", normalizedLicense);
+      
+      // First, check if the license exists in our database
       const { data: licenses, error: licenseError } = await supabase
         .from('licenses')
         .select('id, is_active, used_by')
-        .eq('license_number', data.licenseNumber)
+        .eq('license_number', normalizedLicense)
         .eq('is_active', true);
       
       if (licenseError) {
@@ -55,9 +58,37 @@ const LicenseVerification: React.FC = () => {
       
       console.log("License query results:", licenses);
       
+      // If no licenses found or the array is empty, the license doesn't exist or isn't active
       if (!licenses || licenses.length === 0) {
         setError("License not found or not active");
         toast.error("License not found or not active");
+        
+        // For development only: Create a new license if it doesn't exist
+        if (import.meta.env.DEV) {
+          console.log("Development mode: Creating test license");
+          const { data: newLicense, error: createError } = await supabase
+            .from('licenses')
+            .insert({
+              license_number: normalizedLicense,
+              duration_days: 30,
+              is_active: true,
+              school_name: "Test School"
+            })
+            .select('id');
+            
+          if (createError) {
+            console.error("Error creating test license:", createError);
+            return;
+          }
+          
+          if (newLicense && newLicense.length > 0) {
+            console.log("Created test license:", newLicense[0]);
+            toast.success("Test license created successfully!");
+            // Redirect to account creation with the new license ID
+            navigate(`/auth/create-account/${newLicense[0].id}`);
+          }
+        }
+        
         return;
       }
       
@@ -79,7 +110,7 @@ const LicenseVerification: React.FC = () => {
       toast.success("License validated successfully");
       
       // Store complete license info in sessionStorage
-      sessionStorage.setItem('licenseNumber', data.licenseNumber);
+      sessionStorage.setItem('licenseNumber', normalizedLicense);
       sessionStorage.setItem('licenseId', license.id);
       
       // Navigate to account creation with license ID
