@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,7 +84,6 @@ const TeamAccess = () => {
       [name]: value
     }));
     
-    // Clear error when field is being edited
     if (name in errors) {
       setErrors(prev => ({
         ...prev,
@@ -149,38 +147,31 @@ const TeamAccess = () => {
     try {
       setFormLoading(true);
       
-      // Get current user from localStorage
       const currentUser = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null;
       
       if (!currentUser || !currentUser.id) {
         throw new Error("You must be logged in to add team members");
       }
       
-      // Pass in the current user from localStorage to determine if they're an admin
-      const { data, error } = await supabase.rpc('add_team_member', {
-        member_first_name: formData.firstName,
-        member_last_name: formData.lastName,
-        member_email: formData.email,
-        member_role: formData.role,
-        member_password: formData.password
-      }, {
-        headers: {
-          'x-user-id': currentUser.id
-        }
-      });
+      const { data, error } = await supabase
+        .rpc('add_team_member', {
+          member_first_name: formData.firstName,
+          member_last_name: formData.lastName,
+          member_email: formData.email,
+          member_role: formData.role,
+          member_password: formData.password
+        });
       
       if (error) {
         throw error;
       }
       
-      // Cast data first to unknown, then to our custom interface
       const response = (data as unknown) as TeamMemberResponse;
       
       if (!response.success) {
         throw new Error(response.message || "Failed to add team member");
       }
       
-      // Reset form
       setFormData({
         firstName: '',
         lastName: '',
@@ -195,7 +186,6 @@ const TeamAccess = () => {
         description: `${formData.firstName} ${formData.lastName} has been added successfully.`,
       });
       
-      // Refresh the team members list
       fetchTeamMembers();
       
     } catch (error) {
