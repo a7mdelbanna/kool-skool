@@ -1,7 +1,9 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Clock } from 'lucide-react';
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from '@tanstack/react-query';
 
 interface LicenseDetails {
   id: string;
@@ -13,21 +15,82 @@ interface LicenseDetails {
   school_name: string;
 }
 
-// Dummy license data
-const dummyLicenseDetails: LicenseDetails = {
-  id: 'lic-12345',
-  license_number: 'TUT-PRO-2023-12345',
-  is_active: true,
-  duration_days: 365,
-  days_remaining: 280,
-  expires_at: '2025-12-31T00:00:00Z',
-  school_name: 'Sample Language School'
+const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
+  try {
+    // Get current user from localStorage
+    const userString = localStorage.getItem('user');
+    if (!userString) {
+      console.error('No user found in localStorage');
+      return null;
+    }
+    
+    const user = JSON.parse(userString);
+    const schoolId = user.schoolId;
+    
+    if (!schoolId) {
+      console.error('No school ID found for user');
+      return null;
+    }
+    
+    // Get school details including license_id
+    const { data: schoolData, error: schoolError } = await supabase
+      .from('schools')
+      .select('name, license_id')
+      .eq('id', schoolId)
+      .single();
+    
+    if (schoolError) {
+      console.error('Error fetching school:', schoolError);
+      return null;
+    }
+    
+    if (!schoolData.license_id) {
+      console.error('No license ID found for school');
+      return null;
+    }
+    
+    // Get license details
+    const { data: licenseData, error: licenseError } = await supabase
+      .from('licenses')
+      .select('id, license_key, expires_at, duration_days')
+      .eq('id', schoolData.license_id)
+      .single();
+    
+    if (licenseError) {
+      console.error('Error fetching license:', licenseError);
+      return null;
+    }
+    
+    // Calculate days remaining
+    const now = new Date();
+    const expiryDate = licenseData.expires_at ? new Date(licenseData.expires_at) : null;
+    const daysRemaining = expiryDate 
+      ? Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) 
+      : 0;
+    const isActive = expiryDate ? expiryDate > now : false;
+    
+    return {
+      id: licenseData.id,
+      license_number: licenseData.license_key,
+      is_active: isActive,
+      duration_days: licenseData.duration_days || 0,
+      days_remaining: daysRemaining,
+      expires_at: licenseData.expires_at,
+      school_name: schoolData.name
+    };
+  } catch (error) {
+    console.error('Error fetching license details:', error);
+    return null;
+  }
 };
 
 const LicenseWidget: React.FC = () => {
-  const [loading, setLoading] = React.useState(false);
-  const [licenseDetails, setLicenseDetails] = React.useState<LicenseDetails | null>(dummyLicenseDetails);
-  const [error, setError] = React.useState<string | null>(null);
+  const { data: licenseDetails, isLoading, error, refetch } = useQuery({
+    queryKey: ['licenseDetails'],
+    queryFn: fetchLicenseDetails,
+    enabled: !!localStorage.getItem('user'), // Only run when user is authenticated
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
@@ -36,7 +99,7 @@ const LicenseWidget: React.FC = () => {
         <Clock className="h-5 w-5 text-gray-400" />
       </div>
       
-      {loading ? (
+      {isLoading ? (
         <div className="flex items-center justify-center h-12">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
         </div>

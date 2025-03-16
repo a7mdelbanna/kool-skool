@@ -12,21 +12,30 @@ export type Database = {
       licenses: {
         Row: {
           created_at: string | null
+          duration_days: number | null
+          expires_at: string | null
           id: string
           is_used: boolean | null
           license_key: string
+          starts_at: string | null
         }
         Insert: {
           created_at?: string | null
+          duration_days?: number | null
+          expires_at?: string | null
           id?: string
           is_used?: boolean | null
           license_key: string
+          starts_at?: string | null
         }
         Update: {
           created_at?: string | null
+          duration_days?: number | null
+          expires_at?: string | null
           id?: string
           is_used?: boolean | null
           license_key?: string
+          starts_at?: string | null
         }
         Relationships: []
       }
