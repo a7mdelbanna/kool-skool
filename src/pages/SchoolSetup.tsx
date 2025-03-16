@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -29,10 +28,11 @@ import {
   GraduationCap,
   CheckCircle2,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Mail
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, createTeamMember } from "@/integrations/supabase/client";
+import { supabase, inviteTeamMember } from "@/integrations/supabase/client";
 import LicenseWidget from "@/components/LicenseWidget";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -54,7 +54,6 @@ interface Teacher {
   telegram: string;
   instagram: string;
   email: string;
-  password: string;
   role: string;
 }
 
@@ -119,7 +118,7 @@ const SchoolSetup = () => {
   const [userSchoolInfo, setUserSchoolInfo] = useState<UserSchoolInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creatingTeamMember, setCreatingTeamMember] = useState<Record<string, boolean>>({});
+  const [invitingTeamMember, setInvitingTeamMember] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [openSections, setOpenSections] = useState({
@@ -139,7 +138,7 @@ const SchoolSetup = () => {
   });
   
   const [teachers, setTeachers] = useState<Teacher[]>([
-    { id: '1', name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', password: '', role: 'teacher' }
+    { id: '1', name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', role: 'teacher' }
   ]);
   
   const [levels, setLevels] = useState<Level[]>([
@@ -232,7 +231,6 @@ const SchoolSetup = () => {
               telegram: '',
               instagram: '',
               email: member.email,
-              password: '',
               role: member.role
             }));
             
@@ -276,7 +274,7 @@ const SchoolSetup = () => {
   const handleAddTeacher = () => {
     setTeachers(prev => [
       ...prev,
-      { id: Date.now().toString(), name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', password: '', role: 'teacher' }
+      { id: Date.now().toString(), name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', role: 'teacher' }
     ]);
   };
   
@@ -314,12 +312,6 @@ const SchoolSetup = () => {
       newErrors[`${teacher.id}_email`] = 'Invalid email format';
     }
     
-    if (!teacher.password) {
-      newErrors[`${teacher.id}_password`] = 'Password is required';
-    } else if (teacher.password.length < 6) {
-      newErrors[`${teacher.id}_password`] = 'Password must be at least 6 characters';
-    }
-    
     if (!teacher.role) {
       newErrors[`${teacher.id}_role`] = 'Role is required';
     }
@@ -327,7 +319,7 @@ const SchoolSetup = () => {
     return newErrors;
   };
   
-  const handleCreateTeamMember = async (teacher: Teacher) => {
+  const handleInviteTeamMember = async (teacher: Teacher) => {
     const validationErrors = validateTeamMember(teacher);
     
     if (Object.keys(validationErrors).length > 0) {
@@ -336,7 +328,7 @@ const SchoolSetup = () => {
     }
     
     try {
-      setCreatingTeamMember(prev => ({ ...prev, [teacher.id]: true }));
+      setInvitingTeamMember(prev => ({ ...prev, [teacher.id]: true }));
       
       // Split the name to get first name and last name
       const nameParts = teacher.name.split(' ');
@@ -344,45 +336,36 @@ const SchoolSetup = () => {
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       
       // Log the data being sent to the API for debugging
-      console.log("Creating team member with data:", {
+      console.log("Inviting team member with data:", {
         email: teacher.email,
-        password: teacher.password,
         role: teacher.role,
         firstName,
         lastName
       });
       
-      const result = await createTeamMember({
+      const result = await inviteTeamMember({
         email: teacher.email,
-        password: teacher.password,
         role: teacher.role as "director" | "teacher" | "admin" | "staff",
         firstName,
         lastName
       });
       
-      console.log("Team member creation result:", result);
+      console.log("Team member invitation result:", result);
       
       toast({
-        title: 'Team member created',
-        description: `${teacher.name} has been added to your team with login credentials`,
+        title: 'Team member invited',
+        description: `An invitation has been sent to ${teacher.email}`,
       });
       
-      // Reset the password field after successful creation
-      setTeachers(prev => 
-        prev.map(t => 
-          t.id === teacher.id ? { ...t, password: '' } : t
-        )
-      );
-      
     } catch (error: any) {
-      console.error('Error creating team member:', error);
+      console.error('Error inviting team member:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create team member',
+        description: error.message || 'Failed to invite team member',
         variant: 'destructive'
       });
     } finally {
-      setCreatingTeamMember(prev => ({ ...prev, [teacher.id]: false }));
+      setInvitingTeamMember(prev => ({ ...prev, [teacher.id]: false }));
     }
   };
   
@@ -814,56 +797,40 @@ const SchoolSetup = () => {
                   </div>
                 </div>
                 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`teacher-password-${teacher.id}`}>Password</Label>
-                    <Input 
-                      id={`teacher-password-${teacher.id}`}
-                      type="password"
-                      value={teacher.password}
-                      onChange={(e) => handleTeacherChange(teacher.id, 'password', e.target.value)}
-                      placeholder="Minimum 6 characters" 
-                      className={errors[`${teacher.id}_password`] ? 'border-destructive' : ''}
-                    />
-                    {errors[`${teacher.id}_password`] && (
-                      <p className="text-sm text-destructive">{errors[`${teacher.id}_password`]}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor={`teacher-role-${teacher.id}`}>Role</Label>
-                    <select
-                      id={`teacher-role-${teacher.id}`}
-                      value={teacher.role}
-                      onChange={(e) => handleTeacherChange(teacher.id, 'role', e.target.value)}
-                      className={`w-full rounded-md border h-10 px-3 py-2 bg-background text-sm ${
-                        errors[`${teacher.id}_role`] ? 'border-destructive' : ''
-                      }`}
-                    >
-                      <option value="teacher">Teacher</option>
-                      <option value="admin">Admin</option>
-                      <option value="staff">Staff</option>
-                    </select>
-                    {errors[`${teacher.id}_role`] && (
-                      <p className="text-sm text-destructive">{errors[`${teacher.id}_role`]}</p>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`teacher-role-${teacher.id}`}>Role</Label>
+                  <select
+                    id={`teacher-role-${teacher.id}`}
+                    value={teacher.role}
+                    onChange={(e) => handleTeacherChange(teacher.id, 'role', e.target.value)}
+                    className={`w-full rounded-md border h-10 px-3 py-2 bg-background text-sm ${
+                      errors[`${teacher.id}_role`] ? 'border-destructive' : ''
+                    }`}
+                  >
+                    <option value="teacher">Teacher</option>
+                    <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
+                  </select>
+                  {errors[`${teacher.id}_role`] && (
+                    <p className="text-sm text-destructive">{errors[`${teacher.id}_role`]}</p>
+                  )}
                 </div>
                 
                 <div className="flex justify-end mt-4">
                   <Button 
                     type="button" 
-                    onClick={() => handleCreateTeamMember(teacher)}
-                    disabled={creatingTeamMember[teacher.id]}
+                    onClick={() => handleInviteTeamMember(teacher)}
+                    disabled={invitingTeamMember[teacher.id]}
                   >
-                    {creatingTeamMember[teacher.id] ? (
+                    {invitingTeamMember[teacher.id] ? (
                       <div className="flex items-center gap-2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
-                        <span>Creating...</span>
+                        <span>Sending Invitation...</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span>Create User</span>
+                        <Mail className="h-4 w-4" />
+                        <span>Send Invitation</span>
                       </div>
                     )}
                   </Button>
@@ -1004,212 +971,4 @@ const SchoolSetup = () => {
                 </div>
               ))}
               
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddCourse}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Course
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <Collapsible 
-          open={openSections.finance} 
-          onOpenChange={() => toggleSection('finance')}
-          className="border rounded-lg overflow-hidden"
-        >
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">Finance</h2>
-              </div>
-              {openSections.finance ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="p-4 space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Bank Accounts</h3>
-              </div>
-              
-              {accounts.map(account => (
-                <div key={account.id} className="grid grid-cols-3 gap-2 items-center">
-                  <Input 
-                    value={account.name}
-                    onChange={(e) => handleAccountChange(account.id, 'name', e.target.value)}
-                    placeholder="Account name (e.g., Main Account, Cash)" 
-                  />
-                  <Input 
-                    value={account.currency}
-                    onChange={(e) => handleAccountChange(account.id, 'currency', e.target.value)}
-                    placeholder="Currency (e.g., USD, EUR)" 
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveAccount(account.id)}
-                    disabled={accounts.length <= 1}
-                    className="text-destructive justify-self-end"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddAccount}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Account
-              </Button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Expense Categories</h3>
-              </div>
-              
-              {expenseCategories.map(category => (
-                <div key={category.id} className="flex items-center gap-2">
-                  <Input 
-                    value={category.name}
-                    onChange={(e) => handleExpenseCategoryChange(category.id, e.target.value)}
-                    placeholder="Category name (e.g., Rent, Utilities, Salaries)" 
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveExpenseCategory(category.id)}
-                    disabled={expenseCategories.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddExpenseCategory}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Category
-              </Button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Repeat className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Recurring Expenses</h3>
-              </div>
-              
-              {recurringExpenses.map(expense => (
-                <div key={expense.id} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-4">
-                    <Input 
-                      value={expense.name}
-                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'name', e.target.value)}
-                      placeholder="Expense name" 
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <select
-                      value={expense.categoryId}
-                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'categoryId', e.target.value)}
-                      className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
-                    >
-                      <option value="">Select Category</option>
-                      {expenseCategories.map(category => (
-                        <option key={category.id} value={category.id}>
-                          {category.name || `Category ${category.id}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <select
-                      value={expense.frequency}
-                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'frequency', e.target.value)}
-                      className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <Input 
-                      type="number"
-                      value={expense.amount}
-                      onChange={(e) => handleRecurringExpenseChange(expense.id, 'amount', parseFloat(e.target.value))}
-                      placeholder="Amount" 
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleRemoveRecurringExpense(expense.id)}
-                      disabled={recurringExpenses.length <= 1}
-                      className="text-destructive justify-self-end"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Remove</span>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddRecurringExpense}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Recurring Expense
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <div className="flex justify-end">
-          <Button type="submit" disabled={saving}>
-            {saving ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Saving...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Save Settings</span>
-              </div>
-            )}
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-export default SchoolSetup;
+              <Button

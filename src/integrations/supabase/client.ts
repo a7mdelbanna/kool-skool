@@ -121,7 +121,71 @@ const checkEmailExists = async (email: string) => {
   }
 };
 
-// Helper function to create a team member with direct authentication
+// Helper function to invite a team member via email
+export const inviteTeamMember = async (
+  userData: {
+    email: string;
+    role: "director" | "teacher" | "admin" | "staff";
+    firstName?: string;
+    lastName?: string;
+  }
+) => {
+  try {
+    // Log the attempted invitation for debugging
+    console.log("Inviting team member with data:", userData);
+    
+    // First check if the email already exists
+    const emailExists = await checkEmailExists(userData.email);
+    
+    if (emailExists) {
+      console.log(`Email ${userData.email} already exists, stopping invitation process`);
+      throw new Error(`The email ${userData.email} is already registered. Please use a different email address.`);
+    }
+    
+    // Use the invite_team_member RPC function to create the invitation
+    const { data, error } = await supabase.rpc(
+      'invite_team_member',
+      {
+        email_param: userData.email,
+        role_param: userData.role,
+        first_name_param: userData.firstName || null,
+        last_name_param: userData.lastName || null
+      }
+    );
+    
+    if (error) {
+      console.error("Error inviting team member:", error);
+      throw error;
+    }
+    
+    // Log the success
+    console.log("Team member invited successfully:", data);
+    
+    // Now send invitation email via Supabase auth
+    const { error: inviteError } = await supabase.auth.signInWithOtp({
+      email: userData.email,
+      options: {
+        // Set data to pass to the invite_team_member function
+        data: {
+          invitation: true,
+          role: userData.role
+        }
+      }
+    });
+    
+    if (inviteError) {
+      console.error("Error sending invitation email:", inviteError);
+      throw inviteError;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception inviting team member:", error);
+    throw error;
+  }
+};
+
+// Legacy function kept for compatibility
 export const createTeamMember = async (
   userData: {
     email: string;
