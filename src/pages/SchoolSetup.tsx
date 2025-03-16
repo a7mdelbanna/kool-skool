@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, Loader2, School } from "lucide-react";
@@ -17,7 +16,6 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { PlusCircle, RefreshCw } from "lucide-react";
 
-// School schema with license_number validation
 const schoolSchema = z.object({
   name: z.string().min(1, { message: "School name is required" }),
   license_number: z.string().min(4, { message: "License number is required and must be at least 4 characters" }),
@@ -62,7 +60,6 @@ const SchoolSetup = () => {
         setError(null);
         setIsRetrying(false);
         
-        // Use RPC function to get role safely
         const { data: roleData, error: roleError } = await supabase
           .rpc('get_current_user_role');
           
@@ -74,7 +71,6 @@ const SchoolSetup = () => {
         }
         
         try {
-          // Fetch school information using is_user_in_school first to avoid potential recursion issues
           const { data: isInSchool, error: isInSchoolError } = await supabase
             .rpc('is_user_in_school', { user_id_param: user.id });
           
@@ -89,7 +85,6 @@ const SchoolSetup = () => {
             return;
           }
           
-          // If user is in a school, now try to fetch school data
           const { data: schoolIds } = await supabase
             .rpc('get_user_school_id', { user_id_param: user.id });
           
@@ -144,6 +139,25 @@ const SchoolSetup = () => {
         return;
       }
 
+      if (data.license_number) {
+        const { data: licenseData, error: licenseQueryError } = await supabase
+          .from('licenses')
+          .select('id')
+          .eq('license_number', data.license_number)
+          .single();
+          
+        if (!licenseQueryError && licenseData) {
+          const { error: updateError } = await supabase
+            .from('licenses')
+            .update({ school_name: data.name })
+            .eq('id', licenseData.id);
+            
+          if (updateError) {
+            console.error("Error updating license school name:", updateError);
+          }
+        }
+      }
+
       const { data: result, error } = await supabase.rpc(
         'create_school_and_update_profile_rpc',
         {
@@ -162,7 +176,6 @@ const SchoolSetup = () => {
       schoolForm.reset();
       setSchoolDialogOpen(false);
       
-      // Refresh school information
       await fetchUserData();
       
     } catch (error: any) {
@@ -305,7 +318,6 @@ const SchoolSetup = () => {
         </Card>
       )}
 
-      {/* Display School Information */}
       {schoolInfo && !error && (
         <Card>
           <CardHeader>
@@ -348,7 +360,6 @@ const SchoolSetup = () => {
       <div className="space-y-6">
         <SubscriptionInfo />
         
-        {/* Only show license manager for admin users */}
         {userRole === 'admin' && <LicenseManager />}
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -50,7 +49,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 
-// Generate a random 16-character license number
 const generateLicenseNumber = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let result = "";
@@ -116,6 +114,7 @@ const LicenseManager = () => {
         license_number: data.licenseNumber,
         duration_days: data.durationDays,
         school_name: data.schoolName,
+        is_active: true
       });
 
       if (error) {

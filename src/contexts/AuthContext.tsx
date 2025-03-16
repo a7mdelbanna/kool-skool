@@ -117,6 +117,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setIsLoading(true);
       
+      // First, update the license record with the school name
+      if (userData.licenseId && userData.schoolName) {
+        const { error: licenseUpdateError } = await supabase
+          .from('licenses')
+          .update({ school_name: userData.schoolName })
+          .eq('id', userData.licenseId);
+          
+        if (licenseUpdateError) {
+          console.error("Error updating license school name:", licenseUpdateError);
+          // Continue with signup even if this fails
+        }
+      }
+      
       // Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
