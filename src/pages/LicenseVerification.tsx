@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowRight, Shield, School } from 'lucide-react';
+import { ArrowRight, Shield, School, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -14,10 +14,12 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const licenseSchema = z.object({
   licenseNumber: z.string().min(1, { message: 'Please enter a license number' }),
@@ -28,6 +30,7 @@ type LicenseFormValues = z.infer<typeof licenseSchema>;
 
 const LicenseVerification = () => {
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -42,6 +45,7 @@ const LicenseVerification = () => {
   const onSubmit = async (data: LicenseFormValues) => {
     try {
       setLoading(true);
+      setSuccess(false);
       
       // 1. Verify license exists and is valid
       const { data: licenseData, error: licenseError } = await supabase
@@ -69,12 +73,17 @@ const LicenseVerification = () => {
       if (schoolError) throw schoolError;
       
       toast({
-        title: 'License verified',
-        description: 'Your school has been created successfully',
+        title: 'License verified successfully!',
+        description: `Your school "${data.schoolName}" has been created with license ${data.licenseNumber}`,
+        variant: 'default',
       });
       
-      // Redirect to school setup page for more details
-      navigate('/school-setup');
+      setSuccess(true);
+      
+      // Redirect to school setup page for more details after a short delay
+      setTimeout(() => {
+        navigate('/school-setup');
+      }, 2000);
       
     } catch (error: any) {
       toast({
@@ -82,6 +91,7 @@ const LicenseVerification = () => {
         description: error.message || 'There was an error verifying your license',
         variant: 'destructive',
       });
+      setSuccess(false);
     } finally {
       setLoading(false);
     }
@@ -101,6 +111,15 @@ const LicenseVerification = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {success ? (
+              <Alert className="bg-green-50 border-green-200 mb-4">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <AlertDescription className="text-green-700">
+                  License verified successfully! Redirecting you to the school setup page...
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -112,6 +131,9 @@ const LicenseVerification = () => {
                       <FormControl>
                         <Input placeholder="Enter your license number" {...field} />
                       </FormControl>
+                      <FormDescription className="text-xs text-gray-500">
+                        For testing, you can use: LICENSE-TEST-2023
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
