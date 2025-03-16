@@ -144,6 +144,29 @@ export const createTeamMember = async (
       throw new Error(`The email ${userData.email} is already registered. Please use a different email address.`);
     }
     
+    // Get the current user's school ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+    
+    const { data: adminProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('school_id')
+      .eq('id', user.id)
+      .single();
+      
+    if (profileError) {
+      console.error("Error fetching admin profile:", profileError);
+      throw new Error('Could not fetch admin school information');
+    }
+    
+    if (!adminProfile.school_id) {
+      throw new Error('Admin does not have a school assigned');
+    }
+    
+    console.log("Admin school ID:", adminProfile.school_id);
+    
     // Proceed with creating the team member
     console.log("Creating team member with validated email:", userData.email);
     
