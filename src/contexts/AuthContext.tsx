@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setIsLoading(true);
       
-      // 1. Create user account with metadata
+      // Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -126,7 +126,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             license_id: userData.licenseId,
             first_name: userData.firstName,
             last_name: userData.lastName,
-            role: userData.role || "admin"
           }
         }
       });
@@ -140,55 +139,64 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         toast.error("Failed to create user account");
         return;
       }
-      
-      // 2. Create school entry using RPC instead of direct insert
-      // This handles license validation, expiry date calculation, and user-school connection
-      try {
-        const { error: schoolError } = await supabase.rpc(
-          'create_school_and_update_profile',
-          {
-            school_name: userData.schoolName,
-            license_number: userData.licenseId
-          }
-        );
-        
-        if (schoolError) throw schoolError;
-      } catch (error: any) {
-        console.error("Error in create_school_and_update_profile:", error);
-        toast.error(`Failed to set up school: ${error.message}`);
-        // Continue anyway since we've already created the user account
+
+      // Create school entry
+      const { data: schoolData, error: schoolError } = await supabase
+        .from('schools')
+        .insert({
+          name: userData.schoolName || "My School",
+          license_id: userData.licenseId,
+          created_by: authData.user.id,
+          logo: userData.schoolLogo,
+          phone: userData.schoolPhone,
+          telegram: userData.schoolTelegram,
+          whatsapp: userData.schoolWhatsapp,
+          instagram: userData.schoolInstagram
+        })
+        .select('id')
+        .single();
+
+      if (schoolError) {
+        toast.error(schoolError.message);
+        return;
       }
 
-      // 3. Create or update profile - this might be redundant with the RPC function
-      // but included as a fallback to ensure profile data is set
+      // Create profile entry
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({
+        .insert({
           id: authData.user.id,
           email: email,
           first_name: userData.firstName,
           last_name: userData.lastName,
-          role: userData.role || "admin",
-          phone: userData.phone || null,
-          whatsapp: userData.whatsapp || null,
-          telegram: userData.telegram || null,
-          instagram: userData.instagram || null,
-          profile_picture: userData.profilePicture || null
+          role: userData.role,
+          phone: userData.phone,
+          whatsapp: userData.whatsapp,
+          telegram: userData.telegram,
+          instagram: userData.instagram,
+          profile_picture: userData.profilePicture,
+          school_id: schoolData.id
         });
 
       if (profileError) {
-        console.error("Error updating profile:", profileError);
-        toast.error(`Profile error: ${profileError.message}`);
-        // Continue anyway, we'll handle this in onboarding
+        toast.error(profileError.message);
+        return;
+      }
+
+      // Process team members if provided
+      if (userData.teamMembers && userData.teamMembers.length > 0) {
+        // In a real app, you would create invitations for team members
+        // This would typically involve sending emails with signup links
+        console.log("Team members to invite:", userData.teamMembers);
+        
+        // For now, just log the information
+        toast.success(`${userData.teamMembers.length} team members will be invited`);
       }
 
       toast.success("Account created successfully!");
-      
-      // No need to navigate here as the component will handle it
+      navigate("/");
     } catch (error: any) {
-      console.error("Signup error:", error);
       toast.error(error.message || "An error occurred during signup");
-      throw error; // Re-throw to let calling component handle it
     } finally {
       setIsLoading(false);
     }

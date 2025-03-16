@@ -15,9 +15,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 // Account details schema
 const accountSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
-  firstName: z.string().min(1, { message: "First name is required" }),
-  lastName: z.string().min(1, { message: "Last name is required" }),
-  schoolName: z.string().min(1, { message: "School name is required" }),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
   confirmPassword: z.string().min(8, { message: "Password must be at least 8 characters" }),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -45,9 +42,6 @@ const AccountCreation: React.FC = () => {
     resolver: zodResolver(accountSchema),
     defaultValues: {
       email: "",
-      firstName: "",
-      lastName: "",
-      schoolName: "",
       password: "",
       confirmPassword: "",
     },
@@ -64,13 +58,12 @@ const AccountCreation: React.FC = () => {
       setIsSubmitting(true);
       console.log("Creating account with license ID:", licenseId);
       
-      // Initial user data for account creation
+      // Simple user data for initial account creation
       const userData = {
         licenseId: licenseId,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        schoolName: data.schoolName,
-        role: "admin", // Set as admin since they're creating the school
+        firstName: "New",
+        lastName: "User",
+        schoolName: "New School",
       };
 
       await completeSignUp(data.email, data.password, userData);
@@ -96,7 +89,7 @@ const AccountCreation: React.FC = () => {
         <Card className="shadow-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">Create Your Account</CardTitle>
-            <CardDescription>Enter your information to complete signup</CardDescription>
+            <CardDescription>Enter your credentials to complete signup</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...accountForm}>
@@ -117,51 +110,6 @@ const AccountCreation: React.FC = () => {
                     </FormItem>
                   )}
                 />
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={accountForm.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={accountForm.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <FormField
-                  control={accountForm.control}
-                  name="schoolName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>School Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter school name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
                 <FormField
                   control={accountForm.control}
                   name="password"
