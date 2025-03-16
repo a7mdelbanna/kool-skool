@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -153,14 +154,14 @@ const TeamAccess = () => {
         throw new Error("You must be logged in to add team members");
       }
       
-      const { data, error } = await supabase
-        .rpc('add_team_member', {
-          member_first_name: formData.firstName,
-          member_last_name: formData.lastName,
-          member_email: formData.email,
-          member_role: formData.role,
-          member_password: formData.password
-        });
+      // Set up the Supabase JWT for this request
+      const { data, error } = await supabase.rpc('add_team_member', {
+        member_first_name: formData.firstName,
+        member_last_name: formData.lastName,
+        member_email: formData.email,
+        member_role: formData.role,
+        member_password: formData.password
+      });
       
       if (error) {
         throw error;
