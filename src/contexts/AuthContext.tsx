@@ -93,38 +93,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // If no licenses found or the array is empty, the license doesn't exist or isn't active
       if (!licenses || licenses.length === 0) {
-        console.error("License validation failed: License not found or not active");
+        console.log("License not found or not active");
         
-        // For development only: Create a new license if it doesn't exist
+        // For development mode only: create a mock license that will be accepted in the UI flow
         if (import.meta.env.DEV) {
-          console.log("Development mode: Creating test license");
-          const { data: newLicense, error: createError } = await supabase
-            .from('licenses')
-            .insert({
-              license_number: normalizedLicense,
-              duration_days: 30,
-              is_active: true,
-              school_name: "Test School"
-            })
-            .select('id');
-            
-          if (createError) {
-            console.error("Error creating test license:", createError);
-            return { 
-              valid: false,
-              message: "Error creating test license", 
-              licenseId: null 
-            };
-          }
+          console.log("Development mode: Creating mock license");
           
-          if (newLicense && newLicense.length > 0) {
-            console.log("Created test license:", newLicense[0]);
-            return { 
-              valid: true,
-              message: "Test license created successfully", 
-              licenseId: newLicense[0].id 
-            };
-          }
+          // Instead of trying to create the license in the database (which fails due to RLS),
+          // we'll create a mock license object that we'll work with in the client
+          const mockLicenseId = crypto.randomUUID(); // Generate a random UUID
+          
+          // Store the mock license in sessionStorage
+          sessionStorage.setItem('mockLicenseId', mockLicenseId);
+          sessionStorage.setItem('mockLicenseNumber', normalizedLicense);
+          
+          console.log("Created mock license for development:", mockLicenseId);
+          return { 
+            valid: true,
+            message: "Test license created successfully for development", 
+            licenseId: mockLicenseId 
+          };
         }
         
         return { 
@@ -175,16 +163,80 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setIsLoading(true);
       
-      if (!userData.licenseId) {
+      // Check if we have a license ID
+      let licenseId = userData.licenseId;
+      let licenseNumber = userData.licenseNumber;
+      
+      if (!licenseId) {
         toast.error("Missing license ID. Please verify your license first.");
         return { success: false, error: "Missing license ID" };
       }
+
+      // Check if we're using a mock license in development mode
+      const mockLicenseId = sessionStorage.getItem('mockLicenseId');
+      if (import.meta.env.DEV && mockLicenseId && mockLicenseId === licenseId) {
+        console.log("Using mock license for development:", licenseId);
+        
+        // Create auth user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              license_id: licenseId,
+              first_name: userData.firstName,
+              last_name: userData.lastName,
+            }
+          }
+        });
+
+        if (authError) {
+          console.error("Auth error during signup:", authError);
+          toast.error(authError.message);
+          return { success: false, error: authError.message };
+        }
+
+        if (!authData.user) {
+          console.error("Failed to create user account - no user data returned");
+          toast.error("Failed to create user account");
+          return { success: false, error: "Failed to create user account" };
+        }
+
+        console.log("User created successfully for development mode");
+        toast.success("Development account created successfully!");
+        
+        // Since we can't create actual school or profile data due to RLS,
+        // we'll just simulate success for development purposes
+        const { data: { session: newSession } } = await supabase.auth.getSession();
+        if (newSession) {
+          console.log("New session established:", newSession);
+          setSession(newSession);
+          setUser(newSession.user);
+        } else {
+          console.log("No session after signup - attempting login with credentials");
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          
+          if (signInError) {
+            console.error("Error signing in after account creation:", signInError);
+          } else if (signInData.session) {
+            console.log("Successfully logged in after account creation");
+            setSession(signInData.session);
+            setUser(signInData.session.user);
+          }
+        }
+        
+        return { success: true };
+      }
       
-      console.log("CompleteSignUp with licenseId:", userData.licenseId);
-      console.log("CompleteSignUp with licenseNumber:", userData.licenseNumber);
+      // Normal flow for production or when a valid license exists
+      console.log("CompleteSignUp with licenseId:", licenseId);
+      console.log("CompleteSignUp with licenseNumber:", licenseNumber);
       
       const { data: licenseData, error: licenseError } = await supabase
-        .rpc('get_license_by_id', { license_id_param: userData.licenseId });
+        .rpc('get_license_by_id', { license_id_param: licenseId });
       
       console.log("License data from RPC:", licenseData);
       

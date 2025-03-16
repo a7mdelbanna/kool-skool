@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,7 +54,17 @@ const AccountCreation: React.FC = () => {
     // Try to get stored license number from session storage first
     const storedLicenseNumber = sessionStorage.getItem('licenseNumber');
     const storedLicenseId = sessionStorage.getItem('licenseId');
+    const mockLicenseId = sessionStorage.getItem('mockLicenseId');
+    const mockLicenseNumber = sessionStorage.getItem('mockLicenseNumber');
     
+    // Check if we're using a mock license in development mode
+    if (import.meta.env.DEV && mockLicenseId && mockLicenseId === licenseId) {
+      console.log("Using mock license for development:", { number: mockLicenseNumber, id: mockLicenseId });
+      setLicenseInfo({ license_number: mockLicenseNumber || 'MOCK-LICENSE' });
+      return;
+    }
+    
+    // Check regular stored license
     if (storedLicenseNumber && storedLicenseId === licenseId) {
       console.log("Using stored license info:", { number: storedLicenseNumber, id: storedLicenseId });
       setLicenseInfo({ license_number: storedLicenseNumber });

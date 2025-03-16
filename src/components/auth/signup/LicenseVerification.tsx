@@ -42,79 +42,22 @@ const LicenseVerification: React.FC = () => {
       const normalizedLicense = data.licenseNumber.trim().toUpperCase();
       console.log("Verifying license:", normalizedLicense);
       
-      // First, check if the license exists in our database
-      const { data: licenses, error: licenseError } = await supabase
-        .from('licenses')
-        .select('id, is_active, used_by')
-        .eq('license_number', normalizedLicense)
-        .eq('is_active', true);
+      // Use the signUp method from AuthContext to verify the license
+      const result = await signUp(normalizedLicense);
       
-      if (licenseError) {
-        console.error("License verification error:", licenseError);
-        setError(licenseError.message || "An error occurred during license verification");
-        toast.error("An error occurred during license verification");
+      if (!result.valid) {
+        setError(result.message);
+        toast.error(result.message);
         return;
       }
       
-      console.log("License query results:", licenses);
-      
-      // If no licenses found or the array is empty, the license doesn't exist or isn't active
-      if (!licenses || licenses.length === 0) {
-        setError("License not found or not active");
-        toast.error("License not found or not active");
-        
-        // For development only: Create a new license if it doesn't exist
-        if (import.meta.env.DEV) {
-          console.log("Development mode: Creating test license");
-          const { data: newLicense, error: createError } = await supabase
-            .from('licenses')
-            .insert({
-              license_number: normalizedLicense,
-              duration_days: 30,
-              is_active: true,
-              school_name: "Test School"
-            })
-            .select('id');
-            
-          if (createError) {
-            console.error("Error creating test license:", createError);
-            return;
-          }
-          
-          if (newLicense && newLicense.length > 0) {
-            console.log("Created test license:", newLicense[0]);
-            toast.success("Test license created successfully!");
-            // Redirect to account creation with the new license ID
-            navigate(`/auth/create-account/${newLicense[0].id}`);
-          }
-        }
-        
-        return;
-      }
-      
-      const license = licenses[0];
-      
-      // Get current user, if any
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUser = userData?.user?.id;
-      
-      // Check if license is already used by someone else
-      // If used_by is null, it means it's a new unused license
-      if (license.used_by && license.used_by !== currentUser) {
-        setError("This license is already in use by another account");
-        toast.error("This license is already in use by another account");
-        return;
-      }
-      
-      // License is valid - either new or belongs to current user
-      toast.success("License validated successfully");
-      
-      // Store complete license info in sessionStorage
+      // License is valid, save it and navigate to account creation
+      toast.success(result.message);
       sessionStorage.setItem('licenseNumber', normalizedLicense);
-      sessionStorage.setItem('licenseId', license.id);
+      sessionStorage.setItem('licenseId', result.licenseId || '');
       
       // Navigate to account creation with license ID
-      navigate(`/auth/create-account/${license.id}`);
+      navigate(`/auth/create-account/${result.licenseId}`);
       
     } catch (error: any) {
       console.error("License verification error:", error);
