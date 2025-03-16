@@ -52,7 +52,6 @@ const Students = () => {
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Get user data from localStorage
   const getUserData = () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
@@ -61,7 +60,6 @@ const Students = () => {
   const userData = getUserData();
   const schoolId = userData?.school_id;
   
-  // Fetch students from Supabase
   const { 
     data: studentsData, 
     isLoading: studentsLoading, 
@@ -73,7 +71,6 @@ const Students = () => {
     enabled: !!schoolId,
   });
   
-  // Convert Supabase students to the format expected by our components
   const mapStudentRecordToStudent = (record: StudentRecord): Student => {
     return {
       id: record.id,
@@ -85,7 +82,7 @@ const Students = () => {
       ageGroup: (record.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
       level: (record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
       phone: record.phone,
-      paymentStatus: 'pending', // This would come from subscriptions/payments
+      paymentStatus: 'pending',
       teacherId: record.teacher_id,
       lessonsCompleted: 0,
       nextLesson: 'Not scheduled',
@@ -97,7 +94,6 @@ const Students = () => {
     studentsData.data.map(mapStudentRecordToStudent) : 
     [];
   
-  // Extract unique values for filters
   const courses = Array.from(new Set(students.map(s => s.courseName)));
   const lessonTypes = Array.from(new Set(students.map(s => s.lessonType)));
   const ageGroups = Array.from(new Set(students.map(s => s.ageGroup)));
@@ -132,7 +128,6 @@ const Students = () => {
   
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // The search is already reactive, but we can add focus behavior
     if (searchInputRef.current) {
       searchInputRef.current.blur();
     }
@@ -145,7 +140,6 @@ const Students = () => {
   const filterStudents = () => {
     let filtered = [...students];
     
-    // Search functionality
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(
@@ -157,7 +151,6 @@ const Students = () => {
       );
     }
     
-    // Apply multiple filter types
     if (activeFilters.courseName.length > 0) {
       filtered = filtered.filter(student => 
         activeFilters.courseName.includes(student.courseName)
@@ -182,7 +175,6 @@ const Students = () => {
       );
     }
     
-    // Payment status filtering from tabs
     if (selectedTab !== 'all') {
       filtered = filtered.filter(student => 
         student.paymentStatus === selectedTab
@@ -205,7 +197,6 @@ const Students = () => {
   };
   
   const handleDeleteStudent = (student: Student) => {
-    // In a real app, we would call a Supabase function to delete the student
     toast.success(`${student.firstName} ${student.lastName} deleted successfully`);
     refetchStudents();
   };
@@ -225,8 +216,14 @@ const Students = () => {
     try {
       setSavingCourse(true);
       
+      const userData = getUserData();
+      if (!userData || !userData.school_id) {
+        toast.error("User data is missing. Please log in again.");
+        return;
+      }
+      
       const { data, error } = await createCourse(
-        schoolId,
+        userData.school_id,
         newCourseName.trim(),
         newCourseType
       );
@@ -398,7 +395,6 @@ const Students = () => {
         </DropdownMenu>
       </div>
       
-      {/* Show active filters as badges, but only when filters are active */}
       {getActiveFilterCount() > 0 && (
         <div className="flex flex-wrap gap-2 mt-2">
           {Object.entries(activeFilters).map(([filterType, values]) => 
@@ -506,7 +502,6 @@ const Students = () => {
         />
       </PaymentProvider>
       
-      {/* Add Course Dialog */}
       <Dialog open={isAddCourseOpen} onOpenChange={setIsAddCourseOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

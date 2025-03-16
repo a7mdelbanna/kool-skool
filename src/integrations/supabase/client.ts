@@ -189,15 +189,26 @@ export async function getSchoolCourses(schoolId: string) {
 
 // Create a course
 export async function createCourse(schoolId: string, name: string, lessonType: 'Individual' | 'Group') {
-  const { data, error } = await supabase
-    .from('courses')
-    .insert([
-      { school_id: schoolId, name, lesson_type: lessonType }
-    ])
-    .select()
-    .single();
+  console.log("Creating course with:", { schoolId, name, lessonType });
+  
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .insert([
+        { school_id: schoolId, name, lesson_type: lessonType }
+      ])
+      .select()
+      .single();
 
-  return { data: data as Course, error };
+    if (error) {
+      console.error("Error creating course:", error);
+    }
+    
+    return { data: data as Course, error };
+  } catch (error) {
+    console.error("Exception creating course:", error);
+    return { data: null, error: error as Error };
+  }
 }
 
 // Get teachers for a school
