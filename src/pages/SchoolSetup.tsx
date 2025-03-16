@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -93,6 +92,19 @@ interface UserSchoolInfo {
   license_is_active: boolean;
   license_days_remaining: number;
   license_expires_at: string;
+}
+
+interface TeamMemberData {
+  id: string;
+  email: string;
+  role: "director" | "teacher" | "admin" | "staff";
+  profile_id: string | null;
+  invitation_accepted: boolean | null;
+  invitation_sent: boolean | null;
+  invited_by: string | null;
+  school_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const SchoolSetup = () => {
@@ -206,9 +218,9 @@ const SchoolSetup = () => {
           if (teamError) throw teamError;
           
           if (teamData && teamData.length > 0) {
-            const formattedTeachers = teamData.map(member => ({
+            const formattedTeachers = teamData.map((member: TeamMemberData) => ({
               id: member.id,
-              name: member.profile_id ? `${member.first_name || ''} ${member.last_name || ''}`.trim() : '',
+              name: member.email.split('@')[0],
               picture: '',
               whatsapp: '',
               telegram: '',
@@ -222,7 +234,6 @@ const SchoolSetup = () => {
             }
           }
         } else {
-          // If no school is associated, redirect to license verification
           navigate('/license-verification');
         }
       } catch (error) {
@@ -287,7 +298,6 @@ const SchoolSetup = () => {
     try {
       setInvitingSent({...invitingSent, [teacher.id]: true});
       
-      // Invite team member via RPC function
       const { data, error } = await supabase.rpc('invite_team_member', {
         email_param: teacher.email,
         role_param: teacher.role as any,
@@ -410,7 +420,6 @@ const SchoolSetup = () => {
   };
   
   const handleImageUpload = async (type: 'school' | 'teacher', teacherId?: string) => {
-    // Simulate image upload for now
     if (type === 'school') {
       setSchoolInfo(prev => ({
         ...prev,
@@ -419,7 +428,6 @@ const SchoolSetup = () => {
       
       if (userSchoolInfo) {
         try {
-          // Update school logo in database
           const { error } = await supabase
             .from('schools')
             .update({ logo: 'https://placehold.co/200x200?text=School+Logo' })
@@ -471,7 +479,6 @@ const SchoolSetup = () => {
     try {
       setSaving(true);
       
-      // Update school information
       const { error: schoolError } = await supabase
         .from('schools')
         .update({
@@ -492,7 +499,6 @@ const SchoolSetup = () => {
         description: "All your changes have been saved successfully.",
       });
       
-      // Reload school info
       const { data, error } = await supabase.rpc('get_user_school_info');
       
       if (error) throw error;
