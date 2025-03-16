@@ -172,12 +172,16 @@ export const createTeamMember = async (
     console.log("Auth user created with ID:", authData.user.id);
     
     // Now call the stored procedure to set up the team member
-    const { data, error } = await supabase.rpc('finalize_team_member', {
-      user_id_param: authData.user.id,
-      role_param: userData.role,
-      first_name_param: userData.firstName || null,
-      last_name_param: userData.lastName || null
-    });
+    // Use type assertion to work around TypeScript limitations with RPC functions
+    const { data, error } = await supabase.rpc(
+      'finalize_team_member' as any, 
+      {
+        user_id_param: authData.user.id,
+        role_param: userData.role,
+        first_name_param: userData.firstName || null,
+        last_name_param: userData.lastName || null
+      }
+    );
     
     if (error) {
       console.error("Error finalizing team member:", error);
@@ -192,4 +196,3 @@ export const createTeamMember = async (
     throw error;
   }
 };
-
