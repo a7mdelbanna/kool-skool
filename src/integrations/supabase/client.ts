@@ -79,67 +79,45 @@ export const updateUserProfile = async (
   return data;
 };
 
-// Improved helper function to check if an email exists in the auth system
+// More accurate helper function to check if an email exists
 const checkEmailExists = async (email: string) => {
   try {
-    // First, check in the auth.users table via the profiles table
-    // Since we can't directly query auth.users, we check the profiles table
-    // which is linked to auth.users via triggers
-    const { data: profileData, error: profileError } = await supabase
+    // Method 1: Check directly in auth.users using an admin function
+    // Since we can't directly query auth.users from the client, we need to use an RPC
+    // This approach would require a database function, but let's try the other methods first
+    
+    // Method 2: Check profiles table which is linked to auth users
+    const { count: profileCount, error: countError } = await supabase
       .from('profiles')
-      .select('email')
+      .select('id', { count: 'exact', head: true })
       .eq('email', email);
     
-    if (profileError) {
-      console.error("Error checking profiles for email:", profileError);
-    }
-    
-    if (profileData && profileData.length > 0) {
-      console.log(`Found email ${email} in profiles table`);
+    if (countError) {
+      console.error("Error checking profiles count for email:", countError);
+    } else if (profileCount && profileCount > 0) {
+      console.log(`Found ${profileCount} entries with email ${email} in profiles table`);
       return true;
     }
 
-    // Check team_members table as well
-    const { data: teamMemberData, error: teamMemberError } = await supabase
+    // Method 3: Check team_members table
+    const { count: teamMemberCount, error: teamMemberError } = await supabase
       .from('team_members')
-      .select('email')
+      .select('id', { count: 'exact', head: true })
       .eq('email', email);
       
     if (teamMemberError) {
       console.error("Error checking team_members for email:", teamMemberError);
-    }
-    
-    if (teamMemberData && teamMemberData.length > 0) {
-      console.log(`Found email ${email} in team_members table`);
+    } else if (teamMemberCount && teamMemberCount > 0) {
+      console.log(`Found ${teamMemberCount} entries with email ${email} in team_members table`);
       return true;
     }
     
-    // As a fallback, attempt sign-in with dummy password
-    // This is less reliable but can catch cases where the email exists in auth
-    // but not in our profiles/team_members tables
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: 'dummy-password-for-checking-only'
-    });
-    
-    if (error) {
-      // If the error suggests the email exists but password is wrong
-      if (error.message.includes('Invalid login credentials')) {
-        console.log(`Email ${email} exists in auth system (invalid credentials)`);
-        return true;
-      }
-      
-      if (error.message.includes('Email not confirmed')) {
-        console.log(`Email ${email} exists in auth system (not confirmed)`);
-        return true;
-      }
-    }
-    
-    console.log(`Email ${email} does not exist in any checked location`);
-    return false; // Email doesn't exist
+    // No evidence that the email exists in our system
+    console.log(`No evidence that email ${email} exists in our system`);
+    return false;
   } catch (error) {
     console.error("Error checking email existence:", error);
-    return false;
+    return false; // Default to false to avoid blocking valid users
   }
 };
 
