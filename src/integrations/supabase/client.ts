@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -203,7 +204,7 @@ export async function createStudent(
         password_hash: password, // Note: In production, this should be properly hashed
         first_name: firstName,
         last_name: lastName,
-        role: 'student',
+        role: 'student', // This value must match exactly what's allowed in the database constraints
         school_id: userData.schoolId,
         created_by: userData.id
       })

@@ -106,6 +106,11 @@ serve(async (req) => {
       );
     }
     
+    // Make sure role value matches the allowed values in the database
+    const validRole = role === 'student' ? 'student' : 
+                     role === 'teacher' ? 'teacher' : 
+                     role === 'admin' ? 'admin' : 'student';
+    
     const { data: userData, error: userError } = await supabase
       .from('users')
       .insert({
@@ -113,7 +118,7 @@ serve(async (req) => {
         password_hash: hashResult,
         first_name,
         last_name,
-        role,
+        role: validRole,
         school_id,
         created_by: userId
       })

@@ -191,7 +191,27 @@ serve(async (req) => {
       )
     }
     
-    // Insert into users table first
+    // Hash the password
+    const { data: hashResult, error: hashError } = await supabaseClient.rpc(
+      'hash_password',
+      { password: student_password }
+    );
+    
+    if (hashError || !hashResult) {
+      console.error("Error hashing password:", hashError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Error hashing password: " + (hashError?.message || "Unknown error")
+        }), 
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      );
+    }
+    
+    // Insert into users table first with properly hashed password
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .insert([
@@ -199,8 +219,8 @@ serve(async (req) => {
           first_name,
           last_name,
           email: student_email,
-          password_hash: student_password, // Use actual password or hash it here
-          role: 'student',
+          password_hash: hashResult,
+          role: 'student', // Make sure this matches the allowed values in the database constraint
           school_id: schoolId,
           created_by: userId
         }
