@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -38,7 +37,10 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  console.log("AccountCreation received licenseData:", licenseData);
+  // Added for debugging
+  useEffect(() => {
+    console.log("AccountCreation component mounted with licenseData:", licenseData);
+  }, [licenseData]);
   
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
@@ -85,6 +87,20 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
       setIsSubmitting(false);
     }
   };
+
+  // Add a debug check to ensure licenseData is valid
+  if (!licenseData || !licenseData.licenseId) {
+    console.error("Invalid licenseData received:", licenseData);
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardContent className="pt-6">
+          <div className="text-center text-red-500">
+            License data is missing. Please verify your license again.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-md mx-auto">

@@ -49,17 +49,20 @@ const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVeri
       console.log("License verification result:", result);
       
       if (result.valid) {
-        // Create the license data object
+        // Create the license data object with the verified data
         const licenseData: LicenseData = {
           licenseId: result.licenseId || "",
           licenseNumber: values.licenseNumber
         };
         
         toast.success("License verified successfully");
-        console.log("License verified, data:", licenseData);
+        console.log("License verified, passing data to parent:", licenseData);
         
-        // Call the callback with the license data
-        onLicenseVerified(licenseData);
+        // Force a small delay to ensure state updates properly
+        setTimeout(() => {
+          // Call the callback with the license data
+          onLicenseVerified(licenseData);
+        }, 100);
       } else {
         toast.error(result.message || "License verification failed");
       }
