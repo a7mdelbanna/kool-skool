@@ -36,7 +36,7 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
       .from('schools')
       .select('id, name, contact_info, logo')
       .eq('id', schoolId)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single to prevent error when no data is found
     
     if (error) {
       console.error('Error fetching school:', error);
@@ -54,11 +54,12 @@ const LicenseManagement: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const { data: schoolInfo, isLoading: schoolLoading } = useQuery({
+  const { data: schoolInfo, isLoading: schoolLoading, error: schoolError } = useQuery({
     queryKey: ['schoolInfo'],
     queryFn: fetchSchoolInfo,
     enabled: !!localStorage.getItem('user'),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2, // Retry failed requests 2 times
   });
 
   return (
@@ -82,7 +83,24 @@ const LicenseManagement: React.FC = () => {
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-              ) : schoolInfo ? (
+              ) : schoolError || !schoolInfo ? (
+                <div className="p-4 bg-red-50 rounded-lg border border-red-100 text-red-800">
+                  <div className="flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+                    <h3 className="font-medium text-red-700">Error Loading School Information</h3>
+                  </div>
+                  <p className="text-sm text-red-600">
+                    We couldn't retrieve your school information. Please try refreshing the page or contact support.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-3"
+                    onClick={() => window.location.reload()}
+                  >
+                    Refresh Page
+                  </Button>
+                </div>
+              ) : (
                 <div className="space-y-6">
                   <div className="flex items-center space-x-3">
                     <School className="h-8 w-8 text-primary" />
@@ -122,16 +140,6 @@ const LicenseManagement: React.FC = () => {
                       Renew License
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="p-4 bg-red-50 rounded-lg border border-red-100 text-red-800">
-                  <div className="flex items-center mb-2">
-                    <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                    <h3 className="font-medium text-red-700">Error Loading School Information</h3>
-                  </div>
-                  <p className="text-sm text-red-600">
-                    We couldn't retrieve your school information. Please try refreshing the page or contact support.
-                  </p>
                 </div>
               )}
             </CardContent>
