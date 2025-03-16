@@ -1,500 +1,365 @@
-import React from "react";
+
+import React, { useState } from "react";
 import { 
   Form,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
+  FormMessage,
+  FormDescription
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Student } from "@/components/StudentCard";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { 
-  Facebook, 
-  Twitter, 
-  Instagram, 
-  Linkedin, 
-  Mail, 
-  Phone, 
-  User,
-  MessageCircle,
-  Send,
-  Users,
-  Baby,
-  Book,
-  BarChart
-} from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
-  SelectValue 
+  SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2 } from "lucide-react";
+import { Course } from "@/integrations/supabase/client";
 
 interface ProfileTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
   isViewMode?: boolean;
+  password?: string;
+  setPassword?: (password: string) => void;
+  createPassword?: boolean;
+  setCreatePassword?: (create: boolean) => void;
+  isNewStudent?: boolean;
+  courses?: Course[];
+  teachers?: { id: string; first_name: string; last_name: string }[];
+  isLoading?: boolean;
 }
 
-const availableCourses = [
-  "English Conversation",
-  "Business English",
-  "IELTS Preparation",
-  "TOEFL Preparation",
-  "Grammar Fundamentals",
-  "Vocabulary Building",
-  "Academic Writing",
-  "Pronunciation Workshop"
-];
-
-const profileSchema = z.object({
-  firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
-  lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  phone: z.string().optional(),
-  lessonType: z.enum(["individual", "group"]),
-  ageGroup: z.enum(["kid", "adult"]),
-  courseName: z.string().min(1, { message: "Please specify a course name" }),
-  level: z.enum(["beginner", "intermediate", "advanced", "fluent"]),
-  facebook: z.string().optional(),
-  twitter: z.string().optional(),
-  instagram: z.string().optional(),
-  linkedin: z.string().optional(),
-  telegram: z.string().optional(),
-  whatsapp: z.string().optional(),
-  notes: z.string().optional(),
-  image: z.any().optional()
-});
-
-type ProfileFormValues = z.infer<typeof profileSchema>;
-
-const ProfileTab: React.FC<ProfileTabProps> = ({ studentData, setStudentData, isViewMode = false }) => {
-  const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
-
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      firstName: studentData.firstName || "",
-      lastName: studentData.lastName || "",
-      email: studentData.email || "",
-      phone: studentData.phone || "",
-      lessonType: studentData.lessonType || "individual",
-      ageGroup: studentData.ageGroup || "adult",
-      courseName: studentData.courseName || "",
-      level: studentData.level || "beginner",
-      facebook: studentData.facebook || "",
-      twitter: studentData.twitter || "",
-      instagram: studentData.instagram || "",
-      linkedin: studentData.linkedin || "",
-      telegram: studentData.telegram || "",
-      whatsapp: studentData.whatsapp || "",
-      notes: studentData.notes || "",
-      image: null
-    },
-  });
-
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-    
-    if (!file.type.startsWith("image/")) {
-      toast.error("Only image files are allowed");
-      return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setPhotoPreview(result);
-      
-      form.setValue("image", file);
-      
-      setStudentData(prev => ({
-        ...prev,
-        image: result
-      }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const onSubmit = (data: ProfileFormValues) => {
-    setStudentData((prev) => ({ ...prev, ...data }));
-  };
+const ProfileTab: React.FC<ProfileTabProps> = ({ 
+  studentData, 
+  setStudentData, 
+  isViewMode = false,
+  password = "",
+  setPassword = () => {},
+  createPassword = false,
+  setCreatePassword = () => {},
+  isNewStudent = false,
+  courses = [],
+  teachers = [],
+  isLoading = false
+}) => {
   
-  React.useEffect(() => {
-    const subscription = form.watch((value) => {
-      setStudentData(prev => ({
-        ...prev,
-        ...value
-      }));
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [form, setStudentData]);
-
-  const getInitials = (firstName: string, lastName: string) => {
-    const firstInitial = firstName ? firstName[0] : '';
-    const lastInitial = lastName ? lastName[0] : '';
-    return (firstInitial + lastInitial).toUpperCase();
+  const handleChange = (field: string, value: string) => {
+    setStudentData(prev => ({ ...prev, [field]: value }));
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
-        <div className="flex flex-col items-center gap-2">
-          <Avatar className="h-24 w-24">
-            <AvatarImage src={photoPreview || studentData.image || ""} alt={studentData.firstName} />
-            <AvatarFallback className="text-xl">
-              {studentData.firstName && studentData.lastName 
-                ? getInitials(studentData.firstName, studentData.lastName) 
-                : <User />}
-            </AvatarFallback>
-          </Avatar>
-          {!isViewMode && (
-            <>
-              <input 
-                type="file" 
-                id="photo-upload" 
-                className="hidden" 
-                accept="image/*"
-                onChange={handlePhotoUpload}
-              />
-              <label htmlFor="photo-upload">
-                <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-                  <span>Upload Photo</span>
-                </Button>
-              </label>
-            </>
-          )}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Form>
+          <FormField
+            name="firstName"
+            render={() => (
+              <FormItem>
+                <FormLabel>First Name</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="John"
+                    value={studentData.firstName || ""}
+                    onChange={(e) => handleChange("firstName", e.target.value)}
+                    readOnly={isViewMode}
+                    className={isViewMode ? "bg-muted" : ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </Form>
         
-        <div className="flex-1">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name*</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John" {...field} disabled={isViewMode} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name*</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Doe" {...field} disabled={isViewMode} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address*</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-10" placeholder="john@example.com" {...field} disabled={isViewMode} />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input className="pl-10" placeholder="+1 234 567 8900" {...field} disabled={isViewMode} />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="lessonType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lesson Type*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        disabled={isViewMode}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-muted-foreground" />
-                              <SelectValue placeholder="Select lesson type" />
-                            </div>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="individual">Individual</SelectItem>
-                          <SelectItem value="group">Group</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="ageGroup"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Age Group*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        disabled={isViewMode}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <div className="flex items-center gap-2">
-                              <Baby className="h-4 w-4 text-muted-foreground" />
-                              <SelectValue placeholder="Select age group" />
-                            </div>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="kid">Kid</SelectItem>
-                          <SelectItem value="adult">Adult</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="courseName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Course Name*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        disabled={isViewMode}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <div className="flex items-center gap-2">
-                              <Book className="h-4 w-4 text-muted-foreground" />
-                              <SelectValue placeholder="Select course" />
-                            </div>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {availableCourses.map(course => (
-                            <SelectItem key={course} value={course}>{course}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="level"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Level*</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        disabled={isViewMode}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <div className="flex items-center gap-2">
-                              <BarChart className="h-4 w-4 text-muted-foreground" />
-                              <SelectValue placeholder="Select level" />
-                            </div>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="beginner">Beginner</SelectItem>
-                          <SelectItem value="intermediate">Intermediate</SelectItem>
-                          <SelectItem value="advanced">Advanced</SelectItem>
-                          <SelectItem value="fluent">Fluent</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="mt-6">
-                <h3 className="text-lg font-medium mb-3">Social Links</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="facebook"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Facebook</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Facebook username" {...field} disabled={isViewMode} />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+        <Form>
+          <FormField
+            name="lastName"
+            render={() => (
+              <FormItem>
+                <FormLabel>Last Name</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Doe"
+                    value={studentData.lastName || ""}
+                    onChange={(e) => handleChange("lastName", e.target.value)}
+                    readOnly={isViewMode}
+                    className={isViewMode ? "bg-muted" : ""}
                   />
-                  
-                  <FormField
-                    control={form.control}
-                    name="twitter"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Twitter</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Twitter username" {...field} disabled={isViewMode} />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="instagram"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Instagram</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Instagram username" {...field} disabled={isViewMode} />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="linkedin"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>LinkedIn</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="LinkedIn username" {...field} disabled={isViewMode} />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="telegram"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Telegram</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Send className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="Telegram username" {...field} disabled={isViewMode} />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="whatsapp"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>WhatsApp</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input className="pl-10" placeholder="WhatsApp number" {...field} disabled={isViewMode} />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-              
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </Form>
+      </div>
+      
+      <Form>
+        <FormField
+          name="email"
+          render={() => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  placeholder="student@example.com"
+                  value={studentData.email || ""}
+                  onChange={(e) => handleChange("email", e.target.value)}
+                  readOnly={isViewMode || !isNewStudent}
+                  className={isViewMode || !isNewStudent ? "bg-muted" : ""}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </Form>
+      
+      {isNewStudent && (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="createPassword" 
+              checked={createPassword}
+              onCheckedChange={(checked) => setCreatePassword(checked as boolean)}
+              disabled={isViewMode}
+            />
+            <label
+              htmlFor="createPassword"
+              className="text-sm font-medium leading-none cursor-pointer"
+            >
+              Set password for student
+            </label>
+          </div>
+          
+          {createPassword && (
+            <Form>
               <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
+                name="password"
+                render={() => (
                   <FormItem>
-                    <FormLabel>Additional Notes</FormLabel>
+                    <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Add any additional information about the student here" 
-                        {...field}
+                      <Input
+                        type="password"
+                        placeholder="Password for student"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         disabled={isViewMode}
+                        className={isViewMode ? "bg-muted" : ""}
                       />
                     </FormControl>
+                    <FormDescription>
+                      This password will be used for the student to log in
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </form>
-          </Form>
+            </Form>
+          )}
         </div>
+      )}
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Form>
+          <FormField
+            name="phone"
+            render={() => (
+              <FormItem>
+                <FormLabel>Phone</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="+1 234 567 8900"
+                    value={studentData.phone || ""}
+                    onChange={(e) => handleChange("phone", e.target.value)}
+                    readOnly={isViewMode}
+                    className={isViewMode ? "bg-muted" : ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </Form>
+        
+        <Form>
+          <FormField
+            name="courseName"
+            render={() => (
+              <FormItem>
+                <FormLabel>Course</FormLabel>
+                <Select
+                  value={studentData.courseName}
+                  onValueChange={(value) => handleChange("courseName", value)}
+                  disabled={isViewMode || isLoading}
+                >
+                  <SelectTrigger className={isViewMode ? "bg-muted" : ""}>
+                    <SelectValue placeholder="Select a course" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center p-2">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span>Loading courses...</span>
+                      </div>
+                    ) : (
+                      courses.map((course) => (
+                        <SelectItem key={course.id} value={course.name}>
+                          {course.name} ({course.lesson_type})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </Form>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Form>
+          <FormField
+            name="level"
+            render={() => (
+              <FormItem>
+                <FormLabel>Level</FormLabel>
+                <Select
+                  value={studentData.level}
+                  onValueChange={(value) => handleChange("level", value)}
+                  disabled={isViewMode}
+                >
+                  <SelectTrigger className={isViewMode ? "bg-muted" : ""}>
+                    <SelectValue placeholder="Select a level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </Form>
+        
+        <Form>
+          <FormField
+            name="ageGroup"
+            render={() => (
+              <FormItem className="space-y-3">
+                <FormLabel>Age Group</FormLabel>
+                <FormControl>
+                  <RadioGroup 
+                    value={studentData.ageGroup} 
+                    onValueChange={(value) => handleChange("ageGroup", value)}
+                    className="flex space-x-4"
+                    disabled={isViewMode}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="adult" id="adult" />
+                      <label htmlFor="adult" className="text-sm font-medium leading-none cursor-pointer">
+                        Adult
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="kid" id="kid" />
+                      <label htmlFor="kid" className="text-sm font-medium leading-none cursor-pointer">
+                        Kid
+                      </label>
+                    </div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </Form>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Form>
+          <FormField
+            name="lessonType"
+            render={() => (
+              <FormItem className="space-y-3">
+                <FormLabel>Lesson Type</FormLabel>
+                <FormControl>
+                  <RadioGroup 
+                    value={studentData.lessonType} 
+                    onValueChange={(value) => handleChange("lessonType", value)}
+                    className="flex space-x-4"
+                    disabled={isViewMode}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="individual" id="individual" />
+                      <label htmlFor="individual" className="text-sm font-medium leading-none cursor-pointer">
+                        Individual
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="group" id="group" />
+                      <label htmlFor="group" className="text-sm font-medium leading-none cursor-pointer">
+                        Group
+                      </label>
+                    </div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </Form>
+        
+        {teachers.length > 0 && (
+          <Form>
+            <FormField
+              name="teacherId"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Teacher</FormLabel>
+                  <Select
+                    value={studentData.teacherId}
+                    onValueChange={(value) => handleChange("teacherId", value)}
+                    disabled={isViewMode || isLoading}
+                  >
+                    <SelectTrigger className={isViewMode ? "bg-muted" : ""}>
+                      <SelectValue placeholder="Select a teacher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoading ? (
+                        <div className="flex items-center justify-center p-2">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span>Loading teachers...</span>
+                        </div>
+                      ) : (
+                        teachers.map((teacher) => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.first_name} {teacher.last_name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </Form>
+        )}
       </div>
     </div>
   );

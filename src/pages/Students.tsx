@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown } from 'lucide-react';
+import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,16 @@ import StudentCard, { Student } from '@/components/StudentCard';
 import AddStudentDialog from '@/components/AddStudentDialog';
 import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
+import { useQuery } from '@tanstack/react-query';
+import { getStudentsWithDetails, StudentRecord, createCourse } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,116 +28,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const sampleStudents: Student[] = [
-  {
-    id: '1',
-    firstName: 'Alex',
-    lastName: 'Johnson',
-    email: 'alex.j@example.com',
-    courseName: 'English Conversation',
-    lessonType: 'individual',
-    ageGroup: 'adult',
-    level: 'beginner',
-    lessonsCompleted: 12,
-    nextLesson: 'Today, 4 PM',
-    paymentStatus: 'paid',
-    nextPaymentDate: 'Next month, 15'
-  },
-  {
-    id: '2',
-    firstName: 'Sophia',
-    lastName: 'Chen',
-    email: 'sophia.c@example.com',
-    courseName: 'Business English',
-    lessonType: 'group',
-    ageGroup: 'adult',
-    level: 'intermediate',
-    lessonsCompleted: 8,
-    nextLesson: 'Tomorrow, 3 PM',
-    paymentStatus: 'pending',
-    nextPaymentDate: 'This week, Friday'
-  },
-  {
-    id: '3',
-    firstName: 'Michael',
-    lastName: 'Davis',
-    email: 'michael.d@example.com',
-    courseName: 'IELTS Preparation',
-    lessonType: 'individual',
-    ageGroup: 'adult',
-    level: 'advanced',
-    lessonsCompleted: 15,
-    nextLesson: 'Friday, 5 PM',
-    paymentStatus: 'overdue',
-    nextPaymentDate: 'Overdue since 05/15'
-  },
-  {
-    id: '4',
-    firstName: 'Emma',
-    lastName: 'Wilson',
-    email: 'emma.w@example.com',
-    courseName: 'TOEFL Preparation',
-    lessonType: 'individual',
-    ageGroup: 'adult',
-    level: 'advanced',
-    lessonsCompleted: 6,
-    nextLesson: 'Today, 6 PM',
-    paymentStatus: 'paid'
-  },
-  {
-    id: '5',
-    firstName: 'Noah',
-    lastName: 'Martinez',
-    email: 'noah.m@example.com',
-    courseName: 'Grammar Fundamentals',
-    lessonType: 'group',
-    ageGroup: 'kid',
-    level: 'beginner',
-    lessonsCompleted: 10,
-    nextLesson: 'Monday, 5 PM',
-    paymentStatus: 'paid'
-  },
-  {
-    id: '6',
-    firstName: 'Olivia',
-    lastName: 'Brown',
-    email: 'olivia.b@example.com',
-    courseName: 'Vocabulary Building',
-    lessonType: 'group',
-    ageGroup: 'kid',
-    level: 'intermediate',
-    lessonsCompleted: 9,
-    nextLesson: 'Wednesday, 4 PM',
-    paymentStatus: 'overdue'
-  },
-  {
-    id: '7',
-    firstName: 'William',
-    lastName: 'Taylor',
-    email: 'william.t@example.com',
-    courseName: 'Academic Writing',
-    lessonType: 'individual',
-    ageGroup: 'adult',
-    level: 'advanced',
-    lessonsCompleted: 14,
-    nextLesson: 'Thursday, 6 PM',
-    paymentStatus: 'pending'
-  },
-  {
-    id: '8',
-    firstName: 'Ava',
-    lastName: 'Anderson',
-    email: 'ava.a@example.com',
-    courseName: 'Pronunciation Workshop',
-    lessonType: 'individual',
-    ageGroup: 'adult',
-    level: 'intermediate',
-    lessonsCompleted: 7,
-    nextLesson: 'Tuesday, 3 PM',
-    paymentStatus: 'paid'
-  },
-];
 
 const Students = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -146,14 +46,60 @@ const Students = () => {
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
+  const [newCourseName, setNewCourseName] = useState('');
+  const [newCourseType, setNewCourseType] = useState<'Individual' | 'Group'>('Individual');
+  const [savingCourse, setSavingCourse] = useState(false);
+  
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  // Get user data from localStorage
+  const getUserData = () => {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  };
+
+  const userData = getUserData();
+  const schoolId = userData?.school_id;
+  
+  // Fetch students from Supabase
+  const { 
+    data: studentsData, 
+    isLoading: studentsLoading, 
+    error: studentsError,
+    refetch: refetchStudents
+  } = useQuery({
+    queryKey: ['students', schoolId],
+    queryFn: () => getStudentsWithDetails(schoolId),
+    enabled: !!schoolId,
+  });
+  
+  // Convert Supabase students to the format expected by our components
+  const mapStudentRecordToStudent = (record: StudentRecord): Student => {
+    return {
+      id: record.id,
+      firstName: record.first_name || '',
+      lastName: record.last_name || '',
+      email: record.email || '',
+      courseName: record.course_name || '',
+      lessonType: record.lessonType || 'individual',
+      ageGroup: record.age_group?.toLowerCase() || 'adult',
+      level: record.level?.toLowerCase() || 'beginner',
+      phone: record.phone,
+      paymentStatus: 'pending', // This would come from subscriptions/payments
+      teacherId: record.teacher_id,
+    };
+  };
+  
+  const students: Student[] = studentsData?.data ? 
+    studentsData.data.map(mapStudentRecordToStudent) : 
+    [];
+  
   // Extract unique values for filters
-  const courses = Array.from(new Set(sampleStudents.map(s => s.courseName)));
-  const lessonTypes = Array.from(new Set(sampleStudents.map(s => s.lessonType)));
-  const ageGroups = Array.from(new Set(sampleStudents.map(s => s.ageGroup)));
-  const levels = Array.from(new Set(sampleStudents.map(s => s.level)));
+  const courses = Array.from(new Set(students.map(s => s.courseName)));
+  const lessonTypes = Array.from(new Set(students.map(s => s.lessonType)));
+  const ageGroups = Array.from(new Set(students.map(s => s.ageGroup)));
+  const levels = Array.from(new Set(students.map(s => s.level)));
   
   const handleFilterToggle = (filterType: keyof typeof activeFilters, value: string) => {
     setActiveFilters(prev => {
@@ -195,7 +141,7 @@ const Students = () => {
   };
   
   const filterStudents = () => {
-    let filtered = [...sampleStudents];
+    let filtered = [...students];
     
     // Search functionality
     if (searchTerm.trim()) {
@@ -257,13 +203,52 @@ const Students = () => {
   };
   
   const handleDeleteStudent = (student: Student) => {
+    // In a real app, we would call a Supabase function to delete the student
     toast.success(`${student.firstName} ${student.lastName} deleted successfully`);
+    refetchStudents();
   };
   
   const handleCloseDialog = () => {
     setIsAddStudentOpen(false);
     setSelectedStudent(null);
     setIsEditMode(false);
+  };
+  
+  const handleAddCourse = async () => {
+    if (!newCourseName.trim()) {
+      toast.error("Please enter a course name");
+      return;
+    }
+    
+    try {
+      setSavingCourse(true);
+      
+      const { data, error } = await createCourse(
+        schoolId,
+        newCourseName.trim(),
+        newCourseType
+      );
+      
+      if (error) {
+        console.error("Error creating course:", error);
+        toast.error(error.message || "Failed to create course");
+        return;
+      }
+      
+      toast.success(`Course "${newCourseName}" created successfully`);
+      setNewCourseName("");
+      setIsAddCourseOpen(false);
+      
+    } catch (error) {
+      console.error("Error adding course:", error);
+      toast.error("An error occurred while creating the course");
+    } finally {
+      setSavingCourse(false);
+    }
+  };
+  
+  const handleStudentAdded = () => {
+    refetchStudents();
   };
   
   const filteredStudents = filterStudents();
@@ -276,18 +261,30 @@ const Students = () => {
           <p className="text-muted-foreground mt-1">Manage your students and track their progress</p>
         </div>
         
-        <Button 
-          className="gap-2 shrink-0" 
-          variant="default"
-          onClick={() => {
-            setSelectedStudent(null);
-            setIsEditMode(false);
-            setIsAddStudentOpen(true);
-          }}
-        >
-          <PlusCircle className="h-4 w-4" />
-          <span>Add New Student</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAddCourseOpen(true)}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Course</span>
+          </Button>
+          
+          <Button 
+            className="gap-2 shrink-0" 
+            variant="default"
+            onClick={() => {
+              setSelectedStudent(null);
+              setIsEditMode(false);
+              setIsAddStudentOpen(true);
+            }}
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>Add New Student</span>
+          </Button>
+        </div>
       </div>
       
       <div className="flex flex-col md:flex-row gap-4">
@@ -438,27 +435,45 @@ const Students = () => {
         <TabsList className="grid grid-cols-4 mb-6">
           <TabsTrigger value="all" className="gap-2">
             All
-            <Badge variant="secondary">{sampleStudents.length}</Badge>
+            <Badge variant="secondary">{students.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="paid" className="gap-2">
             <CheckCircle className="h-4 w-4 text-green-500" />
             Paid
-            <Badge variant="secondary">{sampleStudents.filter(s => s.paymentStatus === 'paid').length}</Badge>
+            <Badge variant="secondary">{students.filter(s => s.paymentStatus === 'paid').length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="pending" className="gap-2">
             <span className="h-2 w-2 rounded-full bg-yellow-500" />
             Pending
-            <Badge variant="secondary">{sampleStudents.filter(s => s.paymentStatus === 'pending').length}</Badge>
+            <Badge variant="secondary">{students.filter(s => s.paymentStatus === 'pending').length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="overdue" className="gap-2">
             <span className="h-2 w-2 rounded-full bg-red-500" />
             Overdue
-            <Badge variant="secondary">{sampleStudents.filter(s => s.paymentStatus === 'overdue').length}</Badge>
+            <Badge variant="secondary">{students.filter(s => s.paymentStatus === 'overdue').length}</Badge>
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value={selectedTab} className="mt-0">
-          {filteredStudents.length > 0 ? (
+          {studentsLoading ? (
+            <div className="text-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <h3 className="text-lg font-medium">Loading students...</h3>
+            </div>
+          ) : studentsError ? (
+            <div className="text-center py-10 space-y-4">
+              <p className="text-red-500">Error loading students</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => refetchStudents()}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try Again
+              </Button>
+            </div>
+          ) : filteredStudents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 element-transition">
               {filteredStudents.map(student => (
                 <StudentCard 
@@ -485,8 +500,81 @@ const Students = () => {
           onOpenChange={handleCloseDialog}
           student={selectedStudent}
           isEditMode={isEditMode}
+          onStudentAdded={handleStudentAdded}
         />
       </PaymentProvider>
+      
+      {/* Add Course Dialog */}
+      <Dialog open={isAddCourseOpen} onOpenChange={setIsAddCourseOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Course</DialogTitle>
+            <DialogDescription>
+              Create a new course for your students.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="courseName" className="text-sm font-medium">
+                Course Name
+              </label>
+              <Input
+                id="courseName"
+                placeholder="e.g., IELTS Preparation"
+                value={newCourseName}
+                onChange={(e) => setNewCourseName(e.target.value)}
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <label htmlFor="courseType" className="text-sm font-medium">
+                Lesson Type
+              </label>
+              <div className="flex gap-4">
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="radio" 
+                    id="individual" 
+                    value="Individual"
+                    checked={newCourseType === 'Individual'}
+                    onChange={() => setNewCourseType('Individual')}
+                    className="form-radio h-4 w-4"
+                  />
+                  <label htmlFor="individual" className="text-sm">Individual</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="radio" 
+                    id="group" 
+                    value="Group"
+                    checked={newCourseType === 'Group'}
+                    onChange={() => setNewCourseType('Group')}
+                    className="form-radio h-4 w-4"
+                  />
+                  <label htmlFor="group" className="text-sm">Group</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsAddCourseOpen(false)}
+              disabled={savingCourse}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddCourse}
+              disabled={savingCourse}
+            >
+              {savingCourse ? 'Creating...' : 'Create Course'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

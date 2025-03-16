@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,19 +10,28 @@ import { Student } from "./StudentCard";
 import { User, CreditCard, Calendar, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { PaymentProvider } from "@/contexts/PaymentContext";
+import { 
+  createStudent, 
+  createCourse, 
+  getSchoolCourses, 
+  getSchoolTeachers 
+} from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 interface AddStudentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   student?: Student | null;
   isEditMode?: boolean;
+  onStudentAdded?: (student: Student) => void;
 }
 
 const AddStudentDialog: React.FC<AddStudentDialogProps> = ({ 
   open, 
   onOpenChange,
   student,
-  isEditMode = false
+  isEditMode = false,
+  onStudentAdded
 }) => {
   const [activeTab, setActiveTab] = useState("profile");
   const [studentData, setStudentData] = useState<Partial<Student>>({
@@ -36,15 +44,34 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     level: "beginner",
     paymentStatus: "pending"
   });
+  const [saving, setSaving] = useState(false);
+  const [password, setPassword] = useState("");
+  const [createPassword, setCreatePassword] = useState(false);
   
-  // Always in edit mode, so remove isViewMode variable
+  const getUserData = () => {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  };
+
+  const userData = getUserData();
+  const schoolId = userData?.school_id;
   
-  // Load student data when viewing or editing
+  const { data: coursesData, isLoading: coursesLoading } = useQuery({
+    queryKey: ['courses', schoolId],
+    queryFn: () => getSchoolCourses(schoolId),
+    enabled: !!schoolId && open,
+  });
+
+  const { data: teachersData, isLoading: teachersLoading } = useQuery({
+    queryKey: ['teachers', schoolId],
+    queryFn: () => getSchoolTeachers(schoolId),
+    enabled: !!schoolId && open,
+  });
+  
   useEffect(() => {
     if (student) {
       setStudentData(student);
     } else {
-      // Reset to default values when adding a new student
       setStudentData({
         firstName: "",
         lastName: "",
@@ -55,23 +82,87 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
         level: "beginner",
         paymentStatus: "pending"
       });
+      setPassword("");
+      setCreatePassword(true);
     }
   }, [student, open]);
 
-  const handleSave = () => {
-    // Here you would typically save the student data to your database
+  const handleSave = async () => {
     if (!studentData.firstName || !studentData.lastName || !studentData.email || !studentData.courseName) {
       toast.error("Please fill in required fields");
       return;
     }
     
-    if (isEditMode) {
-      toast.success(`${studentData.firstName} ${studentData.lastName} updated successfully`);
-    } else if (!student) {
-      toast.success("Student added successfully");
+    if (!isEditMode && createPassword && !password) {
+      toast.error("Please provide a password for the student");
+      return;
     }
     
-    onOpenChange(false);
+    try {
+      setSaving(true);
+      
+      if (isEditMode) {
+        toast.success(`${studentData.firstName} ${studentData.lastName} updated successfully`);
+      } else {
+        const course = coursesData?.data?.find(course => course.name === studentData.courseName);
+        if (!course) {
+          toast.error("Selected course not found");
+          setSaving(false);
+          return;
+        }
+        
+        const teacher = teachersData?.data?.[0];
+        if (!teacher) {
+          toast.error("No teachers available. Please add a teacher first.");
+          setSaving(false);
+          return;
+        }
+        
+        const { data, error } = await createStudent(
+          studentData.email as string,
+          password,
+          studentData.firstName as string,
+          studentData.lastName as string,
+          teacher.id,
+          course.id,
+          studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
+          studentData.level === 'beginner' ? 'Beginner' : 
+            studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
+          studentData.phone
+        );
+        
+        if (error || !data.success) {
+          console.error("Error creating student:", error || data.message);
+          toast.error(data.message || "Failed to create student");
+          setSaving(false);
+          return;
+        }
+        
+        toast.success("Student added successfully");
+        
+        if (onStudentAdded) {
+          const newStudent: Student = {
+            id: data.student_id as string,
+            firstName: studentData.firstName as string,
+            lastName: studentData.lastName as string,
+            email: studentData.email as string,
+            lessonType: studentData.lessonType as string,
+            ageGroup: studentData.ageGroup as string,
+            courseName: studentData.courseName as string,
+            level: studentData.level as string,
+            paymentStatus: "pending",
+          };
+          onStudentAdded(newStudent);
+        }
+      }
+      
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error saving student:", error);
+      toast.error("An error occurred while saving the student");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -111,7 +202,19 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
             </TabsList>
             
             <TabsContent value="profile">
-              <ProfileTab studentData={studentData} setStudentData={setStudentData} isViewMode={false} />
+              <ProfileTab 
+                studentData={studentData} 
+                setStudentData={setStudentData} 
+                isViewMode={false}
+                password={password}
+                setPassword={setPassword}
+                createPassword={createPassword}
+                setCreatePassword={setCreatePassword}
+                isNewStudent={!isEditMode}
+                courses={coursesData?.data || []}
+                teachers={teachersData?.data || []}
+                isLoading={coursesLoading || teachersLoading}
+              />
             </TabsContent>
             
             <TabsContent value="subscriptions">
@@ -129,11 +232,11 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
         </PaymentProvider>
         
         <div className="flex justify-end mt-6 space-x-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            {isEditMode ? 'Update Student' : 'Save Student'}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : isEditMode ? 'Update Student' : 'Save Student'}
           </Button>
         </div>
       </DialogContent>

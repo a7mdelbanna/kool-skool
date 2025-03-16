@@ -9,6 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      courses: {
+        Row: {
+          id: string
+          lesson_type: string
+          name: string
+          school_id: string
+        }
+        Insert: {
+          id?: string
+          lesson_type: string
+          name: string
+          school_id: string
+        }
+        Update: {
+          id?: string
+          lesson_type?: string
+          name?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       licenses: {
         Row: {
           created_at: string | null
@@ -77,6 +106,150 @@ export type Database = {
           },
         ]
       }
+      sessions: {
+        Row: {
+          actual_date: string | null
+          id: string
+          original_date: string
+          reschedule_mode: string | null
+          status: string
+          subscription_id: string
+        }
+        Insert: {
+          actual_date?: string | null
+          id?: string
+          original_date: string
+          reschedule_mode?: string | null
+          status: string
+          subscription_id: string
+        }
+        Update: {
+          actual_date?: string | null
+          id?: string
+          original_date?: string
+          reschedule_mode?: string | null
+          status?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          age_group: string
+          course_id: string
+          created_at: string | null
+          id: string
+          level: string
+          phone: string | null
+          school_id: string
+          teacher_id: string
+          user_id: string
+        }
+        Insert: {
+          age_group: string
+          course_id: string
+          created_at?: string | null
+          id?: string
+          level: string
+          phone?: string | null
+          school_id: string
+          teacher_id: string
+          user_id: string
+        }
+        Update: {
+          age_group?: string
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          level?: string
+          phone?: string | null
+          school_id?: string
+          teacher_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          days_of_week: string[]
+          duration_minutes: number
+          end_date: string
+          id: string
+          price_per_session: number
+          session_time: string
+          start_date: string
+          status: string
+          student_id: string
+        }
+        Insert: {
+          days_of_week: string[]
+          duration_minutes: number
+          end_date: string
+          id?: string
+          price_per_session: number
+          session_time: string
+          start_date: string
+          status: string
+          student_id: string
+        }
+        Update: {
+          days_of_week?: string[]
+          duration_minutes?: number
+          end_date?: string
+          id?: string
+          price_per_session?: number
+          session_time?: string
+          start_date?: string
+          status?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string | null
@@ -136,6 +309,20 @@ export type Database = {
         }
         Returns: Json
       }
+      create_student: {
+        Args: {
+          student_email: string
+          student_password: string
+          first_name: string
+          last_name: string
+          teacher_id: string
+          course_id: string
+          age_group: string
+          level: string
+          phone: string
+        }
+        Returns: Json
+      }
       get_user_license_id: {
         Args: {
           user_id: string
@@ -153,6 +340,18 @@ export type Database = {
           password: string
         }
         Returns: string
+      }
+      reschedule_session: {
+        Args: {
+          session_id: string
+          new_date: string
+          reschedule_mode?: string
+        }
+        Returns: Json
+      }
+      update_subscription_status: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       user_login: {
         Args: {
