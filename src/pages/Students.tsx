@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import AddStudentDialog from '@/components/AddStudentDialog';
 import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { useQuery } from '@tanstack/react-query';
-import { getStudentsWithDetails, StudentRecord, createCourse } from '@/integrations/supabase/client';
+import { getStudentsWithDetails, StudentRecord, createCourse, supabase } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import {
   Dialog,
