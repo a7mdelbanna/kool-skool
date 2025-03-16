@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -28,7 +29,7 @@ export interface TeamMemberResponse {
   member_id?: string;
 }
 
-// Make sure the CreateStudentResponse interface explicitly includes student_id
+// Explicitly define CreateStudentResponse interface with student_id
 export interface CreateStudentResponse {
   success: boolean;
   message?: string;
@@ -99,13 +100,12 @@ export interface Session {
   reschedule_mode?: 'auto' | 'manual';
 }
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
+// Create the supabase client with simplified configuration
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   global: {
     headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
     }
   }
 });
@@ -204,7 +204,7 @@ export async function createStudent(
   ageGroup: 'Adult' | 'Kid',
   level: 'Beginner' | 'Intermediate' | 'Advanced',
   phone?: string
-) {
+): Promise<{ data: CreateStudentResponse | null, error: Error | null }> {
   try {
     // Get user data from localStorage to set admin info
     const userDataStr = localStorage.getItem('user');
@@ -269,7 +269,8 @@ export async function createStudent(
     }
 
     console.log("Student creation response:", data);
-    return { data, error: null };
+    // Ensure data has the correct shape for CreateStudentResponse
+    return { data: data || { success: false, message: "No data returned" }, error: null };
   } catch (error) {
     console.error("Exception in createStudent:", error);
     return { 

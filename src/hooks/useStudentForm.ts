@@ -230,7 +230,7 @@ export const useStudentForm = (
         toast.success("Student added successfully");
         
         if (onStudentAdded && data.success) {
-          // Check if student_id exists in the response before using it
+          // Type guard to check if student_id exists in the response
           if (!data.student_id) {
             console.error("No student_id in response:", data);
             toast.error("Created student but couldn't retrieve student ID");
