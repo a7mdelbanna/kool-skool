@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -40,14 +39,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
-// Form schema for adding staff
 const staffSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   role: z.string().min(1, { message: "Please select a role" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
-// Form schema for creating a school
 const schoolSchema = z.object({
   name: z.string().min(1, { message: "School name is required" }),
   license_number: z.string().min(1, { message: "License number is required" }),
@@ -298,10 +295,8 @@ const SubscriptionInfo = () => {
         return;
       }
 
-      // Use the standard rpc method with type casting to call our stored procedure
-      const { error } = await supabase.rpc(
-        // Cast the procedure name to any to bypass TypeScript checking
-        "create_school_and_update_profile" as any,
+      const { data: result, error } = await supabase.rpc(
+        'create_school_and_update_profile',
         {
           school_name: data.name,
           license_number: data.license_number
