@@ -54,7 +54,9 @@ const NavItem = ({ to, icon: Icon, label, onClick }: {
 };
 
 const Sidebar = () => {
-  const { expanded } = useSidebar();
+  // Fix: Using the correct properties from useSidebar
+  const { state, open } = useSidebar();
+  const expanded = state === "expanded";
   const navigate = useNavigate();
   const [userRole, setUserRole] = useState<string | null>(null);
   
