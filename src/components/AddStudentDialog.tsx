@@ -58,7 +58,6 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
       if (!user) return null;
       
       const userData = JSON.parse(user);
-      // Make sure we're using the schoolId property correctly
       console.log("Parsed user data:", userData);
       return userData;
     } catch (error) {
@@ -68,7 +67,6 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   };
 
   const userData = getUserData();
-  // Fix: Correctly access schoolId from userData
   const schoolId = userData?.schoolId || null;
   console.log("School ID for queries:", schoolId);
   
@@ -192,6 +190,12 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
       if (isEditMode) {
         toast.success(`${studentData.firstName} ${studentData.lastName} updated successfully`);
       } else {
+        if (!userData || !userData.schoolId || userData.role !== 'admin') {
+          toast.error("Only school admins can create students");
+          setSaving(false);
+          return;
+        }
+        
         const course = coursesData?.data?.find(course => course.name === studentData.courseName);
         if (!course) {
           toast.error("Selected course not found");
@@ -205,6 +209,12 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
           setSaving(false);
           return;
         }
+        
+        console.log("Creating student with admin credentials:", { 
+          userId: userData.id,
+          schoolId: userData.schoolId,
+          role: userData.role
+        });
         
         const { data, error } = await createStudent(
           studentData.email as string,

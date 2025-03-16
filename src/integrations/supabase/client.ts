@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -105,14 +104,21 @@ export interface Session {
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Helper function to manually set auth from user data
-export const refreshSupabaseAuth = async (userId: string) => {
+export const refreshSupabaseAuth = async (userId: string, schoolId: string, role: string) => {
   if (!userId) return false;
   
   try {
-    // Even if the signin fails, we can still create a custom session
+    // Set a custom session for authentication
     await supabase.auth.setSession({
       access_token: `${userId}_custom_token`,
       refresh_token: ''
+    });
+    
+    // Set custom headers to pass admin info
+    supabase.functions.setHeaders({
+      'x-user-id': userId,
+      'x-school-id': schoolId,
+      'x-user-role': role
     });
     
     return true;
@@ -181,22 +187,57 @@ export async function createStudent(
   level: 'Beginner' | 'Intermediate' | 'Advanced',
   phone?: string
 ) {
-  const { data, error } = await supabase.rpc('create_student', {
-    student_email: email,
-    student_password: password,
-    first_name: firstName,
-    last_name: lastName,
-    teacher_id: teacherId,
-    course_id: courseId,
-    age_group: ageGroup,
-    level: level,
-    phone: phone || null
-  });
+  try {
+    // Get user data from localStorage to set admin info
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // Refresh authentication with admin credentials
+    if (userData && userData.id && userData.schoolId && userData.role) {
+      console.log("Setting up auth for admin user:", userData.id, userData.schoolId, userData.role);
+      await refreshSupabaseAuth(userData.id, userData.schoolId, userData.role);
+    } else {
+      console.error("Missing user data for authentication:", userData);
+      return { 
+        data: { success: false, message: "Missing authentication data. Please log in again." }, 
+        error: null 
+      };
+    }
 
-  return { 
-    data: data as unknown as CreateStudentResponse, 
-    error 
-  };
+    // Make the request to create a student
+    console.log("Creating student with credentials:", {
+      email, firstName, lastName, teacherId, courseId, ageGroup, level, phone
+    });
+    
+    const { data, error } = await supabase.functions.invoke('create_student', {
+      body: {
+        student_email: email,
+        student_password: password,
+        first_name: firstName,
+        last_name: lastName,
+        teacher_id: teacherId,
+        course_id: courseId,
+        age_group: ageGroup,
+        level: level,
+        phone: phone || null
+      }
+    });
+
+    if (error) {
+      console.error("Error from createStudent function:", error);
+      return { 
+        data: { success: false, message: error.message }, 
+        error 
+      };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error("Exception in createStudent:", error);
+    return { 
+      data: { success: false, message: error.message }, 
+      error 
+    };
+  }
 }
 
 // Get courses for a school
