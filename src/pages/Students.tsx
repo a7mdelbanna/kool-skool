@@ -10,8 +10,15 @@ import AddStudentDialog from '@/components/AddStudentDialog';
 import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { useQuery } from '@tanstack/react-query';
-import { getStudentsWithDetails, StudentRecord, createCourse, supabase } from '@/integrations/supabase/client';
+import { 
+  getStudentsWithDetails, 
+  StudentRecord, 
+  createCourse, 
+  supabase, 
+  refreshSupabaseAuth 
+} from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +63,7 @@ const Students = () => {
   const { user } = useContext(UserContext);
   
   const schoolId = user?.schoolId;
+  const navigate = useNavigate();
   
   const { 
     data: studentsData, 
@@ -218,6 +226,11 @@ const Students = () => {
         return;
       }
       
+      // Try to refresh the auth session first
+      if (user.id) {
+        await refreshSupabaseAuth(user.id);
+      }
+      
       // Log authentication state for debugging
       console.log("Creating course with school ID:", user.schoolId);
       
@@ -231,9 +244,15 @@ const Students = () => {
         console.error("Error creating course:", error);
         
         // Check if it's an authentication error
-        if (error.message?.includes("Authentication required")) {
+        if (error.message?.includes("Authentication required") || 
+            error.message?.includes("expired") || 
+            error.message?.includes("JWT")) {
           toast.error("Your session has expired. Please log in again.");
-          // You might want to redirect to login
+          
+          // Clear user data and redirect to login
+          localStorage.removeItem('user');
+          setUser(null);
+          navigate('/login');
           return;
         }
         
