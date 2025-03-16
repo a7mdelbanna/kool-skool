@@ -139,6 +139,31 @@ const SchoolSetup = () => {
       if (!response.success) {
         throw new Error(response.message || 'Failed to verify license');
       }
+
+      // After successful school setup, automatically log in the user
+      const { data: loginData, error: loginError } = await supabase.rpc('user_login', {
+        user_email: formData.adminEmail,
+        user_password: formData.adminPassword
+      });
+      
+      if (loginError) {
+        // Still show success message even if auto-login fails
+        toast({
+          title: "School setup complete",
+          description: `${formData.schoolName} has been successfully set up! Please log in.`,
+        });
+        navigate('/login');
+        return;
+      }
+      
+      // Store user information in local storage
+      localStorage.setItem('user', JSON.stringify({
+        id: response.user_id,
+        firstName: formData.adminFirstName,
+        lastName: formData.adminLastName,
+        role: 'admin',
+        schoolId: response.school_id
+      }));
       
       toast({
         title: "School setup complete",
@@ -146,9 +171,7 @@ const SchoolSetup = () => {
       });
       
       // Redirect to dashboard
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      navigate('/');
       
     } catch (error) {
       console.error('Error during school setup:', error);
