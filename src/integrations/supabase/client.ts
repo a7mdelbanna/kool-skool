@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -261,11 +262,13 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Session verified or custom auth applied, proceeding with course creation");
     
-    // Use RPC function for course creation
-    const { data, error } = await supabase.rpc<CreateCourseResponse>('create_course', {
-      school_id: schoolId,
-      course_name: name,
-      lesson_type: lessonType
+    // Use custom form submission to handle the RPC function that TypeScript doesn't fully recognize
+    const { data, error } = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
+      body: {
+        school_id: schoolId,
+        course_name: name,
+        lesson_type: lessonType
+      }
     });
 
     if (error) {
@@ -282,12 +285,10 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
       return { data: null, error };
     }
     
-    // Check if there was an error in the response itself
-    if (data && 'error' in data) {
-      console.error("Error in course creation response:", data.error);
+    if (!data) {
       return { 
         data: null, 
-        error: new Error(data.error as string || "Failed to create course") 
+        error: new Error("Failed to create course, no data returned") 
       };
     }
     
