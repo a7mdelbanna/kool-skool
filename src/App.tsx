@@ -21,9 +21,6 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PersonalProfile from "./pages/PersonalProfile";
 import Access from "./pages/Access";
 
-// Remove the direct import of AccountCreation since we'll handle it differently
-// import AccountCreation from "./components/auth/signup/AccountCreation";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -36,8 +33,8 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              {/* Redirect users from the direct AccountCreation route to the auth page */}
-              <Route path="/auth/create-account/:licenseId" element={<Navigate to="/auth" replace />} />
+              {/* Redirect users from any direct account creation attempts to the auth page */}
+              <Route path="/auth/create-account" element={<Navigate to="/auth" replace />} />
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingFlow /></ProtectedRoute>} />
               <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route path="/" element={<Index />} />

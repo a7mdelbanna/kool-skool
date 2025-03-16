@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Key } from "lucide-react";
-import AccountCreation from "./AccountCreation";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -25,11 +24,13 @@ export interface LicenseData {
   licenseNumber: string;
 }
 
-const LicenseVerification = () => {
+interface LicenseVerificationProps {
+  onLicenseVerified: (licenseData: LicenseData) => void;
+}
+
+const LicenseVerification: React.FC<LicenseVerificationProps> = ({ onLicenseVerified }) => {
   const { signUp } = useAuth();
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  const [licenseData, setLicenseData] = useState<LicenseData | null>(null);
 
   const form = useForm<LicenseFormValues>({
     resolver: zodResolver(licenseSchema),
@@ -49,17 +50,16 @@ const LicenseVerification = () => {
       
       if (result.valid) {
         // Create the license data object
-        const newLicenseData: LicenseData = {
+        const licenseData: LicenseData = {
           licenseId: result.licenseId || "",
           licenseNumber: values.licenseNumber
         };
         
-        // Store the license data
-        setLicenseData(newLicenseData);
-        setIsVerified(true);
-        
         toast.success("License verified successfully");
-        console.log("License verified, data set:", newLicenseData);
+        console.log("License verified, data:", licenseData);
+        
+        // Call the callback with the license data
+        onLicenseVerified(licenseData);
       } else {
         toast.error(result.message || "License verification failed");
       }
@@ -70,12 +70,6 @@ const LicenseVerification = () => {
       setIsVerifying(false);
     }
   };
-
-  // Render the account creation component if verified
-  if (isVerified && licenseData) {
-    console.log("Rendering AccountCreation with data:", licenseData);
-    return <AccountCreation licenseData={licenseData} />;
-  }
 
   return (
     <Card className="w-full max-w-md mx-auto">

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -38,14 +38,7 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Redirect if no license data is available
-  useEffect(() => {
-    console.log("AccountCreation loaded with licenseData:", licenseData);
-    if (!licenseData?.licenseId) {
-      toast.error("Invalid license. Please verify your license first.");
-      navigate("/auth");
-    }
-  }, [licenseData, navigate]);
+  console.log("AccountCreation received licenseData:", licenseData);
   
   const accountForm = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
@@ -62,7 +55,6 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
   const handleSubmit = async (data: AccountFormValues) => {
     if (!licenseData?.licenseId) {
       toast.error("Invalid license. Please verify your license first.");
-      navigate("/auth");
       return;
     }
     
@@ -94,137 +86,120 @@ const AccountCreation: React.FC<AccountCreationProps> = ({ licenseData }) => {
     }
   };
 
-  if (!licenseData?.licenseId) {
-    return null; // Will redirect in useEffect
-  }
-
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-muted">
-      <div className="p-4 w-full max-w-md">
-        <Card className="shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Create Your Account</CardTitle>
-            <CardDescription>Enter your information to complete signup</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...accountForm}>
-              <form 
-                onSubmit={accountForm.handleSubmit(handleSubmit)} 
-                className="space-y-4"
-              >
-                <FormField
-                  control={accountForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="your@email.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={accountForm.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={accountForm.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <FormField
-                  control={accountForm.control}
-                  name="schoolName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>School Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter school name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={accountForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={accountForm.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isSubmitting || isLoading}
-                >
-                  {isSubmitting || isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating Account...
-                    </>
-                  ) : (
-                    "Create Account"
-                  )}
-                </Button>
-                
-                <div className="text-center mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Already have an account? 
-                    <Button variant="link" className="p-0 ml-1" onClick={() => navigate("/auth")}>
-                      Log in
-                    </Button>
-                  </p>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl font-bold">Create Your Account</CardTitle>
+        <CardDescription>Enter your information to complete signup</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...accountForm}>
+          <form 
+            onSubmit={accountForm.handleSubmit(handleSubmit)} 
+            className="space-y-4"
+          >
+            <FormField
+              control={accountForm.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Address</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="your@email.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={accountForm.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={accountForm.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <FormField
+              control={accountForm.control}
+              name="schoolName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>School Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter school name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={accountForm.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={accountForm.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting || isLoading}
+            >
+              {isSubmitting || isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 };
 
