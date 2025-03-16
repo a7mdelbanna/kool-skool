@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Clock } from 'lucide-react';
+import { Clock, AlertCircle } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 interface LicenseDetails {
   id: string;
@@ -20,6 +22,7 @@ const LicenseWidget: React.FC = () => {
   const [licenseDetails, setLicenseDetails] = useState<LicenseDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchLicenseDetails = async () => {
@@ -33,7 +36,11 @@ const LicenseWidget: React.FC = () => {
         if (licenseError) throw licenseError;
         
         if (!data || data.length === 0) {
-          throw new Error('No license information found');
+          // User might not be associated with a school yet
+          setLicenseDetails(null);
+          setError('No license information found');
+          setLoading(false);
+          return;
         }
 
         const userInfo = data[0];
@@ -65,8 +72,26 @@ const LicenseWidget: React.FC = () => {
       }
     };
 
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          fetchLicenseDetails();
+        } else if (event === 'SIGNED_OUT') {
+          setLicenseDetails(null);
+        }
+      }
+    );
+
     fetchLicenseDetails();
-  }, [toast]);
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [toast, navigate]);
+
+  const handleSchoolSetup = () => {
+    navigate('/license-verification');
+  }
 
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
@@ -80,16 +105,29 @@ const LicenseWidget: React.FC = () => {
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
         </div>
       ) : error ? (
-        <Alert variant="destructive" className="bg-red-50 border-red-200">
-          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
-          <AlertDescription className="text-red-500">
-            Please refresh the page or contact support if this issue persists.
-          </AlertDescription>
-        </Alert>
+        <div className="space-y-4">
+          <Alert variant="destructive" className="bg-red-50 border-red-200">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle className="text-red-600">No active license</AlertTitle>
+            <AlertDescription className="text-red-500">
+              You don't have an active license or school association.
+            </AlertDescription>
+          </Alert>
+          <Button 
+            onClick={handleSchoolSetup} 
+            className="w-full"
+          >
+            Verify License & Setup School
+          </Button>
+        </div>
       ) : licenseDetails ? (
         <div className="space-y-2">
           {licenseDetails.license_number && (
             <p className="text-sm text-gray-500">License: {licenseDetails.license_number}</p>
+          )}
+          
+          {licenseDetails.school_name && (
+            <p className="text-sm text-gray-500">School: {licenseDetails.school_name}</p>
           )}
           
           {licenseDetails.expires_at && (

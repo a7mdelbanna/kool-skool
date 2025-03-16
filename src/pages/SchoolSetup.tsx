@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Collapsible,
   CollapsibleContent,
@@ -8,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -16,7 +17,6 @@ import {
   Phone, 
   Instagram, 
   MessageSquare, 
-  Briefcase,
   Users,
   Upload,
   Book,
@@ -26,9 +26,12 @@ import {
   Plus,
   Trash2,
   Repeat,
-  GraduationCap
+  GraduationCap,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import LicenseWidget from "@/components/LicenseWidget";
 
 interface SchoolInfo {
@@ -47,6 +50,8 @@ interface Teacher {
   whatsapp: string;
   telegram: string;
   instagram: string;
+  email: string;
+  role: string;
 }
 
 interface Level {
@@ -78,8 +83,26 @@ interface Account {
   currency: string;
 }
 
+interface UserSchoolInfo {
+  user_id: string;
+  school_id: string;
+  license_id: string;
+  role: string;
+  school_name: string;
+  license_number: string;
+  license_is_active: boolean;
+  license_days_remaining: number;
+  license_expires_at: string;
+}
+
 const SchoolSetup = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const [userSchoolInfo, setUserSchoolInfo] = useState<UserSchoolInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [invitingSent, setInvitingSent] = useState<Record<string, boolean>>({});
   
   const [openSections, setOpenSections] = useState({
     schoolInfo: true,
@@ -98,7 +121,7 @@ const SchoolSetup = () => {
   });
   
   const [teachers, setTeachers] = useState<Teacher[]>([
-    { id: '1', name: '', picture: '', whatsapp: '', telegram: '', instagram: '' }
+    { id: '1', name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', role: 'teacher' }
   ]);
   
   const [levels, setLevels] = useState<Level[]>([
@@ -120,6 +143,102 @@ const SchoolSetup = () => {
   const [accounts, setAccounts] = useState<Account[]>([
     { id: '1', name: '', currency: '' }
   ]);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        
+        // Get user's school info
+        const { data, error } = await supabase.rpc('get_user_school_info');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          const userInfo = data[0];
+          setUserSchoolInfo(userInfo);
+          
+          // Prefill school information
+          setSchoolInfo({
+            name: userInfo.school_name || '',
+            picture: '',
+            phone: '',
+            telegram: '',
+            whatsapp: '',
+            instagram: ''
+          });
+          
+          // Get school details
+          const { data: schoolData, error: schoolError } = await supabase
+            .from('schools')
+            .select('*')
+            .eq('id', userInfo.school_id)
+            .single();
+          
+          if (schoolError && schoolError.code !== 'PGRST116') {
+            throw schoolError;
+          }
+          
+          if (schoolData) {
+            setSchoolInfo({
+              name: schoolData.name || '',
+              picture: schoolData.logo || '',
+              phone: schoolData.phone || '',
+              telegram: schoolData.telegram || '',
+              whatsapp: schoolData.whatsapp || '',
+              instagram: schoolData.instagram || ''
+            });
+          }
+          
+          // Get team members
+          const { data: teamData, error: teamError } = await supabase
+            .from('team_members')
+            .select('*')
+            .eq('school_id', userInfo.school_id);
+          
+          if (teamError) throw teamError;
+          
+          if (teamData && teamData.length > 0) {
+            const formattedTeachers = teamData.map(member => ({
+              id: member.id,
+              name: member.profile_id ? `${member.first_name || ''} ${member.last_name || ''}`.trim() : '',
+              picture: '',
+              whatsapp: '',
+              telegram: '',
+              instagram: '',
+              email: member.email,
+              role: member.role
+            }));
+            
+            if (formattedTeachers.length > 0) {
+              setTeachers(formattedTeachers);
+            }
+          }
+        } else {
+          // If no school is associated, redirect to license verification
+          navigate('/license-verification');
+        }
+      } catch (error) {
+        console.error('Error loading school data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load school information',
+          variant: 'destructive'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, [navigate, toast]);
   
   const toggleSection = (section: keyof typeof openSections) => {
     setOpenSections(prev => ({
@@ -139,7 +258,7 @@ const SchoolSetup = () => {
   const handleAddTeacher = () => {
     setTeachers(prev => [
       ...prev,
-      { id: Date.now().toString(), name: '', picture: '', whatsapp: '', telegram: '', instagram: '' }
+      { id: Date.now().toString(), name: '', picture: '', whatsapp: '', telegram: '', instagram: '', email: '', role: 'teacher' }
     ]);
   };
   
@@ -153,6 +272,46 @@ const SchoolSetup = () => {
   
   const handleRemoveTeacher = (id: string) => {
     setTeachers(prev => prev.filter(teacher => teacher.id !== id));
+  };
+  
+  const handleInviteTeacher = async (teacher: Teacher) => {
+    if (!teacher.email || !teacher.role) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in both email and role for the team member',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    try {
+      setInvitingSent({...invitingSent, [teacher.id]: true});
+      
+      // Invite team member via RPC function
+      const { data, error } = await supabase.rpc('invite_team_member', {
+        email_param: teacher.email,
+        role_param: teacher.role as any,
+        first_name_param: teacher.name.split(' ')[0],
+        last_name_param: teacher.name.split(' ').slice(1).join(' ')
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Invitation sent',
+        description: `An invitation has been sent to ${teacher.email}`,
+      });
+      
+    } catch (error: any) {
+      console.error('Error inviting team member:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send invitation',
+        variant: 'destructive'
+      });
+    } finally {
+      setInvitingSent({...invitingSent, [teacher.id]: false});
+    }
   };
   
   const handleAddLevel = () => {
@@ -250,25 +409,37 @@ const SchoolSetup = () => {
     setAccounts(prev => prev.filter(account => account.id !== id));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "School settings saved",
-      description: "All your changes have been saved successfully.",
-    });
-  };
-
-  const handleImageUpload = (type: 'school' | 'teacher', teacherId?: string) => {
+  const handleImageUpload = async (type: 'school' | 'teacher', teacherId?: string) => {
+    // Simulate image upload for now
     if (type === 'school') {
       setSchoolInfo(prev => ({
         ...prev,
         picture: 'https://placehold.co/200x200?text=School+Logo'
       }));
       
-      toast({
-        title: "Image uploaded",
-        description: "School logo has been uploaded successfully.",
-      });
+      if (userSchoolInfo) {
+        try {
+          // Update school logo in database
+          const { error } = await supabase
+            .from('schools')
+            .update({ logo: 'https://placehold.co/200x200?text=School+Logo' })
+            .eq('id', userSchoolInfo.school_id);
+          
+          if (error) throw error;
+          
+          toast({
+            title: "Image uploaded",
+            description: "School logo has been updated successfully.",
+          });
+        } catch (error) {
+          console.error('Error updating school logo:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to update school logo',
+            variant: 'destructive'
+          });
+        }
+      }
     } else if (type === 'teacher' && teacherId) {
       setTeachers(prev => 
         prev.map(teacher => 
@@ -284,6 +455,74 @@ const SchoolSetup = () => {
       });
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!userSchoolInfo) {
+      toast({
+        title: 'Error',
+        description: 'No school information found',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      
+      // Update school information
+      const { error: schoolError } = await supabase
+        .from('schools')
+        .update({
+          name: schoolInfo.name,
+          logo: schoolInfo.picture,
+          phone: schoolInfo.phone,
+          telegram: schoolInfo.telegram,
+          whatsapp: schoolInfo.whatsapp,
+          instagram: schoolInfo.instagram,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userSchoolInfo.school_id);
+      
+      if (schoolError) throw schoolError;
+      
+      toast({
+        title: "School settings saved",
+        description: "All your changes have been saved successfully.",
+      });
+      
+      // Reload school info
+      const { data, error } = await supabase.rpc('get_user_school_info');
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        setUserSchoolInfo(data[0]);
+      }
+      
+    } catch (error: any) {
+      console.error('Error saving school settings:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save school settings',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto py-6 flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-lg">Loading school information...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-6">
@@ -423,7 +662,7 @@ const SchoolSetup = () => {
             <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">Teachers</h2>
+                <h2 className="text-lg font-medium">Team Members</h2>
               </div>
               {openSections.teachers ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
             </div>
@@ -432,7 +671,7 @@ const SchoolSetup = () => {
             {teachers.map((teacher, index) => (
               <div key={teacher.id} className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-medium">Teacher {index + 1}</h3>
+                  <h3 className="font-medium">Team Member {index + 1}</h3>
                   {teachers.length > 1 && (
                     <Button 
                       type="button" 
@@ -454,36 +693,55 @@ const SchoolSetup = () => {
                       id={`teacher-name-${teacher.id}`}
                       value={teacher.name} 
                       onChange={(e) => handleTeacherChange(teacher.id, 'name', e.target.value)}
-                      placeholder="Teacher name" 
+                      placeholder="Team member name" 
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Profile Picture</Label>
-                    <div className="flex items-center gap-2">
-                      {teacher.picture ? (
-                        <div className="relative h-12 w-12 rounded-full overflow-hidden border">
-                          <img 
-                            src={teacher.picture} 
-                            alt={`${teacher.name || 'Teacher'}'s profile`} 
-                            className="h-full w-full object-cover"
-                          />
+                    <Label htmlFor={`teacher-email-${teacher.id}`}>Email</Label>
+                    <Input 
+                      id={`teacher-email-${teacher.id}`}
+                      type="email"
+                      value={teacher.email}
+                      onChange={(e) => handleTeacherChange(teacher.id, 'email', e.target.value)}
+                      placeholder="team.member@example.com" 
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={`teacher-role-${teacher.id}`}>Role</Label>
+                    <select
+                      id={`teacher-role-${teacher.id}`}
+                      value={teacher.role}
+                      onChange={(e) => handleTeacherChange(teacher.id, 'role', e.target.value)}
+                      className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
+                    >
+                      <option value="teacher">Teacher</option>
+                      <option value="admin">Admin</option>
+                      <option value="staff">Staff</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button 
+                      type="button" 
+                      onClick={() => handleInviteTeacher(teacher)}
+                      disabled={invitingSent[teacher.id] || !teacher.email || !teacher.role}
+                      className="w-full"
+                    >
+                      {invitingSent[teacher.id] ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                          <span>Sending...</span>
                         </div>
                       ) : (
-                        <div className="h-12 w-12 rounded-full border border-dashed flex items-center justify-center bg-muted/50">
-                          <Users className="h-6 w-6 text-muted-foreground" />
+                        <div className="flex items-center gap-2">
+                          <span>Send Invitation</span>
                         </div>
                       )}
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleImageUpload('teacher', teacher.id)}
-                      >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Upload
-                      </Button>
-                    </div>
+                    </Button>
                   </div>
                 </div>
                 
@@ -537,7 +795,7 @@ const SchoolSetup = () => {
               className="w-full"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add New Teacher
+              Add New Team Member
             </Button>
           </CollapsibleContent>
         </Collapsible>
@@ -830,8 +1088,18 @@ const SchoolSetup = () => {
         </Collapsible>
         
         <div className="pt-4 flex justify-end">
-          <Button type="submit" className="px-8">
-            Save Changes
+          <Button type="submit" className="px-8" disabled={saving}>
+            {saving ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                <span>Saving...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Save Changes</span>
+              </div>
+            )}
           </Button>
         </div>
       </form>
