@@ -16,6 +16,7 @@ import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import LicenseVerification from "./pages/LicenseVerification";
 import { PaymentProvider } from "./contexts/PaymentContext";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,7 @@ const App = () => {
             <Sonner />
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/license-verification" element={<LicenseVerification />} />
               
               <Route element={
                 <ProtectedRoute>
