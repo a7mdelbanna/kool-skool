@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -122,7 +121,11 @@ export const refreshSupabaseAuth = async (userId: string, schoolId?: string, rol
     });
     
     // Set custom headers to pass admin info using the correct API
-    const customHeaders: Record<string, string> = { 'x-user-id': userId };
+    const customHeaders: Record<string, string> = { 
+      'x-user-id': userId,
+      'apikey': SUPABASE_PUBLISHABLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+    };
     
     if (schoolId) {
       customHeaders['x-school-id'] = schoolId;
@@ -366,40 +369,26 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
   try {
     // Check for stored authentication data in localStorage
     const storedUser = localStorage.getItem('user');
-    let userId = null;
+    let userData = null;
     
     if (storedUser) {
       try {
-        const userData = JSON.parse(storedUser);
-        userId = userData.id;
-        
-        if (userId) {
-          console.log("Found user ID in localStorage, refreshing session");
-          // Set up auth with the user's ID
-          await refreshSupabaseAuth(userId);
-        }
+        userData = JSON.parse(storedUser);
+        console.log("Found user data in localStorage:", userData);
       } catch (parseError) {
         console.error("Error parsing user data from localStorage:", parseError);
       }
     }
     
-    // Verify we have an active session
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error("Error getting session:", sessionError);
-      return { data: null, error: sessionError };
-    }
-    
-    if (!sessionData.session && !userId) {
-      console.error("No active session found when creating course");
+    if (!userData || !userData.id || !userData.schoolId) {
+      console.error("Missing user data for authentication");
       return { 
         data: null, 
         error: new Error("Authentication required. Please sign in again.") 
       };
     }
     
-    console.log("Session verified or custom auth applied, proceeding with course creation");
+    console.log("Session verified, proceeding with course creation");
     
     // Use our Edge Function to create the course
     const { data, error } = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
@@ -407,6 +396,14 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
         school_id: schoolId,
         course_name: name,
         lesson_type: lessonType
+      },
+      headers: {
+        'x-user-id': userData.id,
+        'x-school-id': userData.schoolId,
+        'x-user-role': userData.role || 'admin',
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
       }
     });
 
@@ -414,7 +411,7 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
       console.error("Error creating course:", error);
       
       // Handle auth errors
-      if (error.message?.includes('JWT')) {
+      if (error.message?.includes('JWT') || error.message?.includes('401')) {
         return { 
           data: null, 
           error: new Error("Your session has expired. Please sign in again.") 

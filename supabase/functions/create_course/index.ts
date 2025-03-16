@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-id, x-school-id, x-user-role',
 }
 
 serve(async (req) => {
@@ -14,9 +14,48 @@ serve(async (req) => {
   }
   
   try {
+    // Verify API key is present
+    const apiKey = req.headers.get('apikey') || req.headers.get('Authorization')?.split('Bearer ')[1];
+    
+    if (!apiKey) {
+      console.error("No API key found in request headers");
+      return new Response(
+        JSON.stringify({ 
+          error: "No API key found in request",
+          detail: "No 'apikey' request header or url param was found."
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      )
+    }
+    
+    // Get request headers for validation
+    const userId = req.headers.get('x-user-id')
+    const schoolId = req.headers.get('x-school-id')
+    const userRole = req.headers.get('x-user-role')
+    
+    console.log("Received headers:", { 
+      userId, 
+      schoolId, 
+      userRole,
+      hasApiKey: !!apiKey
+    })
+    
+    // Create Supabase client with service role key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false
+        },
+        global: {
+          headers: {
+            apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          }
+        }
+      }
     )
     
     // Get request body
@@ -24,6 +63,15 @@ serve(async (req) => {
     const { school_id, course_name, lesson_type } = requestData
     
     console.log(`Creating course with name: ${course_name}, type: ${lesson_type} for school: ${school_id}`)
+    
+    // Validate request data
+    if (!school_id || !course_name || !lesson_type) {
+      console.error("Missing required fields in request body");
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
     
     // Call the RPC function to create the course
     const { data, error } = await supabaseClient.rpc('create_course', {
@@ -33,9 +81,9 @@ serve(async (req) => {
     })
     
     if (error) {
-      console.error("Error creating course:", error)
+      console.error("Error creating course:", error);
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: error.message, detail: error.details }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -46,7 +94,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
-    console.error("Error:", error.message)
+    console.error("Error:", error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
