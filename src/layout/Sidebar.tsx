@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { NavLink } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -26,77 +26,10 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { supabase, fetchUserProfile } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 export function Sidebar() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [profileData, setProfileData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    profilePicture: null as string | null
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      try {
-        setIsLoading(true);
-        const { profile } = await fetchUserProfile();
-        
-        console.log("Sidebar profile data:", profile);
-        
-        setProfileData({
-          firstName: profile?.first_name || '',
-          lastName: profile?.last_name || '',
-          email: profile?.email || '',
-          profilePicture: profile?.profile_picture
-        });
-      } catch (error) {
-        console.error('Error fetching profile for sidebar:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadUserProfile();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out",
-      });
-      
-      navigate('/auth');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      toast({
-        title: "Error",
-        description: "There was a problem logging out",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Get initials for avatar fallback
-  const getInitials = () => {
-    const firstInitial = profileData.firstName ? profileData.firstName[0] : '';
-    const lastInitial = profileData.lastName ? profileData.lastName[0] : '';
-    return (firstInitial + lastInitial).toUpperCase() || 'TP';
-  };
-
   return (
     <SidebarComponent className="hidden lg:flex">
       <SidebarHeader className="p-4">
@@ -244,30 +177,14 @@ export function Sidebar() {
           <div className="flex items-center justify-between p-2 rounded-md border">
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
-                {profileData.profilePicture ? (
-                  <AvatarImage src={profileData.profilePicture} alt="Profile" />
-                ) : null}
-                <AvatarFallback>{getInitials()}</AvatarFallback>
+                <AvatarFallback>TP</AvatarFallback>
               </Avatar>
               <div className="text-sm">
-                <div className="font-medium">
-                  {isLoading ? 'Loading...' : 
-                    (profileData.firstName || profileData.lastName) 
-                      ? `${profileData.firstName} ${profileData.lastName}`.trim() 
-                      : 'Unnamed User'}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {profileData.email || 'No email'}
-                </div>
+                <div className="font-medium">Tutor Name</div>
+                <div className="text-xs text-muted-foreground">tutor@example.com</div>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={handleLogout}
-              aria-label="Log out"
-              title="Log out"
-            >
+            <Button variant="ghost" size="icon">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
