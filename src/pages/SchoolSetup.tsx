@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -16,7 +15,6 @@ import {
   Phone, 
   Instagram, 
   MessageSquare, 
-  Briefcase,
   Users,
   Upload,
   Book,
@@ -254,7 +252,7 @@ const SchoolSetup = () => {
     e.preventDefault();
     toast({
       title: "School settings saved",
-      description: "All your changes have been saved successfully.",
+      description: "All your changes have been saved (locally only - no database connection).",
     });
   };
 
@@ -267,7 +265,7 @@ const SchoolSetup = () => {
       
       toast({
         title: "Image uploaded",
-        description: "School logo has been uploaded successfully.",
+        description: "School logo has been uploaded successfully (mock upload - no actual storage).",
       });
     } else if (type === 'teacher' && teacherId) {
       setTeachers(prev => 
@@ -280,7 +278,7 @@ const SchoolSetup = () => {
       
       toast({
         title: "Image uploaded",
-        description: "Teacher profile picture has been uploaded successfully.",
+        description: "Teacher profile picture has been uploaded successfully (mock upload - no actual storage).",
       });
     }
   };
@@ -840,3 +838,4 @@ const SchoolSetup = () => {
 };
 
 export default SchoolSetup;
+

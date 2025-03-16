@@ -1,9 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Clock } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 interface LicenseDetails {
   id: string;
@@ -15,64 +13,21 @@ interface LicenseDetails {
   school_name: string;
 }
 
+// Dummy license data
+const dummyLicenseDetails: LicenseDetails = {
+  id: 'lic-12345',
+  license_number: 'TUT-PRO-2023-12345',
+  is_active: true,
+  duration_days: 365,
+  days_remaining: 280,
+  expires_at: '2025-12-31T00:00:00Z',
+  school_name: 'Sample Language School'
+};
+
 const LicenseWidget: React.FC = () => {
-  const [loading, setLoading] = useState(true);
-  const [licenseDetails, setLicenseDetails] = useState<LicenseDetails | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchLicenseDetails = async () => {
-      try {
-        setLoading(true);
-        // First get the school ID for the current user
-        const { data: schoolData, error: schoolError } = await supabase
-          .rpc('get_user_school_id');
-
-        if (schoolError) throw schoolError;
-        if (!schoolData || !schoolData[0]?.school_id) {
-          throw new Error('No school found for this user');
-        }
-
-        // Get school details to get the license ID
-        const { data: schoolInfo, error: schoolInfoError } = await supabase
-          .rpc('get_school_info', {
-            school_id_param: schoolData[0].school_id
-          });
-
-        if (schoolInfoError) throw schoolInfoError;
-        if (!schoolInfo || !schoolInfo[0]?.license_id) {
-          throw new Error('No license found for this school');
-        }
-
-        // Get license details using the license ID
-        const { data: licenseData, error: licenseError } = await supabase
-          .rpc('get_license_details', {
-            license_id_param: schoolInfo[0].license_id
-          });
-
-        if (licenseError) throw licenseError;
-        if (!licenseData || licenseData.length === 0) {
-          throw new Error('License details not found');
-        }
-
-        setLicenseDetails(licenseData[0]);
-        setError(null);
-      } catch (error) {
-        console.error('Error fetching license details:', error);
-        setError('Error loading license information');
-        toast({
-          title: "Error",
-          description: "Failed to load license information",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLicenseDetails();
-  }, [toast]);
+  const [loading, setLoading] = React.useState(false);
+  const [licenseDetails, setLicenseDetails] = React.useState<LicenseDetails | null>(dummyLicenseDetails);
+  const [error, setError] = React.useState<string | null>(null);
 
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
