@@ -141,31 +141,61 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
         throw profileError;
       }
       
-      if (!profileData || !Array.isArray(profileData) || profileData.length === 0) {
-        throw new Error("No school associated with this account");
-      }
-      
-      const schoolId = profileData[0]?.school_id;
-      
-      if (!schoolId) {
-        throw new Error("No school ID found in profile");
-      }
-      
-      // Update school in database
-      const { error: updateError } = await supabase
-        .from('schools')
-        .update({
-          name: values.schoolName || "My School",
-          logo: logoPreview,
-          phone: values.schoolPhone || null,
-          telegram: values.schoolTelegram || null,
-          whatsapp: values.schoolWhatsapp || null,
-          instagram: values.schoolInstagram || null
-        })
-        .eq('id', schoolId);
-      
-      if (updateError) {
-        throw updateError;
+      // Check if user has a school associated
+      if (!profileData || !Array.isArray(profileData) || profileData.length === 0 || !profileData[0]?.school_id) {
+        console.log("No school found, creating a new one");
+        
+        // Create a new school since none exists
+        const { data: newSchool, error: createError } = await supabase
+          .from('schools')
+          .insert({
+            name: values.schoolName || "My School",
+            logo: logoPreview,
+            phone: values.schoolPhone || null,
+            telegram: values.schoolTelegram || null,
+            whatsapp: values.schoolWhatsapp || null,
+            instagram: values.schoolInstagram || null,
+            created_by: user.id
+          })
+          .select('id')
+          .single();
+          
+        if (createError) {
+          throw createError;
+        }
+        
+        // Update the user's profile with the new school ID
+        const { error: updateProfileError } = await supabase
+          .from('profiles')
+          .update({ school_id: newSchool.id })
+          .eq('id', user.id);
+          
+        if (updateProfileError) {
+          throw updateProfileError;
+        }
+        
+        console.log("Created new school and updated profile:", newSchool.id);
+      } else {
+        // Update existing school
+        const schoolId = profileData[0].school_id;
+        
+        const { error: updateError } = await supabase
+          .from('schools')
+          .update({
+            name: values.schoolName || "My School",
+            logo: logoPreview,
+            phone: values.schoolPhone || null,
+            telegram: values.schoolTelegram || null,
+            whatsapp: values.schoolWhatsapp || null,
+            instagram: values.schoolInstagram || null
+          })
+          .eq('id', schoolId);
+        
+        if (updateError) {
+          throw updateError;
+        }
+        
+        console.log("Updated existing school:", schoolId);
       }
       
       // Update data in the onboarding state
