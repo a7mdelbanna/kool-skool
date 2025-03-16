@@ -148,13 +148,7 @@ const TeamAccess = () => {
     try {
       setFormLoading(true);
       
-      const currentUser = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null;
-      
-      if (!currentUser || !currentUser.id) {
-        throw new Error("You must be logged in to add team members");
-      }
-      
-      // Set up the Supabase JWT for this request
+      // Call the Supabase RPC function to add a team member
       const { data, error } = await supabase.rpc('add_team_member', {
         member_first_name: formData.firstName,
         member_last_name: formData.lastName,
