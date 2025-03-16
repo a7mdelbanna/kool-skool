@@ -12,11 +12,9 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Create a client with type safety
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// Create a type-safe wrapper for RPC calls that allows any function name
-type RPCFunction = typeof supabase.rpc;
-const originalRpc = supabase.rpc.bind(supabase);
-
-// Override the rpc method to accept any string as function name
-supabase.rpc = ((functionName: string, ...args: any[]) => {
-  return originalRpc(functionName as any, ...args);
-}) as RPCFunction;
+// Override rpc method to accept any function name
+// This will allow calling any RPC function without TypeScript errors
+const originalRpc = supabase.rpc;
+supabase.rpc = ((...args: any[]) => {
+  return originalRpc(...args);
+}) as typeof supabase.rpc;

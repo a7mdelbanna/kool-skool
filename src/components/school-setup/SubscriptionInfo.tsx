@@ -33,6 +33,13 @@ interface LicenseInfo {
   progressPercentage?: number;
 }
 
+interface SchoolData {
+  id: string;
+  name: string;
+  license_id: string;
+  [key: string]: any;
+}
+
 const SubscriptionInfo = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
@@ -73,8 +80,18 @@ const SubscriptionInfo = () => {
         throw schoolError;
       }
       
-      if (!schoolData || !Array.isArray(schoolData) || schoolData.length === 0 || !schoolData[0].license_id) {
-        console.log("No license information found");
+      // Type assertion and validation for schoolData
+      if (!schoolData || !Array.isArray(schoolData) || schoolData.length === 0) {
+        console.log("No school information found");
+        setLicenseInfo(null);
+        setIsLoading(false);
+        return;
+      }
+      
+      const schoolInfo = schoolData[0] as SchoolData;
+      
+      if (!schoolInfo.license_id) {
+        console.log("No license information found for this school");
         setLicenseInfo(null);
         setIsLoading(false);
         return;
@@ -82,7 +99,7 @@ const SubscriptionInfo = () => {
       
       // Get license details
       const { data: licenseData, error: licenseError } = await supabase
-        .rpc('get_license_details', { license_id_param: schoolData[0].license_id });
+        .rpc('get_license_details', { license_id_param: schoolInfo.license_id });
       
       if (licenseError) {
         console.error("Error fetching license details:", licenseError);

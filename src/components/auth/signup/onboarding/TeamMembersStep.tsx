@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -59,7 +58,7 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
     try {
       setIsAddingMember(true);
       
-      // Create the team invitation in the database
+      // Create the team invitation in the database using rpc function
       const { data: invitationId, error } = await supabase
         .rpc('create_team_invitation', {
           email_param: values.email,
@@ -109,8 +108,7 @@ const TeamMembersStep: React.FC<TeamMembersStepProps> = ({
         return;
       }
       
-      // We need to use a custom query here since team_invitations is not in our types
-      // Use a raw query instead of strongly typed query since the table is not in our types
+      // Use the delete_team_invitation RPC function
       const { error } = await supabase.rpc('delete_team_invitation', {
         email_param: email,
         school_id_param: schoolId

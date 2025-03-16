@@ -35,6 +35,12 @@ interface SchoolInfo {
   instagram: string | null;
 }
 
+interface LicenseVerificationResult {
+  valid: boolean;
+  message: string;
+  license_id: string;
+}
+
 const SchoolSetup = () => {
   const { user } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -102,12 +108,13 @@ const SchoolSetup = () => {
         
         if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
           console.log("School data:", schoolData[0]);
-          setSchoolInfo(schoolData[0] as SchoolInfo);
+          // Type assertion to ensure compatibility with SchoolInfo interface
+          setSchoolInfo(schoolData[0] as unknown as SchoolInfo);
           setNoSchoolFound(false);
         } else {
           setNoSchoolFound(true);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error in fetchUserData:", err);
         setError("An unexpected error occurred. Please try again.");
         setNoSchoolFound(true);
@@ -134,13 +141,26 @@ const SchoolSetup = () => {
       const { data: licenseResult, error: licenseError } = await supabase
         .rpc('verify_license', { license_number_param: data.license_number });
       
-      if (licenseError || !licenseResult || !Array.isArray(licenseResult) || !licenseResult[0]?.valid) {
-        console.error("Error verifying license:", licenseError || "Invalid license");
-        toast.error(`Invalid license: ${licenseResult && Array.isArray(licenseResult) && licenseResult[0] ? licenseResult[0].message : "Please check your license number"}`);
+      if (licenseError) {
+        console.error("Error verifying license:", licenseError);
+        toast.error(`Error verifying license: ${licenseError.message}`);
         return;
       }
       
-      const licenseId = licenseResult[0].license_id;
+      if (!licenseResult || !Array.isArray(licenseResult) || licenseResult.length === 0 || 
+          !(licenseResult[0] as LicenseVerificationResult).valid) {
+        const errorMessage = licenseResult && 
+                            Array.isArray(licenseResult) && 
+                            licenseResult.length > 0 ? 
+                            (licenseResult[0] as LicenseVerificationResult).message : 
+                            "Please check your license number";
+        
+        console.error("Invalid license:", errorMessage);
+        toast.error(`Invalid license: ${errorMessage}`);
+        return;
+      }
+      
+      const licenseId = (licenseResult[0] as LicenseVerificationResult).license_id;
       
       // Create or update the school with the verified license
       const { data: schoolId, error: schoolError } = await supabase
