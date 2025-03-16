@@ -1,31 +1,62 @@
 
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import MobileNavbar from '@/components/Navbar';
 import Sidebar from './Sidebar';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const MainLayout = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
   
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/auth');
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          navigate('/auth');
+          return;
+        }
+        
+        // Only check school association if not on school setup page
+        if (!location.pathname.includes('/school-setup')) {
+          // Check if user has a school association
+          const { data, error } = await supabase.rpc('get_user_school_info');
+          
+          // If error isn't "no rows returned" or user has no school
+          if ((error && error.code !== 'PGRST116') || (!error && (!data || data.length === 0))) {
+            if (location.pathname === '/team-members') {
+              // Don't redirect, just let the page handle the no-school state
+              console.log('User has no school association, but staying on team members page');
+            } else if (!location.pathname.includes('/license-verification')) {
+              // Redirect to school setup for other pages
+              console.log('User has no school association, redirecting to school setup');
+              toast({
+                title: "School Setup Required",
+                description: "Please set up your school before continuing",
+              });
+              navigate('/school-setup');
+              return;
+            }
+          }
+        }
+        
+        // Session exists and school check passed if needed, continue rendering
+        setLoading(false);
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setLoading(false);
       }
-      
-      // Session exists, continue rendering
-      setLoading(false);
     };
     
     checkAuth();
-  }, [navigate]);
+  }, [navigate, location.pathname, toast]);
   
   if (loading) {
     return (
