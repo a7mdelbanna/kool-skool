@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -28,8 +27,37 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export function Sidebar() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+      });
+      
+      navigate('/auth');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast({
+        title: "Error",
+        description: "There was a problem logging out",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <SidebarComponent className="hidden lg:flex">
       <SidebarHeader className="p-4">
@@ -184,7 +212,13 @@ export function Sidebar() {
                 <div className="text-xs text-muted-foreground">tutor@example.com</div>
               </div>
             </div>
-            <Button variant="ghost" size="icon">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleLogout}
+              aria-label="Log out"
+              title="Log out"
+            >
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
