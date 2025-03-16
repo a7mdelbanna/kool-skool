@@ -113,9 +113,22 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     }
   };
 
+  // Use watch to update parent component's state without submitting the form
+  useEffect(() => {
+    const subscription = form.watch((values) => {
+      // Only update if we have valid values to prevent partial updates
+      if (values.firstName !== undefined && values.lastName !== undefined) {
+        onFormChange(values as z.infer<typeof formSchema>);
+      }
+    });
+    
+    // Cleanup subscription on component unmount
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
+
   return (
     <Form {...form}>
-      <form onChange={form.handleSubmit(onFormChange)} className="space-y-6">
+      <form className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Personal Information Section */}
           <div className="space-y-4">
