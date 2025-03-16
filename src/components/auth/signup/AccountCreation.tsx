@@ -11,7 +11,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 
 // Account details schema
 const accountSchema = z.object({
@@ -30,51 +29,16 @@ const AccountCreation: React.FC = () => {
   const navigate = useNavigate();
   const { licenseId } = useParams<{ licenseId: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isValidLicense, setIsValidLicense] = useState(true);
   
-  // Verify the license exists in the database
+  // Redirect to auth page if no licenseId is provided
   useEffect(() => {
     if (!licenseId) {
       console.error("No license ID provided in URL params");
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
-      return;
+    } else {
+      console.log("License ID from URL:", licenseId);
     }
-    
-    const checkLicense = async () => {
-      try {
-        console.log("Checking license ID from URL:", licenseId);
-        const { data, error } = await supabase
-          .from('licenses')
-          .select('*')
-          .eq('id', licenseId)
-          .maybeSingle(); // Use maybeSingle instead of single to avoid error
-        
-        if (error) {
-          console.error("Error checking license:", error);
-          toast.error("Error validating license. Please try again.");
-          setIsValidLicense(false);
-          return;
-        }
-        
-        if (!data) {
-          console.error("License not found in database");
-          toast.error("Invalid license. Please verify your license first.");
-          setIsValidLicense(false);
-          navigate("/auth");
-          return;
-        }
-        
-        // License is valid
-        setIsValidLicense(true);
-      } catch (error) {
-        console.error("License verification error:", error);
-        toast.error("Error validating license. Please try again.");
-        setIsValidLicense(false);
-      }
-    };
-    
-    checkLicense();
   }, [licenseId, navigate]);
   
   const accountForm = useForm<AccountFormValues>({
@@ -87,8 +51,8 @@ const AccountCreation: React.FC = () => {
   });
 
   const handleSubmit = async (data: AccountFormValues) => {
-    if (!licenseId || !isValidLicense) {
-      console.error("Invalid license during account creation");
+    if (!licenseId) {
+      console.error("Missing license ID during account creation");
       toast.error("Invalid license. Please verify your license first.");
       navigate("/auth");
       return;
@@ -125,7 +89,7 @@ const AccountCreation: React.FC = () => {
     }
   };
 
-  if (!licenseId || !isValidLicense) {
+  if (!licenseId) {
     return null; // Will redirect in useEffect
   }
 
