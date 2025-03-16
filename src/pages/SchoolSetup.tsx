@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -343,7 +342,16 @@ const SchoolSetup = () => {
       const firstName = nameParts[0];
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       
-      await createTeamMember({
+      // Log the data being sent to the API for debugging
+      console.log("Creating team member with data:", {
+        email: teacher.email,
+        password: teacher.password,
+        role: teacher.role,
+        firstName,
+        lastName
+      });
+      
+      const result = await createTeamMember({
         email: teacher.email,
         password: teacher.password,
         role: teacher.role as "director" | "teacher" | "admin" | "staff",
@@ -351,9 +359,11 @@ const SchoolSetup = () => {
         lastName
       });
       
+      console.log("Team member creation result:", result);
+      
       toast({
         title: 'Team member created',
-        description: `${teacher.name} has been added to your team`,
+        description: `${teacher.name} has been added to your team with login credentials`,
       });
       
       // Reset the password field after successful creation
@@ -953,271 +963,3 @@ const SchoolSetup = () => {
                     <span className="sr-only">Remove</span>
                   </Button>
                 </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddLevel}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Level
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Courses</h3>
-              </div>
-              
-              {courses.map(course => (
-                <div key={course.id} className="flex items-center gap-2">
-                  <Input 
-                    value={course.name}
-                    onChange={(e) => handleCourseChange(course.id, e.target.value)}
-                    placeholder="Course name (e.g., Grammar, Conversation, IELTS)" 
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveCourse(course.id)}
-                    disabled={courses.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddCourse}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Course
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <Collapsible 
-          open={openSections.finance} 
-          onOpenChange={() => toggleSection('finance')}
-          className="border rounded-lg overflow-hidden"
-        >
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">Income & Expenses</h2>
-              </div>
-              {openSections.finance ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="p-4 space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Expense Categories</h3>
-              </div>
-              
-              {expenseCategories.map(category => (
-                <div key={category.id} className="flex items-center gap-2">
-                  <Input 
-                    value={category.name}
-                    onChange={(e) => handleExpenseCategoryChange(category.id, e.target.value)}
-                    placeholder="Category name (e.g., Rent, Utilities, Supplies)" 
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveExpenseCategory(category.id)}
-                    disabled={expenseCategories.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddExpenseCategory}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Repeat className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Recurring Expenses</h3>
-              </div>
-              
-              {recurringExpenses.map(expense => (
-                <div key={expense.id} className="grid md:grid-cols-4 gap-3 items-center">
-                  <Input 
-                    value={expense.name}
-                    onChange={(e) => handleRecurringExpenseChange(expense.id, 'name', e.target.value)}
-                    placeholder="Expense name" 
-                    className="md:col-span-1"
-                  />
-                  
-                  <select 
-                    value={expense.categoryId}
-                    onChange={(e) => handleRecurringExpenseChange(expense.id, 'categoryId', e.target.value)}
-                    className="rounded-md border h-10 px-3 py-2 bg-background text-sm"
-                  >
-                    <option value="">Select category</option>
-                    {expenseCategories.map(category => (
-                      <option key={category.id} value={category.id}>
-                        {category.name || `Category ${category.id}`}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  <div className="flex gap-2 md:col-span-1">
-                    <select 
-                      value={expense.frequency}
-                      onChange={(e) => handleRecurringExpenseChange(
-                        expense.id, 
-                        'frequency', 
-                        e.target.value as RecurringExpense['frequency']
-                      )}
-                      className="rounded-md border h-10 px-3 py-2 bg-background text-sm flex-1"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                    
-                    <Input 
-                      type="number"
-                      min="0"
-                      value={expense.amount > 0 ? expense.amount : ''}
-                      onChange={(e) => handleRecurringExpenseChange(
-                        expense.id, 
-                        'amount',
-                        parseFloat(e.target.value) || 0
-                      )}
-                      placeholder="Amount" 
-                      className="w-24"
-                    />
-                  </div>
-                  
-                  <div className="flex justify-end">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleRemoveRecurringExpense(expense.id)}
-                      disabled={recurringExpenses.length <= 1}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Remove</span>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddRecurringExpense}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Recurring Expense
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                <h3 className="font-medium">Accounts</h3>
-              </div>
-              
-              {accounts.map(account => (
-                <div key={account.id} className="flex items-center gap-3">
-                  <Input 
-                    value={account.name}
-                    onChange={(e) => handleAccountChange(account.id, 'name', e.target.value)}
-                    placeholder="Account name (e.g., PayPal, Bank Account)" 
-                    className="flex-1"
-                  />
-                  
-                  <Input 
-                    value={account.currency}
-                    onChange={(e) => handleAccountChange(account.id, 'currency', e.target.value)}
-                    placeholder="Currency (USD, EUR, etc.)" 
-                    className="w-32"
-                  />
-                  
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleRemoveAccount(account.id)}
-                    disabled={accounts.length <= 1}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </div>
-              ))}
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleAddAccount}
-                size="sm"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Account
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        
-        <div className="pt-4 flex justify-end">
-          <Button type="submit" className="px-8" disabled={saving}>
-            {saving ? (
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
-                <span>Saving...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Save Changes</span>
-              </div>
-            )}
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-export default SchoolSetup;

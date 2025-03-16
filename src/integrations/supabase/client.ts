@@ -89,18 +89,26 @@ export const createTeamMember = async (
     lastName?: string;
   }
 ) => {
-  const { data, error } = await supabase.rpc('create_team_member', {
-    email_param: userData.email,
-    password_param: userData.password,
-    role_param: userData.role,
-    first_name_param: userData.firstName || null,
-    last_name_param: userData.lastName || null
-  });
-  
-  if (error) {
-    console.error("Error creating team member:", error);
+  try {
+    // Call the stored procedure with proper parameters
+    const { data, error } = await supabase.rpc('create_team_member', {
+      email_param: userData.email,
+      password_param: userData.password,
+      role_param: userData.role,
+      first_name_param: userData.firstName || null,
+      last_name_param: userData.lastName || null
+    });
+    
+    if (error) {
+      console.error("Error creating team member:", error);
+      throw error;
+    }
+    
+    // Add logging to help with debugging
+    console.log("Team member created successfully:", data);
+    return data;
+  } catch (error) {
+    console.error("Exception creating team member:", error);
     throw error;
   }
-  
-  return data;
 };
