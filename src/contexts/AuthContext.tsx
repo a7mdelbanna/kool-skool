@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -127,33 +128,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("CompleteSignUp with licenseId:", userData.licenseId);
       console.log("CompleteSignUp with licenseNumber:", userData.licenseNumber);
       
-      // Verify license exists before proceeding
-      const { data: licenseData, error: licenseCheckError } = await supabase
-        .from('licenses')
-        .select('*')
-        .eq('id', userData.licenseId)
-        .single();
-        
-      if (licenseCheckError || !licenseData) {
-        console.error("License not found:", licenseCheckError);
-        toast.error("Invalid license. Please verify your license again.");
-        navigate("/auth");
-        return { success: false, error: "Invalid license" };
+      // Double-check license is valid using RPC function
+      const { data: licenseData, error: licenseError } = await supabase
+        .rpc('get_license_by_id', { license_id_param: userData.licenseId });
+      
+      if (licenseError || !licenseData || licenseData.length === 0) {
+        console.error("License verification failed:", licenseError || "No license data");
+        toast.error("License verification failed. Please verify your license again.");
+        return { success: false, error: "License verification failed" };
       }
       
-      // First, update the license record with the school name if provided
-      if (userData.licenseId && userData.schoolName) {
-        console.log("Updating license with school name:", userData.schoolName);
-        const { error: licenseUpdateError } = await supabase
-          .from('licenses')
-          .update({ school_name: userData.schoolName })
-          .eq('id', userData.licenseId);
-          
-        if (licenseUpdateError) {
-          console.error("Error updating license school name:", licenseUpdateError);
-          // Continue with signup even if this fails
-        }
-      }
+      console.log("License verification succeeded:", licenseData);
       
       // Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -169,17 +154,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (authError) {
+        console.error("Auth error during signup:", authError);
         toast.error(authError.message);
         return { success: false, error: authError.message };
       }
 
       if (!authData.user) {
+        console.error("Failed to create user account - no user data returned");
         toast.error("Failed to create user account");
         return { success: false, error: "Failed to create user account" };
       }
 
+      console.log("User created successfully, creating school...");
+      console.log("User ID:", authData.user.id);
+      
       // Create school entry with explicit license_id
-      console.log("Creating school with license ID:", userData.licenseId);
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
         .insert({
@@ -228,17 +217,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { success: false, error: `Error creating profile: ${profileError.message}` };
       }
 
-      // Process team members if provided
-      if (userData.teamMembers && userData.teamMembers.length > 0) {
-        // In a real app, you would create invitations for team members
-        // This would typically involve sending emails with signup links
-        console.log("Team members to invite:", userData.teamMembers);
-        
-        // For now, just log the information
-        toast.success(`${userData.teamMembers.length} team members will be invited`);
-      }
-
+      console.log("Profile created successfully. Signup complete.");
       toast.success("Account created successfully!");
+      
+      // Force a session check to ensure we're properly signed in
+      const { data: { session: newSession } } = await supabase.auth.getSession();
+      if (newSession) {
+        console.log("New session established:", newSession);
+        setSession(newSession);
+        setUser(newSession.user);
+      } else {
+        console.log("No session after signup - attempting login with credentials");
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (signInError) {
+          console.error("Error signing in after account creation:", signInError);
+        } else if (signInData.session) {
+          console.log("Successfully logged in after account creation");
+          setSession(signInData.session);
+          setUser(signInData.session.user);
+        }
+      }
+      
       return { success: true };
     } catch (error: any) {
       console.error("Complete signup error:", error);

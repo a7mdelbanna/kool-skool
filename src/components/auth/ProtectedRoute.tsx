@@ -33,6 +33,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
+  // Special case for account creation pages - don't redirect
+  if (location.pathname.includes("/auth/create-account/")) {
+    console.log("On account creation page, allowing access");
+    return <>{children}</>;
+  }
+
   if (!isAuthenticated) {
     console.log("Not authenticated, redirecting to", redirectTo);
     return <Navigate to={redirectTo} replace state={{ from: location }} />;

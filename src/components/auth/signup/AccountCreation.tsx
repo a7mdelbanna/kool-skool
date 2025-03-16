@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -66,12 +65,9 @@ const AccountCreation: React.FC = () => {
       try {
         setLicenseError(null);
         
-        // Get just the license number for this license ID
+        // Get the license number for this license ID using RPC function to avoid RLS issues
         const { data, error } = await supabase
-          .from('licenses')
-          .select('license_number')
-          .eq('id', licenseId)
-          .maybeSingle();
+          .rpc('get_license_by_id', { license_id_param: licenseId });
           
         if (error) {
           console.error("Error fetching license:", error);
@@ -80,19 +76,19 @@ const AccountCreation: React.FC = () => {
           return;
         }
         
-        if (!data) {
-          console.error("License not found");
+        if (!data || data.length === 0 || !data[0].license_number) {
+          console.error("License not found or invalid data format", data);
           setLicenseError("License not found. Please verify your license first.");
           toast.error("License not found. Please verify your license first.");
           navigate("/auth");
           return;
         }
         
-        console.log("Successfully fetched license info:", data);
-        setLicenseInfo(data);
+        console.log("Successfully fetched license info:", data[0]);
+        setLicenseInfo({ license_number: data[0].license_number });
         
         // Store in session storage for future use
-        sessionStorage.setItem('licenseNumber', data.license_number);
+        sessionStorage.setItem('licenseNumber', data[0].license_number);
         sessionStorage.setItem('licenseId', licenseId);
       } catch (err) {
         console.error("Error in fetchLicenseInfo:", err);
