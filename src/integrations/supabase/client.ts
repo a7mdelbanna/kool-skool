@@ -12,13 +12,14 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Create a client with type safety
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// The original rpc method is preserved to maintain its functionality
-const originalRpc = supabase.rpc.bind(supabase);
+// Save the original rpc method
+const originalRpc = supabase.rpc;
 
-// Override the rpc method to accept any function name
-// This uses a properly bound function to prevent 'rest' property errors
-supabase.rpc = function(functionName: string, params?: Record<string, any>) {
-  console.log(`Calling RPC function: ${functionName}`, params);
-  // Use type assertion to satisfy TypeScript
-  return originalRpc(functionName as any, params);
+// Override the rpc method with a version that accepts any function name as string
+supabase.rpc = function(fnName: string, params?: Record<string, any>) {
+  // Log which RPC function is being called (helpful for debugging)
+  console.log(`Calling RPC function: ${fnName}`, params);
+  
+  // Call the original method with type assertion
+  return originalRpc(fnName as any, params);
 } as typeof supabase.rpc;
