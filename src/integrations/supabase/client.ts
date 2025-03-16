@@ -390,27 +390,34 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Session verified, proceeding with course creation");
     
-    // Stringify the request body properly
-    const requestBody = JSON.stringify({
+    // Create the request body object
+    const requestBody = {
       school_id: schoolId,
       course_name: name,
       lesson_type: lessonType
-    });
+    };
     
-    console.log("Request body:", requestBody);
+    console.log("Request body object:", requestBody);
+    
+    // Create headers with the right content type
+    const headers = {
+      'x-user-id': userData.id,
+      'x-school-id': userData.schoolId,
+      'x-user-role': userData.role || 'admin',
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_PUBLISHABLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+    };
+    
+    console.log("Request headers:", headers);
     
     // Use our Edge Function to create the course with improved error handling
     const response = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
       body: requestBody,
-      headers: {
-        'x-user-id': userData.id,
-        'x-school-id': userData.schoolId,
-        'x-user-role': userData.role || 'admin',
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_PUBLISHABLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
-      }
+      headers: headers
     });
+
+    console.log("Edge function response:", response);
 
     if (response.error) {
       console.error("Error creating course:", response.error);

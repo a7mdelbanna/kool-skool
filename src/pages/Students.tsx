@@ -226,6 +226,8 @@ const Students = () => {
       
       console.log("Creating course with school ID:", user.schoolId);
       
+      toast.loading("Creating course...");
+      
       const { data, error } = await createCourse(
         user.schoolId,
         newCourseName.trim(),
@@ -234,6 +236,7 @@ const Students = () => {
       
       if (error) {
         console.error("Error creating course:", error);
+        toast.dismiss();
         
         if (error.message?.includes("Authentication required") || 
             error.message?.includes("expired") || 
@@ -246,15 +249,11 @@ const Students = () => {
           return;
         }
         
-        if (error.message?.includes("violates row-level security policy")) {
-          toast.error("You don't have permission to create courses for this school.");
-          return;
-        }
-        
         toast.error(error.message || "Failed to create course");
         return;
       }
       
+      toast.dismiss();
       toast.success(`Course "${newCourseName}" created successfully`);
       setNewCourseName("");
       setIsAddCourseOpen(false);
@@ -262,6 +261,7 @@ const Students = () => {
       refetchStudents();
       
     } catch (error) {
+      toast.dismiss();
       console.error("Error adding course:", error);
       toast.error("An error occurred while creating the course");
     } finally {

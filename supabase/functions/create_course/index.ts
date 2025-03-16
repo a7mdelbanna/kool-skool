@@ -43,9 +43,14 @@ serve(async (req) => {
       hasApiKey: !!apiKey
     })
     
-    // Parse request body with error handling
+    // Get request body and content type
+    const contentType = req.headers.get('content-type') || '';
+    console.log("Content type:", contentType);
+    
+    // Parse request body with extensive error handling
     let requestData;
     try {
+      // Read the request body as text to log it first
       const text = await req.text();
       console.log("Raw request body:", text);
       
@@ -56,14 +61,27 @@ serve(async (req) => {
         )
       }
       
-      requestData = JSON.parse(text);
+      // Parse the text into JSON
+      try {
+        requestData = JSON.parse(text);
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Invalid JSON in request body", 
+            detail: parseError.message 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+      }
+      
       console.log("Parsed request data:", requestData);
-    } catch (parseError) {
-      console.error("Error parsing request body:", parseError);
+    } catch (bodyError) {
+      console.error("Error reading request body:", bodyError);
       return new Response(
         JSON.stringify({ 
-          error: "Invalid JSON in request body", 
-          detail: parseError.message 
+          error: "Error reading request body", 
+          detail: bodyError.message 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
@@ -87,6 +105,7 @@ serve(async (req) => {
       }
     )
     
+    // Extract data from request body
     const { school_id, course_name, lesson_type } = requestData
     
     console.log(`Creating course with name: ${course_name}, type: ${lesson_type} for school: ${school_id}`)
@@ -95,7 +114,14 @@ serve(async (req) => {
     if (!school_id || !course_name || !lesson_type) {
       console.error("Missing required fields in request body");
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ 
+          error: "Missing required fields",
+          detail: {
+            hasSchoolId: !!school_id,
+            hasCourseName: !!course_name,
+            hasLessonType: !!lesson_type
+          }
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
