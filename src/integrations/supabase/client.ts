@@ -79,27 +79,63 @@ export const updateUserProfile = async (
   return data;
 };
 
-// Helper function to check if an email exists in auth system
+// Improved helper function to check if an email exists in the auth system
 const checkEmailExists = async (email: string) => {
   try {
-    // We can use the signIn method with a wrong password to check if the email exists
-    // If the response contains a 'user' object but login fails, it means the email exists
+    // First, check in the auth.users table via the profiles table
+    // Since we can't directly query auth.users, we check the profiles table
+    // which is linked to auth.users via triggers
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('email', email);
+    
+    if (profileError) {
+      console.error("Error checking profiles for email:", profileError);
+    }
+    
+    if (profileData && profileData.length > 0) {
+      console.log(`Found email ${email} in profiles table`);
+      return true;
+    }
+
+    // Check team_members table as well
+    const { data: teamMemberData, error: teamMemberError } = await supabase
+      .from('team_members')
+      .select('email')
+      .eq('email', email);
+      
+    if (teamMemberError) {
+      console.error("Error checking team_members for email:", teamMemberError);
+    }
+    
+    if (teamMemberData && teamMemberData.length > 0) {
+      console.log(`Found email ${email} in team_members table`);
+      return true;
+    }
+    
+    // As a fallback, attempt sign-in with dummy password
+    // This is less reliable but can catch cases where the email exists in auth
+    // but not in our profiles/team_members tables
     const { error } = await supabase.auth.signInWithPassword({
       email: email,
       password: 'dummy-password-for-checking-only'
     });
     
     if (error) {
-      // If the error message indicates invalid credentials but not invalid email, the email exists
+      // If the error suggests the email exists but password is wrong
       if (error.message.includes('Invalid login credentials')) {
-        return true; // Email exists
+        console.log(`Email ${email} exists in auth system (invalid credentials)`);
+        return true;
       }
       
       if (error.message.includes('Email not confirmed')) {
-        return true; // Email exists but not confirmed
+        console.log(`Email ${email} exists in auth system (not confirmed)`);
+        return true;
       }
     }
     
+    console.log(`Email ${email} does not exist in any checked location`);
     return false; // Email doesn't exist
   } catch (error) {
     console.error("Error checking email existence:", error);
@@ -118,10 +154,14 @@ export const createTeamMember = async (
   }
 ) => {
   try {
+    // Log the attempted creation for debugging
+    console.log("Attempting to create team member with email:", userData.email);
+    
     // First check if the email already exists
     const emailExists = await checkEmailExists(userData.email);
     
     if (emailExists) {
+      console.log(`Email ${userData.email} already exists, stopping creation process`);
       throw new Error(`The email ${userData.email} is already registered. Please use a different email address.`);
     }
     
