@@ -129,84 +129,42 @@ const SchoolDetailsStep: React.FC<SchoolDetailsStepProps> = ({
         schoolLogo: logoPreview,
       };
       
-      // Get the user's school ID first
-      const { data: profileData, error: profileError } = await supabase.rpc(
-        'get_user_school_id',
-        {
-          user_id_param: user.id
-        }
-      );
-      
-      if (profileError) {
-        throw profileError;
-      }
-      
-      // Check if user has a school associated
-      if (!profileData || !Array.isArray(profileData) || profileData.length === 0 || !profileData[0]?.school_id) {
-        console.log("No school found, creating a new one");
-        
-        // Create a new school since none exists
-        const { data: newSchool, error: createError } = await supabase
-          .from('schools')
-          .insert({
-            name: values.schoolName || "My School",
-            logo: logoPreview,
-            phone: values.schoolPhone || null,
-            telegram: values.schoolTelegram || null,
-            whatsapp: values.schoolWhatsapp || null,
-            instagram: values.schoolInstagram || null,
-            created_by: user.id
-          })
-          .select('id')
-          .single();
-          
-        if (createError) {
-          throw createError;
-        }
-        
-        // Update the user's profile with the new school ID
-        const { error: updateProfileError } = await supabase
-          .from('profiles')
-          .update({ school_id: newSchool.id })
-          .eq('id', user.id);
-          
-        if (updateProfileError) {
-          throw updateProfileError;
-        }
-        
-        console.log("Created new school and updated profile:", newSchool.id);
-      } else {
-        // Update existing school
-        const schoolId = profileData[0].school_id;
-        
-        const { error: updateError } = await supabase
-          .from('schools')
-          .update({
-            name: values.schoolName || "My School",
-            logo: logoPreview,
-            phone: values.schoolPhone || null,
-            telegram: values.schoolTelegram || null,
-            whatsapp: values.schoolWhatsapp || null,
-            instagram: values.schoolInstagram || null
-          })
-          .eq('id', schoolId);
-        
-        if (updateError) {
-          throw updateError;
-        }
-        
-        console.log("Updated existing school:", schoolId);
-      }
-      
       // Update data in the onboarding state
       updateData(schoolData);
-      toast.success("School details saved successfully");
       
-      // Proceed to next step
+      try {
+        // Use the security definer function we created to save school details
+        const { data, error } = await supabase.rpc(
+          'save_school_details',
+          {
+            user_id_param: user.id,
+            school_name_param: values.schoolName || "My School",
+            school_logo_param: logoPreview,
+            school_phone_param: values.schoolPhone || null,
+            school_telegram_param: values.schoolTelegram || null,
+            school_whatsapp_param: values.schoolWhatsapp || null,
+            school_instagram_param: values.schoolInstagram || null
+          }
+        );
+
+        if (error) {
+          console.error("Error from save_school_details:", error);
+          throw error;
+        }
+
+        console.log("School saved successfully with ID:", data);
+        toast.success("School details saved successfully");
+      } catch (error: any) {
+        // If the save fails, we continue anyway since we've updated the local state
+        console.error("Error saving to database:", error);
+        toast.error("Could not save to database, but your changes have been saved locally");
+      }
+      
+      // Proceed to next step even if the database update fails
       onNext();
     } catch (error: any) {
-      console.error("Error saving school details:", error);
-      toast.error(error.message || "Failed to save school details");
+      console.error("Error in submit handler:", error);
+      toast.error(error.message || "Failed to process school details");
     } finally {
       setSaving(false);
     }

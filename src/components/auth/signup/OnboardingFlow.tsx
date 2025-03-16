@@ -79,7 +79,8 @@ const OnboardingFlow = () => {
           if (currentStep === 1) {
             await savePersonalDetails();
           } else if (currentStep === 2) {
-            await saveSchoolDetails();
+            // School details are now saved directly in the SchoolDetailsStep component
+            // No need to call saveSchoolDetails here
           } else if (currentStep === 3) {
             await saveTeamMembers();
           }
@@ -129,6 +130,8 @@ const OnboardingFlow = () => {
     }
   };
 
+  // School details are now saved directly in the SchoolDetailsStep component
+  // This function is kept for reference but not used
   const saveSchoolDetails = async () => {
     if (!user) return;
     
