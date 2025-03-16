@@ -54,8 +54,8 @@ const SubscriptionInfo = () => {
         throw new Error("User not authenticated");
       }
       
-      // First, get the user's school_id
-      const { data: schoolId, error: schoolIdError } = await supabase
+      // First, get the user's school_id using the updated function call
+      const { data: schoolIdData, error: schoolIdError } = await supabase
         .rpc('get_user_school_id');
       
       if (schoolIdError) {
@@ -63,16 +63,18 @@ const SubscriptionInfo = () => {
         throw schoolIdError;
       }
       
-      if (!schoolId) {
+      if (!schoolIdData || schoolIdData.length === 0 || !schoolIdData[0]?.school_id) {
         console.log("No school associated with this user");
         setLicenseInfo(null);
         setIsLoading(false);
         return;
       }
       
-      // Get school info - using explicit type assertion for the function name
+      const schoolId = schoolIdData[0].school_id;
+      
+      // Get school info using the school_id
       const { data: schoolData, error: schoolError } = await supabase
-        .rpc('get_school_info' as any, { school_id_param: schoolId });
+        .rpc('get_school_info', { school_id_param: schoolId });
       
       if (schoolError) {
         console.error("Error fetching school:", schoolError);
@@ -97,9 +99,9 @@ const SubscriptionInfo = () => {
         return;
       }
       
-      // Get license details - using explicit type assertion for the function name
+      // Get license details using the school's license_id
       const { data: licenseData, error: licenseError } = await supabase
-        .rpc('get_license_details' as any, { license_id_param: schoolInfo.license_id });
+        .rpc('get_license_details', { license_id_param: schoolInfo.license_id });
       
       if (licenseError) {
         console.error("Error fetching license details:", licenseError);

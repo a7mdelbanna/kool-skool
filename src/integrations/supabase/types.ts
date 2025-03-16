@@ -154,6 +154,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      create_or_update_school: {
+        Args: {
+          school_name: string
+          school_logo: string
+          school_phone: string
+          school_telegram: string
+          school_whatsapp: string
+          school_instagram: string
+        }
+        Returns: string
+      }
       create_school_and_update_profile_rpc: {
         Args: {
           school_name: string
@@ -176,20 +187,61 @@ export type Database = {
           used_by: string
         }[]
       }
+      get_license_details: {
+        Args: {
+          license_id_param: string
+        }
+        Returns: {
+          id: string
+          license_number: string
+          is_active: boolean
+          duration_days: number
+          max_users: number
+          created_at: string
+          expires_at: string
+          days_remaining: number
+          school_name: string
+          school_id: string
+        }[]
+      }
+      get_school_info: {
+        Args: {
+          school_id_param: string
+        }
+        Returns: {
+          id: string
+          name: string
+          license_id: string
+          logo: string
+          phone: string
+          telegram: string
+          whatsapp: string
+          instagram: string
+          created_at: string
+          created_by: string
+        }[]
+      }
       get_user_role: {
         Args: {
           user_id: string
         }
         Returns: string
       }
-      get_user_school_id: {
-        Args: {
-          user_id_param: string
-        }
-        Returns: {
-          school_id: string
-        }[]
-      }
+      get_user_school_id:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              school_id: string
+            }[]
+          }
+        | {
+            Args: {
+              user_id_param: string
+            }
+            Returns: {
+              school_id: string
+            }[]
+          }
       handle_license_signup: {
         Args: {
           license_number: string
@@ -234,6 +286,16 @@ export type Database = {
           instagram_param: string
         }
         Returns: undefined
+      }
+      verify_license: {
+        Args: {
+          license_number_param: string
+        }
+        Returns: {
+          valid: boolean
+          message: string
+          license_id: string
+        }[]
       }
     }
     Enums: {

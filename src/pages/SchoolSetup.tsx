@@ -76,7 +76,7 @@ const SchoolSetup = () => {
           setUserRole(roleData || null);
         }
         
-        const { data: schoolId, error: schoolIdError } = await supabase
+        const { data: schoolIdData, error: schoolIdError } = await supabase
           .rpc('get_user_school_id');
         
         if (schoolIdError) {
@@ -84,8 +84,17 @@ const SchoolSetup = () => {
           throw schoolIdError;
         }
         
-        if (!schoolId) {
+        if (!schoolIdData || schoolIdData.length === 0) {
           console.log("No school ID found");
+          setNoSchoolFound(true);
+          setIsLoading(false);
+          return;
+        }
+        
+        const schoolId = schoolIdData[0]?.school_id;
+        
+        if (!schoolId) {
+          console.log("No school ID found in response data");
           setNoSchoolFound(true);
           setIsLoading(false);
           return;
@@ -94,7 +103,7 @@ const SchoolSetup = () => {
         console.log("Found school ID:", schoolId);
             
         const { data: schoolData, error: schoolError } = await supabase
-          .rpc('get_school_info' as any, { school_id_param: schoolId });
+          .rpc('get_school_info', { school_id_param: schoolId });
           
         if (schoolError) {
           console.error("Error fetching school:", schoolError);
@@ -132,7 +141,7 @@ const SchoolSetup = () => {
       }
 
       const { data: licenseResult, error: licenseError } = await supabase
-        .rpc('verify_license' as any, { license_number_param: data.license_number });
+        .rpc('verify_license', { license_number_param: data.license_number });
       
       if (licenseError) {
         console.error("Error verifying license:", licenseError);
@@ -153,10 +162,8 @@ const SchoolSetup = () => {
         return;
       }
       
-      const licenseId = licenseVerification.license_id;
-      
       const { data: schoolId, error: schoolError } = await supabase
-        .rpc('create_or_update_school' as any, {
+        .rpc('create_or_update_school', {
           school_name: data.name,
           school_logo: null,
           school_phone: null,
