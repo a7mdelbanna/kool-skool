@@ -42,13 +42,18 @@ const Login = () => {
       }
       
       // Store user information in local storage
-      localStorage.setItem('user', JSON.stringify({
+      const userData = {
         id: response.user_id,
         firstName: response.first_name,
         lastName: response.last_name,
         role: response.role,
         schoolId: response.school_id
-      }));
+      };
+      
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      // Dispatch a storage event to notify other tabs
+      window.dispatchEvent(new Event('storage'));
       
       toast({
         title: "Login successful",
@@ -56,11 +61,15 @@ const Login = () => {
       });
       
       console.log("Login successful, redirecting to dashboard...");
+      console.log("User data:", userData);
       
-      // Force a small delay to ensure localStorage is updated
+      // Use a more reliable approach for navigation
+      // First ensure localStorage is updated by using a callback
       setTimeout(() => {
-        navigate('/');
-      }, 100);
+        console.log("Navigating to dashboard...");
+        // Force reload the page and navigate to dashboard
+        window.location.href = '/';
+      }, 500);
       
     } catch (error) {
       console.error('Login error:', error);

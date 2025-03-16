@@ -37,6 +37,8 @@ const App = () => {
     
     // Listen for storage events to handle authentication across tabs
     window.addEventListener('storage', checkAuth);
+    // Also listen for custom storage event we dispatch on login
+    window.addEventListener('storage', checkAuth);
     
     return () => {
       window.removeEventListener('storage', checkAuth);
@@ -44,7 +46,9 @@ const App = () => {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>;
   }
 
   return (
