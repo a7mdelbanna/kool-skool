@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -24,7 +23,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("AuthProvider getSession:", session);
       setSession(session);
@@ -32,7 +30,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("Auth state change event:", event, "Session:", session);
@@ -72,7 +69,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       console.log("Verifying license:", licenseNumber);
       
-      // First verify the license
       const { data, error } = await supabase
         .rpc('handle_license_signup', { license_number: licenseNumber });
       
@@ -119,7 +115,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setIsLoading(true);
       
-      // Make sure we have all the required data
       if (!userData.licenseId) {
         toast.error("Missing license ID. Please verify your license first.");
         return { success: false, error: "Missing license ID" };
@@ -128,11 +123,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("CompleteSignUp with licenseId:", userData.licenseId);
       console.log("CompleteSignUp with licenseNumber:", userData.licenseNumber);
       
-      // Double-check license is valid using RPC function
       const { data: licenseData, error: licenseError } = await supabase
-        .rpc('get_license_by_id', { license_id_param: userData.licenseId });
+        .from('licenses')
+        .select('license_number, id, is_active, used_by')
+        .eq('id', userData.licenseId)
+        .single();
       
-      if (licenseError || !licenseData || licenseData.length === 0) {
+      if (licenseError || !licenseData) {
         console.error("License verification failed:", licenseError || "No license data");
         toast.error("License verification failed. Please verify your license again.");
         return { success: false, error: "License verification failed" };
@@ -140,7 +137,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       console.log("License verification succeeded:", licenseData);
       
-      // Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -168,12 +164,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("User created successfully, creating school...");
       console.log("User ID:", authData.user.id);
       
-      // Create school entry with explicit license_id
       const { data: schoolData, error: schoolError } = await supabase
         .from('schools')
         .insert({
           name: userData.schoolName || "My School",
-          license_id: userData.licenseId, // Explicitly set the license_id
+          license_id: userData.licenseId,
           created_by: authData.user.id,
           logo: userData.schoolLogo,
           phone: userData.schoolPhone,
@@ -190,11 +185,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { success: false, error: `Error creating school: ${schoolError.message}` };
       }
 
-      // For debugging purposes, verify the school creation
       console.log("School created with ID:", schoolData.id);
       console.log("School data full:", schoolData);
 
-      // Create profile entry
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -202,13 +195,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           email: email,
           first_name: userData.firstName,
           last_name: userData.lastName,
-          role: userData.role || 'admin', // Default to admin for new users
+          role: userData.role || 'admin',
           phone: userData.phone,
           whatsapp: userData.whatsapp,
           telegram: userData.telegram,
           instagram: userData.instagram,
           profile_picture: userData.profilePicture,
-          school_id: schoolData.id // Use the school ID we just created
+          school_id: schoolData.id
         });
 
       if (profileError) {
@@ -220,7 +213,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("Profile created successfully. Signup complete.");
       toast.success("Account created successfully!");
       
-      // Force a session check to ensure we're properly signed in
       const { data: { session: newSession } } = await supabase.auth.getSession();
       if (newSession) {
         console.log("New session established:", newSession);

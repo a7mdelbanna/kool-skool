@@ -161,6 +161,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_license_by_id: {
+        Args: {
+          license_id_param: string
+        }
+        Returns: {
+          license_number: string
+          id: string
+          is_active: boolean
+          used_by: string
+        }[]
+      }
       get_user_role: {
         Args: {
           user_id: string
