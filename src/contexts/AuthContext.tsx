@@ -81,8 +81,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { valid: false, message: error.message, licenseId: null };
       }
       
-      if (!data || data.length === 0 || !data[0].valid) {
-        const errorMessage = data && data[0] ? data[0].message : "Invalid license";
+      if (!data || !Array.isArray(data) || data.length === 0 || !data[0].valid) {
+        const errorMessage = data && Array.isArray(data) && data[0] ? data[0].message : "Invalid license";
         console.error("License validation failed:", errorMessage);
         toast.error(errorMessage);
         return { 

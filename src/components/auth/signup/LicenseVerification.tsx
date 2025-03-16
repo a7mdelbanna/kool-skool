@@ -10,6 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // License verification schema
 const licenseSchema = z.object({
@@ -21,6 +22,7 @@ type LicenseFormValues = z.infer<typeof licenseSchema>;
 const LicenseVerification: React.FC = () => {
   const { signUp } = useAuth();
   const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   
   const licenseForm = useForm<LicenseFormValues>({
@@ -33,6 +35,7 @@ const LicenseVerification: React.FC = () => {
   const verifyLicense = async (data: LicenseFormValues) => {
     try {
       setIsVerifying(true);
+      setError(null);
       console.log("Verifying license:", data.licenseNumber);
       
       const result = await signUp(data.licenseNumber);
@@ -49,10 +52,12 @@ const LicenseVerification: React.FC = () => {
         // Navigate to account creation with license ID
         navigate(`/auth/create-account/${result.licenseId}`);
       } else {
+        setError(result.message || "License verification failed");
         toast.error(result.message || "License verification failed");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("License verification error:", error);
+      setError(error.message || "An error occurred during license verification");
       toast.error("An error occurred during license verification");
     } finally {
       setIsVerifying(false);
@@ -65,6 +70,12 @@ const LicenseVerification: React.FC = () => {
         <h1 className="text-2xl font-bold">License Verification</h1>
         <p className="text-muted-foreground">Enter your license number to get started</p>
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Form {...licenseForm}>
         <form 
