@@ -9,7 +9,29 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(
+  SUPABASE_URL, 
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  }
+);
+
+// Helper function for safe property access
+export function safeGet<T, K extends string>(obj: T | null | undefined, key: K): any {
+  if (!obj) return null;
+  return (obj as any)[key];
+}
+
+// Helper function for safe array access
+export function safeArray<T>(data: T | T[] | null | undefined): T[] {
+  if (!data) return [];
+  return Array.isArray(data) ? data : [data];
+}
 
 // Helper function to upload base64 image to schools
 export const uploadBase64Image = async (
@@ -19,8 +41,8 @@ export const uploadBase64Image = async (
 ) => {
   const { data, error } = await supabase
     .from('schools')
-    .update({ [field]: base64String })
-    .eq('id', schoolId);
+    .update({ [field]: base64String } as any)
+    .eq('id', schoolId as any);
     
   return { data, error };
 };
@@ -39,7 +61,7 @@ export const fetchUserProfile = async () => {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', user.id as any)
     .single();
     
   if (error) {
@@ -69,10 +91,123 @@ export const updateUserProfile = async (
   
   const { data, error } = await supabase
     .from('profiles')
-    .update(profileData)
-    .eq('id', user.id);
+    .update(profileData as any)
+    .eq('id', user.id as any);
     
   if (error) {
+    throw error;
+  }
+  
+  return data;
+};
+
+// Helper function to fetch profiles by email
+export const fetchProfileByEmail = async (email: string) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', email as any)
+    .single();
+    
+  if (error) {
+    console.error("Error fetching profile by email:", error);
+    throw error;
+  }
+  
+  return data;
+};
+
+// Helper function to fetch team invite by email
+export const fetchTeamInviteByEmail = async (email: string) => {
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('*')
+    .eq('email', email as any)
+    .eq('invitation_accepted', false)
+    .single();
+    
+  if (error && error.code !== 'PGRST116') { // Code for "no rows returned"
+    console.error("Error fetching team invite:", error);
+    throw error;
+  }
+  
+  return data;
+};
+
+// Helper function to fetch user school information
+export const fetchUserSchoolInfo = async () => {
+  const { data, error } = await supabase
+    .rpc('get_user_school_info');
+    
+  if (error) {
+    console.error("Error fetching user school info:", error);
+    throw error;
+  }
+  
+  // Ensure data is returned as an array
+  const dataArray = safeArray(data);
+  
+  return dataArray;
+};
+
+// Helper function to fetch license details
+export const fetchLicenseDetails = async (licenseId: string) => {
+  const { data, error } = await supabase
+    .rpc('get_license_details', { license_id_param: licenseId });
+    
+  if (error) {
+    console.error("Error fetching license details:", error);
+    throw error;
+  }
+  
+  // Ensure data is returned as an array
+  const dataArray = safeArray(data);
+  
+  return dataArray;
+};
+
+// Helper function to fetch team members
+export const fetchTeamMembers = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('No user authenticated');
+  }
+  
+  // First get the user's school_id
+  const { data: profileData, error: profileError } = await supabase
+    .from('profiles')
+    .select('school_id')
+    .eq('id', user.id as any)
+    .single();
+    
+  if (profileError) {
+    console.error("Error fetching profile for team members:", profileError);
+    throw profileError;
+  }
+  
+  const schoolId = safeGet(profileData, 'school_id');
+  
+  if (!schoolId) {
+    throw new Error('User is not associated with any school');
+  }
+  
+  const { data, error } = await supabase
+    .from('team_members')
+    .select(`
+      *,
+      profiles:profile_id (
+        first_name,
+        last_name,
+        email,
+        phone,
+        profile_picture
+      )
+    `)
+    .eq('school_id', schoolId);
+    
+  if (error) {
+    console.error("Error fetching team members:", error);
     throw error;
   }
   

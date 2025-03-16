@@ -35,6 +35,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state change event:", event);
         setAuthenticated(!!session);
       }
     );
@@ -68,7 +69,11 @@ const App = () => {
             <Toaster />
             <Sonner />
             <Routes>
-              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth" element={
+                <PublicRoute>
+                  <Auth />
+                </PublicRoute>
+              } />
               
               <Route element={
                 <ProtectedRoute>
@@ -91,6 +96,46 @@ const App = () => {
       </TooltipProvider>
     </QueryClientProvider>
   );
+};
+
+// Public route component - redirects to dashboard if already logged in
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const [loading, setLoading] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setAuthenticated(!!data.session);
+      setLoading(false);
+    };
+    
+    checkAuth();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setAuthenticated(!!session);
+      }
+    );
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (authenticated) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
 };
 
 export default App;

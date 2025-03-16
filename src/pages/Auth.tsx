@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -139,7 +140,7 @@ const Auth = () => {
         throw licenseError;
       }
       
-      if (!licenseData || licenseData.length === 0) {
+      if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
         throw new Error('Invalid license number or license has expired');
       }
       
@@ -182,7 +183,9 @@ const Auth = () => {
           data: {
             first_name: data.firstName,
             last_name: data.lastName
-          }
+          },
+          // Disable email confirmation for development
+          emailRedirectTo: window.location.origin
         }
       });
 
@@ -202,7 +205,7 @@ const Auth = () => {
           throw licenseError;
         }
         
-        if (!licenseData || licenseData.length === 0) {
+        if (!licenseData || !Array.isArray(licenseData) || licenseData.length === 0) {
           console.error('License validation failed during signup');
           throw new Error('License validation failed');
         }
@@ -239,7 +242,22 @@ const Auth = () => {
           description: 'Your account has been created and associated with your school.',
         });
         
-        navigate('/');
+        // Auto sign-in after successful signup
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        
+        if (signInError) {
+          console.error("Auto sign-in error:", signInError);
+          toast({
+            title: 'Please sign in',
+            description: 'Your account has been created. Please sign in with your credentials.',
+          });
+        } else {
+          // Navigate should happen automatically due to the auth state change listener
+          console.log("Auto sign-in successful");
+        }
       }
     } catch (error: any) {
       console.error("Signup error:", error);
