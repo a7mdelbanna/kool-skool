@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       console.log("Verifying license:", licenseNumber);
       
+      // Direct database query rather than RPC
       const { data: licenses, error: licenseError } = await supabase
         .from('licenses')
         .select('id, is_active, used_by')
@@ -84,6 +85,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           licenseId: null 
         };
       }
+      
+      console.log("License query results:", licenses);
       
       if (!licenses || licenses.length === 0) {
         console.error("License validation failed: Invalid or already used license");

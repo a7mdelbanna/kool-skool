@@ -39,7 +39,7 @@ const LicenseVerification: React.FC = () => {
       setError(null);
       console.log("Verifying license:", data.licenseNumber);
       
-      // Make a direct query instead of using RPC
+      // Check if license exists in database
       const { data: licenses, error: licenseError } = await supabase
         .from('licenses')
         .select('id, is_active, used_by')
@@ -52,6 +52,8 @@ const LicenseVerification: React.FC = () => {
         toast.error("An error occurred during license verification");
         return;
       }
+      
+      console.log("License query results:", licenses);
       
       if (!licenses || licenses.length === 0) {
         setError("Invalid or already used license number");
