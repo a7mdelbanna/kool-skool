@@ -115,22 +115,28 @@ serve(async (req) => {
     console.log(`Creating student ${first_name} ${last_name} for school: ${schoolId}`)
     
     // Verify all required fields are present
-    if (!student_email || !student_password || !first_name || !last_name || !teacher_id || !course_id || !age_group || !level) {
-      console.error("Missing required fields:", { 
-        hasEmail: !!student_email, 
-        hasPassword: !!student_password,
-        hasFirstName: !!first_name,
-        hasLastName: !!last_name,
-        hasTeacherId: !!teacher_id,
-        hasCourseId: !!course_id,
-        hasAgeGroup: !!age_group,
-        hasLevel: !!level
-      });
-      
+    const requiredFields = {
+      'email': student_email,
+      'password': student_password,
+      'first_name': first_name,
+      'last_name': last_name,
+      'teacher_id': teacher_id,
+      'course_id': course_id,
+      'age_group': age_group,
+      'level': level,
+      'school_id': schoolId
+    };
+    
+    const missingFields = Object.entries(requiredFields)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+    
+    if (missingFields.length > 0) {
+      console.error("Missing required fields:", missingFields);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Missing required fields for student creation" 
+          message: `Missing required fields for student creation: ${missingFields.join(', ')}` 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
@@ -139,16 +145,43 @@ serve(async (req) => {
     // Verify the teacher belongs to the same school
     const { data: teacherData, error: teacherError } = await supabaseClient
       .from('users')
-      .select('school_id')
+      .select('school_id, role')
       .eq('id', teacher_id)
       .single()
     
-    if (teacherError || !teacherData || teacherData.school_id !== schoolId) {
-      console.error("Teacher verification failed:", { teacherError, teacherData })
+    if (teacherError || !teacherData) {
+      console.error("Teacher not found:", { teacherError });
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Teacher not found or not associated with this school" 
+          message: "Teacher not found" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
+    if (teacherData.school_id !== schoolId) {
+      console.error("Teacher not from same school:", { 
+        teacherSchoolId: teacherData.school_id, 
+        requestSchoolId: schoolId 
+      });
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Teacher not associated with this school" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
+    if (teacherData.role !== 'teacher') {
+      console.error("Selected user is not a teacher:", { 
+        selectedUserRole: teacherData.role 
+      });
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Selected user is not a teacher"
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
@@ -161,12 +194,26 @@ serve(async (req) => {
       .eq('id', course_id)
       .single()
     
-    if (courseError || !courseData || courseData.school_id !== schoolId) {
-      console.error("Course verification failed:", { courseError, courseData })
+    if (courseError || !courseData) {
+      console.error("Course not found:", { courseError });
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Course not found or not associated with this school" 
+          message: "Course not found" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+    
+    if (courseData.school_id !== schoolId) {
+      console.error("Course not from same school:", { 
+        courseSchoolId: courseData.school_id, 
+        requestSchoolId: schoolId 
+      });
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Course not associated with this school" 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
