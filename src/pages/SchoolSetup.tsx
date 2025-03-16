@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Collapsible,
@@ -30,6 +29,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import LicenseWidget from "@/components/LicenseWidget";
 
 interface SchoolInfo {
   name: string;
@@ -81,7 +81,6 @@ interface Account {
 const SchoolSetup = () => {
   const { toast } = useToast();
   
-  // State for collapsible sections
   const [openSections, setOpenSections] = useState({
     schoolInfo: true,
     teachers: false,
@@ -89,7 +88,6 @@ const SchoolSetup = () => {
     finance: false
   });
   
-  // State for form data
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({
     name: '',
     picture: '',
@@ -123,7 +121,6 @@ const SchoolSetup = () => {
     { id: '1', name: '', currency: '' }
   ]);
   
-  // Toggle section handlers
   const toggleSection = (section: keyof typeof openSections) => {
     setOpenSections(prev => ({
       ...prev,
@@ -131,7 +128,6 @@ const SchoolSetup = () => {
     }));
   };
   
-  // School info handlers
   const handleSchoolInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setSchoolInfo(prev => ({
@@ -140,7 +136,6 @@ const SchoolSetup = () => {
     }));
   };
   
-  // Teachers handlers
   const handleAddTeacher = () => {
     setTeachers(prev => [
       ...prev,
@@ -160,7 +155,6 @@ const SchoolSetup = () => {
     setTeachers(prev => prev.filter(teacher => teacher.id !== id));
   };
   
-  // Level handlers
   const handleAddLevel = () => {
     setLevels(prev => [
       ...prev,
@@ -180,7 +174,6 @@ const SchoolSetup = () => {
     setLevels(prev => prev.filter(level => level.id !== id));
   };
   
-  // Course handlers
   const handleAddCourse = () => {
     setCourses(prev => [
       ...prev,
@@ -200,7 +193,6 @@ const SchoolSetup = () => {
     setCourses(prev => prev.filter(course => course.id !== id));
   };
   
-  // Expense category handlers
   const handleAddExpenseCategory = () => {
     setExpenseCategories(prev => [
       ...prev,
@@ -220,7 +212,6 @@ const SchoolSetup = () => {
     setExpenseCategories(prev => prev.filter(category => category.id !== id));
   };
   
-  // Recurring expense handlers
   const handleAddRecurringExpense = () => {
     setRecurringExpenses(prev => [
       ...prev,
@@ -240,7 +231,6 @@ const SchoolSetup = () => {
     setRecurringExpenses(prev => prev.filter(expense => expense.id !== id));
   };
   
-  // Account handlers
   const handleAddAccount = () => {
     setAccounts(prev => [
       ...prev,
@@ -260,20 +250,15 @@ const SchoolSetup = () => {
     setAccounts(prev => prev.filter(account => account.id !== id));
   };
   
-  // Form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically save the data to your backend
-    // For now, we'll just show a success toast
     toast({
       title: "School settings saved",
       description: "All your changes have been saved successfully.",
     });
   };
 
-  // Handle image upload (in a real app, you would implement file upload)
   const handleImageUpload = (type: 'school' | 'teacher', teacherId?: string) => {
-    // Simulate image upload success
     if (type === 'school') {
       setSchoolInfo(prev => ({
         ...prev,
@@ -307,8 +292,11 @@ const SchoolSetup = () => {
         <h1 className="text-2xl font-bold">School Setup</h1>
       </div>
       
+      <div className="mb-6">
+        <LicenseWidget />
+      </div>
+      
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* School Information Section */}
         <Collapsible 
           open={openSections.schoolInfo} 
           onOpenChange={() => toggleSection('schoolInfo')}
@@ -426,7 +414,6 @@ const SchoolSetup = () => {
           </CollapsibleContent>
         </Collapsible>
         
-        {/* Teachers Section */}
         <Collapsible 
           open={openSections.teachers} 
           onOpenChange={() => toggleSection('teachers')}
@@ -555,7 +542,6 @@ const SchoolSetup = () => {
           </CollapsibleContent>
         </Collapsible>
         
-        {/* Lessons Section */}
         <Collapsible 
           open={openSections.lessons} 
           onOpenChange={() => toggleSection('lessons')}
@@ -651,7 +637,6 @@ const SchoolSetup = () => {
           </CollapsibleContent>
         </Collapsible>
         
-        {/* Finance Section */}
         <Collapsible 
           open={openSections.finance} 
           onOpenChange={() => toggleSection('finance')}
