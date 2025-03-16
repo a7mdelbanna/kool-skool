@@ -24,13 +24,12 @@ export const supabase = createClient<Database>(
   SUPABASE_PUBLISHABLE_KEY,
   {
     auth: {
-      // Use the actual site URL rather than hardcoded localhost
       flowType: 'pkce',
       autoRefreshToken: true,
       detectSessionInUrl: true,
       persistSession: true,
       // This is critical for making invitation links work with the correct URL
-      site: getSiteUrl()
+      redirectTo: getSiteUrl()
     }
   }
 );
@@ -193,7 +192,9 @@ export const inviteTeamMember = async (
         data: {
           invitation: true,
           role: userData.role
-        }
+        },
+        // Use the current origin as redirect URL
+        emailRedirectTo: `${getSiteUrl()}/auth`
       }
     });
     
