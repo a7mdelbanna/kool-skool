@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -123,12 +122,12 @@ const TeamMembers = () => {
         throw new Error('User is not associated with any school');
       }
       
-      // Update the query to specify the profile_id column explicitly
+      // Fix the query by properly specifying the profile_id column for the join
       const { data, error } = await supabase
         .from('team_members')
         .select(`
           *,
-          profiles:profile_id (
+          profiles:profiles(
             first_name,
             last_name,
             email,
@@ -144,10 +143,7 @@ const TeamMembers = () => {
       }
       
       // Convert the data to ensure it matches the expected type
-      const typedData: TeamMemberData[] = data?.map(member => ({
-        ...member,
-        profiles: member.profiles || null
-      })) || [];
+      const typedData: TeamMemberData[] = data || [];
       
       setTeamMembers(typedData);
     } catch (error: any) {
