@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -229,6 +230,7 @@ export const useStudentForm = (
         toast.success("Student added successfully");
         
         if (onStudentAdded && data.success) {
+          // Check if student_id exists in the response before using it
           if (!data.student_id) {
             console.error("No student_id in response:", data);
             toast.error("Created student but couldn't retrieve student ID");
