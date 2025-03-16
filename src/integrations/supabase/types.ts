@@ -309,6 +309,14 @@ export type Database = {
         }
         Returns: Json
       }
+      create_course: {
+        Args: {
+          school_id: string
+          course_name: string
+          lesson_type: string
+        }
+        Returns: Json
+      }
       create_student: {
         Args: {
           student_email: string

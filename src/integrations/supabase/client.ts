@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -47,6 +46,15 @@ export interface Course {
   school_id: string;
   name: string;
   lesson_type: 'Individual' | 'Group';
+}
+
+export interface CreateCourseResponse {
+  id: string;
+  school_id: string;
+  name: string;
+  lesson_type: string;
+  error?: string;
+  detail?: string;
 }
 
 export interface StudentRecord {
@@ -253,8 +261,8 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Session verified or custom auth applied, proceeding with course creation");
     
-    // Use RPC function instead of direct insert for better security handling
-    const { data, error } = await supabase.rpc('create_course', {
+    // Use RPC function for course creation
+    const { data, error } = await supabase.rpc<CreateCourseResponse>('create_course', {
       school_id: schoolId,
       course_name: name,
       lesson_type: lessonType
@@ -274,7 +282,24 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
       return { data: null, error };
     }
     
-    return { data: data as Course, error: null };
+    // Check if there was an error in the response itself
+    if (data && 'error' in data) {
+      console.error("Error in course creation response:", data.error);
+      return { 
+        data: null, 
+        error: new Error(data.error as string || "Failed to create course") 
+      };
+    }
+    
+    // Convert the response to a Course object
+    const courseData: Course = {
+      id: data.id,
+      school_id: data.school_id,
+      name: data.name,
+      lesson_type: data.lesson_type as 'Individual' | 'Group'
+    };
+    
+    return { data: courseData, error: null };
   } catch (error) {
     console.error("Exception creating course:", error);
     return { data: null, error: error as Error };
@@ -368,3 +393,4 @@ export async function rescheduleSession(sessionId: string, newDate: string, mode
     error 
   };
 }
+

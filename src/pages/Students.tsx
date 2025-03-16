@@ -60,7 +60,7 @@ const Students = () => {
   const [savingCourse, setSavingCourse] = useState(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { user } = useContext(UserContext);
+  const { user, setUser } = useContext(UserContext);
   
   const schoolId = user?.schoolId;
   const navigate = useNavigate();
