@@ -102,13 +102,6 @@ const LicenseVerification: React.FC = () => {
           </Button>
         </form>
       </Form>
-      
-      <div className="text-center mt-4">
-        <p className="text-sm text-muted-foreground">
-          Already have an account? 
-          <Button variant="link" className="p-0 ml-1" onClick={() => navigate("/auth")}>Log in</Button>
-        </p>
-      </div>
     </div>
   );
 };
