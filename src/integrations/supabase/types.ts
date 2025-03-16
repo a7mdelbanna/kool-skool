@@ -223,25 +223,6 @@ export type Database = {
         }
         Returns: string
       }
-      create_team_member: {
-        Args: {
-          email_param: string
-          password_param: string
-          role_param: Database["public"]["Enums"]["user_role"]
-          first_name_param?: string
-          last_name_param?: string
-        }
-        Returns: string
-      }
-      finalize_team_member: {
-        Args: {
-          user_id_param: string
-          role_param: Database["public"]["Enums"]["user_role"]
-          first_name_param?: string
-          last_name_param?: string
-        }
-        Returns: string
-      }
       get_license_details: {
         Args: {
           license_id_param: string

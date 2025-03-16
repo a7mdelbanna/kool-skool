@@ -28,15 +28,11 @@ import {
   Repeat,
   GraduationCap,
   CheckCircle2,
-  Loader2,
-  AlertCircle,
-  Mail
+  Loader2
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, inviteTeamMember } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import LicenseWidget from "@/components/LicenseWidget";
-import { useForm } from "react-hook-form";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 interface SchoolInfo {
   name: string;
@@ -119,8 +115,7 @@ const SchoolSetup = () => {
   const [userSchoolInfo, setUserSchoolInfo] = useState<UserSchoolInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [invitingTeamMember, setInvitingTeamMember] = useState<Record<string, boolean>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [invitingSent, setInvitingSent] = useState<Record<string, boolean>>({});
   
   const [openSections, setOpenSections] = useState({
     schoolInfo: true,
@@ -285,76 +280,36 @@ const SchoolSetup = () => {
         teacher.id === id ? { ...teacher, [field]: value } : teacher
       )
     );
-    
-    // Clear any validation errors when user changes the field
-    if (errors[`${id}_${field}`]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[`${id}_${field}`];
-        return newErrors;
-      });
-    }
   };
   
   const handleRemoveTeacher = (id: string) => {
     setTeachers(prev => prev.filter(teacher => teacher.id !== id));
   };
   
-  const validateTeamMember = (teacher: Teacher) => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!teacher.name) {
-      newErrors[`${teacher.id}_name`] = 'Name is required';
-    }
-    
-    if (!teacher.email) {
-      newErrors[`${teacher.id}_email`] = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(teacher.email)) {
-      newErrors[`${teacher.id}_email`] = 'Invalid email format';
-    }
-    
-    if (!teacher.role) {
-      newErrors[`${teacher.id}_role`] = 'Role is required';
-    }
-    
-    return newErrors;
-  };
-  
-  const handleInviteTeamMember = async (teacher: Teacher) => {
-    const validationErrors = validateTeamMember(teacher);
-    
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(prev => ({ ...prev, ...validationErrors }));
+  const handleInviteTeacher = async (teacher: Teacher) => {
+    if (!teacher.email || !teacher.role) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in both email and role for the team member',
+        variant: 'destructive'
+      });
       return;
     }
     
     try {
-      setInvitingTeamMember(prev => ({ ...prev, [teacher.id]: true }));
+      setInvitingSent({...invitingSent, [teacher.id]: true});
       
-      // Split the name to get first name and last name
-      const nameParts = teacher.name.split(' ');
-      const firstName = nameParts[0];
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-      
-      // Log the data being sent to the API for debugging
-      console.log("Inviting team member with data:", {
-        email: teacher.email,
-        role: teacher.role,
-        firstName,
-        lastName
+      const { data, error } = await supabase.rpc('invite_team_member', {
+        email_param: teacher.email,
+        role_param: teacher.role as any,
+        first_name_param: teacher.name.split(' ')[0],
+        last_name_param: teacher.name.split(' ').slice(1).join(' ')
       });
       
-      const result = await inviteTeamMember({
-        email: teacher.email,
-        role: teacher.role as "director" | "teacher" | "admin" | "staff",
-        firstName,
-        lastName
-      });
-      
-      console.log("Team member invitation result:", result);
+      if (error) throw error;
       
       toast({
-        title: 'Team member invited',
+        title: 'Invitation sent',
         description: `An invitation has been sent to ${teacher.email}`,
       });
       
@@ -362,11 +317,11 @@ const SchoolSetup = () => {
       console.error('Error inviting team member:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to invite team member',
+        description: error.message || 'Failed to send invitation',
         variant: 'destructive'
       });
     } finally {
-      setInvitingTeamMember(prev => ({ ...prev, [teacher.id]: false }));
+      setInvitingSent({...invitingSent, [teacher.id]: false});
     }
   };
   
@@ -775,11 +730,7 @@ const SchoolSetup = () => {
                       value={teacher.name} 
                       onChange={(e) => handleTeacherChange(teacher.id, 'name', e.target.value)}
                       placeholder="Team member name" 
-                      className={errors[`${teacher.id}_name`] ? 'border-destructive' : ''}
                     />
-                    {errors[`${teacher.id}_name`] && (
-                      <p className="text-sm text-destructive">{errors[`${teacher.id}_name`]}</p>
-                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -790,51 +741,44 @@ const SchoolSetup = () => {
                       value={teacher.email}
                       onChange={(e) => handleTeacherChange(teacher.id, 'email', e.target.value)}
                       placeholder="team.member@example.com" 
-                      className={errors[`${teacher.id}_email`] ? 'border-destructive' : ''}
                     />
-                    {errors[`${teacher.id}_email`] && (
-                      <p className="text-sm text-destructive">{errors[`${teacher.id}_email`]}</p>
-                    )}
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor={`teacher-role-${teacher.id}`}>Role</Label>
-                  <select
-                    id={`teacher-role-${teacher.id}`}
-                    value={teacher.role}
-                    onChange={(e) => handleTeacherChange(teacher.id, 'role', e.target.value)}
-                    className={`w-full rounded-md border h-10 px-3 py-2 bg-background text-sm ${
-                      errors[`${teacher.id}_role`] ? 'border-destructive' : ''
-                    }`}
-                  >
-                    <option value="teacher">Teacher</option>
-                    <option value="admin">Admin</option>
-                    <option value="staff">Staff</option>
-                  </select>
-                  {errors[`${teacher.id}_role`] && (
-                    <p className="text-sm text-destructive">{errors[`${teacher.id}_role`]}</p>
-                  )}
-                </div>
-                
-                <div className="flex justify-end mt-4">
-                  <Button 
-                    type="button" 
-                    onClick={() => handleInviteTeamMember(teacher)}
-                    disabled={invitingTeamMember[teacher.id]}
-                  >
-                    {invitingTeamMember[teacher.id] ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
-                        <span>Sending Invitation...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        <span>Send Invitation</span>
-                      </div>
-                    )}
-                  </Button>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={`teacher-role-${teacher.id}`}>Role</Label>
+                    <select
+                      id={`teacher-role-${teacher.id}`}
+                      value={teacher.role}
+                      onChange={(e) => handleTeacherChange(teacher.id, 'role', e.target.value)}
+                      className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
+                    >
+                      <option value="teacher">Teacher</option>
+                      <option value="admin">Admin</option>
+                      <option value="staff">Staff</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button 
+                      type="button" 
+                      onClick={() => handleInviteTeacher(teacher)}
+                      disabled={invitingSent[teacher.id] || !teacher.email || !teacher.role}
+                      className="w-full"
+                    >
+                      {invitingSent[teacher.id] ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                          <span>Sending...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span>Send Invitation</span>
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="grid md:grid-cols-3 gap-4">
@@ -938,12 +882,14 @@ const SchoolSetup = () => {
                 type="button" 
                 variant="outline" 
                 onClick={handleAddLevel}
-                className="w-full"
+                size="sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add New Level
+                Add Level
               </Button>
             </div>
+            
+            <Separator />
             
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -956,7 +902,7 @@ const SchoolSetup = () => {
                   <Input 
                     value={course.name}
                     onChange={(e) => handleCourseChange(course.id, e.target.value)}
-                    placeholder="Course name (e.g., English, Math, Science)" 
+                    placeholder="Course name (e.g., Grammar, Conversation, IELTS)" 
                   />
                   <Button 
                     type="button" 
@@ -972,14 +918,14 @@ const SchoolSetup = () => {
                 </div>
               ))}
               
-              <Button
+              <Button 
                 type="button" 
                 variant="outline" 
                 onClick={handleAddCourse}
-                className="w-full"
+                size="sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add New Course
+                Add Course
               </Button>
             </div>
           </CollapsibleContent>
@@ -994,7 +940,7 @@ const SchoolSetup = () => {
             <div className="flex items-center justify-between p-4 bg-muted/50 cursor-pointer hover:bg-muted">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-medium">Finance</h2>
+                <h2 className="text-lg font-medium">Income & Expenses</h2>
               </div>
               {openSections.finance ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
             </div>
@@ -1011,7 +957,7 @@ const SchoolSetup = () => {
                   <Input 
                     value={category.name}
                     onChange={(e) => handleExpenseCategoryChange(category.id, e.target.value)}
-                    placeholder="Category name (e.g., Rent, Utilities, Salaries)" 
+                    placeholder="Category name (e.g., Rent, Utilities, Supplies)" 
                   />
                   <Button 
                     type="button" 
@@ -1031,12 +977,14 @@ const SchoolSetup = () => {
                 type="button" 
                 variant="outline" 
                 onClick={handleAddExpenseCategory}
-                className="w-full"
+                size="sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add New Category
+                Add Category
               </Button>
             </div>
+            
+            <Separator />
             
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -1045,79 +993,69 @@ const SchoolSetup = () => {
               </div>
               
               {recurringExpenses.map(expense => (
-                <div key={expense.id} className="border p-3 rounded-md space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor={`expense-name-${expense.id}`}>Name</Label>
-                      <Input 
-                        id={`expense-name-${expense.id}`}
-                        value={expense.name}
-                        onChange={(e) => handleRecurringExpenseChange(expense.id, 'name', e.target.value)}
-                        placeholder="Expense name" 
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor={`expense-category-${expense.id}`}>Category</Label>
-                      <select
-                        id={`expense-category-${expense.id}`}
-                        value={expense.categoryId}
-                        onChange={(e) => handleRecurringExpenseChange(expense.id, 'categoryId', e.target.value)}
-                        className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
-                      >
-                        <option value="">Select category</option>
-                        {expenseCategories.map(category => (
-                          <option key={category.id} value={category.id}>
-                            {category.name || "Unnamed category"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                <div key={expense.id} className="grid md:grid-cols-4 gap-3 items-center">
+                  <Input 
+                    value={expense.name}
+                    onChange={(e) => handleRecurringExpenseChange(expense.id, 'name', e.target.value)}
+                    placeholder="Expense name" 
+                    className="md:col-span-1"
+                  />
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor={`expense-frequency-${expense.id}`}>Frequency</Label>
-                      <select
-                        id={`expense-frequency-${expense.id}`}
-                        value={expense.frequency}
-                        onChange={(e) => handleRecurringExpenseChange(expense.id, 'frequency', e.target.value)}
-                        className="w-full rounded-md border h-10 px-3 py-2 bg-background text-sm"
-                      >
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="quarterly">Quarterly</option>
-                        <option value="yearly">Yearly</option>
-                      </select>
-                    </div>
+                  <select 
+                    value={expense.categoryId}
+                    onChange={(e) => handleRecurringExpenseChange(expense.id, 'categoryId', e.target.value)}
+                    className="rounded-md border h-10 px-3 py-2 bg-background text-sm"
+                  >
+                    <option value="">Select category</option>
+                    {expenseCategories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name || `Category ${category.id}`}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <div className="flex gap-2 md:col-span-1">
+                    <select 
+                      value={expense.frequency}
+                      onChange={(e) => handleRecurringExpenseChange(
+                        expense.id, 
+                        'frequency', 
+                        e.target.value as RecurringExpense['frequency']
+                      )}
+                      className="rounded-md border h-10 px-3 py-2 bg-background text-sm flex-1"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
                     
-                    <div>
-                      <Label htmlFor={`expense-amount-${expense.id}`}>Amount</Label>
-                      <div className="flex items-center">
-                        <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <Input 
-                          id={`expense-amount-${expense.id}`}
-                          type="number"
-                          value={expense.amount || ''}
-                          onChange={(e) => handleRecurringExpenseChange(expense.id, 'amount', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00" 
-                        />
-                      </div>
-                    </div>
+                    <Input 
+                      type="number"
+                      min="0"
+                      value={expense.amount > 0 ? expense.amount : ''}
+                      onChange={(e) => handleRecurringExpenseChange(
+                        expense.id, 
+                        'amount',
+                        parseFloat(e.target.value) || 0
+                      )}
+                      placeholder="Amount" 
+                      className="w-24"
+                    />
                   </div>
                   
                   <div className="flex justify-end">
                     <Button 
                       type="button" 
                       variant="ghost" 
-                      size="sm"
+                      size="icon"
                       onClick={() => handleRemoveRecurringExpense(expense.id)}
                       disabled={recurringExpenses.length <= 1}
                       className="text-destructive"
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remove
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Remove</span>
                     </Button>
                   </div>
                 </div>
@@ -1127,12 +1065,14 @@ const SchoolSetup = () => {
                 type="button" 
                 variant="outline" 
                 onClick={handleAddRecurringExpense}
-                className="w-full"
+                size="sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add New Recurring Expense
+                Add Recurring Expense
               </Button>
             </div>
+            
+            <Separator />
             
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -1141,19 +1081,21 @@ const SchoolSetup = () => {
               </div>
               
               {accounts.map(account => (
-                <div key={account.id} className="flex items-center gap-2">
-                  <div className="grid grid-cols-2 gap-3 flex-1">
-                    <Input 
-                      value={account.name}
-                      onChange={(e) => handleAccountChange(account.id, 'name', e.target.value)}
-                      placeholder="Account name (e.g., Cash, Bank)" 
-                    />
-                    <Input 
-                      value={account.currency}
-                      onChange={(e) => handleAccountChange(account.id, 'currency', e.target.value)}
-                      placeholder="Currency (e.g., USD, EUR)" 
-                    />
-                  </div>
+                <div key={account.id} className="flex items-center gap-3">
+                  <Input 
+                    value={account.name}
+                    onChange={(e) => handleAccountChange(account.id, 'name', e.target.value)}
+                    placeholder="Account name (e.g., PayPal, Bank Account)" 
+                    className="flex-1"
+                  />
+                  
+                  <Input 
+                    value={account.currency}
+                    onChange={(e) => handleAccountChange(account.id, 'currency', e.target.value)}
+                    placeholder="Currency (USD, EUR, etc.)" 
+                    className="w-32"
+                  />
+                  
                   <Button 
                     type="button" 
                     variant="ghost" 
@@ -1172,26 +1114,26 @@ const SchoolSetup = () => {
                 type="button" 
                 variant="outline" 
                 onClick={handleAddAccount}
-                className="w-full"
+                size="sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add New Account
+                Add Account
               </Button>
             </div>
           </CollapsibleContent>
         </Collapsible>
         
-        <div className="flex justify-end mt-6">
-          <Button type="submit" disabled={saving}>
+        <div className="pt-4 flex justify-end">
+          <Button type="submit" className="px-8" disabled={saving}>
             {saving ? (
               <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
                 <span>Saving...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>Save Settings</span>
+                <span>Save Changes</span>
               </div>
             )}
           </Button>
