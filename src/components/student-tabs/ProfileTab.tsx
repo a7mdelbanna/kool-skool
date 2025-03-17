@@ -137,16 +137,16 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   };
 
   useEffect(() => {
-    console.log('Teachers data in ProfileTab:', teachers);
-    if (teachers && teachers.length > 0) {
-      teachers.forEach((teacher, index) => {
-        console.log(`Teacher ${index + 1} details:`, teacher);
-        console.log(`  Display name: ${teacher.display_name}`);
-        console.log(`  First name: ${teacher.first_name}`);
-        console.log(`  Last name: ${teacher.last_name}`);
+    console.log('Courses received in ProfileTab:', courses);
+    if (courses.length > 0) {
+      console.log(`Found ${courses.length} courses for select dropdown`);
+      courses.forEach((course, index) => {
+        console.log(`Course option ${index + 1}: ${course.name} (${course.id})`);
       });
+    } else {
+      console.log('No courses available in ProfileTab');
     }
-  }, [teachers]);
+  }, [courses]);
 
   return (
     <Form {...form}>

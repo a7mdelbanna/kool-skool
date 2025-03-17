@@ -41,8 +41,22 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Enhanced teacher data debugging
+  // Enhanced course and teacher data debugging
   useEffect(() => {
+    if (coursesData?.data) {
+      console.log('Courses data in StudentDialogContent:', coursesData.data);
+      
+      // Log each course with detailed information
+      coursesData.data.forEach((course, index) => {
+        console.log(`Course ${index + 1}:`, course);
+        console.log(`  ID: ${course.id}`);
+        console.log(`  Name: ${course.name}`);
+        console.log(`  Lesson type: ${course.lesson_type}`);
+      });
+    } else {
+      console.log('No courses data available in StudentDialogContent');
+    }
+    
     if (teachersData?.data) {
       console.log('Teachers data in StudentDialogContent:', teachersData.data);
       
@@ -57,7 +71,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     } else {
       console.log('No teachers data available in StudentDialogContent');
     }
-  }, [teachersData]);
+  }, [coursesData, teachersData]);
 
   return (
     <>

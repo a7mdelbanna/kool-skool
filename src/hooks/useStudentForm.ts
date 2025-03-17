@@ -66,7 +66,30 @@ export const useStudentForm = (
       }
       
       try {
-        console.log('Fetching courses using get_students_with_details RPC call');
+        console.log('Fetching courses directly from courses table');
+        const { data: coursesDirectData, error: coursesDirectError } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('school_id', schoolId);
+          
+        if (coursesDirectError) {
+          console.error('Error in direct courses query:', coursesDirectError);
+          return { data: [] as Course[] };
+        }
+        
+        if (coursesDirectData && coursesDirectData.length > 0) {
+          const formattedCourses = coursesDirectData.map(course => ({
+            id: course.id,
+            school_id: course.school_id,
+            name: course.name,
+            lesson_type: course.lesson_type
+          })) as Course[];
+          
+          console.log('Retrieved courses via direct query:', formattedCourses);
+          return { data: formattedCourses };
+        }
+        
+        console.log('No courses found via direct query, trying RPC fallback');
         const { data, error } = await supabase
           .rpc('get_students_with_details', {
             p_school_id: schoolId
@@ -74,30 +97,6 @@ export const useStudentForm = (
           
         if (error) {
           console.error('Error fetching courses via RPC:', error);
-          console.log('Trying fallback approach with direct query');
-          
-          const { data: coursesDirectData, error: coursesDirectError } = await supabase
-            .from('courses')
-            .select('*')
-            .eq('school_id', schoolId);
-            
-          if (coursesDirectError) {
-            console.error('Error in direct courses query:', coursesDirectError);
-            return { data: [] as Course[] };
-          }
-          
-          if (coursesDirectData && coursesDirectData.length > 0) {
-            const formattedCourses = coursesDirectData.map(course => ({
-              id: course.id,
-              school_id: course.school_id,
-              name: course.name,
-              lesson_type: course.lesson_type
-            })) as Course[];
-            
-            console.log('Retrieved courses via direct query:', formattedCourses);
-            return { data: formattedCourses };
-          }
-          
           return { data: [] as Course[] };
         }
         
