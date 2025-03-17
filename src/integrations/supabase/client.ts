@@ -138,8 +138,8 @@ export async function getStudentsWithDetails(schoolId: string) {
   }
 
   try {
-    // APPROACH 1: Direct query from students table with joins
-    console.log('Trying direct query approach...');
+    // APPROACH 1: Direct query from students table with specific join hints
+    console.log('Trying direct query approach with relationship hints...');
     
     const { data: directData, error: directError } = await supabase
       .from('students')
@@ -153,7 +153,7 @@ export async function getStudentsWithDetails(schoolId: string) {
         level,
         phone,
         created_at,
-        users!inner(first_name, last_name, email),
+        users!students_user_id_fkey(first_name, last_name, email),
         courses(name, lesson_type)
       `)
       .eq('school_id', schoolId);
