@@ -158,14 +158,20 @@ export const useStudentForm = (
         if (!directTeachersError && directTeachersData && directTeachersData.length > 0) {
           console.log('Successfully fetched teachers directly:', directTeachersData);
           
-          const formattedTeachers = directTeachersData.map(teacher => ({
-            id: teacher.id,
-            first_name: teacher.first_name || '',
-            last_name: teacher.last_name || '',
-            display_name: teacher.first_name && teacher.last_name 
+          const formattedTeachers = directTeachersData.map(teacher => {
+            const displayName = teacher.first_name && teacher.last_name 
               ? `${teacher.first_name} ${teacher.last_name}`
-              : teacher.email || teacher.id
-          }));
+              : teacher.email || `ID: ${teacher.id.substring(0, 8)}`;
+            
+            console.log(`Teacher ${teacher.id} display name: ${displayName}`);
+            
+            return {
+              id: teacher.id,
+              first_name: teacher.first_name || '',
+              last_name: teacher.last_name || '',
+              display_name: displayName
+            };
+          });
           
           console.log('Formatted teachers data:', formattedTeachers);
           return { data: formattedTeachers };
@@ -214,7 +220,7 @@ export const useStudentForm = (
             
             const { data: teacherData, error: teacherError } = await supabase
               .from('users')
-              .select('id, first_name, last_name, email, role')
+              .select('id, first_name, last_name, email')
               .eq('id', student.teacher_id)
               .maybeSingle();
             
@@ -224,12 +230,15 @@ export const useStudentForm = (
             
             let displayName;
             
-            if (teacherData && (teacherData.first_name || teacherData.last_name)) {
-              displayName = [teacherData.first_name, teacherData.last_name].filter(Boolean).join(' ');
+            if (teacherData && teacherData.first_name && teacherData.last_name) {
+              displayName = `${teacherData.first_name} ${teacherData.last_name}`;
+              console.log(`Found teacher name: ${displayName} for ID: ${student.teacher_id}`);
             } else if (teacherData && teacherData.email) {
               displayName = teacherData.email;
+              console.log(`Using email as display name: ${displayName} for ID: ${student.teacher_id}`);
             } else {
               displayName = `Teacher ID: ${student.teacher_id.substring(0, 8)}`;
+              console.log(`Using fallback display name: ${displayName} for ID: ${student.teacher_id}`);
             }
             
             uniqueTeachers.push({
@@ -241,7 +250,7 @@ export const useStudentForm = (
           }
         }
         
-        console.log('Extracted teachers from students with names:', uniqueTeachers);
+        console.log('Extracted teachers from students with display names:', uniqueTeachers);
         
         if (uniqueTeachers.length === 0) {
           return { 

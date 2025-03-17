@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import ProfileTab from "../student-tabs/ProfileTab";
@@ -40,6 +40,20 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     teachersData,
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
+
+  // Log teacher data for debugging
+  useEffect(() => {
+    if (teachersData?.data) {
+      console.log('Teachers data in StudentDialogContent:', teachersData.data);
+      
+      if (teachersData.data.length > 0) {
+        console.log('First teacher:', teachersData.data[0]);
+        if (teachersData.data[0].display_name) {
+          console.log('First teacher display name:', teachersData.data[0].display_name);
+        }
+      }
+    }
+  }, [teachersData]);
 
   return (
     <>
