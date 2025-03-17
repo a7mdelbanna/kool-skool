@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -151,18 +152,21 @@ export async function getStudentsWithDetails(schoolId: string) {
 
     // Transform the data to match the expected format
     const enhancedStudents = studentsData.map(student => {
+      // Safely access nested properties with null coalescing
       const userData = student.users || {};
       const courseData = student.courses || {};
       
-      // Transform the lesson_type to match UI expectations
-      const lessonType = courseData.lesson_type === 'Individual' ? 'individual' : 'group';
+      // Transform the lesson_type to match UI expectations, with type checking
+      const lessonType = typeof courseData === 'object' && courseData !== null && 
+                          'lesson_type' in courseData && 
+                          courseData.lesson_type === 'Individual' ? 'individual' : 'group';
       
       return {
         ...student,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        email: userData.email,
-        course_name: courseData.name,
+        first_name: typeof userData === 'object' && userData !== null && 'first_name' in userData ? userData.first_name : '',
+        last_name: typeof userData === 'object' && userData !== null && 'last_name' in userData ? userData.last_name : '',
+        email: typeof userData === 'object' && userData !== null && 'email' in userData ? userData.email : '',
+        course_name: typeof courseData === 'object' && courseData !== null && 'name' in courseData ? courseData.name : '',
         lessonType
       };
     });
