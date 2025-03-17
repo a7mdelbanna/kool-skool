@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -156,11 +155,10 @@ export const useStudentForm = (
       }
       
       try {
-        // Try direct query to teachers (users with role=teacher)
-        console.log('Fetching teachers directly from users table');
+        // Try direct query to users table for teachers
         const { data: directTeachersData, error: directTeachersError } = await supabase
           .from('users')
-          .select('id, first_name, last_name')
+          .select('id, first_name, last_name, email, role')
           .eq('school_id', schoolId)
           .eq('role', 'teacher');
           
@@ -169,63 +167,10 @@ export const useStudentForm = (
           return { data: directTeachersData };
         }
         
-        if (directTeachersError) {
-          console.error('Error fetching teachers directly:', directTeachersError);
-        }
+        // If no teachers found, return empty array
+        console.warn('No teachers found');
+        return { data: [] };
         
-        // Similar approach as courses - try getting teachers via students data
-        console.log('Getting teachers from students data');
-        const { data: studentsData, error: studentsError } = await supabase.rpc('get_students_with_details', {
-          p_school_id: schoolId
-        });
-        
-        if (studentsError) {
-          console.error('Error fetching students for teacher data:', studentsError);
-          return { data: [] };
-        }
-        
-        if (!studentsData || !Array.isArray(studentsData) || studentsData.length === 0) {
-          console.warn('No students found for teacher extraction');
-          
-          // Fallback to hardcoded teacher if necessary
-          return { 
-            data: [{
-              id: '946f2802-74df-4409-99a7-b295687dd0cc',
-              first_name: 'Default',
-              last_name: 'Teacher'
-            }] 
-          };
-        }
-        
-        // Extract unique teachers from students data
-        const uniqueTeacherIds = new Set<string>();
-        const uniqueTeachers: Array<{id: string, first_name: string, last_name: string}> = [];
-        
-        studentsData.forEach(student => {
-          if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
-            uniqueTeacherIds.add(student.teacher_id);
-            uniqueTeachers.push({
-              id: student.teacher_id,
-              first_name: 'Teacher', // We don't have actual teacher names from this data
-              last_name: student.teacher_id.substring(0, 8) // Use part of ID as identifier
-            });
-          }
-        });
-        
-        console.log('Extracted teachers from students:', uniqueTeachers);
-        
-        if (uniqueTeachers.length === 0) {
-          // Last resort fallback if no teachers found
-          return { 
-            data: [{
-              id: '946f2802-74df-4409-99a7-b295687dd0cc',
-              first_name: 'Default',
-              last_name: 'Teacher'
-            }] 
-          };
-        }
-        
-        return { data: uniqueTeachers };
       } catch (error) {
         console.error('Exception in teachers query:', error);
         return { data: [] };
