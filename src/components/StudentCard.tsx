@@ -66,6 +66,18 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     }
   };
 
+  // Make sure we have a valid student object with required properties
+  const isValidStudent = student && 
+    typeof student === 'object' && 
+    'id' in student && 
+    student.id;
+
+  // If we don't have a valid student, return nothing
+  if (!isValidStudent) {
+    console.error('Invalid student data provided to StudentCard:', student);
+    return null;
+  }
+
   return (
     <Card 
       className={cn(
