@@ -257,16 +257,42 @@ serve(async (req) => {
       );
     }
     
-    // Get check constraint values for the role column
-    const { data: roleCheckData, error: roleCheckError } = await supabaseClient
+    // Get all valid values for the role column to ensure we're using a valid value
+    const { data: roleData, error: roleError } = await supabaseClient
       .from('users')
       .select('role')
-      .limit(1);
+      .limit(10);
+      
+    if (roleError) {
+      console.error("Error checking role values:", roleError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Error determining valid role values: " + roleError.message
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
     
-    console.log("Checking available roles:", { roleCheckData, roleCheckError });
+    // Find all the unique roles in the system to determine the correct case
+    const uniqueRoles = new Set();
+    roleData?.forEach(user => {
+      if (user.role) uniqueRoles.add(user.role);
+    });
     
-    // Insert into users table first with properly hashed password and explicitly set role
-    // Make sure role value is lowercase to match the constraint
+    console.log("Found roles in system:", Array.from(uniqueRoles));
+    
+    // Find the correct case for "student" role
+    let studentRole = 'student'; // Default lowercase
+    Array.from(uniqueRoles).forEach(role => {
+      if (typeof role === 'string' && role.toLowerCase() === 'student') {
+        studentRole = role; // Use the existing case in the database
+      }
+    });
+    
+    console.log("Using role value:", studentRole);
+    
+    // Insert into users table first with properly hashed password and correct role case
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .insert([
@@ -275,7 +301,7 @@ serve(async (req) => {
           last_name,
           email: student_email,
           password_hash: hashResult,
-          role: 'student',  // Use lowercase role to match db constraint
+          role: studentRole,  // Use the role with proper casing
           school_id: schoolId,
           created_by: userId
         }
