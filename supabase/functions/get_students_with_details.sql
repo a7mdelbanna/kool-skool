@@ -1,25 +1,39 @@
 
 -- Function to retrieve students with joined user and course details
 CREATE OR REPLACE FUNCTION public.get_students_with_details(p_school_id UUID)
-RETURNS SETOF json AS $$
+RETURNS TABLE (
+  id UUID,
+  school_id UUID,
+  user_id UUID,
+  teacher_id UUID,
+  course_id UUID,
+  age_group TEXT,
+  level TEXT,
+  phone TEXT,
+  created_at TIMESTAMP WITH TIME ZONE,
+  first_name TEXT,
+  last_name TEXT,
+  email TEXT,
+  course_name TEXT,
+  lesson_type TEXT
+) AS $$
 BEGIN
   RETURN QUERY
-  SELECT json_build_object(
-    'id', s.id,
-    'school_id', s.school_id,
-    'user_id', s.user_id,
-    'teacher_id', s.teacher_id,
-    'course_id', s.course_id,
-    'age_group', s.age_group,
-    'level', s.level,
-    'phone', s.phone,
-    'created_at', s.created_at,
-    'first_name', u.first_name,
-    'last_name', u.last_name,
-    'email', u.email,
-    'course_name', c.name,
-    'lesson_type', c.lesson_type
-  )
+  SELECT 
+    s.id,
+    s.school_id,
+    s.user_id,
+    s.teacher_id,
+    s.course_id,
+    s.age_group,
+    s.level,
+    s.phone,
+    s.created_at,
+    u.first_name,
+    u.last_name,
+    u.email,
+    c.name as course_name,
+    c.lesson_type
   FROM students s
   LEFT JOIN users u ON s.user_id = u.id
   LEFT JOIN courses c ON s.course_id = c.id

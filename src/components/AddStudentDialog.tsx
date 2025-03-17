@@ -47,7 +47,6 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     
     // Force refresh student data
     queryClient.invalidateQueries({ queryKey: ['students'] });
-    toast.success(`Student ${student.firstName} ${student.lastName} added successfully`);
     
     if (onStudentAdded) {
       onStudentAdded(student);

@@ -127,7 +127,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Helper function to get students with details
+// Direct fetch of students data
 export async function getStudentsWithDetails(schoolId: string) {
   console.log('Fetching students for school ID:', schoolId);
   
@@ -137,56 +137,53 @@ export async function getStudentsWithDetails(schoolId: string) {
   }
 
   try {
-    // Using a direct database function call for reliable joins
-    const { data, error } = await supabase.rpc('get_students_with_details', {
-      p_school_id: schoolId
-    });
+    // Direct query instead of using RPC function
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select(`
+        *,
+        users:user_id (first_name, last_name, email),
+        courses:course_id (name, lesson_type)
+      `)
+      .eq('school_id', schoolId);
     
-    if (error) {
-      console.error('Error fetching students with details:', error);
-      return { data: null, error };
+    if (studentsError) {
+      console.error('Error fetching students:', studentsError);
+      return { data: null, error: studentsError };
     }
     
-    console.log('Fetched students with details:', data);
+    console.log('Raw students data:', students);
     
-    // If no data was found, return an empty array
-    if (!data || !Array.isArray(data) || data.length === 0) {
+    if (!students || students.length === 0) {
       console.log('No students found for school ID:', schoolId);
-      
-      // Fall back to manually getting students if the RPC fails
-      return await getStudentsManually(schoolId);
+      return { data: [], error: null };
     }
-
-    // Transform returned data to match expected StudentRecord format
-    // We need to parse the JSON objects returned by the RPC function
-    const mappedData = data.map(item => {
-      // Parse the JSON object if it's a string
-      const studentData = typeof item === 'string' ? JSON.parse(item) : item;
-      
+    
+    // Transform data to match expected StudentRecord format
+    const mappedData = students.map(student => {
       return {
-        id: studentData.id,
-        school_id: studentData.school_id,
-        user_id: studentData.user_id,
-        teacher_id: studentData.teacher_id,
-        course_id: studentData.course_id,
-        age_group: studentData.age_group,
-        level: studentData.level,
-        phone: studentData.phone,
-        created_at: studentData.created_at,
-        first_name: studentData.first_name,
-        last_name: studentData.last_name,
-        email: studentData.email,
-        course_name: studentData.course_name,
-        lessonType: studentData.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
+        id: student.id,
+        school_id: student.school_id,
+        user_id: student.user_id,
+        teacher_id: student.teacher_id,
+        course_id: student.course_id,
+        age_group: student.age_group,
+        level: student.level,
+        phone: student.phone,
+        created_at: student.created_at,
+        first_name: student.users?.first_name || '',
+        last_name: student.users?.last_name || '',
+        email: student.users?.email || '',
+        course_name: student.courses?.name || '',
+        lessonType: student.courses?.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
       } as StudentRecord;
     });
     
+    console.log('Processed students data:', mappedData);
     return { data: mappedData, error: null };
   } catch (error) {
     console.error('Exception in getStudentsWithDetails:', error);
-    
-    // Fall back to manually getting students if the RPC fails
-    return await getStudentsManually(schoolId);
+    return { data: null, error: error as Error };
   }
 }
 

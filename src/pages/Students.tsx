@@ -77,7 +77,8 @@ const Students = () => {
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     staleTime: 0,
-    retry: 2,
+    retry: 3,
+    retryDelay: 1000,
     refetchInterval: false
   });
   
@@ -313,10 +314,12 @@ const Students = () => {
   const handleStudentAdded = (newStudent: Student) => {
     toast.success(`Student ${newStudent.firstName} ${newStudent.lastName} added successfully`);
     
+    refetchStudents();
+    
     setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       refetchStudents();
-    }, 300);
+    }, 1000);
   };
   
   const handleForceRefresh = () => {
