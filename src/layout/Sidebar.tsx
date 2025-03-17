@@ -33,7 +33,7 @@ const SidebarLink = ({
 };
 
 const Sidebar = () => {
-  const { open: isOpen } = useSidebar(); // Changed from isOpen to open to match SidebarContext
+  const { open } = useSidebar(); // Use 'open' property from SidebarContext
   const location = useLocation();
   const navigate = useNavigate();
   const { user, setUser } = useContext(UserContext);
@@ -58,11 +58,11 @@ const Sidebar = () => {
   return (
     <div className={cn(
       "border-r bg-background h-screen fixed top-0 left-0 z-40 transition-all duration-300",
-      isOpen ? "w-64" : "w-[70px]"
+      open ? "w-64" : "w-[70px]"
     )}>
       <div className="h-full px-3 py-4 flex flex-col">
         <div className="mb-4 flex items-center justify-between">
-          {isOpen ? (
+          {open ? (
             <div className="font-bold text-xl">EduManage</div>
           ) : (
             <div className="font-bold text-xl mx-auto">EM</div>
@@ -84,11 +84,11 @@ const Sidebar = () => {
         <div className="pt-2">
           <Button variant="ghost" size="sm" className="w-full justify-start gap-3 text-red-500" onClick={handleLogout}>
             <LogOut className="h-5 w-5" />
-            <span className={cn(!isOpen && "hidden")}>Log out</span>
+            <span className={cn(!open && "hidden")}>Log out</span>
           </Button>
 
           <Button variant="ghost" size="sm" className="w-full justify-start gap-3 mt-2">
-            <span className={cn(!isOpen && "hidden")}>v1.0.0</span>
+            <span className={cn(!open && "hidden")}>v1.0.0</span>
           </Button>
         </div>
       </div>

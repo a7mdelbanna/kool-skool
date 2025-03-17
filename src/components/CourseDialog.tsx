@@ -35,8 +35,17 @@ const CourseDialog: React.FC<CourseDialogProps> = ({
     try {
       setSaving(true);
       
-      // Passing the third argument 'null' to match the expected function signature
-      const { data, error } = await createCourse(courseName, lessonType, null);
+      // Get the schoolId from local storage
+      const userData = localStorage.getItem('user');
+      const schoolId = userData ? JSON.parse(userData).schoolId : null;
+      
+      if (!schoolId) {
+        toast.error("School ID not found. Please log in again.");
+        setSaving(false);
+        return;
+      }
+      
+      const { data, error } = await createCourse(schoolId, courseName, lessonType);
       
       if (error || !data || !data.success) {
         const errorMessage = error?.message || (data && data.message) || "Failed to create course";
