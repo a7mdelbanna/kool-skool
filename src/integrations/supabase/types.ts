@@ -335,6 +335,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_students_with_details: {
+        Args: {
+          p_school_id: string
+        }
+        Returns: Json[]
+      }
       get_user_license_id: {
         Args: {
           user_id: string

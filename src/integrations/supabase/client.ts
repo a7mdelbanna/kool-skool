@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -119,7 +120,7 @@ export async function getStudentsWithDetails(schoolId: string) {
   }
 
   try {
-    // Using a direct SQL query for reliable joins
+    // Using a direct database function call for reliable joins
     const { data, error } = await supabase.rpc('get_students_with_details', {
       p_school_id: schoolId
     });
@@ -132,7 +133,7 @@ export async function getStudentsWithDetails(schoolId: string) {
     console.log('Fetched students with details:', data);
     
     // If no data was found, return an empty array
-    if (!data || data.length === 0) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       console.log('No students found for school ID:', schoolId);
       
       // Fall back to manually getting students if the RPC fails
