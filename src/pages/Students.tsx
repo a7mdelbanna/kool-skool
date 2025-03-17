@@ -72,7 +72,14 @@ const Students = () => {
     queryKey: ['students', schoolId],
     queryFn: () => getStudentsWithDetails(schoolId),
     enabled: !!schoolId,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 5000
   });
+  
+  useEffect(() => {
+    console.log('Students data from query:', studentsData);
+  }, [studentsData]);
   
   const mapStudentRecordToStudent = (record: StudentRecord): Student => {
     return {
@@ -208,6 +215,7 @@ const Students = () => {
     setIsAddStudentOpen(false);
     setSelectedStudent(null);
     setIsEditMode(false);
+    refetchStudents();
   };
   
   const handleAddCourse = async () => {
@@ -267,7 +275,8 @@ const Students = () => {
     }
   };
   
-  const handleStudentAdded = () => {
+  const handleStudentAdded = (newStudent: Student) => {
+    toast.success(`Student ${newStudent.firstName} ${newStudent.lastName} added successfully`);
     refetchStudents();
   };
   

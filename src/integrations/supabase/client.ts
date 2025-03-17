@@ -111,49 +111,68 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Helper function to get students with details
 export async function getStudentsWithDetails(schoolId: string) {
-  // First get the students
-  const { data: studentsData, error: studentsError } = await supabase
-    .from('students')
-    .select('*')
-    .eq('school_id', schoolId);
-
-  if (studentsError) {
-    console.error('Error fetching students:', studentsError);
-    return { data: null, error: studentsError };
+  console.log('Fetching students for school ID:', schoolId);
+  
+  if (!schoolId) {
+    console.error('Invalid school ID provided');
+    return { data: null, error: new Error('Invalid school ID') };
   }
 
-  // For each student, get the user and course details
-  const enhancedStudents = await Promise.all(
-    studentsData.map(async (student) => {
-      // Get user details
-      const { data: userData } = await supabase
-        .from('users')
-        .select('first_name, last_name, email')
-        .eq('id', student.user_id)
-        .single();
-      
-      // Get course details
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('name, lesson_type')
-        .eq('id', student.course_id)
-        .single();
+  try {
+    // First get the students with a more direct query
+    const { data: studentsData, error: studentsError } = await supabase
+      .from('students')
+      .select(`
+        id,
+        school_id,
+        user_id,
+        teacher_id,
+        course_id,
+        age_group,
+        level,
+        phone,
+        created_at,
+        users:user_id (first_name, last_name, email),
+        courses:course_id (name, lesson_type)
+      `)
+      .eq('school_id', schoolId);
 
+    console.log('Raw students query result:', { data: studentsData, error: studentsError });
+
+    if (studentsError) {
+      console.error('Error fetching students:', studentsError);
+      return { data: null, error: studentsError };
+    }
+
+    if (!studentsData || studentsData.length === 0) {
+      console.log('No students found for school ID:', schoolId);
+      return { data: [], error: null };
+    }
+
+    // Transform the data to match the expected format
+    const enhancedStudents = studentsData.map(student => {
+      const userData = student.users || {};
+      const courseData = student.courses || {};
+      
       // Transform the lesson_type to match UI expectations
-      const lessonType = courseData?.lesson_type === 'Individual' ? 'individual' : 'group';
+      const lessonType = courseData.lesson_type === 'Individual' ? 'individual' : 'group';
       
       return {
         ...student,
-        first_name: userData?.first_name,
-        last_name: userData?.last_name,
-        email: userData?.email,
-        course_name: courseData?.name,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        email: userData.email,
+        course_name: courseData.name,
         lessonType
       };
-    })
-  );
+    });
 
-  return { data: enhancedStudents as StudentRecord[], error: null };
+    console.log('Transformed students data:', enhancedStudents);
+    return { data: enhancedStudents as StudentRecord[], error: null };
+  } catch (error) {
+    console.error('Exception in getStudentsWithDetails:', error);
+    return { data: null, error: error as Error };
+  }
 }
 
 // Create a student
