@@ -453,10 +453,12 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                     <SelectContent>
                       {isLoading ? (
                         <SelectItem value="loading">Loading teachers...</SelectItem>
-                      ) : teachers.length > 0 ? (
+                      ) : teachers && teachers.length > 0 ? (
                         teachers.map((teacher) => (
                           <SelectItem key={teacher.id} value={teacher.id}>
-                            {teacher.first_name} {teacher.last_name}
+                            {teacher.first_name && teacher.last_name 
+                              ? `${teacher.first_name} ${teacher.last_name}`
+                              : 'Unknown Teacher'}
                           </SelectItem>
                         ))
                       ) : (
