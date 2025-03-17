@@ -96,6 +96,20 @@ interface StudentDetails {
   lesson_type: string | null;
 }
 
+// Define interfaces for joined data to fix TypeScript errors
+interface UserData {
+  id?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+}
+
+interface CourseData {
+  id?: string;
+  name?: string;
+  lesson_type?: string;
+}
+
 export interface Subscription {
   id: string;
   student_id: string;
@@ -204,10 +218,11 @@ export async function getStudentsWithDetails(schoolId: string) {
       console.log('Direct query results:', directData);
       
       if (directData && directData.length > 0) {
-        // Map the data to our StudentRecord interface
+        // Map the data to our StudentRecord interface with proper type assertions
         const mappedData = directData.map(record => {
-          const userData = record.users || {};
-          const courseData = record.courses || {};
+          // TypeScript needs help understanding the nested join structures
+          const userData = record.users as UserData || {};
+          const courseData = record.courses as CourseData || {};
           
           return {
             id: record.id,
@@ -946,21 +961,21 @@ async function getStudentsManually(schoolId: string) {
     
     console.log('Course details from manual fetch:', courses);
     
-    // Create lookup maps for faster access
+    // Create lookup maps for faster access with proper type definitions
     const userMap = (users || []).reduce((map, user) => {
-      map[user.id] = user;
+      map[user.id] = user as UserData;
       return map;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, UserData>);
     
     const courseMap = (courses || []).reduce((map, course) => {
-      map[course.id] = course;
+      map[course.id] = course as CourseData;
       return map;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, CourseData>);
     
     // Map student records with user and course details
     const result = students.map(student => {
-      const user = userMap[student.user_id] || {};
-      const course = courseMap[student.course_id] || {};
+      const user = userMap[student.user_id] || {} as UserData;
+      const course = courseMap[student.course_id] || {} as CourseData;
       
       return {
         ...student,
