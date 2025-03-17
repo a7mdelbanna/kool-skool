@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -129,7 +128,7 @@ export const useStudentForm = (
         return { data: [] as Course[] };
       }
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
     enabled: !!schoolId && open,
     retry: 3,
   });
@@ -161,9 +160,9 @@ export const useStudentForm = (
           
           const formattedTeachers = directTeachersData.map(teacher => ({
             id: teacher.id,
-            first_name: teacher.first_name || 'Unknown',
+            first_name: teacher.first_name || 'Unnamed',
             last_name: teacher.last_name || 'Teacher',
-            display_name: `${teacher.first_name || 'Unknown'} ${teacher.last_name || 'Teacher'}`
+            display_name: `${teacher.first_name || 'Unnamed'} ${teacher.last_name || 'Teacher'}`
           }));
           
           console.log('Formatted teachers data:', formattedTeachers);
@@ -207,27 +206,22 @@ export const useStudentForm = (
         const uniqueTeacherIds = new Set<string>();
         const uniqueTeachers: Array<{id: string, first_name: string, last_name: string, display_name: string}> = [];
         
-        // Extract teacher information from students data
         for (const student of studentsData) {
           if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
             uniqueTeacherIds.add(student.teacher_id);
             
-            // Try to get actual teacher names from the users table
-            const { data: teacherData } = await supabase
+            const { data: teacherData, error: teacherFetchError } = await supabase
               .from('users')
               .select('first_name, last_name')
               .eq('id', student.teacher_id)
-              .single();
+              .maybeSingle();
               
             let firstName = 'Teacher';
-            let lastName = '';
+            let lastName = '#' + uniqueTeachers.length + 1;
             
             if (teacherData && teacherData.first_name) {
               firstName = teacherData.first_name;
               lastName = teacherData.last_name || '';
-            } else {
-              // Use a shortened version of the ID if no name is available
-              lastName = student.teacher_id.substring(0, 8);
             }
             
             uniqueTeachers.push({
@@ -265,7 +259,7 @@ export const useStudentForm = (
         };
       }
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
     enabled: !!schoolId && open,
     retry: 3,
   });
