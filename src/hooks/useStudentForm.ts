@@ -68,11 +68,10 @@ export const useStudentForm = (
       }
       
       try {
-        // Use a different approach: call a stored procedure instead of direct table access
-        // This should bypass the RLS policy issues
-        console.log('Fetching courses using RPC call');
+        // Use the get_students_with_details RPC function to get courses data
+        console.log('Fetching courses using get_students_with_details RPC call');
         const { data, error } = await supabase
-          .rpc('get_courses_by_school_id', {
+          .rpc('get_students_with_details', {
             p_school_id: schoolId
           });
           
@@ -80,75 +79,57 @@ export const useStudentForm = (
           console.error('Error fetching courses via RPC:', error);
           // Fall back to direct query with special headers as a last resort
           console.log('Trying fallback approach with direct query');
-          const headers = {
-            'x-school-id': schoolId,
-            'x-user-role': userData?.role || 'admin',
-            'x-user-id': userData?.id || ''
-          };
           
-          // Try using a POST to a custom endpoint to retrieve courses
-          const response = await fetch(`${supabase.supabaseUrl}/functions/v1/get_courses`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.supabaseKey}`,
-              ...headers
-            },
-            body: JSON.stringify({ school_id: schoolId })
-          });
-          
-          if (response.ok) {
-            const responseData = await response.json();
-            console.log('Successfully fetched courses via function:', responseData);
-            return { data: responseData };
-          }
-          
-          // If all else fails, try using an existing RPC function like create_course to retrieve courses indirectly
-          console.log('Using indirect retrieval method');
-          const { data: newCourse } = await supabase.functions.invoke('create_course', {
-            body: { 
-              school_id: schoolId,
-              course_name: 'temp_course_' + Date.now(),
-              lesson_type: 'Individual'
-            },
-            headers: headers
-          });
-          
-          if (newCourse) {
-            console.log('Successfully created a test course:', newCourse);
-            // Use this to trigger a refresh of the courses list
-            const { data: allCourses } = await supabase.rpc('get_students_with_details', {
-              p_school_id: schoolId
-            });
+          // Try direct query to courses table
+          const { data: coursesDirectData, error: coursesDirectError } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('school_id', schoolId);
             
-            // Extract unique courses from students data
-            if (allCourses && allCourses.length > 0) {
-              const uniqueCourses = Array.from(new Set(allCourses.map(s => s.course_id)))
-                .map(courseId => {
-                  const student = allCourses.find(s => s.course_id === courseId);
-                  return {
-                    id: courseId,
-                    name: student?.course_name || '',
-                    lesson_type: student?.lesson_type || 'Individual',
-                    school_id: schoolId
-                  };
-                });
-              console.log('Extracted courses from students:', uniqueCourses);
-              return { data: uniqueCourses };
-            }
+          if (coursesDirectError) {
+            console.error('Error in direct courses query:', coursesDirectError);
+            return { data: [] as Course[] };
           }
           
-          // Last resort: return an empty array with the error
-          return { data: [] as Course[], error };
-        }
-        
-        if (!data || data.length === 0) {
-          console.warn('No courses found via RPC');
+          if (coursesDirectData && coursesDirectData.length > 0) {
+            // Map to Course format
+            const formattedCourses = coursesDirectData.map(course => ({
+              id: course.id,
+              school_id: course.school_id,
+              name: course.name,
+              lesson_type: course.lesson_type
+            })) as Course[];
+            
+            console.log('Retrieved courses via direct query:', formattedCourses);
+            return { data: formattedCourses };
+          }
+          
           return { data: [] as Course[] };
         }
         
-        console.log('Successfully fetched courses via RPC:', data);
-        return { data: data as Course[] };
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          console.warn('No data found via RPC');
+          return { data: [] as Course[] };
+        }
+        
+        // Extract unique courses from the students data
+        const uniqueCourseIds = new Set<string>();
+        const uniqueCourses: Course[] = [];
+        
+        data.forEach(student => {
+          if (student.course_id && !uniqueCourseIds.has(student.course_id)) {
+            uniqueCourseIds.add(student.course_id);
+            uniqueCourses.push({
+              id: student.course_id,
+              school_id: schoolId,
+              name: student.course_name || '',
+              lesson_type: student.lesson_type as 'Individual' | 'Group'
+            });
+          }
+        });
+        
+        console.log('Extracted courses from students data:', uniqueCourses);
+        return { data: uniqueCourses };
       } catch (error) {
         console.error('Exception in courses query:', error);
         return { data: [] as Course[] };
@@ -175,6 +156,23 @@ export const useStudentForm = (
       }
       
       try {
+        // Try direct query to teachers (users with role=teacher)
+        console.log('Fetching teachers directly from users table');
+        const { data: directTeachersData, error: directTeachersError } = await supabase
+          .from('users')
+          .select('id, first_name, last_name')
+          .eq('school_id', schoolId)
+          .eq('role', 'teacher');
+          
+        if (!directTeachersError && directTeachersData && directTeachersData.length > 0) {
+          console.log('Successfully fetched teachers directly:', directTeachersData);
+          return { data: directTeachersData };
+        }
+        
+        if (directTeachersError) {
+          console.error('Error fetching teachers directly:', directTeachersError);
+        }
+        
         // Similar approach as courses - try getting teachers via students data
         console.log('Getting teachers from students data');
         const { data: studentsData, error: studentsError } = await supabase.rpc('get_students_with_details', {
@@ -186,14 +184,13 @@ export const useStudentForm = (
           return { data: [] };
         }
         
-        if (!studentsData || studentsData.length === 0) {
+        if (!studentsData || !Array.isArray(studentsData) || studentsData.length === 0) {
           console.warn('No students found for teacher extraction');
           
           // Fallback to hardcoded teacher if necessary
-          // This ensures we always have at least one teacher to assign to new students
           return { 
             data: [{
-              id: studentsData?.[0]?.teacher_id || '946f2802-74df-4409-99a7-b295687dd0cc',
+              id: '946f2802-74df-4409-99a7-b295687dd0cc',
               first_name: 'Default',
               last_name: 'Teacher'
             }] 
@@ -201,16 +198,33 @@ export const useStudentForm = (
         }
         
         // Extract unique teachers from students data
-        const uniqueTeachers = Array.from(new Set(studentsData.map(s => s.teacher_id)))
-          .map(teacherId => {
-            return {
-              id: teacherId,
+        const uniqueTeacherIds = new Set<string>();
+        const uniqueTeachers: Array<{id: string, first_name: string, last_name: string}> = [];
+        
+        studentsData.forEach(student => {
+          if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
+            uniqueTeacherIds.add(student.teacher_id);
+            uniqueTeachers.push({
+              id: student.teacher_id,
               first_name: 'Teacher', // We don't have actual teacher names from this data
-              last_name: teacherId.substring(0, 8) // Use part of ID as identifier
-            };
-          });
+              last_name: student.teacher_id.substring(0, 8) // Use part of ID as identifier
+            });
+          }
+        });
         
         console.log('Extracted teachers from students:', uniqueTeachers);
+        
+        if (uniqueTeachers.length === 0) {
+          // Last resort fallback if no teachers found
+          return { 
+            data: [{
+              id: '946f2802-74df-4409-99a7-b295687dd0cc',
+              first_name: 'Default',
+              last_name: 'Teacher'
+            }] 
+          };
+        }
+        
         return { data: uniqueTeachers };
       } catch (error) {
         console.error('Exception in teachers query:', error);
