@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -52,7 +51,7 @@ export const useStudentForm = (
   const schoolId = userData?.schoolId || null;
   console.log("School ID for queries:", schoolId);
   
-  // Fetch courses with error handling and retry logic
+  // Always fetch directly from the courses table instead of using the function that's failing
   const { 
     data: coursesData, 
     isLoading: coursesLoading,
@@ -68,36 +67,32 @@ export const useStudentForm = (
       }
       
       try {
-        const result = await getSchoolCourses(schoolId);
-        console.log('Courses query result:', result);
-        
-        if (result.error) {
-          console.error('Error fetching courses:', result.error);
-          // Try a direct fetch approach as fallback
-          const { data } = await supabase
-            .from('courses')
-            .select('id, name, lesson_type, school_id')
-            .eq('school_id', schoolId);
-            
-          if (data) {
-            console.log('Fallback courses query successful:', data);
-            return { 
-              data: data.map(c => ({
-                id: c.id,
-                name: c.name,
-                lesson_type: c.lesson_type,
-                school_id: c.school_id
-              })) as Course[] 
-            };
-          }
+        // Skip the getSchoolCourses function and directly fetch from the database
+        console.log('Directly fetching courses from the database');
+        const { data, error } = await supabase
+          .from('courses')
+          .select('id, name, lesson_type, school_id')
+          .eq('school_id', schoolId);
+          
+        if (error) {
+          console.error('Error fetching courses directly:', error);
+          return { data: [] as Course[], error };
         }
         
-        if (!result.data) {
-          console.warn('No data returned from getSchoolCourses');
+        if (!data || data.length === 0) {
+          console.warn('No courses found in database');
           return { data: [] as Course[] };
         }
         
-        return result;
+        console.log('Successfully fetched courses directly:', data);
+        return { 
+          data: data.map(c => ({
+            id: c.id,
+            name: c.name,
+            lesson_type: c.lesson_type,
+            school_id: c.school_id
+          })) as Course[] 
+        };
       } catch (error) {
         console.error('Exception in courses query:', error);
         return { data: [] as Course[] };
@@ -108,7 +103,7 @@ export const useStudentForm = (
     retry: 3,
   });
 
-  // Fetch teachers with similar error handling and retry logic
+  // Use direct database query for teachers as well
   const { 
     data: teachersData, 
     isLoading: teachersLoading,
@@ -124,30 +119,26 @@ export const useStudentForm = (
       }
       
       try {
-        const result = await getSchoolTeachers(schoolId);
-        console.log('Teachers query result:', result);
-        
-        if (result.error) {
-          console.error('Error fetching teachers:', result.error);
-          // Try a direct fetch approach as fallback
-          const { data } = await supabase
-            .from('users')
-            .select('id, first_name, last_name')
-            .eq('school_id', schoolId)
-            .eq('role', 'teacher');
-            
-          if (data) {
-            console.log('Fallback teachers query successful:', data);
-            return { data };
-          }
-        }
-        
-        if (!result.data) {
-          console.warn('No data returned from getSchoolTeachers');
+        // Skip the getSchoolTeachers function and directly fetch from the database
+        console.log('Directly fetching teachers from the database');
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, first_name, last_name')
+          .eq('school_id', schoolId)
+          .eq('role', 'teacher');
+          
+        if (error) {
+          console.error('Error fetching teachers directly:', error);
           return { data: [] };
         }
         
-        return result;
+        if (!data || data.length === 0) {
+          console.warn('No teachers found in database');
+          return { data: [] };
+        }
+        
+        console.log('Successfully fetched teachers directly:', data);
+        return { data };
       } catch (error) {
         console.error('Exception in teachers query:', error);
         return { data: [] };
