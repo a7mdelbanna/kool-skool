@@ -257,7 +257,16 @@ serve(async (req) => {
       );
     }
     
+    // Get check constraint values for the role column
+    const { data: roleCheckData, error: roleCheckError } = await supabaseClient
+      .from('users')
+      .select('role')
+      .limit(1);
+    
+    console.log("Checking available roles:", { roleCheckData, roleCheckError });
+    
     // Insert into users table first with properly hashed password and explicitly set role
+    // Make sure role value is lowercase to match the constraint
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .insert([
@@ -266,7 +275,7 @@ serve(async (req) => {
           last_name,
           email: student_email,
           password_hash: hashResult,
-          role: 'student',  // Explicitly set the role string
+          role: 'student',  // Use lowercase role to match db constraint
           school_id: schoolId,
           created_by: userId
         }
