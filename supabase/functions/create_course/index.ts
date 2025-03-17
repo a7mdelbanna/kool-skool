@@ -56,14 +56,13 @@ serve(async (req) => {
     }
     
     // Get request body and create a copy to log (to avoid consuming the body)
-    const clonedRequest = req.clone();
-    const rawBody = await clonedRequest.text();
-    console.log("Raw request body:", rawBody);
+    const requestText = await req.text();
+    console.log("Raw request body:", requestText);
     
     // Parse the raw body into JSON with error handling
     let requestData;
     try {
-      if (!rawBody || rawBody.trim() === '') {
+      if (!requestText || requestText.trim() === '') {
         console.error("Empty request body");
         return new Response(
           JSON.stringify({ error: "Empty request body" }),
@@ -71,7 +70,7 @@ serve(async (req) => {
         )
       }
       
-      requestData = JSON.parse(rawBody);
+      requestData = JSON.parse(requestText);
       console.log("Parsed request data:", requestData);
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
@@ -127,7 +126,7 @@ serve(async (req) => {
       )
     }
     
-    // Insert directly into courses table instead of using RPC
+    // Insert directly into courses table
     const { data, error } = await supabaseClient
       .from('courses')
       .insert({

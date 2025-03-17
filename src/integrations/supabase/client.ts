@@ -391,16 +391,15 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
       'x-user-id': userData.id,
       'x-school-id': userData.schoolId,
       'x-user-role': userData.role || 'admin',
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_PUBLISHABLE_KEY,
-      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+      'Content-Type': 'application/json'
     };
     
     console.log("Request headers:", headers);
     
     // Use our Edge Function to create the course with improved error handling
     const response = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
-      body: JSON.stringify(requestBody), // Ensure proper stringification
+      method: 'POST',
+      body: requestBody,
       headers: headers
     });
 
