@@ -35,7 +35,8 @@ const CourseDialog: React.FC<CourseDialogProps> = ({
     try {
       setSaving(true);
       
-      const { data, error } = await createCourse(courseName, lessonType);
+      // Passing the third argument 'null' to match the expected function signature
+      const { data, error } = await createCourse(courseName, lessonType, null);
       
       if (error || !data || !data.success) {
         const errorMessage = error?.message || (data && data.message) || "Failed to create course";

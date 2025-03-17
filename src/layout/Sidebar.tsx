@@ -33,7 +33,7 @@ const SidebarLink = ({
 };
 
 const Sidebar = () => {
-  const { isOpen } = useSidebar();
+  const { open: isOpen } = useSidebar(); // Changed from isOpen to open to match SidebarContext
   const location = useLocation();
   const navigate = useNavigate();
   const { user, setUser } = useContext(UserContext);
