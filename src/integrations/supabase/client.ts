@@ -79,6 +79,24 @@ export interface StudentRecord {
   lessonType?: 'individual' | 'group';
 }
 
+// Interface for the StudentDetails returned by the get_students_with_details RPC
+interface StudentDetails {
+  id: string;
+  school_id: string;
+  user_id: string;
+  teacher_id: string;
+  course_id: string;
+  age_group: string;
+  level: string;
+  phone: string | null;
+  created_at: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  course_name: string | null;
+  lesson_type: string | null;
+}
+
 export interface Subscription {
   id: string;
   student_id: string;
@@ -139,24 +157,30 @@ export async function getStudentsWithDetails(schoolId: string) {
       // Fall back to manually getting students if the RPC fails
       return await getStudentsManually(schoolId);
     }
-    
+
     // Transform returned data to match expected StudentRecord format
-    const mappedData = data.map(item => ({
-      id: item.id,
-      school_id: item.school_id,
-      user_id: item.user_id,
-      teacher_id: item.teacher_id,
-      course_id: item.course_id,
-      age_group: item.age_group,
-      level: item.level,
-      phone: item.phone,
-      created_at: item.created_at,
-      first_name: item.first_name,
-      last_name: item.last_name,
-      email: item.email,
-      course_name: item.course_name,
-      lessonType: item.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
-    })) as StudentRecord[];
+    // We need to parse the JSON objects returned by the RPC function
+    const mappedData = data.map(item => {
+      // Parse the JSON object if it's a string
+      const studentData = typeof item === 'string' ? JSON.parse(item) : item;
+      
+      return {
+        id: studentData.id,
+        school_id: studentData.school_id,
+        user_id: studentData.user_id,
+        teacher_id: studentData.teacher_id,
+        course_id: studentData.course_id,
+        age_group: studentData.age_group,
+        level: studentData.level,
+        phone: studentData.phone,
+        created_at: studentData.created_at,
+        first_name: studentData.first_name,
+        last_name: studentData.last_name,
+        email: studentData.email,
+        course_name: studentData.course_name,
+        lessonType: studentData.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
+      } as StudentRecord;
+    });
     
     return { data: mappedData, error: null };
   } catch (error) {
