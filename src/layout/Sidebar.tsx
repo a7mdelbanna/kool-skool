@@ -1,241 +1,98 @@
-import React, { useState } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Menu } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { NavLink } from "react-router-dom";
-import {
-  Home,
-  Calendar,
-  DollarSign,
-  Settings,
-  Users,
-  Key,
-  BarChart,
-  BookOpen,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useNavigate } from 'react-router-dom';
 
-interface SidebarProps {
-  open: boolean;
-  toggleSidebar: () => void;
-  className?: string;
-}
+import React, { useContext } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useSidebar } from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils';
+import { Home, Users, BookOpen, Calendar, CreditCard, Settings, LogOut, Layers, Users2 } from 'lucide-react';
+import { UserContext } from '@/App';
+import { Button } from '@/components/ui/button';
 
-const Sidebar = ({ open, toggleSidebar, className }: SidebarProps) => {
-  const [isMounted, setIsMounted] = useState(false);
+const SidebarLink = ({
+  to,
+  icon: Icon,
+  label,
+  active,
+}: {
+  to: string;
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+}) => {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        'flex items-center gap-3 rounded-lg px-3 py-2 transition-all',
+        active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
+      )}
+    >
+      <Icon className="h-5 w-5" />
+      <span>{label}</span>
+    </Link>
+  );
+};
+
+const Sidebar = () => {
+  const { isOpen } = useSidebar();
+  const location = useLocation();
   const navigate = useNavigate();
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted) {
-    return null;
-  }
-
+  const { user, setUser } = useContext(UserContext);
+  
   const handleLogout = () => {
     localStorage.removeItem('user');
+    setUser(null);
     navigate('/login');
   };
   
-  const userData = localStorage.getItem('user');
-  const user = userData ? JSON.parse(userData) : null;
-  const userName = user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
-  const userAvatar = user ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}` : 'UU';
-
+  const links = [
+    { to: '/', icon: Home, label: 'Dashboard' },
+    { to: '/students', icon: Users, label: 'Students' },
+    { to: '/courses', icon: BookOpen, label: 'Courses' },
+    { to: '/calendar', icon: Calendar, label: 'Calendar' },
+    { to: '/payments', icon: CreditCard, label: 'Payments' },
+    { to: '/team-access', icon: Users2, label: 'Team Access' },
+    { to: '/reports', icon: Layers, label: 'Reports' },
+    { to: '/settings', icon: Settings, label: 'Settings' },
+  ];
+  
   return (
-    <Sheet open={open} onOpenChange={toggleSidebar}>
-      <SheetTrigger asChild>
-        <Menu className="md:hidden h-6 w-6" />
-      </SheetTrigger>
-      <SheetContent side="left" className={cn("w-full sm:w-64 p-6 flex flex-col gap-4", className)}>
-        <SheetHeader className="text-left pb-4 border-b">
-          <SheetTitle className="text-lg font-semibold">Menu</SheetTitle>
-          <SheetDescription>
-            Navigate through your school management system
-          </SheetDescription>
-        </SheetHeader>
-        
-        <div className="flex items-center justify-between">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/avatars/01.png" alt="Avatar" />
-                  <AvatarFallback>{userAvatar}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 mr-2">
-              <DropdownMenuItem>
-                {userName}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <div className={cn(
+      "border-r bg-background h-screen fixed top-0 left-0 z-40 transition-all duration-300",
+      isOpen ? "w-64" : "w-[70px]"
+    )}>
+      <div className="h-full px-3 py-4 flex flex-col">
+        <div className="mb-4 flex items-center justify-between">
+          {isOpen ? (
+            <div className="font-bold text-xl">EduManage</div>
+          ) : (
+            <div className="font-bold text-xl mx-auto">EM</div>
+          )}
         </div>
-              
-              {/* Menu items */}
-              <div className="space-y-1">
-                {/* Dashboard link */}
-                <NavLink
-                  to="/"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <Home className="h-5 w-5" />
-                  <span>Dashboard</span>
-                </NavLink>
-                
-                {/* Students link */}
-                <NavLink
-                  to="/students"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <Users className="h-5 w-5" />
-                  <span>Students</span>
-                </NavLink>
-                
-                {/* Courses link */}
-                <NavLink
-                  to="/courses"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <BookOpen className="h-5 w-5" />
-                  <span>Courses</span>
-                </NavLink>
-                
-                {/* Calendar link */}
-                <NavLink
-                  to="/calendar"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <Calendar className="h-5 w-5" />
-                  <span>Calendar</span>
-                </NavLink>
-                
-                {/* Payments link */}
-                <NavLink
-                  to="/payments"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <DollarSign className="h-5 w-5" />
-                  <span>Payments</span>
-                </NavLink>
-                
-                {/* Team Access link */}
-                <NavLink
-                  to="/team-access"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <Key className="h-5 w-5" />
-                  <span>Team Access</span>
-                </NavLink>
-                
-                {/* Settings link */}
-                <NavLink
-                  to="/settings"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <Settings className="h-5 w-5" />
-                  <span>Settings</span>
-                </NavLink>
-                
-                {/* Reports link */}
-                <NavLink
-                  to="/reports"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
-                      {
-                        "bg-primary/10 text-primary font-semibold": isActive,
-                        "text-foreground/80": !isActive,
-                      }
-                    )
-                  }
-                >
-                  <BarChart className="h-5 w-5" />
-                  <span>Reports</span>
-                </NavLink>
-              </div>
-              
-              <Separator className="my-6" />
-              
-              <div className="mt-auto pb-4">
-                <p className="text-xs text-muted-foreground">
-                  © {new Date().getFullYear()} School Management System
-                </p>
-              </div>
-      </SheetContent>
-    </Sheet>
+        
+        <div className="space-y-1 flex-1">
+          {links.map((link) => (
+            <SidebarLink
+              key={link.to}
+              to={link.to}
+              icon={link.icon}
+              label={link.label}
+              active={location.pathname === link.to}
+            />
+          ))}
+        </div>
+        
+        <div className="pt-2">
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-3 text-red-500" onClick={handleLogout}>
+            <LogOut className="h-5 w-5" />
+            <span className={cn(!isOpen && "hidden")}>Log out</span>
+          </Button>
+
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-3 mt-2">
+            <span className={cn(!isOpen && "hidden")}>v1.0.0</span>
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
 

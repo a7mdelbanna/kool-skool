@@ -346,6 +346,7 @@ export async function getSchoolCourses(schoolId: string) {
 
 // Create a course
 export const createCourse = async (
+  schoolId: string,
   courseName: string,
   lessonType: string
 ): Promise<{ data: CreateCourseResponse | null; error: Error | null }> => {
