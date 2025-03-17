@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -58,93 +57,54 @@ export const useStudentForm = (
     error: coursesError,
     refetch: refetchCourses 
   } = useQuery({
-    queryKey: ['courses', schoolId],
+    queryKey: ['courses', schoolId, 'direct'],
     queryFn: async () => {
-      console.log('Executing course query function with schoolId:', schoolId);
+      console.log('Executing direct courses query with schoolId:', schoolId);
+      
       if (!schoolId) {
         console.warn('No school ID available for fetching courses');
         return { data: [] as Course[] };
       }
       
       try {
-        // First attempt: directly query the courses table
-        console.log('Fetching courses directly from courses table with school_id:', schoolId);
-        
-        // Add debugging to verify the schoolId format
-        console.log('School ID type:', typeof schoolId);
-        console.log('School ID value:', schoolId);
-        
-        const { data: coursesDirectData, error: coursesDirectError } = await supabase
+        const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
           .select('*')
           .eq('school_id', schoolId);
-          
-        // Log the raw response
-        console.log('Direct courses query response:', { data: coursesDirectData, error: coursesDirectError });
         
-        if (coursesDirectError) {
-          console.error('Error in direct courses query:', coursesDirectError);
+        console.log('Direct courses query response - Data:', coursesData);
+        console.log('Direct courses query response - Error:', coursesError);
+        
+        if (coursesError) {
+          console.error('Error fetching courses directly:', coursesError);
+          throw new Error(`Failed to fetch courses: ${coursesError.message}`);
+        }
+        
+        if (!coursesData || coursesData.length === 0) {
+          console.warn('No courses found for school:', schoolId);
           return { data: [] as Course[] };
         }
         
-        if (coursesDirectData && coursesDirectData.length > 0) {
-          console.log('Found courses count:', coursesDirectData.length);
-          
-          const formattedCourses = coursesDirectData.map(course => ({
-            id: course.id,
-            school_id: course.school_id,
-            name: course.name,
-            lesson_type: course.lesson_type
-          })) as Course[];
-          
-          console.log('Formatted courses to return:', formattedCourses);
-          return { data: formattedCourses };
-        } else {
-          console.log('No courses found in direct query, courses table might be empty for this school');
-        }
+        const formattedCourses = coursesData.map(course => ({
+          id: course.id,
+          school_id: course.school_id,
+          name: course.name,
+          lesson_type: course.lesson_type
+        })) as Course[];
         
-        // Fallback: try to get courses via the RPC function
-        console.log('No courses found via direct query, trying RPC fallback');
-        const { data, error } = await supabase
-          .rpc('get_students_with_details', {
-            p_school_id: schoolId
-          });
-          
-        if (error) {
-          console.error('Error fetching courses via RPC:', error);
-          return { data: [] as Course[] };
-        }
+        console.log('Formatted courses (count):', formattedCourses.length);
+        console.log('Formatted courses data:', formattedCourses);
         
-        if (!data || !Array.isArray(data) || data.length === 0) {
-          console.warn('No data found via RPC');
-          return { data: [] as Course[] };
-        }
-        
-        const uniqueCourseIds = new Set<string>();
-        const uniqueCourses: Course[] = [];
-        
-        data.forEach(student => {
-          if (student.course_id && !uniqueCourseIds.has(student.course_id)) {
-            uniqueCourseIds.add(student.course_id);
-            uniqueCourses.push({
-              id: student.course_id,
-              school_id: schoolId,
-              name: student.course_name || '',
-              lesson_type: student.lesson_type as 'Individual' | 'Group'
-            });
-          }
-        });
-        
-        console.log('Extracted courses from students data:', uniqueCourses);
-        return { data: uniqueCourses };
+        return { data: formattedCourses };
       } catch (error) {
         console.error('Exception in courses query:', error);
+        toast.error("Failed to load courses: " + (error as Error).message);
         return { data: [] as Course[] };
       }
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: 0,
     enabled: !!schoolId && open,
-    retry: 3,
+    retry: 1,
   });
 
   const { 
@@ -417,6 +377,14 @@ export const useStudentForm = (
       setSaving(false);
     }
   };
+
+  console.log('useStudentForm returning coursesData:', coursesData);
+  if (coursesData?.data) {
+    console.log('Courses count to return:', coursesData.data.length);
+    console.log('First course:', coursesData.data[0]);
+  } else {
+    console.log('No courses data available to return');
+  }
 
   return {
     studentData,

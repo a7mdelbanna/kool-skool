@@ -138,17 +138,36 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   };
 
   useEffect(() => {
-    console.log('Courses received in ProfileTab:', courses);
+    console.log('===== COURSES DATA DEBUG (ProfileTab) =====');
+    console.log('Courses prop received type:', typeof courses);
+    console.log('Courses prop is array?', Array.isArray(courses));
+    console.log('Courses prop length:', courses.length);
+    
     if (courses.length > 0) {
-      console.log(`Found ${courses.length} courses for select dropdown`);
-      courses.forEach((course, index) => {
-        console.log(`Course option ${index + 1}: ${course.name} (${course.id})`);
+      console.log(`Found ${courses.length} courses for dropdown:`);
+      const sampleCourses = courses.slice(0, 3);
+      sampleCourses.forEach((course, index) => {
+        console.log(`Course option ${index + 1}:`, {
+          id: course.id, 
+          name: course.name,
+          lessonType: course.lesson_type
+        });
       });
     } else {
-      console.log('No courses available in ProfileTab or courses array is empty');
-      console.log('Courses array type:', typeof courses);
-      console.log('Is courses array?', Array.isArray(courses));
+      console.log('No courses available in ProfileTab - empty array');
+      
+      try {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          const parsedUserData = JSON.parse(userData);
+          console.log('User data from localStorage for debugging courses issue in ProfileTab:', 
+            { schoolId: parsedUserData.schoolId, role: parsedUserData.role });
+        }
+      } catch (error) {
+        console.error('Error accessing localStorage in ProfileTab:', error);
+      }
     }
+    console.log('===== END COURSES DEBUG (ProfileTab) =====');
   }, [courses]);
 
   return (

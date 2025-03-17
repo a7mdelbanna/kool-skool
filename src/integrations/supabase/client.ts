@@ -552,7 +552,7 @@ export async function createStudent(
   }
 }
 
-// Get courses for a school
+// Get courses for a school - completely rewritten for reliability
 export async function getSchoolCourses(schoolId: string) {
   console.log('Fetching courses for school ID:', schoolId);
   
@@ -560,84 +560,45 @@ export async function getSchoolCourses(schoolId: string) {
     // Ensure schoolId is valid
     if (!schoolId) {
       console.error('Invalid school ID provided');
-      return { data: [], error: new Error('Invalid school ID') };
+      return { data: [] as Course[], error: new Error('Invalid school ID') };
     }
     
-    // Check for stored authentication data in localStorage
-    const storedUser = localStorage.getItem('user');
-    let userId = null;
-    let userRole = null;
+    // Simple direct query to courses table
+    console.log('Executing simple direct query to courses table with school_id:', schoolId);
     
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        userId = userData.id;
-        userRole = userData.role;
-        
-        if (userId) {
-          console.log("Found user ID in localStorage:", userId);
-          console.log("User role:", userRole);
-        }
-      } catch (parseError) {
-        console.error("Error parsing user data from localStorage:", parseError);
-      }
-    }
-    
-    // Log all the request details before making the request
-    console.log("Requesting courses with:", { 
-      schoolId, 
-      hasUserId: !!userId,
-      userRole
-    });
-    
-    // Make the request with improved error handling
     const { data, error } = await supabase
       .from('courses')
       .select('*')
       .eq('school_id', schoolId);
     
-    if (error) {
-      console.error('Supabase error fetching courses:', error);
-      return { data: [], error };
-    }
+    // Log complete response
+    console.log('Direct courses query raw response:', { data, error });
     
-    console.log('Raw courses data:', data);
+    if (error) {
+      console.error('Error fetching courses:', error);
+      return { data: [] as Course[], error };
+    }
     
     if (!data || data.length === 0) {
       console.log('No courses found for school ID:', schoolId);
-      
-      // If no courses found, try to create a test course
-      try {
-        console.log('Creating a test course');
-        const { data: testCourseData, error: testCourseError } = await supabase.functions.invoke('test_create_course', {
-          body: { school_id: schoolId }
-        });
-        
-        if (testCourseError) {
-          console.error('Error creating test course:', testCourseError);
-        } else if (testCourseData) {
-          console.log('Created test course:', testCourseData);
-          return { data: [testCourseData] as Course[], error: null };
-        }
-      } catch (testError) {
-        console.error('Exception creating test course:', testError);
-      }
-      
-      return { data: [], error: null };
+      return { data: [] as Course[], error: null };
     }
     
-    console.log('Courses retrieved successfully, count:', data.length);
-
-    // Convert string lesson_type to proper enum type
-    const typedData = data.map(course => ({
-      ...course,
+    // Format data to match Course type
+    const formattedData: Course[] = data.map(course => ({
+      id: course.id,
+      school_id: course.school_id,
+      name: course.name,
       lesson_type: course.lesson_type as 'Individual' | 'Group'
     }));
-
-    return { data: typedData as Course[], error: null };
+    
+    console.log('Formatted courses:', formattedData);
+    console.log('Courses count:', formattedData.length);
+    
+    return { data: formattedData, error: null };
   } catch (error) {
-    console.error('Exception fetching courses:', error);
-    return { data: [], error: error as Error };
+    console.error('Exception in getSchoolCourses:', error);
+    return { data: [] as Course[], error: error as Error };
   }
 }
 
