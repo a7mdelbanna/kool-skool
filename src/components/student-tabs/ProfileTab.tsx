@@ -138,6 +138,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
 
   useEffect(() => {
     console.log('Teachers data in ProfileTab:', teachers);
+    if (teachers && teachers.length > 0) {
+      teachers.forEach((teacher, index) => {
+        console.log(`Teacher ${index + 1} details:`, teacher);
+        console.log(`  Display name: ${teacher.display_name}`);
+        console.log(`  First name: ${teacher.first_name}`);
+        console.log(`  Last name: ${teacher.last_name}`);
+      });
+    }
   }, [teachers]);
 
   return (
@@ -448,7 +456,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                           console.log(`Rendering teacher option: ${teacher.display_name} (${teacher.id})`);
                           return (
                             <SelectItem key={teacher.id} value={teacher.id}>
-                              {teacher.display_name}
+                              {teacher.display_name || `${teacher.first_name} ${teacher.last_name}` || teacher.id}
                             </SelectItem>
                           );
                         })

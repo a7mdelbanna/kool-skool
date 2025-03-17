@@ -41,17 +41,21 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Log teacher data for debugging
+  // Enhanced teacher data debugging
   useEffect(() => {
     if (teachersData?.data) {
       console.log('Teachers data in StudentDialogContent:', teachersData.data);
       
-      if (teachersData.data.length > 0) {
-        console.log('First teacher:', teachersData.data[0]);
-        if (teachersData.data[0].display_name) {
-          console.log('First teacher display name:', teachersData.data[0].display_name);
-        }
-      }
+      // Log each teacher with detailed information
+      teachersData.data.forEach((teacher, index) => {
+        console.log(`Teacher ${index + 1}:`, teacher);
+        console.log(`  ID: ${teacher.id}`);
+        console.log(`  First name: ${teacher.first_name}`);
+        console.log(`  Last name: ${teacher.last_name}`);
+        console.log(`  Display name: ${teacher.display_name}`);
+      });
+    } else {
+      console.log('No teachers data available in StudentDialogContent');
     }
   }, [teachersData]);
 

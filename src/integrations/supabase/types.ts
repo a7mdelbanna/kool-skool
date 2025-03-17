@@ -358,6 +358,9 @@ export type Database = {
           email: string
           course_name: string
           lesson_type: string
+          teacher_first_name: string
+          teacher_last_name: string
+          teacher_email: string
         }[]
       }
       get_user_license_id: {

@@ -148,6 +148,54 @@ export const useStudentForm = (
       }
       
       try {
+        console.log('Fetching teachers from updated get_students_with_details RPC function');
+        const { data: studentsWithTeacherData, error: rpcError } = await supabase
+          .rpc('get_students_with_details', {
+            p_school_id: schoolId
+          });
+        
+        if (rpcError) {
+          console.error('Error fetching students with teacher details:', rpcError);
+        } else if (studentsWithTeacherData && Array.isArray(studentsWithTeacherData) && studentsWithTeacherData.length > 0) {
+          console.log('Successfully got students data with teacher details:', studentsWithTeacherData);
+          
+          const uniqueTeacherIds = new Set<string>();
+          const uniqueTeachers: Array<{id: string, first_name: string, last_name: string, display_name: string}> = [];
+          
+          for (const student of studentsWithTeacherData) {
+            if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
+              uniqueTeacherIds.add(student.teacher_id);
+              
+              const firstName = student.teacher_first_name || '';
+              const lastName = student.teacher_last_name || '';
+              const email = student.teacher_email || '';
+              
+              let displayName;
+              if (firstName && lastName) {
+                displayName = `${firstName} ${lastName}`;
+              } else if (email) {
+                displayName = email;
+              } else {
+                displayName = `Teacher ID: ${student.teacher_id.substring(0, 8)}`;
+              }
+              
+              console.log(`Constructed teacher: ID=${student.teacher_id}, Name=${displayName}`);
+              
+              uniqueTeachers.push({
+                id: student.teacher_id,
+                first_name: firstName,
+                last_name: lastName,
+                display_name: displayName
+              });
+            }
+          }
+          
+          if (uniqueTeachers.length > 0) {
+            console.log('Extracted teachers with display names:', uniqueTeachers);
+            return { data: uniqueTeachers };
+          }
+        }
+        
         console.log('Fetching teachers directly from users table');
         const { data: directTeachersData, error: directTeachersError } = await supabase
           .from('users')
@@ -181,89 +229,15 @@ export const useStudentForm = (
           console.error('Error fetching teachers directly:', directTeachersError);
         }
         
-        console.log('Getting teachers from students data');
-        const { data: studentsData, error: studentsError } = await supabase.rpc('get_students_with_details', {
-          p_school_id: schoolId
-        });
-        
-        if (studentsError) {
-          console.error('Error fetching students for teacher data:', studentsError);
-          return { 
-            data: [{
-              id: '946f2802-74df-4409-99a7-b295687dd0cc',
-              first_name: 'Default',
-              last_name: 'Teacher',
-              display_name: 'Default Teacher'
-            }] 
-          };
-        }
-        
-        if (!studentsData || !Array.isArray(studentsData) || studentsData.length === 0) {
-          console.warn('No students found for teacher extraction');
-          
-          return { 
-            data: [{
-              id: '946f2802-74df-4409-99a7-b295687dd0cc',
-              first_name: 'Default',
-              last_name: 'Teacher',
-              display_name: 'Default Teacher'
-            }] 
-          };
-        }
-        
-        const uniqueTeacherIds = new Set<string>();
-        const uniqueTeachers: Array<{id: string, first_name: string, last_name: string, display_name: string}> = [];
-        
-        for (const student of studentsData) {
-          if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
-            uniqueTeacherIds.add(student.teacher_id);
-            
-            const { data: teacherData, error: teacherError } = await supabase
-              .from('users')
-              .select('id, first_name, last_name, email')
-              .eq('id', student.teacher_id)
-              .maybeSingle();
-            
-            if (teacherError) {
-              console.error(`Error fetching teacher with ID ${student.teacher_id}:`, teacherError);
-            }
-            
-            let displayName;
-            
-            if (teacherData && teacherData.first_name && teacherData.last_name) {
-              displayName = `${teacherData.first_name} ${teacherData.last_name}`;
-              console.log(`Found teacher name: ${displayName} for ID: ${student.teacher_id}`);
-            } else if (teacherData && teacherData.email) {
-              displayName = teacherData.email;
-              console.log(`Using email as display name: ${displayName} for ID: ${student.teacher_id}`);
-            } else {
-              displayName = `Teacher ID: ${student.teacher_id.substring(0, 8)}`;
-              console.log(`Using fallback display name: ${displayName} for ID: ${student.teacher_id}`);
-            }
-            
-            uniqueTeachers.push({
-              id: student.teacher_id,
-              first_name: teacherData?.first_name || '',
-              last_name: teacherData?.last_name || '',
-              display_name: displayName
-            });
-          }
-        }
-        
-        console.log('Extracted teachers from students with display names:', uniqueTeachers);
-        
-        if (uniqueTeachers.length === 0) {
-          return { 
-            data: [{
-              id: '946f2802-74df-4409-99a7-b295687dd0cc',
-              first_name: 'Default',
-              last_name: 'Teacher',
-              display_name: 'Default Teacher'
-            }] 
-          };
-        }
-        
-        return { data: uniqueTeachers };
+        console.log('No teachers found, returning default teacher');
+        return { 
+          data: [{
+            id: '946f2802-74df-4409-99a7-b295687dd0cc',
+            first_name: 'Default',
+            last_name: 'Teacher',
+            display_name: 'Default Teacher'
+          }] 
+        };
       } catch (error) {
         console.error('Exception in teachers query:', error);
         return { 
