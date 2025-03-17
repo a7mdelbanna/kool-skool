@@ -93,6 +93,7 @@ const Students = () => {
   }, [schoolId, refetchStudents]);
   
   const mapStudentRecordToStudent = (record: StudentRecord): Student => {
+    console.log('Mapping student record to UI model:', record);
     return {
       id: record.id,
       firstName: record.first_name || '',
@@ -113,6 +114,13 @@ const Students = () => {
   
   useEffect(() => {
     console.log('Current students data:', studentsData);
+    if (studentsData?.data && studentsData.data.length > 0) {
+      console.log('Students found in data:', studentsData.data.length);
+    } else if (studentsData?.data) {
+      console.log('Students data array is empty');
+    } else {
+      console.log('No students data available');
+    }
   }, [studentsData]);
   
   const students: Student[] = USE_MOCK_DATA 
@@ -120,6 +128,8 @@ const Students = () => {
     : (studentsData?.data ? 
       studentsData.data.map(mapStudentRecordToStudent) : 
       []);
+  
+  console.log('Mapped students for UI:', students);
   
   const courses = Array.from(new Set(students.map(s => s.courseName)));
   const lessonTypes = Array.from(new Set(students.map(s => s.lessonType)));
@@ -331,12 +341,18 @@ const Students = () => {
     setIsLoading(true);
     toast.loading('Refreshing students list...');
     
+    console.log('Current user context:', user);
+    
     queryClient.invalidateQueries({ queryKey: ['students'] });
-    refetchStudents().then(() => {
+    
+    console.log('Force refreshing students data...');
+    refetchStudents().then((result) => {
+      console.log('Refetch result:', result);
       toast.dismiss();
       toast.success('Student list refreshed');
       setIsLoading(false);
     }).catch(error => {
+      console.error('Error during force refresh:', error);
       toast.dismiss();
       toast.error(`Error refreshing: ${error.message}`);
       setIsLoading(false);
@@ -344,6 +360,7 @@ const Students = () => {
   };
   
   const filteredStudents = filterStudents();
+  console.log('Filtered students for display:', filteredStudents);
   
   return (
     <div className="space-y-6 pt-6 sm:pt-8">
@@ -581,6 +598,9 @@ const Students = () => {
           ) : studentsError ? (
             <div className="text-center py-10 space-y-4">
               <p className="text-red-500">Error loading students: {studentsError.message}</p>
+              <pre className="text-xs text-left bg-gray-100 p-2 rounded max-h-32 overflow-auto">
+                {JSON.stringify(studentsError, null, 2)}
+              </pre>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -620,6 +640,17 @@ const Students = () => {
             <div className="text-center py-10">
               <h3 className="text-lg font-medium">No students found</h3>
               <p className="text-muted-foreground mt-1">Add your first student to get started</p>
+              <div className="mt-2 mb-4">
+                <details className="text-sm text-left bg-gray-50 p-3 rounded border">
+                  <summary className="cursor-pointer font-medium">Debug Info (click to expand)</summary>
+                  <div className="pt-2">
+                    <p>School ID: {schoolId || 'Not set'}</p>
+                    <p>User role: {user?.role || 'Not set'}</p>
+                    <p>Data fetch status: {studentsLoading ? 'Loading' : 'Complete'}</p>
+                    <p>Students data array: {studentsData?.data ? `${studentsData.data.length} records` : 'Undefined'}</p>
+                  </div>
+                </details>
+              </div>
               <Button 
                 variant="default" 
                 size="sm" 

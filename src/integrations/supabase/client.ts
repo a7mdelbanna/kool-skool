@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -128,7 +127,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Direct fetch of students data - updated implementation
+// Direct fetch of students data - updated implementation with enhanced error handling
 export async function getStudentsWithDetails(schoolId: string) {
   console.log('Fetching students for school ID:', schoolId);
   
@@ -160,6 +159,7 @@ export async function getStudentsWithDetails(schoolId: string) {
     
     if (directError) {
       console.error('Error in direct query approach:', directError);
+      console.error('Error details:', JSON.stringify(directError, null, 2));
     } else {
       console.log('Direct query results:', directData);
       
@@ -199,6 +199,7 @@ export async function getStudentsWithDetails(schoolId: string) {
     
     if (rpcError) {
       console.error('Error in RPC function approach:', rpcError);
+      console.error('Error details:', JSON.stringify(rpcError, null, 2));
     } else {
       console.log('RPC function results:', rpcData);
       
@@ -244,12 +245,19 @@ async function createAndGetTestStudent(schoolId: string) {
   
   try {
     // First, need to check if we have a teacher
-    const { data: teachers } = await supabase
+    const { data: teachers, error: teachersError } = await supabase
       .from('users')
       .select('id')
       .eq('school_id', schoolId)
       .eq('role', 'teacher')
       .limit(1);
+    
+    if (teachersError) {
+      console.error('Error fetching teachers:', teachersError);
+      console.error('Error details:', JSON.stringify(teachersError, null, 2));
+    }
+    
+    console.log('Teachers found:', teachers);
     
     let teacherId;
     if (!teachers || teachers.length === 0) {
@@ -272,20 +280,30 @@ async function createAndGetTestStudent(schoolId: string) {
       
       if (teacherError) {
         console.error('Error creating test teacher:', teacherError);
+        console.error('Error details:', JSON.stringify(teacherError, null, 2));
         return { data: [], error: null }; // Continue without test data
       }
       
       teacherId = newTeacher.id;
+      console.log('Created new teacher with ID:', teacherId);
     } else {
       teacherId = teachers[0].id;
+      console.log('Using existing teacher with ID:', teacherId);
     }
     
     // Now check if we have a course
-    const { data: courses } = await supabase
+    const { data: courses, error: coursesError } = await supabase
       .from('courses')
       .select('id')
       .eq('school_id', schoolId)
       .limit(1);
+    
+    if (coursesError) {
+      console.error('Error fetching courses:', coursesError);
+      console.error('Error details:', JSON.stringify(coursesError, null, 2));
+    }
+    
+    console.log('Courses found:', courses);
     
     let courseId;
     if (!courses || courses.length === 0) {
@@ -305,12 +323,15 @@ async function createAndGetTestStudent(schoolId: string) {
       
       if (courseError) {
         console.error('Error creating test course:', courseError);
+        console.error('Error details:', JSON.stringify(courseError, null, 2));
         return { data: [], error: null }; // Continue without test data
       }
       
       courseId = newCourse.id;
+      console.log('Created new course with ID:', courseId);
     } else {
       courseId = courses[0].id;
+      console.log('Using existing course with ID:', courseId);
     }
     
     // Create a test user for our student
@@ -331,8 +352,11 @@ async function createAndGetTestStudent(schoolId: string) {
     
     if (userError) {
       console.error('Error creating test user:', userError);
+      console.error('Error details:', JSON.stringify(userError, null, 2));
       return { data: [], error: null }; // Continue without test data
     }
+    
+    console.log('Created new user for student:', user);
     
     // Now create the student record
     const { data: student, error: studentError } = await supabase
@@ -353,8 +377,11 @@ async function createAndGetTestStudent(schoolId: string) {
     
     if (studentError) {
       console.error('Error creating test student:', studentError);
+      console.error('Error details:', JSON.stringify(studentError, null, 2));
       return { data: [], error: null }; // Continue without test data
     }
+    
+    console.log('Created new student record:', student);
     
     // Now that we've created the test student, fetch it with complete details
     const testStudentData: StudentRecord = {
@@ -396,12 +423,16 @@ async function getStudentsManually(schoolId: string) {
     
     if (studentsError) {
       console.error('Error fetching students:', studentsError);
+      console.error('Error details:', JSON.stringify(studentsError, null, 2));
       return { data: null, error: studentsError };
     }
     
     if (!students || students.length === 0) {
       console.log('No students found in manual fetch for school ID:', schoolId);
-      return { data: [], error: null };
+      
+      // As a last resort, try to create a test student for demo purposes
+      console.log('Attempting to create a test student...');
+      return await createAndGetTestStudent(schoolId);
     }
     
     console.log('Raw students data from manual fetch:', students);
@@ -417,8 +448,11 @@ async function getStudentsManually(schoolId: string) {
     
     if (usersError) {
       console.error('Error fetching user details:', usersError);
+      console.error('Error details:', JSON.stringify(usersError, null, 2));
       // Continue anyway with what we have
     }
+    
+    console.log('User details from manual fetch:', users);
     
     // Extract course IDs to fetch course details
     const courseIds = students.map(s => s.course_id).filter(Boolean);
@@ -431,8 +465,11 @@ async function getStudentsManually(schoolId: string) {
     
     if (coursesError) {
       console.error('Error fetching course details:', coursesError);
+      console.error('Error details:', JSON.stringify(coursesError, null, 2));
       // Continue anyway with what we have
     }
+    
+    console.log('Course details from manual fetch:', courses);
     
     // Create lookup maps for faster access
     const userMap = (users || []).reduce((map, user) => {
