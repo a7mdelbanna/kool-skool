@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -264,7 +263,7 @@ async function getStudentsManually(schoolId: string) {
         last_name: user.last_name || '',
         email: user.email || '',
         course_name: course.name || '',
-        lessonType: (course.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group') || 'individual'
+        lessonType: course.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
       };
     });
     
