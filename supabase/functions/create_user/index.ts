@@ -86,6 +86,51 @@ serve(async (req) => {
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
+    // Check valid roles in the database
+    const { data: roleConstraintData, error: roleConstraintError } = await supabase.rpc(
+      'get_role_constraint_values'
+    );
+    
+    if (roleConstraintError) {
+      console.error("Error fetching role constraints:", roleConstraintError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Error fetching role constraints" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+    
+    console.log("Role constraint data:", roleConstraintData);
+    
+    // Extract valid roles from constraint definition
+    // Example format: CHECK ((role = ANY (ARRAY['admin'::text, 'teacher'::text, 'staff'::text])))
+    const roleMatch = roleConstraintData.match(/ARRAY\[(.*?)\]/);
+    let validRoles = [];
+    
+    if (roleMatch && roleMatch[1]) {
+      validRoles = roleMatch[1].split(', ').map(role => 
+        role.replace(/'/g, '').replace(/::text/g, '')
+      );
+    }
+    
+    console.log("Valid roles:", validRoles);
+    
+    // Check if requested role is valid, otherwise use a valid alternative
+    if (!validRoles.includes(role)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: `'${role}' is not a valid role in the database. Valid roles: ${validRoles.join(', ')}` 
+        }), 
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+    
     // Create user directly in the database
     const { data: hashResult, error: hashError } = await supabase.rpc(
       'hash_password',

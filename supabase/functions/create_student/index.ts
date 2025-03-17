@@ -142,6 +142,40 @@ serve(async (req) => {
       )
     }
     
+    // Check valid roles in the database
+    const { data: roleConstraintData, error: roleConstraintError } = await supabaseClient.rpc(
+      'get_role_constraint_values'
+    );
+    
+    if (roleConstraintError) {
+      console.error("Error fetching role constraints:", roleConstraintError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Error fetching role constraints" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
+    }
+    
+    console.log("Role constraint data:", roleConstraintData);
+    
+    // Extract valid roles from constraint definition
+    // Example format: CHECK ((role = ANY (ARRAY['admin'::text, 'teacher'::text, 'staff'::text])))
+    const roleMatch = roleConstraintData.match(/ARRAY\[(.*?)\]/);
+    let validRoles = [];
+    
+    if (roleMatch && roleMatch[1]) {
+      validRoles = roleMatch[1].split(', ').map(role => 
+        role.replace(/'/g, '').replace(/::text/g, '')
+      );
+    }
+    
+    console.log("Valid roles:", validRoles);
+    
+    const roleToUse = validRoles.includes('student') ? 'student' : 'staff';
+    console.log("Using role:", roleToUse);
+    
     // Verify the teacher belongs to the same school
     const { data: teacherData, error: teacherError } = await supabaseClient
       .from('users')
@@ -196,6 +230,26 @@ serve(async (req) => {
       )
     }
     
+    // Hash the password
+    const { data: hashResult, error: hashError } = await supabaseClient.rpc(
+      'hash_password',
+      { password: student_password }
+    );
+    
+    if (hashError || !hashResult) {
+      console.error("Error hashing password:", hashError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Error hashing password: " + hashError?.message || "Unknown error" 
+        }), 
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      );
+    }
+    
     // Insert into users table first
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
@@ -204,8 +258,8 @@ serve(async (req) => {
           first_name,
           last_name,
           email: student_email,
-          password_hash: student_password, // Use actual password or hash it here
-          role: 'student',
+          password_hash: hashResult,
+          role: roleToUse,
           school_id: schoolId,
           created_by: userId
         }

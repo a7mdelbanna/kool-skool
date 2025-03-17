@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -28,8 +29,8 @@ export const useStudentForm = (
     paymentStatus: "pending"
   });
   const [saving, setSaving] = useState(false);
-  const [password, setPassword] = useState("");
-  const [createPassword, setCreatePassword] = useState(false);
+  const [password, setPassword] = useState("defaultPassword123");
+  const [createPassword, setCreatePassword] = useState(true);
   
   const getUserData = () => {
     try {
@@ -141,7 +142,7 @@ export const useStudentForm = (
         level: "beginner",
         paymentStatus: "pending"
       });
-      setPassword("");
+      setPassword("defaultPassword123");
       setCreatePassword(true);
     }
   }, [student, open]);

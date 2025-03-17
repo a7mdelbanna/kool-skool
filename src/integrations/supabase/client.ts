@@ -195,19 +195,18 @@ export async function createStudent(
       role: userData.role
     });
     
-    // First, create the user account
-    const createUserResult = await supabase.functions.invoke<{
-      success: boolean;
-      message?: string;
-      user_id?: string;
-    }>('create_user', {
+    // Call the create_student edge function directly
+    const createStudentResult = await supabase.functions.invoke<CreateStudentResponse>('create_student', {
       body: JSON.stringify({
-        email,
-        password,
+        student_email: email,
+        student_password: password,
         first_name: firstName,
         last_name: lastName,
-        role: 'student',
-        school_id: userData.schoolId,
+        teacher_id: teacherId,
+        course_id: courseId,
+        age_group: ageGroup,
+        level: level,
+        phone: phone || null
       }),
       headers: {
         'x-user-id': userData.id,
@@ -217,57 +216,32 @@ export async function createStudent(
       }
     });
     
-    if (createUserResult.error || !createUserResult.data?.success) {
-      console.error("Error creating user:", createUserResult.error || createUserResult.data?.message);
-      return {
-        data: {
-          success: false,
-          message: createUserResult.data?.message || "Failed to create user account"
-        },
-        error: createUserResult.error || null
-      };
-    }
-    
-    const userId = createUserResult.data.user_id;
-    if (!userId) {
-      return {
-        data: { success: false, message: "User created but no user ID returned" },
-        error: null
-      };
-    }
-    
-    // Now create the student record
-    const createStudentResult = await supabase
-      .from('students')
-      .insert({
-        user_id: userId,
-        school_id: userData.schoolId,
-        teacher_id: teacherId,
-        course_id: courseId,
-        age_group: ageGroup,
-        level: level,
-        phone: phone || null
-      })
-      .select()
-      .single();
-    
     if (createStudentResult.error) {
-      console.error("Error creating student record:", createStudentResult.error);
+      console.error("Error in create_student function:", createStudentResult.error);
       return {
-        data: { success: false, message: createStudentResult.error.message },
+        data: { 
+          success: false, 
+          message: createStudentResult.error.message || "Failed to create student" 
+        },
         error: createStudentResult.error
       };
     }
     
-    console.log("Student record created successfully:", createStudentResult.data);
+    if (!createStudentResult.data || !createStudentResult.data.success) {
+      console.error("Create student function returned error:", createStudentResult.data);
+      return {
+        data: { 
+          success: false, 
+          message: createStudentResult.data?.message || "Failed to create student" 
+        },
+        error: null
+      };
+    }
+    
+    console.log("Student created successfully:", createStudentResult.data);
     
     return {
-      data: {
-        success: true,
-        user_id: userId,
-        student_id: createStudentResult.data.id,
-        message: "Student created successfully"
-      },
+      data: createStudentResult.data,
       error: null
     };
     
