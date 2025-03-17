@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Calendar, CheckSquare, DollarSign, Edit, Trash2, CreditCard } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';

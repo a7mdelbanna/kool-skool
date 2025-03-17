@@ -152,7 +152,9 @@ export async function getStudentsWithDetails(schoolId: string) {
     
     if (!data || data.length === 0) {
       console.log('No students found for school ID:', schoolId);
-      return { data: [], error: null };
+      
+      // If no data from RPC, try the fallback method
+      return await getStudentsManually(schoolId);
     }
     
     // Map the data to our StudentRecord interface
