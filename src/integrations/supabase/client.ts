@@ -119,11 +119,59 @@ export async function getStudentsWithDetails(schoolId: string) {
   }
 
   try {
-    // Log the request details for debugging
-    console.log('Making request to get students with school_id:', schoolId);
+    // Using a direct SQL query for reliable joins
+    const { data, error } = await supabase.rpc('get_students_with_details', {
+      p_school_id: schoolId
+    });
     
-    // Using a different approach to resolve the relationship ambiguity
-    // First, get all students
+    if (error) {
+      console.error('Error fetching students with details:', error);
+      return { data: null, error };
+    }
+    
+    console.log('Fetched students with details:', data);
+    
+    // If no data was found, return an empty array
+    if (!data || data.length === 0) {
+      console.log('No students found for school ID:', schoolId);
+      
+      // Fall back to manually getting students if the RPC fails
+      return await getStudentsManually(schoolId);
+    }
+    
+    // Transform returned data to match expected StudentRecord format
+    const mappedData = data.map(item => ({
+      id: item.id,
+      school_id: item.school_id,
+      user_id: item.user_id,
+      teacher_id: item.teacher_id,
+      course_id: item.course_id,
+      age_group: item.age_group,
+      level: item.level,
+      phone: item.phone,
+      created_at: item.created_at,
+      first_name: item.first_name,
+      last_name: item.last_name,
+      email: item.email,
+      course_name: item.course_name,
+      lessonType: item.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
+    })) as StudentRecord[];
+    
+    return { data: mappedData, error: null };
+  } catch (error) {
+    console.error('Exception in getStudentsWithDetails:', error);
+    
+    // Fall back to manually getting students if the RPC fails
+    return await getStudentsManually(schoolId);
+  }
+}
+
+// Fallback function that manually fetches and joins the data
+async function getStudentsManually(schoolId: string) {
+  console.log('Falling back to manual student fetch for school ID:', schoolId);
+  
+  try {
+    // First, get all students for this school
     const { data: students, error: studentsError } = await supabase
       .from('students')
       .select('*')
@@ -135,74 +183,70 @@ export async function getStudentsWithDetails(schoolId: string) {
     }
     
     if (!students || students.length === 0) {
-      console.log('No students found for school ID:', schoolId);
+      console.log('No students found in manual fetch for school ID:', schoolId);
       return { data: [], error: null };
     }
     
-    console.log('Raw students data:', students);
+    console.log('Raw students data from manual fetch:', students);
     
-    // Get user details for student users
-    const studentUserIds = students.map(student => student.user_id);
-    const { data: studentUsers, error: usersError } = await supabase
+    // Extract user IDs to fetch user details
+    const userIds = students.map(s => s.user_id);
+    
+    // Get user details
+    const { data: users, error: usersError } = await supabase
       .from('users')
       .select('id, first_name, last_name, email')
-      .in('id', studentUserIds);
+      .in('id', userIds);
     
     if (usersError) {
-      console.error('Error fetching student users:', usersError);
-      return { data: null, error: usersError };
+      console.error('Error fetching user details:', usersError);
+      // Continue anyway with what we have
     }
     
-    // Get courses
-    const courseIds = students.map(student => student.course_id).filter(Boolean);
-    let courseData: any[] = [];
+    // Extract course IDs to fetch course details
+    const courseIds = students.map(s => s.course_id).filter(Boolean);
     
-    if (courseIds.length > 0) {
-      const { data: courses, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, name, lesson_type')
-        .in('id', courseIds);
-      
-      if (coursesError) {
-        console.error('Error fetching courses:', coursesError);
-      } else if (courses) {
-        courseData = courses;
-      }
+    // Get course details
+    const { data: courses, error: coursesError } = await supabase
+      .from('courses')
+      .select('id, name, lesson_type')
+      .in('id', courseIds);
+    
+    if (coursesError) {
+      console.error('Error fetching course details:', coursesError);
+      // Continue anyway with what we have
     }
     
-    // Create a lookup map for faster access
-    const usersMap = studentUsers ? studentUsers.reduce((map, user) => {
+    // Create lookup maps for faster access
+    const userMap = (users || []).reduce((map, user) => {
       map[user.id] = user;
       return map;
-    }, {} as Record<string, any>) : {};
+    }, {} as Record<string, any>);
     
-    const coursesMap = courseData.reduce((map, course) => {
+    const courseMap = (courses || []).reduce((map, course) => {
       map[course.id] = course;
       return map;
     }, {} as Record<string, any>);
     
-    // Combine the data
-    const enhancedStudents = students.map(student => {
-      const userData = usersMap[student.user_id] || {};
-      const courseData = coursesMap[student.course_id] || {};
-      
-      // Transform the lesson_type to match UI expectations
-      const lessonType = courseData.lesson_type === 'Individual' ? 'individual' : 'group';
+    // Map student records with user and course details
+    const result = students.map(student => {
+      const user = userMap[student.user_id] || {};
+      const course = courseMap[student.course_id] || {};
       
       return {
         ...student,
-        first_name: userData.first_name || '',
-        last_name: userData.last_name || '',
-        email: userData.email || '',
-        course_name: courseData.name || '',
-        lessonType
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        email: user.email || '',
+        course_name: course.name || '',
+        lessonType: (course.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group') || 'individual'
       };
     });
-
-    console.log('Processed students data:', enhancedStudents);
-    return { data: enhancedStudents as StudentRecord[], error: null };
+    
+    console.log('Processed students data from manual fetch:', result);
+    return { data: result as StudentRecord[], error: null };
   } catch (error) {
-    console.error('Exception in getStudentsWithDetails:', error);
+    console.error('Exception in getStudentsManually:', error);
     return { data: null, error: error as Error };
   }
 }

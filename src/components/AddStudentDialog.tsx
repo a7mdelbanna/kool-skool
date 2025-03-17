@@ -1,10 +1,11 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import StudentDialogContent from "./student/StudentDialogContent";
 import { Student } from "./StudentCard";
 import { PaymentProvider } from "@/contexts/PaymentContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 interface AddStudentDialogProps {
   open: boolean;
@@ -23,20 +24,34 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
 }) => {
   const queryClient = useQueryClient();
   
+  useEffect(() => {
+    // Invalidate query when dialog opens or closes to ensure fresh data
+    if (!open) {
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['students'] });
+      }, 500);
+    }
+  }, [open, queryClient]);
+  
   const handleCloseDialog = () => {
     onOpenChange(false);
+    
+    // Force invalidate queries after closing to refresh data
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    }, 300);
   };
 
   const handleStudentAdded = (student: Student) => {
     console.log("Student added in dialog:", student);
     
-    // Invalidate the students query to force a refetch
+    // Force refresh student data
     queryClient.invalidateQueries({ queryKey: ['students'] });
+    toast.success(`Student ${student.firstName} ${student.lastName} added successfully`);
     
     if (onStudentAdded) {
       onStudentAdded(student);
     }
-    // Don't auto-close, let the parent handle that
   };
 
   return (

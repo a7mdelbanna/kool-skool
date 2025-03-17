@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Calendar, CheckSquare, DollarSign, Eye, Edit, Trash2, CreditCard } from 'lucide-react';
+import { Calendar, CheckSquare, DollarSign, Edit, Trash2, CreditCard } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +35,9 @@ interface StudentCardProps {
 }
 
 const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCardProps) => {
+  // Debug log to see what data is being passed to the component
+  console.log('Rendering StudentCard with data:', student);
+  
   const getPaymentStatusColor = (status: Student['paymentStatus']) => {
     switch (status) {
       case 'paid':
@@ -75,13 +79,13 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
           <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
             <AvatarImage src={student.image} alt={`${student.firstName} ${student.lastName}`} />
             <AvatarFallback className="bg-primary/10 text-primary">
-              {`${student.firstName[0]}${student.lastName[0]}`}
+              {`${student.firstName?.[0] || ''}${student.lastName?.[0] || ''}`}
             </AvatarFallback>
           </Avatar>
           
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-start">
-              <h3 className="font-semibold text-base truncate">{`${student.firstName} ${student.lastName}`}</h3>
+              <h3 className="font-semibold text-base truncate">{`${student.firstName || 'Unnamed'} ${student.lastName || 'Student'}`}</h3>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -108,23 +112,23 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <p className="text-sm text-muted-foreground truncate">{student.email}</p>
+            <p className="text-sm text-muted-foreground truncate">{student.email || 'No email'}</p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge variant="outline" className={cn("text-xs", getLevelColor(student.level))}>
-                {student.level}
+                {student.level || 'beginner'}
               </Badge>
               <Badge variant="outline" className="text-xs bg-secondary">
-                {student.lessonType}
+                {student.lessonType || 'individual'}
               </Badge>
               <Badge variant="outline" className="text-xs">
-                {student.ageGroup}
+                {student.ageGroup || 'adult'}
               </Badge>
             </div>
           </div>
         </div>
         
         <div className="mt-3">
-          <p className="text-sm font-medium">{student.courseName}</p>
+          <p className="text-sm font-medium">{student.courseName || 'No course assigned'}</p>
         </div>
         
         <div className="grid grid-cols-4 gap-2 mt-4">
@@ -132,7 +136,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
             <CheckSquare className="h-4 w-4 text-primary" />
             <div className="text-xs">
               <p className="text-muted-foreground">Lessons</p>
-              <p className="font-medium">{student.lessonsCompleted}</p>
+              <p className="font-medium">{student.lessonsCompleted || 0}</p>
             </div>
           </div>
           
@@ -152,7 +156,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
                 "font-medium px-1.5 py-0.5 rounded-full text-xs capitalize",
                 getPaymentStatusColor(student.paymentStatus)
               )}>
-                {student.paymentStatus}
+                {student.paymentStatus || 'pending'}
               </p>
             </div>
           </div>

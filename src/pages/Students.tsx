@@ -8,7 +8,7 @@ import StudentCard, { Student } from '@/components/StudentCard';
 import AddStudentDialog from '@/components/AddStudentDialog';
 import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   getStudentsWithDetails, 
   StudentRecord, 
@@ -62,24 +62,28 @@ const Students = () => {
   
   const schoolId = user?.schoolId;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   const { 
     data: studentsData, 
     isLoading: studentsLoading, 
     error: studentsError,
-    refetch: refetchStudents
+    refetch: refetchStudents,
+    isRefetching: isRefetchingStudents
   } = useQuery({
     queryKey: ['students', schoolId],
     queryFn: () => getStudentsWithDetails(schoolId),
     enabled: !!schoolId,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
-    staleTime: 0
+    staleTime: 0,
+    retry: 2,
+    refetchInterval: false
   });
   
   useEffect(() => {
-    console.log('Students data from query:', studentsData);
     if (schoolId) {
+      console.log('Component mounted, forcing refetch of students data');
       refetchStudents();
     }
   }, [schoolId, refetchStudents]);
@@ -102,6 +106,10 @@ const Students = () => {
       nextPaymentDate: undefined
     };
   };
+  
+  useEffect(() => {
+    console.log('Current students data:', studentsData);
+  }, [studentsData]);
   
   const students: Student[] = studentsData?.data ? 
     studentsData.data.map(mapStudentRecordToStudent) : 
@@ -209,15 +217,37 @@ const Students = () => {
     setIsAddStudentOpen(true);
   };
   
-  const handleDeleteStudent = (student: Student) => {
-    toast.success(`${student.firstName} ${student.lastName} deleted successfully`);
-    refetchStudents();
+  const handleDeleteStudent = async (student: Student) => {
+    try {
+      toast.promise(
+        async () => {
+          const { error } = await supabase
+            .from('students')
+            .delete()
+            .eq('id', student.id);
+          
+          if (error) throw new Error(error.message);
+          
+          await refetchStudents();
+          
+          return { success: true };
+        },
+        {
+          loading: 'Deleting student...',
+          success: `${student.firstName} ${student.lastName} deleted successfully`,
+          error: (err) => `Failed to delete student: ${err.message}`
+        }
+      );
+    } catch (error) {
+      console.error('Error deleting student:', error);
+    }
   };
   
   const handleCloseDialog = () => {
     setIsAddStudentOpen(false);
     setSelectedStudent(null);
     setIsEditMode(false);
+    
     setTimeout(() => {
       refetchStudents();
     }, 300);
@@ -282,9 +312,24 @@ const Students = () => {
   
   const handleStudentAdded = (newStudent: Student) => {
     toast.success(`Student ${newStudent.firstName} ${newStudent.lastName} added successfully`);
+    
     setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
       refetchStudents();
     }, 300);
+  };
+  
+  const handleForceRefresh = () => {
+    toast.loading('Refreshing students list...');
+    
+    queryClient.invalidateQueries({ queryKey: ['students'] });
+    refetchStudents().then(() => {
+      toast.dismiss();
+      toast.success('Student list refreshed');
+    }).catch(error => {
+      toast.dismiss();
+      toast.error(`Error refreshing: ${error.message}`);
+    });
   };
   
   const filteredStudents = filterStudents();
@@ -324,10 +369,11 @@ const Students = () => {
           <Button 
             variant="outline"
             size="sm"
-            onClick={() => refetchStudents()}
+            onClick={handleForceRefresh}
             className="gap-2"
+            disabled={isRefetchingStudents}
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${isRefetchingStudents ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </Button>
         </div>
