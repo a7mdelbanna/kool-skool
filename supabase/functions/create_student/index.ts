@@ -18,20 +18,8 @@ serve(async (req) => {
   }
   
   try {
-    // Verify API key is present
-    const apiKey = req.headers.get('apikey') || req.headers.get('Authorization')?.split('Bearer ')[1];
-    
-    if (!apiKey) {
-      console.error("No API key found in request headers");
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "No API key found in request",
-          hint: "No 'apikey' request header or url param was found."
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      )
-    }
+    console.log("Request method:", req.method);
+    console.log("Request headers:", Object.fromEntries(req.headers.entries()));
     
     // Get request headers for admin validation
     const userId = req.headers.get('x-user-id')
@@ -41,8 +29,7 @@ serve(async (req) => {
     console.log("Received headers:", { 
       userId, 
       schoolId, 
-      userRole,
-      hasApiKey: !!apiKey
+      userRole
     })
     
     // Validate admin role
@@ -59,9 +46,24 @@ serve(async (req) => {
     }
     
     // Create Supabase client with service role key
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing Supabase configuration");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Server configuration error", 
+          detail: "Supabase URL or service key is missing" 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
+    }
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      supabaseUrl,
+      supabaseServiceKey,
       {
         auth: {
           persistSession: false,
@@ -69,55 +71,42 @@ serve(async (req) => {
         },
         global: {
           headers: {
-            apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+            apikey: supabaseServiceKey,
+            Authorization: `Bearer ${supabaseServiceKey}`
           }
         }
       }
     )
     
-    // Get and log the entire request for debugging
-    console.log("Request method:", req.method);
-    console.log("Request URL:", req.url);
-    console.log("Request headers:", Object.fromEntries(req.headers.entries()));
-    
-    let body;
+    // Get and parse request body
+    let requestBody;
     try {
-      // Try to parse the body as JSON
-      body = await req.json();
-      console.log("Successfully parsed request body:", body);
-    } catch (jsonError) {
-      console.error("Failed to parse JSON body, trying text:", jsonError);
+      const requestText = await req.text();
+      console.log("Raw request body:", requestText);
       
-      try {
-        // If JSON parsing fails, try to get the raw text and then parse it
-        const textBody = await req.text();
-        console.log("Raw text body:", textBody);
-        
-        if (!textBody || textBody.trim() === '') {
-          console.error("Empty request body");
-          return new Response(
-            JSON.stringify({ success: false, message: "Empty request body" }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-          );
-        }
-        
-        body = JSON.parse(textBody);
-        console.log("Parsed body from text:", body);
-      } catch (textError) {
-        console.error("Failed to process request body:", textError);
+      if (!requestText || requestText.trim() === '') {
+        console.error("Empty request body");
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            message: "Invalid request body",
-            detail: textError.message 
-          }),
+          JSON.stringify({ success: false, message: "Empty request body" }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        );
+        )
       }
+      
+      requestBody = JSON.parse(requestText);
+      console.log("Parsed request data:", requestBody);
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Invalid JSON in request body", 
+          detail: parseError.message 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
     }
     
-    // Extract data from the body
+    // Extract data from the request body
     const { 
       student_email, 
       student_password,
@@ -128,7 +117,7 @@ serve(async (req) => {
       age_group,
       level,
       phone
-    } = body;
+    } = requestBody;
     
     console.log(`Creating student ${first_name} ${last_name} for school: ${schoolId}`)
     

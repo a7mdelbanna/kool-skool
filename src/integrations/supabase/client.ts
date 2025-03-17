@@ -210,44 +210,68 @@ export async function createStudent(
     
     console.log("Request payload:", requestBody);
     
-    // Call the create_student edge function directly with improved configuration
-    const createStudentResult = await supabase.functions.invoke<CreateStudentResponse>('create_student', {
-      method: 'POST',
-      body: requestBody,
-      headers: {
-        'x-user-id': userData.id,
-        'x-school-id': userData.schoolId,
-        'x-user-role': userData.role,
-        'Content-Type': 'application/json'
+    // Call the edge function with fetch directly for more control
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/create_student`,
+      {
+        method: 'POST',
+        headers: {
+          'x-user-id': userData.id,
+          'x-school-id': userData.schoolId,
+          'x-user-role': userData.role,
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+        },
+        body: JSON.stringify(requestBody)
       }
-    });
+    );
     
-    if (createStudentResult.error) {
-      console.error("Error in create_student function:", createStudentResult.error);
-      return {
-        data: { 
-          success: false, 
-          message: createStudentResult.error.message || "Failed to create student" 
-        },
-        error: createStudentResult.error
+    // Get the response as text first for logging
+    const responseText = await response.text();
+    console.log(`Edge function response (${response.status}):`, responseText);
+    
+    // Handle non-200 responses
+    if (!response.ok) {
+      let errorDetail;
+      try {
+        errorDetail = JSON.parse(responseText);
+      } catch (e) {
+        errorDetail = { message: responseText };
+      }
+      
+      console.error("Error creating student:", errorDetail);
+      
+      // Handle auth errors
+      if (response.status === 401 || errorDetail.message?.includes('auth') || errorDetail.message?.includes('JWT')) {
+        return { 
+          data: { success: false, message: "Your session has expired. Please sign in again." }, 
+          error: new Error("Authentication failed")
+        };
+      }
+      
+      return { 
+        data: { success: false, message: errorDetail.message || "Failed to create student" }, 
+        error: new Error(errorDetail.message || "Failed to create student")
       };
     }
     
-    if (!createStudentResult.data || !createStudentResult.data.success) {
-      console.error("Create student function returned error:", createStudentResult.data);
-      return {
-        data: { 
-          success: false, 
-          message: createStudentResult.data?.message || "Failed to create student" 
-        },
-        error: null
+    // Parse the successful response
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Error parsing successful response:", parseError);
+      return { 
+        data: { success: false, message: "Failed to parse response data" }, 
+        error: parseError as Error
       };
     }
     
-    console.log("Student created successfully:", createStudentResult.data);
+    console.log("Student created successfully:", data);
     
     return {
-      data: createStudentResult.data,
+      data: data as CreateStudentResponse,
       error: null
     };
     
@@ -255,7 +279,7 @@ export async function createStudent(
     console.error("Exception in createStudent:", error);
     return { 
       data: { success: false, message: error.message }, 
-      error 
+      error: error as Error
     };
   }
 }
@@ -397,7 +421,6 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     console.log("Request headers:", headers);
     
     // Call the edge function with fetch directly for more control
-    // This provides better error handling than using supabase.functions.invoke
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/create_course`,
       {
