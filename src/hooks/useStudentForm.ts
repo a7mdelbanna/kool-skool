@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -165,6 +166,7 @@ export const useStudentForm = (
             display_name: `${teacher.first_name || 'Unknown'} ${teacher.last_name || 'Teacher'}`
           }));
           
+          console.log('Formatted teachers data:', formattedTeachers);
           return { data: formattedTeachers };
         }
         
@@ -205,39 +207,39 @@ export const useStudentForm = (
         const uniqueTeacherIds = new Set<string>();
         const uniqueTeachers: Array<{id: string, first_name: string, last_name: string, display_name: string}> = [];
         
-        studentsData.forEach(student => {
+        // Extract teacher information from students data
+        for (const student of studentsData) {
           if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
             uniqueTeacherIds.add(student.teacher_id);
             
-            const getTeacherName = async (teacherId: string) => {
-              const { data: teacherData } = await supabase
-                .from('users')
-                .select('first_name, last_name')
-                .eq('id', teacherId)
-                .single();
-                
-              if (teacherData) {
-                return {
-                  first_name: teacherData.first_name,
-                  last_name: teacherData.last_name
-                };
-              }
-              return {
-                first_name: 'Teacher',
-                last_name: teacherId.substring(0, 8)
-              };
-            };
+            // Try to get actual teacher names from the users table
+            const { data: teacherData } = await supabase
+              .from('users')
+              .select('first_name, last_name')
+              .eq('id', student.teacher_id)
+              .single();
+              
+            let firstName = 'Teacher';
+            let lastName = '';
+            
+            if (teacherData && teacherData.first_name) {
+              firstName = teacherData.first_name;
+              lastName = teacherData.last_name || '';
+            } else {
+              // Use a shortened version of the ID if no name is available
+              lastName = student.teacher_id.substring(0, 8);
+            }
             
             uniqueTeachers.push({
               id: student.teacher_id,
-              first_name: 'Teacher',
-              last_name: student.teacher_id.substring(0, 8),
-              display_name: `Teacher ${student.teacher_id.substring(0, 8)}`
+              first_name: firstName,
+              last_name: lastName,
+              display_name: `${firstName} ${lastName}`.trim()
             });
           }
-        });
+        }
         
-        console.log('Extracted teachers from students:', uniqueTeachers);
+        console.log('Extracted teachers from students with names:', uniqueTeachers);
         
         if (uniqueTeachers.length === 0) {
           return { 

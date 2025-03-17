@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -455,7 +456,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                       ) : teachers && teachers.length > 0 ? (
                         teachers.map((teacher) => (
                           <SelectItem key={teacher.id} value={teacher.id}>
-                            {teacher.display_name || `${teacher.first_name} ${teacher.last_name}`}
+                            {teacher.display_name}
                           </SelectItem>
                         ))
                       ) : (
