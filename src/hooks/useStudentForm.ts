@@ -201,12 +201,16 @@ export const useStudentForm = (
         
         console.log("Using course:", course);
         console.log("Using teacher:", teacher);
+        console.log("Password provided:", !!password);
         
         toast.loading("Creating student...");
         
+        // Ensure password is always sent when createPassword is true
+        const studentPassword = createPassword ? password : "defaultPassword123"; 
+        
         const { data, error } = await createStudent(
           studentData.email as string,
-          password,
+          studentPassword, // Always provide a password
           studentData.firstName as string,
           studentData.lastName as string,
           teacher.id,

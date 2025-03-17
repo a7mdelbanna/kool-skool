@@ -331,6 +331,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_role_constraint_values: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_license_id: {
         Args: {
           user_id: string

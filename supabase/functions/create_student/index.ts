@@ -257,6 +257,40 @@ serve(async (req) => {
       );
     }
     
+    // Get the role enum values allowed in the database
+    const { data: roleConstraintData, error: roleConstraintError } = await supabaseClient.rpc(
+      'get_role_constraint_values'
+    );
+    
+    console.log("Role constraint data:", roleConstraintData);
+    
+    // The role constraint is typically formatted like: CHECK (role = ANY (ARRAY['admin'::text, 'teacher'::text, 'student'::text]))
+    let validRoles = ['student']; // Default fallback
+    if (roleConstraintData) {
+      const constraintMatch = roleConstraintData.match(/ARRAY\[(.*?)\]/);
+      if (constraintMatch && constraintMatch[1]) {
+        validRoles = constraintMatch[1]
+          .split(',')
+          .map(role => role.trim().replace(/'/g, '').replace(/::text/g, ''));
+        console.log("Extracted valid roles:", validRoles);
+      }
+    }
+    
+    // Check if 'student' is a valid role in the database
+    if (!validRoles.includes('student')) {
+      console.error("'student' is not a valid role in the database. Valid roles:", validRoles);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "'student' is not a valid role in the database. Valid roles: " + validRoles.join(', ')
+        }), 
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      );
+    }
+    
     // Insert into users table first with properly hashed password and explicitly set role
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
@@ -266,7 +300,7 @@ serve(async (req) => {
           last_name,
           email: student_email,
           password_hash: hashResult,
-          role: 'student',  // Explicitly set the role string
+          role: validRoles.includes('student') ? 'student' : validRoles[0],  // Use 'student' if valid, otherwise use the first valid role
           school_id: schoolId,
           created_by: userId
         }
