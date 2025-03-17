@@ -128,7 +128,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Direct fetch of students data
+// Direct fetch of students data - updated implementation
 export async function getStudentsWithDetails(schoolId: string) {
   console.log('Fetching students for school ID:', schoolId);
   
@@ -138,55 +138,100 @@ export async function getStudentsWithDetails(schoolId: string) {
   }
 
   try {
-    // Use the RPC function - updated to use properly typed table function
-    const { data, error } = await supabase
+    // APPROACH 1: Direct query from students table with joins
+    console.log('Trying direct query approach...');
+    
+    const { data: directData, error: directError } = await supabase
+      .from('students')
+      .select(`
+        id,
+        school_id,
+        user_id,
+        teacher_id,
+        course_id,
+        age_group,
+        level,
+        phone,
+        created_at,
+        users!inner(first_name, last_name, email),
+        courses(name, lesson_type)
+      `)
+      .eq('school_id', schoolId);
+    
+    if (directError) {
+      console.error('Error in direct query approach:', directError);
+    } else {
+      console.log('Direct query results:', directData);
+      
+      if (directData && directData.length > 0) {
+        // Map the data to the expected format
+        const mappedData = directData.map(record => {
+          return {
+            id: record.id,
+            school_id: record.school_id,
+            user_id: record.user_id,
+            teacher_id: record.teacher_id,
+            course_id: record.course_id,
+            age_group: record.age_group,
+            level: record.level,
+            phone: record.phone,
+            created_at: record.created_at,
+            first_name: record.users?.first_name || '',
+            last_name: record.users?.last_name || '',
+            email: record.users?.email || '',
+            course_name: record.courses?.name || '',
+            lessonType: (record.courses?.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group') as 'individual' | 'group'
+          } as StudentRecord;
+        });
+        
+        console.log('Processed direct query results:', mappedData);
+        return { data: mappedData, error: null };
+      }
+    }
+    
+    // APPROACH 2: Try the RPC function as a fallback
+    console.log('Trying RPC function approach...');
+    
+    const { data: rpcData, error: rpcError } = await supabase
       .rpc('get_students_with_details', {
         p_school_id: schoolId
       });
     
-    if (error) {
-      console.error('Error fetching students:', error);
-      return { data: null, error };
-    }
-    
-    console.log('Raw students data from RPC:', data);
-    
-    if (!data || data.length === 0) {
-      console.log('No students found for school ID:', schoolId);
+    if (rpcError) {
+      console.error('Error in RPC function approach:', rpcError);
+    } else {
+      console.log('RPC function results:', rpcData);
       
-      // Try the fallback method first
-      const fallbackResult = await getStudentsManually(schoolId);
-      
-      if (!fallbackResult.data || fallbackResult.data.length === 0) {
-        console.log('No students found through fallback method either. Creating test student.');
-        return await createAndGetTestStudent(schoolId);
+      if (rpcData && rpcData.length > 0) {
+        // Map the data to our StudentRecord interface
+        const mappedData = rpcData.map((student: any) => {
+          return {
+            id: student.id,
+            school_id: student.school_id,
+            user_id: student.user_id,
+            teacher_id: student.teacher_id,
+            course_id: student.course_id,
+            age_group: student.age_group,
+            level: student.level,
+            phone: student.phone,
+            created_at: student.created_at,
+            first_name: student.first_name || '',
+            last_name: student.last_name || '',
+            email: student.email || '',
+            course_name: student.course_name || '',
+            lessonType: student.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
+          } as StudentRecord;
+        });
+        
+        console.log('Processed RPC function results:', mappedData);
+        return { data: mappedData, error: null };
       }
-      
-      return fallbackResult;
     }
     
-    // Map the data to our StudentRecord interface
-    const mappedData = data.map((student: StudentDetails) => {
-      return {
-        id: student.id,
-        school_id: student.school_id,
-        user_id: student.user_id,
-        teacher_id: student.teacher_id,
-        course_id: student.course_id,
-        age_group: student.age_group,
-        level: student.level,
-        phone: student.phone,
-        created_at: student.created_at,
-        first_name: student.first_name || '',
-        last_name: student.last_name || '',
-        email: student.email || '',
-        course_name: student.course_name || '',
-        lessonType: student.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
-      } as StudentRecord;
-    });
+    // APPROACH 3: Manual join as a last resort
+    console.log('Trying manual join approach...');
+    return await getStudentsManually(schoolId);
     
-    console.log('Processed students data:', mappedData);
-    return { data: mappedData, error: null };
   } catch (error) {
     console.error('Exception in getStudentsWithDetails:', error);
     return { data: null, error: error as Error };
