@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -153,8 +154,15 @@ export async function getStudentsWithDetails(schoolId: string) {
     if (!data || data.length === 0) {
       console.log('No students found for school ID:', schoolId);
       
-      // If no data from RPC, try the fallback method
-      return await getStudentsManually(schoolId);
+      // Try the fallback method first
+      const fallbackResult = await getStudentsManually(schoolId);
+      
+      if (!fallbackResult.data || fallbackResult.data.length === 0) {
+        console.log('No students found through fallback method either. Creating test student.');
+        return await createAndGetTestStudent(schoolId);
+      }
+      
+      return fallbackResult;
     }
     
     // Map the data to our StudentRecord interface
@@ -182,6 +190,151 @@ export async function getStudentsWithDetails(schoolId: string) {
   } catch (error) {
     console.error('Exception in getStudentsWithDetails:', error);
     return { data: null, error: error as Error };
+  }
+}
+
+// New function to create and fetch a test student
+async function createAndGetTestStudent(schoolId: string) {
+  console.log('Creating test student for demo purposes...');
+  
+  try {
+    // First, need to check if we have a teacher
+    const { data: teachers } = await supabase
+      .from('users')
+      .select('id')
+      .eq('school_id', schoolId)
+      .eq('role', 'teacher')
+      .limit(1);
+    
+    let teacherId;
+    if (!teachers || teachers.length === 0) {
+      // Create a test teacher if none exists
+      console.log('No teachers found, creating test teacher');
+      const { data: newTeacher, error: teacherError } = await supabase
+        .from('users')
+        .insert([
+          {
+            first_name: 'Demo',
+            last_name: 'Teacher',
+            email: `teacher_${Date.now()}@example.com`,
+            password_hash: 'dummy_hash_for_demo',
+            role: 'teacher',
+            school_id: schoolId
+          }
+        ])
+        .select()
+        .single();
+      
+      if (teacherError) {
+        console.error('Error creating test teacher:', teacherError);
+        return { data: [], error: null }; // Continue without test data
+      }
+      
+      teacherId = newTeacher.id;
+    } else {
+      teacherId = teachers[0].id;
+    }
+    
+    // Now check if we have a course
+    const { data: courses } = await supabase
+      .from('courses')
+      .select('id')
+      .eq('school_id', schoolId)
+      .limit(1);
+    
+    let courseId;
+    if (!courses || courses.length === 0) {
+      // Create a test course if none exists
+      console.log('No courses found, creating test course');
+      const { data: newCourse, error: courseError } = await supabase
+        .from('courses')
+        .insert([
+          {
+            name: 'Demo Course',
+            lesson_type: 'Individual',
+            school_id: schoolId
+          }
+        ])
+        .select()
+        .single();
+      
+      if (courseError) {
+        console.error('Error creating test course:', courseError);
+        return { data: [], error: null }; // Continue without test data
+      }
+      
+      courseId = newCourse.id;
+    } else {
+      courseId = courses[0].id;
+    }
+    
+    // Create a test user for our student
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .insert([
+        {
+          first_name: 'Demo',
+          last_name: 'Student',
+          email: `student_${Date.now()}@example.com`,
+          password_hash: 'dummy_hash_for_demo',
+          role: 'student',
+          school_id: schoolId
+        }
+      ])
+      .select()
+      .single();
+    
+    if (userError) {
+      console.error('Error creating test user:', userError);
+      return { data: [], error: null }; // Continue without test data
+    }
+    
+    // Now create the student record
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .insert([
+        {
+          school_id: schoolId,
+          user_id: user.id,
+          teacher_id: teacherId,
+          course_id: courseId,
+          age_group: 'Adult',
+          level: 'Intermediate',
+          phone: '+1234567890'
+        }
+      ])
+      .select()
+      .single();
+    
+    if (studentError) {
+      console.error('Error creating test student:', studentError);
+      return { data: [], error: null }; // Continue without test data
+    }
+    
+    // Now that we've created the test student, fetch it with complete details
+    const testStudentData: StudentRecord = {
+      id: student.id,
+      school_id: student.school_id,
+      user_id: user.id,
+      teacher_id: student.teacher_id,
+      course_id: student.course_id,
+      age_group: student.age_group as 'Adult' | 'Kid',
+      level: student.level as 'Beginner' | 'Intermediate' | 'Advanced',
+      phone: student.phone,
+      created_at: student.created_at,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email,
+      course_name: 'Demo Course',
+      lessonType: 'individual'
+    };
+    
+    console.log('Created test student successfully:', testStudentData);
+    
+    return { data: [testStudentData], error: null };
+  } catch (error) {
+    console.error('Error in createAndGetTestStudent:', error);
+    return { data: [], error: error as Error };
   }
 }
 

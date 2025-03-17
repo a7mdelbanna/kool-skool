@@ -35,6 +35,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const USE_MOCK_DATA = false;
+
 const Students = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<{
@@ -56,6 +58,7 @@ const Students = () => {
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseType, setNewCourseType] = useState<'Individual' | 'Group'>('Individual');
   const [savingCourse, setSavingCourse] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { user, setUser } = useContext(UserContext);
@@ -112,9 +115,11 @@ const Students = () => {
     console.log('Current students data:', studentsData);
   }, [studentsData]);
   
-  const students: Student[] = studentsData?.data ? 
-    studentsData.data.map(mapStudentRecordToStudent) : 
-    [];
+  const students: Student[] = USE_MOCK_DATA 
+    ? getMockStudents() 
+    : (studentsData?.data ? 
+      studentsData.data.map(mapStudentRecordToStudent) : 
+      []);
   
   const courses = Array.from(new Set(students.map(s => s.courseName)));
   const lessonTypes = Array.from(new Set(students.map(s => s.lessonType)));
@@ -323,15 +328,18 @@ const Students = () => {
   };
   
   const handleForceRefresh = () => {
+    setIsLoading(true);
     toast.loading('Refreshing students list...');
     
     queryClient.invalidateQueries({ queryKey: ['students'] });
     refetchStudents().then(() => {
       toast.dismiss();
       toast.success('Student list refreshed');
+      setIsLoading(false);
     }).catch(error => {
       toast.dismiss();
       toast.error(`Error refreshing: ${error.message}`);
+      setIsLoading(false);
     });
   };
   
@@ -374,9 +382,9 @@ const Students = () => {
             size="sm"
             onClick={handleForceRefresh}
             className="gap-2"
-            disabled={isRefetchingStudents}
+            disabled={isRefetchingStudents || isLoading}
           >
-            <RefreshCw className={`h-4 w-4 ${isRefetchingStudents ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${(isRefetchingStudents || isLoading) ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </Button>
         </div>
@@ -424,55 +432,71 @@ const Students = () => {
             
             <div className="max-h-[50vh] overflow-auto p-1">
               <DropdownMenuLabel className="font-semibold text-xs">Course</DropdownMenuLabel>
-              {courses.map(course => (
-                <DropdownMenuCheckboxItem
-                  key={`course-${course}`}
-                  checked={activeFilters.courseName.includes(course)}
-                  onCheckedChange={() => handleFilterToggle('courseName', course)}
-                  className="capitalize"
-                >
-                  {course}
-                </DropdownMenuCheckboxItem>
-              ))}
+              {courses.length > 0 ? (
+                courses.map(course => (
+                  <DropdownMenuCheckboxItem
+                    key={`course-${course}`}
+                    checked={activeFilters.courseName.includes(course)}
+                    onCheckedChange={() => handleFilterToggle('courseName', course)}
+                    className="capitalize"
+                  >
+                    {course}
+                  </DropdownMenuCheckboxItem>
+                ))
+              ) : (
+                <div className="px-2 py-1 text-xs text-muted-foreground">No courses available</div>
+              )}
               
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="font-semibold text-xs">Lesson Type</DropdownMenuLabel>
-              {lessonTypes.map(type => (
-                <DropdownMenuCheckboxItem
-                  key={`type-${type}`}
-                  checked={activeFilters.lessonType.includes(type)}
-                  onCheckedChange={() => handleFilterToggle('lessonType', type)}
-                  className="capitalize"
-                >
-                  {type}
-                </DropdownMenuCheckboxItem>
-              ))}
+              {lessonTypes.length > 0 ? (
+                lessonTypes.map(type => (
+                  <DropdownMenuCheckboxItem
+                    key={`type-${type}`}
+                    checked={activeFilters.lessonType.includes(type)}
+                    onCheckedChange={() => handleFilterToggle('lessonType', type)}
+                    className="capitalize"
+                  >
+                    {type}
+                  </DropdownMenuCheckboxItem>
+                ))
+              ) : (
+                <div className="px-2 py-1 text-xs text-muted-foreground">No lesson types available</div>
+              )}
               
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="font-semibold text-xs">Age Group</DropdownMenuLabel>
-              {ageGroups.map(age => (
-                <DropdownMenuCheckboxItem
-                  key={`age-${age}`}
-                  checked={activeFilters.ageGroup.includes(age)}
-                  onCheckedChange={() => handleFilterToggle('ageGroup', age)}
-                  className="capitalize"
-                >
-                  {age}
-                </DropdownMenuCheckboxItem>
-              ))}
+              {ageGroups.length > 0 ? (
+                ageGroups.map(age => (
+                  <DropdownMenuCheckboxItem
+                    key={`age-${age}`}
+                    checked={activeFilters.ageGroup.includes(age)}
+                    onCheckedChange={() => handleFilterToggle('ageGroup', age)}
+                    className="capitalize"
+                  >
+                    {age}
+                  </DropdownMenuCheckboxItem>
+                ))
+              ) : (
+                <div className="px-2 py-1 text-xs text-muted-foreground">No age groups available</div>
+              )}
               
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="font-semibold text-xs">Level</DropdownMenuLabel>
-              {levels.map(level => (
-                <DropdownMenuCheckboxItem
-                  key={`level-${level}`}
-                  checked={activeFilters.level.includes(level)}
-                  onCheckedChange={() => handleFilterToggle('level', level)}
-                  className="capitalize"
-                >
-                  {level}
-                </DropdownMenuCheckboxItem>
-              ))}
+              {levels.length > 0 ? (
+                levels.map(level => (
+                  <DropdownMenuCheckboxItem
+                    key={`level-${level}`}
+                    checked={activeFilters.level.includes(level)}
+                    onCheckedChange={() => handleFilterToggle('level', level)}
+                    className="capitalize"
+                  >
+                    {level}
+                  </DropdownMenuCheckboxItem>
+                ))
+              ) : (
+                <div className="px-2 py-1 text-xs text-muted-foreground">No levels available</div>
+              )}
             </div>
             
             <DropdownMenuSeparator />
@@ -549,7 +573,7 @@ const Students = () => {
         </TabsList>
         
         <TabsContent value={selectedTab} className="mt-0">
-          {studentsLoading ? (
+          {studentsLoading || isLoading ? (
             <div className="text-center py-10">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
               <h3 className="text-lg font-medium">Loading students...</h3>
@@ -596,6 +620,19 @@ const Students = () => {
             <div className="text-center py-10">
               <h3 className="text-lg font-medium">No students found</h3>
               <p className="text-muted-foreground mt-1">Add your first student to get started</p>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => {
+                  setSelectedStudent(null);
+                  setIsEditMode(false);
+                  setIsAddStudentOpen(true);
+                }}
+                className="mt-4 gap-2"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Add Student
+              </Button>
             </div>
           )}
         </TabsContent>
@@ -686,3 +723,53 @@ const Students = () => {
 };
 
 export default Students;
+
+function getMockStudents(): Student[] {
+  return [
+    {
+      id: '1',
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john.doe@example.com',
+      lessonType: 'individual',
+      ageGroup: 'adult',
+      courseName: 'IELTS Preparation',
+      level: 'intermediate',
+      phone: '+1234567890',
+      paymentStatus: 'paid',
+      lessonsCompleted: 12,
+      nextLesson: '2025-04-01',
+      nextPaymentDate: '2025-04-15'
+    },
+    {
+      id: '2',
+      firstName: 'Jane',
+      lastName: 'Smith',
+      email: 'jane.smith@example.com',
+      lessonType: 'group',
+      ageGroup: 'adult',
+      courseName: 'Business English',
+      level: 'advanced',
+      phone: '+0987654321',
+      paymentStatus: 'pending',
+      lessonsCompleted: 8,
+      nextLesson: '2025-03-28',
+      nextPaymentDate: '2025-04-01'
+    },
+    {
+      id: '3',
+      firstName: 'Michael',
+      lastName: 'Johnson',
+      email: 'michael.j@example.com',
+      lessonType: 'individual',
+      ageGroup: 'kid',
+      courseName: 'Basic English',
+      level: 'beginner',
+      phone: '+1122334455',
+      paymentStatus: 'overdue',
+      lessonsCompleted: 3,
+      nextLesson: '2025-03-29',
+      nextPaymentDate: '2025-03-15'
+    }
+  ];
+}
