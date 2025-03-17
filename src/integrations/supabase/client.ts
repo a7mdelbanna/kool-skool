@@ -194,6 +194,18 @@ export async function createStudent(
       schoolId: userData.schoolId,
       role: userData.role
     });
+
+    console.log("Request payload:", {
+      student_email: email,
+      student_password: password,
+      first_name: firstName,
+      last_name: lastName,
+      teacher_id: teacherId,
+      course_id: courseId,
+      age_group: ageGroup,
+      level: level,
+      phone: phone || null
+    });
     
     // Call the create_student edge function directly
     const createStudentResult = await supabase.functions.invoke<CreateStudentResponse>('create_student', {

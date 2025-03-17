@@ -117,7 +117,7 @@ serve(async (req) => {
     
     console.log("Valid roles:", validRoles);
     
-    // Check if requested role is valid, otherwise use a valid alternative
+    // Check if requested role is valid
     if (!validRoles.includes(role)) {
       return new Response(
         JSON.stringify({ 

@@ -203,10 +203,14 @@ export const useStudentForm = (
         console.log("Using teacher:", teacher);
         
         toast.loading("Creating student...");
+
+        // Always use password from state
+        const studentPassword = password || "defaultPassword123";
+        console.log("Using password for student:", studentPassword);
         
         const { data, error } = await createStudent(
           studentData.email as string,
-          password,
+          studentPassword,
           studentData.firstName as string,
           studentData.lastName as string,
           teacher.id,

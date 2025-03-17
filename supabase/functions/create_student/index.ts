@@ -14,7 +14,7 @@ serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log("Handling OPTIONS request");
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders, status: 204 })
   }
   
   try {
@@ -77,14 +77,13 @@ serve(async (req) => {
     )
     
     // Get request body - Create a copy of the request to avoid consuming it
-    const clonedRequest = req.clone();
-    const rawBody = await clonedRequest.text();
-    console.log("Raw request body:", rawBody);
+    const requestBody = await req.text();
+    console.log("Raw request body:", requestBody);
     
     // Parse the raw body into JSON with error handling
     let requestData;
     try {
-      if (!rawBody || rawBody.trim() === '') {
+      if (!requestBody || requestBody.trim() === '') {
         console.error("Empty request body");
         return new Response(
           JSON.stringify({ success: false, message: "Empty request body" }),
@@ -92,7 +91,7 @@ serve(async (req) => {
         )
       }
       
-      requestData = JSON.parse(rawBody);
+      requestData = JSON.parse(requestBody);
       console.log("Parsed request data:", requestData);
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
@@ -173,7 +172,10 @@ serve(async (req) => {
     
     console.log("Valid roles:", validRoles);
     
-    const roleToUse = validRoles.includes('student') ? 'student' : 'staff';
+    // Check if 'student' is a valid role, otherwise use a valid alternative
+    const roleToUse = validRoles.includes('student') ? 'student' : 
+                      validRoles.includes('user') ? 'user' : validRoles[0];
+    
     console.log("Using role:", roleToUse);
     
     // Verify the teacher belongs to the same school
@@ -241,7 +243,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Error hashing password: " + hashError?.message || "Unknown error" 
+          message: "Error hashing password: " + (hashError?.message || "Unknown error")
         }), 
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
