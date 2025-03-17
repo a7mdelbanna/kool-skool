@@ -7,7 +7,8 @@ import {
   getSchoolCourses, 
   getSchoolTeachers, 
   Course,
-  CreateStudentResponse 
+  CreateStudentResponse,
+  supabase
 } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -51,6 +52,7 @@ export const useStudentForm = (
   const schoolId = userData?.schoolId || null;
   console.log("School ID for queries:", schoolId);
   
+  // Fetch courses with error handling and retry logic
   const { 
     data: coursesData, 
     isLoading: coursesLoading,
@@ -65,21 +67,48 @@ export const useStudentForm = (
         return { data: [] as Course[] };
       }
       
-      const result = await getSchoolCourses(schoolId);
-      console.log('Courses query result:', result);
-      
-      if (!result.data) {
-        console.warn('No data returned from getSchoolCourses');
+      try {
+        const result = await getSchoolCourses(schoolId);
+        console.log('Courses query result:', result);
+        
+        if (result.error) {
+          console.error('Error fetching courses:', result.error);
+          // Try a direct fetch approach as fallback
+          const { data } = await supabase
+            .from('courses')
+            .select('id, name, lesson_type, school_id')
+            .eq('school_id', schoolId);
+            
+          if (data) {
+            console.log('Fallback courses query successful:', data);
+            return { 
+              data: data.map(c => ({
+                id: c.id,
+                name: c.name,
+                lesson_type: c.lesson_type,
+                school_id: c.school_id
+              })) as Course[] 
+            };
+          }
+        }
+        
+        if (!result.data) {
+          console.warn('No data returned from getSchoolCourses');
+          return { data: [] as Course[] };
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('Exception in courses query:', error);
         return { data: [] as Course[] };
       }
-      
-      return result;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!schoolId && open,
     retry: 3,
   });
 
+  // Fetch teachers with similar error handling and retry logic
   const { 
     data: teachersData, 
     isLoading: teachersLoading,
@@ -94,15 +123,35 @@ export const useStudentForm = (
         return { data: [] };
       }
       
-      const result = await getSchoolTeachers(schoolId);
-      console.log('Teachers query result:', result);
-      
-      if (!result.data) {
-        console.warn('No data returned from getSchoolTeachers');
+      try {
+        const result = await getSchoolTeachers(schoolId);
+        console.log('Teachers query result:', result);
+        
+        if (result.error) {
+          console.error('Error fetching teachers:', result.error);
+          // Try a direct fetch approach as fallback
+          const { data } = await supabase
+            .from('users')
+            .select('id, first_name, last_name')
+            .eq('school_id', schoolId)
+            .eq('role', 'teacher');
+            
+          if (data) {
+            console.log('Fallback teachers query successful:', data);
+            return { data };
+          }
+        }
+        
+        if (!result.data) {
+          console.warn('No data returned from getSchoolTeachers');
+          return { data: [] };
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('Exception in teachers query:', error);
         return { data: [] };
       }
-      
-      return result;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!schoolId && open,
