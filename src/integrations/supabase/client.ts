@@ -884,6 +884,7 @@ export async function rescheduleSession(sessionId: string, newDate: string, mode
     error 
   };
 }
+
 // Fallback function that manually fetches and joins the data
 async function getStudentsManually(schoolId: string) {
   console.log('Falling back to manual student fetch for school ID:', schoolId);
@@ -974,3 +975,7 @@ async function getStudentsManually(schoolId: string) {
     console.log('Processed students data from manual fetch:', result);
     return { data: result as StudentRecord[], error: null };
   } catch (error) {
+    console.error('Exception in getStudentsManually:', error);
+    return { data: null, error: error as Error };
+  }
+}
