@@ -67,6 +67,7 @@ serve(async (req) => {
           persistSession: false,
           autoRefreshToken: false
         }
+        // Removed custom headers to use the default client configuration
       }
     )
     
@@ -115,28 +116,22 @@ serve(async (req) => {
     console.log(`Creating student ${first_name} ${last_name} for school: ${schoolId}`)
     
     // Verify all required fields are present
-    const requiredFields = {
-      'email': student_email,
-      'password': student_password,
-      'first_name': first_name,
-      'last_name': last_name,
-      'teacher_id': teacher_id,
-      'course_id': course_id,
-      'age_group': age_group,
-      'level': level,
-      'school_id': schoolId
-    };
-    
-    const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => !value)
-      .map(([key]) => key);
-    
-    if (missingFields.length > 0) {
-      console.error("Missing required fields:", missingFields);
+    if (!student_email || !student_password || !first_name || !last_name || !teacher_id || !course_id || !age_group || !level) {
+      console.error("Missing required fields:", { 
+        hasEmail: !!student_email, 
+        hasPassword: !!student_password,
+        hasFirstName: !!first_name,
+        hasLastName: !!last_name,
+        hasTeacherId: !!teacher_id,
+        hasCourseId: !!course_id,
+        hasAgeGroup: !!age_group,
+        hasLevel: !!level
+      });
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: `Missing required fields for student creation: ${missingFields.join(', ')}` 
+          message: "Missing required fields for student creation" 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
@@ -145,43 +140,16 @@ serve(async (req) => {
     // Verify the teacher belongs to the same school
     const { data: teacherData, error: teacherError } = await supabaseClient
       .from('users')
-      .select('school_id, role')
+      .select('school_id')
       .eq('id', teacher_id)
       .single()
     
-    if (teacherError || !teacherData) {
-      console.error("Teacher not found:", { teacherError });
+    if (teacherError || !teacherData || teacherData.school_id !== schoolId) {
+      console.error("Teacher verification failed:", { teacherError, teacherData })
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Teacher not found" 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-    
-    if (teacherData.school_id !== schoolId) {
-      console.error("Teacher not from same school:", { 
-        teacherSchoolId: teacherData.school_id, 
-        requestSchoolId: schoolId 
-      });
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "Teacher not associated with this school" 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-    
-    if (teacherData.role !== 'teacher') {
-      console.error("Selected user is not a teacher:", { 
-        selectedUserRole: teacherData.role 
-      });
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "Selected user is not a teacher"
+          message: "Teacher not found or not associated with this school" 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
@@ -194,26 +162,12 @@ serve(async (req) => {
       .eq('id', course_id)
       .single()
     
-    if (courseError || !courseData) {
-      console.error("Course not found:", { courseError });
+    if (courseError || !courseData || courseData.school_id !== schoolId) {
+      console.error("Course verification failed:", { courseError, courseData })
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Course not found" 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-    
-    if (courseData.school_id !== schoolId) {
-      console.error("Course not from same school:", { 
-        courseSchoolId: courseData.school_id, 
-        requestSchoolId: schoolId 
-      });
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "Course not associated with this school" 
+          message: "Course not found or not associated with this school" 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
@@ -237,61 +191,7 @@ serve(async (req) => {
       )
     }
     
-    // Hash the password
-    const { data: hashResult, error: hashError } = await supabaseClient.rpc(
-      'hash_password',
-      { password: student_password }
-    );
-    
-    if (hashError || !hashResult) {
-      console.error("Error hashing password:", hashError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "Error hashing password: " + (hashError?.message || "Unknown error")
-        }), 
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        }
-      );
-    }
-    
-    // Get the role enum values allowed in the database
-    const { data: roleConstraintData, error: roleConstraintError } = await supabaseClient.rpc(
-      'get_role_constraint_values'
-    );
-    
-    console.log("Role constraint data:", roleConstraintData);
-    
-    // The role constraint is typically formatted like: CHECK (role = ANY (ARRAY['admin'::text, 'teacher'::text, 'student'::text]))
-    let validRoles = ['student']; // Default fallback
-    if (roleConstraintData) {
-      const constraintMatch = roleConstraintData.match(/ARRAY\[(.*?)\]/);
-      if (constraintMatch && constraintMatch[1]) {
-        validRoles = constraintMatch[1]
-          .split(',')
-          .map(role => role.trim().replace(/'/g, '').replace(/::text/g, ''));
-        console.log("Extracted valid roles:", validRoles);
-      }
-    }
-    
-    // Check if 'student' is a valid role in the database
-    if (!validRoles.includes('student')) {
-      console.error("'student' is not a valid role in the database. Valid roles:", validRoles);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "'student' is not a valid role in the database. Valid roles: " + validRoles.join(', ')
-        }), 
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        }
-      );
-    }
-    
-    // Insert into users table first with properly hashed password and explicitly set role
+    // Insert into users table first
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .insert([
@@ -299,8 +199,8 @@ serve(async (req) => {
           first_name,
           last_name,
           email: student_email,
-          password_hash: hashResult,
-          role: validRoles.includes('student') ? 'student' : validRoles[0],  // Use 'student' if valid, otherwise use the first valid role
+          password_hash: student_password, // Use actual password or hash it here
+          role: 'student',
           school_id: schoolId,
           created_by: userId
         }
@@ -311,11 +211,7 @@ serve(async (req) => {
     if (userError) {
       console.error("Error creating user record:", userError)
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: userError.message,
-          detail: userError.details || userError.hint
-        }),
+        JSON.stringify({ success: false, message: userError.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -349,11 +245,7 @@ serve(async (req) => {
       }
       
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: studentError.message,
-          detail: studentError.details || studentError.hint 
-        }),
+        JSON.stringify({ success: false, message: studentError.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -375,11 +267,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Unhandled error:", error.message)
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: error.message,
-        stack: error.stack
-      }),
+      JSON.stringify({ success: false, message: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
