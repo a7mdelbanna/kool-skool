@@ -195,7 +195,8 @@ export async function createStudent(
       role: userData.role
     });
 
-    console.log("Request payload:", {
+    // Create request payload object
+    const requestBody = {
       student_email: email,
       student_password: password,
       first_name: firstName,
@@ -205,21 +206,14 @@ export async function createStudent(
       age_group: ageGroup,
       level: level,
       phone: phone || null
-    });
+    };
     
-    // Call the create_student edge function directly
+    console.log("Request payload:", requestBody);
+    
+    // Call the create_student edge function directly with improved configuration
     const createStudentResult = await supabase.functions.invoke<CreateStudentResponse>('create_student', {
-      body: JSON.stringify({
-        student_email: email,
-        student_password: password,
-        first_name: firstName,
-        last_name: lastName,
-        teacher_id: teacherId,
-        course_id: courseId,
-        age_group: ageGroup,
-        level: level,
-        phone: phone || null
-      }),
+      method: 'POST',
+      body: requestBody,
       headers: {
         'x-user-id': userData.id,
         'x-school-id': userData.schoolId,

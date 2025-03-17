@@ -76,35 +76,48 @@ serve(async (req) => {
       }
     )
     
-    // Get request body - Create a copy of the request to avoid consuming it
-    const requestBody = await req.text();
-    console.log("Raw request body:", requestBody);
+    // Get and log the entire request for debugging
+    console.log("Request method:", req.method);
+    console.log("Request URL:", req.url);
+    console.log("Request headers:", Object.fromEntries(req.headers.entries()));
     
-    // Parse the raw body into JSON with error handling
-    let requestData;
+    let body;
     try {
-      if (!requestBody || requestBody.trim() === '') {
-        console.error("Empty request body");
-        return new Response(
-          JSON.stringify({ success: false, message: "Empty request body" }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
-      }
+      // Try to parse the body as JSON
+      body = await req.json();
+      console.log("Successfully parsed request body:", body);
+    } catch (jsonError) {
+      console.error("Failed to parse JSON body, trying text:", jsonError);
       
-      requestData = JSON.parse(requestBody);
-      console.log("Parsed request data:", requestData);
-    } catch (parseError) {
-      console.error("Error parsing request body:", parseError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "Invalid JSON in request body",
-          detail: parseError.message 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
+      try {
+        // If JSON parsing fails, try to get the raw text and then parse it
+        const textBody = await req.text();
+        console.log("Raw text body:", textBody);
+        
+        if (!textBody || textBody.trim() === '') {
+          console.error("Empty request body");
+          return new Response(
+            JSON.stringify({ success: false, message: "Empty request body" }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          );
+        }
+        
+        body = JSON.parse(textBody);
+        console.log("Parsed body from text:", body);
+      } catch (textError) {
+        console.error("Failed to process request body:", textError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "Invalid request body",
+            detail: textError.message 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
     }
     
+    // Extract data from the body
     const { 
       student_email, 
       student_password,
@@ -115,7 +128,7 @@ serve(async (req) => {
       age_group,
       level,
       phone
-    } = requestData
+    } = body;
     
     console.log(`Creating student ${first_name} ${last_name} for school: ${schoolId}`)
     

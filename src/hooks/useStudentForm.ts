@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -160,10 +159,7 @@ export const useStudentForm = (
       return;
     }
     
-    if (!isEditMode && createPassword && !password) {
-      toast.error("Please provide a password for the student");
-      return;
-    }
+    const studentPassword = password || "defaultPassword123";
     
     try {
       setSaving(true);
@@ -204,8 +200,6 @@ export const useStudentForm = (
         
         toast.loading("Creating student...");
 
-        // Always use password from state
-        const studentPassword = password || "defaultPassword123";
         console.log("Using password for student:", studentPassword);
         
         const { data, error } = await createStudent(
@@ -234,7 +228,6 @@ export const useStudentForm = (
         toast.success("Student added successfully");
         
         if (onStudentAdded && data.success) {
-          // Type guard to check if student_id exists in the response
           if (!data.student_id) {
             console.error("No student_id in response:", data);
             toast.error("Created student but couldn't retrieve student ID");
