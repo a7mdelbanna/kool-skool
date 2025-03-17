@@ -377,16 +377,16 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Session verified, proceeding with course creation");
     
-    // Create the request body object
+    // Prepare the request payload
     const requestBody = {
       school_id: schoolId,
       course_name: name,
       lesson_type: lessonType
     };
     
-    console.log("Request body object:", requestBody);
+    console.log("Request payload:", requestBody);
     
-    // Create headers with the right content type
+    // Set headers with authentication information
     const headers = {
       'x-user-id': userData.id,
       'x-school-id': userData.schoolId,
@@ -396,35 +396,59 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
     
     console.log("Request headers:", headers);
     
-    // Use our Edge Function to create the course with improved error handling
-    const response = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
-      method: 'POST',
-      body: requestBody,
-      headers: headers
-    });
-
-    console.log("Edge function response:", response);
-
-    if (response.error) {
-      console.error("Error creating course:", response.error);
+    // Call the edge function with fetch directly for more control
+    // This provides better error handling than using supabase.functions.invoke
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/create_course`,
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'apikey': SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+        },
+        body: JSON.stringify(requestBody)
+      }
+    );
+    
+    // Get the response as text first for logging
+    const responseText = await response.text();
+    console.log(`Edge function response (${response.status}):`, responseText);
+    
+    // Handle non-200 responses
+    if (!response.ok) {
+      let errorDetail;
+      try {
+        errorDetail = JSON.parse(responseText);
+      } catch (e) {
+        errorDetail = { message: responseText };
+      }
+      
+      console.error("Error creating course:", errorDetail);
       
       // Handle auth errors
-      if (response.error.message?.includes('JWT') || response.error.message?.includes('401')) {
+      if (response.status === 401 || errorDetail.message?.includes('auth') || errorDetail.message?.includes('JWT')) {
         return { 
           data: null, 
           error: new Error("Your session has expired. Please sign in again.") 
         };
       }
       
-      return { data: null, error: response.error };
-    }
-    
-    const data = response.data;
-    
-    if (!data) {
       return { 
         data: null, 
-        error: new Error("Failed to create course, no data returned") 
+        error: new Error(errorDetail.error || errorDetail.message || "Failed to create course") 
+      };
+    }
+    
+    // Parse the successful response
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Error parsing successful response:", parseError);
+      return { 
+        data: null, 
+        error: new Error("Failed to parse course data from response") 
       };
     }
     
@@ -436,6 +460,7 @@ export async function createCourse(schoolId: string, name: string, lessonType: '
       lesson_type: data.lesson_type as 'Individual' | 'Group'
     };
     
+    console.log("Course created successfully:", courseData);
     return { data: courseData, error: null };
   } catch (error) {
     console.error("Exception creating course:", error);
