@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Course } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters." }),
@@ -144,7 +145,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         console.log(`Course option ${index + 1}: ${course.name} (${course.id})`);
       });
     } else {
-      console.log('No courses available in ProfileTab');
+      console.log('No courses available in ProfileTab or courses array is empty');
+      console.log('Courses array type:', typeof courses);
+      console.log('Is courses array?', Array.isArray(courses));
     }
   }, [courses]);
 
@@ -312,7 +315,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                     <SelectContent>
                       {isLoading ? (
                         <SelectItem value="loading">Loading courses...</SelectItem>
-                      ) : courses.length > 0 ? (
+                      ) : courses && courses.length > 0 ? (
                         courses.map((course) => (
                           <SelectItem key={course.id} value={course.name}>
                             {course.name}

@@ -9,6 +9,7 @@ import SessionsTab from "../student-tabs/SessionsTab";
 import { Student } from "../StudentCard";
 import { User, CreditCard, Calendar, BookOpen } from "lucide-react";
 import { useStudentForm } from "@/hooks/useStudentForm";
+import { toast } from "sonner";
 
 interface StudentDialogContentProps {
   student?: Student | null;
@@ -55,6 +56,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
       });
     } else {
       console.log('No courses data available in StudentDialogContent');
+      console.log('coursesData object:', coursesData);
     }
     
     if (teachersData?.data) {
@@ -72,6 +74,30 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
       console.log('No teachers data available in StudentDialogContent');
     }
   }, [coursesData, teachersData]);
+
+  // Force refetch of courses when dialog opens
+  useEffect(() => {
+    if (open && (!coursesData?.data || coursesData.data.length === 0)) {
+      console.log('No courses found, adding a small delay and checking localStorage');
+      
+      // Check user data directly
+      try {
+        const userData = localStorage.getItem('user');
+        console.log('User data from localStorage for debugging courses issue:', userData);
+      } catch (error) {
+        console.error('Error accessing localStorage:', error);
+      }
+      
+      // If still no courses after a moment, show an error
+      const timer = setTimeout(() => {
+        if (!coursesData?.data || coursesData.data.length === 0) {
+          toast.error("No courses available. Please add courses first.");
+        }
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [open, coursesData]);
 
   return (
     <>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -66,18 +67,29 @@ export const useStudentForm = (
       }
       
       try {
-        console.log('Fetching courses directly from courses table');
+        // First attempt: directly query the courses table
+        console.log('Fetching courses directly from courses table with school_id:', schoolId);
+        
+        // Add debugging to verify the schoolId format
+        console.log('School ID type:', typeof schoolId);
+        console.log('School ID value:', schoolId);
+        
         const { data: coursesDirectData, error: coursesDirectError } = await supabase
           .from('courses')
           .select('*')
           .eq('school_id', schoolId);
           
+        // Log the raw response
+        console.log('Direct courses query response:', { data: coursesDirectData, error: coursesDirectError });
+        
         if (coursesDirectError) {
           console.error('Error in direct courses query:', coursesDirectError);
           return { data: [] as Course[] };
         }
         
         if (coursesDirectData && coursesDirectData.length > 0) {
+          console.log('Found courses count:', coursesDirectData.length);
+          
           const formattedCourses = coursesDirectData.map(course => ({
             id: course.id,
             school_id: course.school_id,
@@ -85,10 +97,13 @@ export const useStudentForm = (
             lesson_type: course.lesson_type
           })) as Course[];
           
-          console.log('Retrieved courses via direct query:', formattedCourses);
+          console.log('Formatted courses to return:', formattedCourses);
           return { data: formattedCourses };
+        } else {
+          console.log('No courses found in direct query, courses table might be empty for this school');
         }
         
+        // Fallback: try to get courses via the RPC function
         console.log('No courses found via direct query, trying RPC fallback');
         const { data, error } = await supabase
           .rpc('get_students_with_details', {
