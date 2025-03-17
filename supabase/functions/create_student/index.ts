@@ -256,110 +256,8 @@ serve(async (req) => {
         }
       );
     }
-
-    // Directly get the check constraint definition for the role column 
-    // This will tell us the exact values allowed by the constraint
-    const { data: constraintData, error: constraintError } = await supabaseClient.rpc(
-      'get_role_constraint_values'
-    );
     
-    if (constraintError) {
-      console.error("Error getting role constraint values:", constraintError);
-      
-      // Fallback to hardcoded value if we can't get the constraint
-      console.log("Using hardcoded role value: 'Student'");
-      
-      // Since there is an error getting the constraint, try 'Student' with capital S
-      const roleValue = 'Student';
-      
-      // Insert into users table first with properly hashed password and best-guess role value
-      const { data: userData, error: userError } = await supabaseClient
-        .from('users')
-        .insert([
-          {
-            first_name,
-            last_name,
-            email: student_email,
-            password_hash: hashResult,
-            role: roleValue,
-            school_id: schoolId,
-            created_by: userId
-          }
-        ])
-        .select('id')
-        .single()
-      
-      if (userError) {
-        console.error("Error creating user record with 'Student':", userError);
-        
-        // If that failed, try 'student' with lowercase s
-        console.log("Trying alternate role value: 'student'");
-        
-        const { data: userData2, error: userError2 } = await supabaseClient
-          .from('users')
-          .insert([
-            {
-              first_name,
-              last_name,
-              email: student_email,
-              password_hash: hashResult,
-              role: 'student',
-              school_id: schoolId,
-              created_by: userId
-            }
-          ])
-          .select('id')
-          .single()
-        
-        if (userError2) {
-          console.error("Error creating user record with 'student':", userError2);
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              message: "Failed to create user with any known role value. Error: " + userError2.message,
-              detail: userError2.details || userError2.hint
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-          )
-        }
-        
-        // If second attempt succeeded, use that user ID
-        return await createStudentRecord(supabaseClient, userData2.id, schoolId, teacher_id, course_id, age_group, level, phone, corsHeaders);
-      }
-      
-      // If first attempt succeeded, use that user ID
-      return await createStudentRecord(supabaseClient, userData.id, schoolId, teacher_id, course_id, age_group, level, phone, corsHeaders);
-    }
-    
-    console.log("Retrieved role constraint values:", constraintData);
-    
-    // Parse the constraint values (usually in format like: 'admin', 'teacher', 'student')
-    let validRoles = [];
-    if (constraintData && typeof constraintData === 'string') {
-      // Extract values from format like: 'CHECK (role::text = ANY (ARRAY['admin'::text, 'teacher'::text, 'student'::text]))'
-      const match = constraintData.match(/ARRAY\[(.*?)\]/);
-      if (match && match[1]) {
-        validRoles = match[1].split(',').map(role => {
-          // Clean up quotes and ::text
-          return role.trim().replace(/['"]|::text/g, '');
-        });
-      }
-    }
-    
-    console.log("Valid roles parsed from constraint:", validRoles);
-    
-    // Find the correct case for "student" in the valid roles
-    let studentRole = 'student'; // Default
-    for (const role of validRoles) {
-      if (role.toLowerCase() === 'student') {
-        studentRole = role;
-        break;
-      }
-    }
-    
-    console.log("Using role value:", studentRole);
-    
-    // Insert into users table with the correct role case
+    // Insert into users table first with properly hashed password and explicitly set role
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .insert([
@@ -368,7 +266,7 @@ serve(async (req) => {
           last_name,
           email: student_email,
           password_hash: hashResult,
-          role: studentRole,  // Use the role with proper casing
+          role: 'student',  // Explicitly set the role string
           school_id: schoolId,
           created_by: userId
         }
@@ -377,7 +275,7 @@ serve(async (req) => {
       .single()
     
     if (userError) {
-      console.error("Error creating user record:", userError);
+      console.error("Error creating user record:", userError)
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -388,24 +286,8 @@ serve(async (req) => {
       )
     }
     
-    return await createStudentRecord(supabaseClient, userData.id, schoolId, teacher_id, course_id, age_group, level, phone, corsHeaders);
+    const studentUserId = userData.id
     
-  } catch (error) {
-    console.error("Unhandled error:", error.message);
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: error.message,
-        stack: error.stack
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    )
-  }
-})
-
-// Helper function to create student record after creating user
-async function createStudentRecord(supabaseClient, studentUserId, schoolId, teacher_id, course_id, age_group, level, phone, corsHeaders) {
-  try {
     // Create student record
     const { data: studentData, error: studentError } = await supabaseClient
       .from('students')
@@ -424,12 +306,12 @@ async function createStudentRecord(supabaseClient, studentUserId, schoolId, teac
       .single()
     
     if (studentError) {
-      console.error("Error creating student record:", studentError);
+      console.error("Error creating student record:", studentError)
       // Attempt to clean up the user record since student creation failed
       try {
-        await supabaseClient.from('users').delete().eq('id', studentUserId);
+        await supabaseClient.from('users').delete().eq('id', studentUserId)
       } catch (cleanupError) {
-        console.error("Failed to clean up user after student creation error:", cleanupError);
+        console.error("Failed to clean up user after student creation error:", cleanupError)
       }
       
       return new Response(
@@ -457,7 +339,7 @@ async function createStudentRecord(supabaseClient, studentUserId, schoolId, teac
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
-    console.error("Error in createStudentRecord:", error);
+    console.error("Unhandled error:", error.message)
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -467,4 +349,4 @@ async function createStudentRecord(supabaseClient, studentUserId, schoolId, teac
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
-}
+})
