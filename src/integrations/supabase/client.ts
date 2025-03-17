@@ -122,46 +122,79 @@ export async function getStudentsWithDetails(schoolId: string) {
     // Log the request details for debugging
     console.log('Making request to get students with school_id:', schoolId);
     
-    // Using a more direct query approach to get all the needed data
-    const { data: studentsWithJoins, error: joinError } = await supabase
+    // Using a different approach to resolve the relationship ambiguity
+    // First, get all students
+    const { data: students, error: studentsError } = await supabase
       .from('students')
-      .select(`
-        *,
-        users (first_name, last_name, email),
-        courses (name, lesson_type)
-      `)
+      .select('*')
       .eq('school_id', schoolId);
     
-    // Log the response for debugging
-    console.log('Raw students join query response:', { data: studentsWithJoins, error: joinError });
-    
-    if (joinError) {
-      console.error('Error fetching students with joins:', joinError);
-      return { data: null, error: joinError };
+    if (studentsError) {
+      console.error('Error fetching students:', studentsError);
+      return { data: null, error: studentsError };
     }
     
-    if (!studentsWithJoins || studentsWithJoins.length === 0) {
+    if (!students || students.length === 0) {
       console.log('No students found for school ID:', schoolId);
       return { data: [], error: null };
     }
     
-    // Process the students data to match the expected format
-    const enhancedStudents = studentsWithJoins.map(student => {
-      const userData = student.users || {};
-      const courseData = student.courses || {};
+    console.log('Raw students data:', students);
+    
+    // Get user details for student users
+    const studentUserIds = students.map(student => student.user_id);
+    const { data: studentUsers, error: usersError } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, email')
+      .in('id', studentUserIds);
+    
+    if (usersError) {
+      console.error('Error fetching student users:', usersError);
+      return { data: null, error: usersError };
+    }
+    
+    // Get courses
+    const courseIds = students.map(student => student.course_id).filter(Boolean);
+    let courseData: any[] = [];
+    
+    if (courseIds.length > 0) {
+      const { data: courses, error: coursesError } = await supabase
+        .from('courses')
+        .select('id, name, lesson_type')
+        .in('id', courseIds);
+      
+      if (coursesError) {
+        console.error('Error fetching courses:', coursesError);
+      } else if (courses) {
+        courseData = courses;
+      }
+    }
+    
+    // Create a lookup map for faster access
+    const usersMap = studentUsers ? studentUsers.reduce((map, user) => {
+      map[user.id] = user;
+      return map;
+    }, {} as Record<string, any>) : {};
+    
+    const coursesMap = courseData.reduce((map, course) => {
+      map[course.id] = course;
+      return map;
+    }, {} as Record<string, any>);
+    
+    // Combine the data
+    const enhancedStudents = students.map(student => {
+      const userData = usersMap[student.user_id] || {};
+      const courseData = coursesMap[student.course_id] || {};
       
       // Transform the lesson_type to match UI expectations
-      const lessonType = typeof courseData === 'object' && courseData !== null && 
-                          'lesson_type' in courseData ? 
-                          (courseData.lesson_type === 'Individual' ? 'individual' : 'group') : 
-                          'individual';
+      const lessonType = courseData.lesson_type === 'Individual' ? 'individual' : 'group';
       
       return {
         ...student,
-        first_name: typeof userData === 'object' && userData !== null && 'first_name' in userData ? userData.first_name : '',
-        last_name: typeof userData === 'object' && userData !== null && 'last_name' in userData ? userData.last_name : '',
-        email: typeof userData === 'object' && userData !== null && 'email' in userData ? userData.email : '',
-        course_name: typeof courseData === 'object' && courseData !== null && 'name' in courseData ? courseData.name : '',
+        first_name: userData.first_name || '',
+        last_name: userData.last_name || '',
+        email: userData.email || '',
+        course_name: courseData.name || '',
         lessonType
       };
     });

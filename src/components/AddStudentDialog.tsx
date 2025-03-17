@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import StudentDialogContent from "./student/StudentDialogContent";
 import { Student } from "./StudentCard";
 import { PaymentProvider } from "@/contexts/PaymentContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AddStudentDialogProps {
   open: boolean;
@@ -20,12 +21,18 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   isEditMode = false,
   onStudentAdded
 }) => {
+  const queryClient = useQueryClient();
+  
   const handleCloseDialog = () => {
     onOpenChange(false);
   };
 
   const handleStudentAdded = (student: Student) => {
     console.log("Student added in dialog:", student);
+    
+    // Invalidate the students query to force a refetch
+    queryClient.invalidateQueries({ queryKey: ['students'] });
+    
     if (onStudentAdded) {
       onStudentAdded(student);
     }
