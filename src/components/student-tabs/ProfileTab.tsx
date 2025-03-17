@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Course } from "@/integrations/supabase/client";
 
+// Form schema for validation
 const formSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters." }),
   lastName: z.string().min(2, { message: "Last name must be at least 2 characters." }),
@@ -52,6 +54,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   teachers = [],
   isLoading = false,
 }) => {
+  // Initialize form with student data
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -69,7 +72,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     },
   });
 
+  // Update form values when studentData changes from parent
   useEffect(() => {
+    // Only reset the form when studentData changes from the parent
+    // and not due to local form changes
     if (
       studentData.firstName !== form.getValues().firstName ||
       studentData.lastName !== form.getValues().lastName ||
@@ -99,6 +105,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     }
   }, [studentData, password, createPassword, form]);
 
+  // Handle form submission when the save button is clicked
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     setStudentData({
       ...studentData,
@@ -122,15 +129,19 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     }
   };
 
+  // Use form.watch only to handle explicit form submission
+  // We don't want to update parent state on every keystroke
   useEffect(() => {
     const subscription = form.watch(() => {});
     return () => subscription.unsubscribe();
   }, [form]);
 
+  // Only update parent component when form is blurred or submitted
   const handleFormBlur = () => {
     const values = form.getValues();
     const isValid = form.formState.isValid;
     
+    // Only update if the form is valid to prevent validation errors
     if (isValid) {
       onSubmit(values);
     }
@@ -147,6 +158,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         onBlur={handleFormBlur}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Personal Information Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Personal Information</h3>
             
@@ -236,6 +248,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                           checked={field.value}
                           onCheckedChange={(checked) => {
                             field.onChange(checked);
+                            // Only update the parent state if we have the setter function
                             if (setCreatePassword) {
                               setCreatePassword(checked === true);
                             }
@@ -277,6 +290,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             )}
           </div>
           
+          {/* Course Information Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Course Information</h3>
             
@@ -442,7 +456,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                       ) : teachers && teachers.length > 0 ? (
                         teachers.map((teacher) => (
                           <SelectItem key={teacher.id} value={teacher.id}>
-                            {`${teacher.first_name || ''} ${teacher.last_name || ''}`}
+                            {teacher.first_name && teacher.last_name 
+                              ? `${teacher.first_name} ${teacher.last_name}`
+                              : 'Unknown Teacher'}
                           </SelectItem>
                         ))
                       ) : (

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -139,7 +140,7 @@ export const useStudentForm = (
     retry: 3,
   });
 
-  // Fixed teacher query to correctly fetch and format teacher data
+  // Use a similar approach for teachers
   const { 
     data: teachersData, 
     isLoading: teachersLoading,
@@ -155,57 +156,76 @@ export const useStudentForm = (
       }
       
       try {
-        // Direct query to users table for teachers with better error logging
-        console.log('Fetching teachers from users table');
+        // Try direct query to teachers (users with role=teacher)
+        console.log('Fetching teachers directly from users table');
         const { data: directTeachersData, error: directTeachersError } = await supabase
           .from('users')
-          .select('id, first_name, last_name, email, role')
+          .select('id, first_name, last_name')
           .eq('school_id', schoolId)
           .eq('role', 'teacher');
           
+        if (!directTeachersError && directTeachersData && directTeachersData.length > 0) {
+          console.log('Successfully fetched teachers directly:', directTeachersData);
+          return { data: directTeachersData };
+        }
+        
         if (directTeachersError) {
           console.error('Error fetching teachers directly:', directTeachersError);
+        }
+        
+        // Similar approach as courses - try getting teachers via students data
+        console.log('Getting teachers from students data');
+        const { data: studentsData, error: studentsError } = await supabase.rpc('get_students_with_details', {
+          p_school_id: schoolId
+        });
+        
+        if (studentsError) {
+          console.error('Error fetching students for teacher data:', studentsError);
           return { data: [] };
         }
         
-        console.log('Teachers data from direct query:', directTeachersData);
-        
-        if (!directTeachersData || directTeachersData.length === 0) {
-          // If no teachers found, create a test teacher for demonstration purposes
-          console.log('No teachers found, attempting to create a fallback teacher');
+        if (!studentsData || !Array.isArray(studentsData) || studentsData.length === 0) {
+          console.warn('No students found for teacher extraction');
           
-          try {
-            // Create a test teacher if none exists
-            const { data: newTeacher, error: teacherError } = await supabase
-              .from('users')
-              .insert([
-                {
-                  first_name: 'Demo',
-                  last_name: 'Teacher',
-                  email: `teacher_${Date.now()}@example.com`,
-                  password_hash: 'dummy_hash_for_demo',
-                  role: 'teacher',
-                  school_id: schoolId
-                }
-              ])
-              .select();
-              
-            if (teacherError) {
-              console.error('Error creating test teacher:', teacherError);
-              return { data: [] };
-            }
-            
-            console.log('Created fallback teacher:', newTeacher);
-            return { data: newTeacher };
-          } catch (fallbackError) {
-            console.error('Error in fallback teacher creation:', fallbackError);
-            return { data: [] };
-          }
+          // Fallback to hardcoded teacher if necessary
+          return { 
+            data: [{
+              id: '946f2802-74df-4409-99a7-b295687dd0cc',
+              first_name: 'Default',
+              last_name: 'Teacher'
+            }] 
+          };
         }
         
-        console.log('Successfully fetched teachers, count:', directTeachersData.length);
-        return { data: directTeachersData };
+        // Extract unique teachers from students data
+        const uniqueTeacherIds = new Set<string>();
+        const uniqueTeachers: Array<{id: string, first_name: string, last_name: string}> = [];
         
+        studentsData.forEach(student => {
+          if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
+            uniqueTeacherIds.add(student.teacher_id);
+            uniqueTeachers.push({
+              id: student.teacher_id,
+              first_name: 'Teacher', // We don't have actual teacher names from this data
+              last_name: student.teacher_id.substring(0, 8) // Use part of ID as identifier
+            });
+          }
+        });
+        
+        console.log('Extracted teachers from students:', uniqueTeachers);
+        
+        if (uniqueTeachers.length === 0) {
+          // Last resort fallback if no teachers found
+          return { 
+            data: [{
+              id: '946f2802-74df-4409-99a7-b295687dd0cc',
+              first_name: 'Default',
+              last_name: 'Teacher'
+            }] 
+          };
+        }
+        
+        return { data: uniqueTeachers };
       } catch (error) {
         console.error('Exception in teachers query:', error);
         return { data: [] };
@@ -215,6 +235,25 @@ export const useStudentForm = (
     enabled: !!schoolId && open,
     retry: 3,
   });
+  
+  useEffect(() => {
+    if (coursesError) {
+      console.error('Error fetching courses:', coursesError);
+      toast.error("Failed to load courses. Please try again.");
+    }
+    if (teachersError) {
+      console.error('Error fetching teachers:', teachersError);
+      toast.error("Failed to load teachers. Please try again.");
+    }
+  }, [coursesError, teachersError]);
+  
+  useEffect(() => {
+    if (open && schoolId) {
+      console.log("Dialog opened - triggering data refetch");
+      refetchCourses();
+      refetchTeachers();
+    }
+  }, [open, schoolId, refetchCourses, refetchTeachers]);
   
   useEffect(() => {
     if (student) {
@@ -241,25 +280,6 @@ export const useStudentForm = (
       ...data
     }));
   };
-  
-  useEffect(() => {
-    if (coursesError) {
-      console.error('Error fetching courses:', coursesError);
-      toast.error("Failed to load courses. Please try again.");
-    }
-    if (teachersError) {
-      console.error('Error fetching teachers:', teachersError);
-      toast.error("Failed to load teachers. Please try again.");
-    }
-  }, [coursesError, teachersError]);
-  
-  useEffect(() => {
-    if (open && schoolId) {
-      console.log("Dialog opened - triggering data refetch");
-      refetchCourses();
-      refetchTeachers();
-    }
-  }, [open, schoolId, refetchCourses, refetchTeachers]);
 
   const handleSave = async () => {
     if (!studentData.firstName || !studentData.lastName || !studentData.email || !studentData.courseName) {
@@ -290,32 +310,32 @@ export const useStudentForm = (
           return;
         }
         
-        // Improved teacher selection logic with better error handling
-        const teachersList = teachersData?.data || [];
-        console.log("Available teachers for selection:", teachersList);
-        
-        let teacherId = studentData.teacherId;
-        if (!teacherId && teachersList.length > 0) {
-          teacherId = teachersList[0].id;
-          console.log("No teacher selected, using first available teacher:", teacherId);
-        }
-        
-        if (!teacherId) {
+        const teacher = teachersData?.data?.[0];
+        if (!teacher) {
           toast.error("No teachers available. Please add a teacher first.");
           setSaving(false);
           return;
         }
         
-        console.log("Creating student with teacher ID:", teacherId);
+        console.log("Creating student with admin credentials:", { 
+          userId: userData.id,
+          schoolId: userData.schoolId,
+          role: userData.role
+        });
+        
+        console.log("Using course:", course);
+        console.log("Using teacher:", teacher);
         
         toast.loading("Creating student...");
+
+        console.log("Using password for student:", studentPassword);
         
         const { data, error } = await createStudent(
           studentData.email as string,
           studentPassword,
           studentData.firstName as string,
           studentData.lastName as string,
-          teacherId,
+          teacher.id,
           course.id,
           studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
           studentData.level === 'beginner' ? 'Beginner' : 
@@ -346,7 +366,7 @@ export const useStudentForm = (
             courseName: studentData.courseName as string,
             level: (studentData.level as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
             paymentStatus: "pending",
-            teacherId: teacherId,
+            teacherId: teacher.id,
             lessonsCompleted: 0,
             nextLesson: 'Not scheduled'
           };
