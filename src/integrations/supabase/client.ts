@@ -156,7 +156,7 @@ export async function getStudentsWithDetails(schoolId: string) {
   return { data: enhancedStudents as StudentRecord[], error: null };
 }
 
-// Create a student - Simplified version using the default client without custom headers
+// Create a student
 export async function createStudent(
   email: string,
   password: string,
@@ -195,33 +195,49 @@ export async function createStudent(
       role: userData.role
     });
     
-    // First, create the user account - use the simplified client approach
-    const { data: userResult, error: userError } = await supabase
-      .from('users')
-      .insert({
+    // First, create the user account
+    const createUserResult = await supabase.functions.invoke<{
+      success: boolean;
+      message?: string;
+      user_id?: string;
+    }>('create_user', {
+      body: JSON.stringify({
         email,
-        password_hash: password, // Note: In production, this should be properly hashed
+        password,
         first_name: firstName,
         last_name: lastName,
         role: 'student',
         school_id: userData.schoolId,
-        created_by: userData.id
-      })
-      .select('id')
-      .single();
-      
-    if (userError) {
-      console.error("Error creating user:", userError);
+      }),
+      headers: {
+        'x-user-id': userData.id,
+        'x-school-id': userData.schoolId,
+        'x-user-role': userData.role,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (createUserResult.error || !createUserResult.data?.success) {
+      console.error("Error creating user:", createUserResult.error || createUserResult.data?.message);
       return {
-        data: { success: false, message: userError.message },
-        error: userError
+        data: {
+          success: false,
+          message: createUserResult.data?.message || "Failed to create user account"
+        },
+        error: createUserResult.error || null
       };
     }
     
-    const userId = userResult.id;
+    const userId = createUserResult.data.user_id;
+    if (!userId) {
+      return {
+        data: { success: false, message: "User created but no user ID returned" },
+        error: null
+      };
+    }
     
-    // Now create the student record - use the simplified client approach
-    const { data: studentResult, error: studentError } = await supabase
+    // Now create the student record
+    const createStudentResult = await supabase
       .from('students')
       .insert({
         user_id: userId,
@@ -235,28 +251,21 @@ export async function createStudent(
       .select()
       .single();
     
-    if (studentError) {
-      console.error("Error creating student record:", studentError);
-      // If student creation fails, try to clean up the user
-      try {
-        await supabase.from('users').delete().eq('id', userId);
-      } catch (cleanupError) {
-        console.error("Failed to clean up user after student creation error:", cleanupError);
-      }
-      
+    if (createStudentResult.error) {
+      console.error("Error creating student record:", createStudentResult.error);
       return {
-        data: { success: false, message: studentError.message },
-        error: studentError
+        data: { success: false, message: createStudentResult.error.message },
+        error: createStudentResult.error
       };
     }
     
-    console.log("Student record created successfully:", studentResult);
+    console.log("Student record created successfully:", createStudentResult.data);
     
     return {
       data: {
         success: true,
         user_id: userId,
-        student_id: studentResult.id,
+        student_id: createStudentResult.data.id,
         message: "Student created successfully"
       },
       error: null

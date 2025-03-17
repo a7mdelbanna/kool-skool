@@ -66,8 +66,13 @@ serve(async (req) => {
         auth: {
           persistSession: false,
           autoRefreshToken: false
+        },
+        global: {
+          headers: {
+            apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          }
         }
-        // Removed custom headers to use the default client configuration
       }
     )
     
