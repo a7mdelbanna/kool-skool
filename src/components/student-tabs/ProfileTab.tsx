@@ -103,7 +103,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         createPassword: createPassword,
       });
     }
-  }, [studentData, password, createPassword]);
+  }, [studentData, password, createPassword, form]);
 
   // Handle form submission when the save button is clicked
   const onSubmit = (values: z.infer<typeof formSchema>) => {
@@ -236,7 +236,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               )}
             />
             
-            {isNewStudent && setCreatePassword && (
+            {isNewStudent && (
               <>
                 <FormField
                   control={form.control}
@@ -246,7 +246,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                       <FormControl>
                         <Checkbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            // Only update the parent state if we have the setter function
+                            if (setCreatePassword) {
+                              setCreatePassword(checked === true);
+                            }
+                          }}
                           disabled={isViewMode}
                         />
                       </FormControl>
@@ -260,7 +266,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                   )}
                 />
                 
-                {createPassword && setPassword && (
+                {form.watch("createPassword") && (
                   <FormField
                     control={form.control}
                     name="password"
