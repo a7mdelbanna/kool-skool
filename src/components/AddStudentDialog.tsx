@@ -24,6 +24,14 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     onOpenChange(false);
   };
 
+  const handleStudentAdded = (student: Student) => {
+    console.log("Student added in dialog:", student);
+    if (onStudentAdded) {
+      onStudentAdded(student);
+    }
+    // Don't auto-close, let the parent handle that
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
@@ -43,7 +51,7 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
           <StudentDialogContent 
             student={student}
             isEditMode={isEditMode}
-            onStudentAdded={onStudentAdded}
+            onStudentAdded={handleStudentAdded}
             onClose={handleCloseDialog}
             open={open}
           />

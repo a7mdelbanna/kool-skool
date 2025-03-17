@@ -72,14 +72,17 @@ const Students = () => {
     queryKey: ['students', schoolId],
     queryFn: () => getStudentsWithDetails(schoolId),
     enabled: !!schoolId,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
-    staleTime: 5000
+    staleTime: 0
   });
   
   useEffect(() => {
     console.log('Students data from query:', studentsData);
-  }, [studentsData]);
+    if (schoolId) {
+      refetchStudents();
+    }
+  }, [schoolId, refetchStudents]);
   
   const mapStudentRecordToStudent = (record: StudentRecord): Student => {
     return {
@@ -215,7 +218,9 @@ const Students = () => {
     setIsAddStudentOpen(false);
     setSelectedStudent(null);
     setIsEditMode(false);
-    refetchStudents();
+    setTimeout(() => {
+      refetchStudents();
+    }, 300);
   };
   
   const handleAddCourse = async () => {
@@ -277,7 +282,9 @@ const Students = () => {
   
   const handleStudentAdded = (newStudent: Student) => {
     toast.success(`Student ${newStudent.firstName} ${newStudent.lastName} added successfully`);
-    refetchStudents();
+    setTimeout(() => {
+      refetchStudents();
+    }, 300);
   };
   
   const filteredStudents = filterStudents();
@@ -312,6 +319,16 @@ const Students = () => {
           >
             <PlusCircle className="h-4 w-4" />
             <span>Add New Student</span>
+          </Button>
+          
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => refetchStudents()}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Refresh</span>
           </Button>
         </div>
       </div>
@@ -490,7 +507,7 @@ const Students = () => {
             </div>
           ) : studentsError ? (
             <div className="text-center py-10 space-y-4">
-              <p className="text-red-500">Error loading students</p>
+              <p className="text-red-500">Error loading students: {studentsError.message}</p>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -513,10 +530,23 @@ const Students = () => {
                 />
               ))}
             </div>
+          ) : students.length > 0 ? (
+            <div className="text-center py-10">
+              <h3 className="text-lg font-medium">No students match your filters</h3>
+              <p className="text-muted-foreground mt-1">Try adjusting your search or filters</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearFilters}
+                className="mt-4"
+              >
+                Clear all filters
+              </Button>
+            </div>
           ) : (
             <div className="text-center py-10">
               <h3 className="text-lg font-medium">No students found</h3>
-              <p className="text-muted-foreground mt-1">Try adjusting your search or filters</p>
+              <p className="text-muted-foreground mt-1">Add your first student to get started</p>
             </div>
           )}
         </TabsContent>

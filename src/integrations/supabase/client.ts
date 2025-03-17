@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -120,46 +119,42 @@ export async function getStudentsWithDetails(schoolId: string) {
   }
 
   try {
-    // First get the students with a more direct query
-    const { data: studentsData, error: studentsError } = await supabase
+    // Log the request details for debugging
+    console.log('Making request to get students with school_id:', schoolId);
+    
+    // Using a more direct query approach to get all the needed data
+    const { data: studentsWithJoins, error: joinError } = await supabase
       .from('students')
       .select(`
-        id,
-        school_id,
-        user_id,
-        teacher_id,
-        course_id,
-        age_group,
-        level,
-        phone,
-        created_at,
-        users:user_id (first_name, last_name, email),
-        courses:course_id (name, lesson_type)
+        *,
+        users (first_name, last_name, email),
+        courses (name, lesson_type)
       `)
       .eq('school_id', schoolId);
-
-    console.log('Raw students query result:', { data: studentsData, error: studentsError });
-
-    if (studentsError) {
-      console.error('Error fetching students:', studentsError);
-      return { data: null, error: studentsError };
+    
+    // Log the response for debugging
+    console.log('Raw students join query response:', { data: studentsWithJoins, error: joinError });
+    
+    if (joinError) {
+      console.error('Error fetching students with joins:', joinError);
+      return { data: null, error: joinError };
     }
-
-    if (!studentsData || studentsData.length === 0) {
+    
+    if (!studentsWithJoins || studentsWithJoins.length === 0) {
       console.log('No students found for school ID:', schoolId);
       return { data: [], error: null };
     }
-
-    // Transform the data to match the expected format
-    const enhancedStudents = studentsData.map(student => {
-      // Safely access nested properties with null coalescing
+    
+    // Process the students data to match the expected format
+    const enhancedStudents = studentsWithJoins.map(student => {
       const userData = student.users || {};
       const courseData = student.courses || {};
       
-      // Transform the lesson_type to match UI expectations, with type checking
+      // Transform the lesson_type to match UI expectations
       const lessonType = typeof courseData === 'object' && courseData !== null && 
-                          'lesson_type' in courseData && 
-                          courseData.lesson_type === 'Individual' ? 'individual' : 'group';
+                          'lesson_type' in courseData ? 
+                          (courseData.lesson_type === 'Individual' ? 'individual' : 'group') : 
+                          'individual';
       
       return {
         ...student,
@@ -171,7 +166,7 @@ export async function getStudentsWithDetails(schoolId: string) {
       };
     });
 
-    console.log('Transformed students data:', enhancedStudents);
+    console.log('Processed students data:', enhancedStudents);
     return { data: enhancedStudents as StudentRecord[], error: null };
   } catch (error) {
     console.error('Exception in getStudentsWithDetails:', error);
