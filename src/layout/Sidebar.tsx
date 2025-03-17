@@ -1,99 +1,250 @@
 
 import React, { useContext } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useSidebar } from '@/components/ui/sidebar';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { 
+  Home, 
+  Users, 
+  Calendar, 
+  DollarSign, 
+  Settings,
+  LogOut,
+  PlusCircle,
+  GraduationCap,
+  School,
+  BarChart2,
+  UserPlus
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Home, Users, BookOpen, Calendar, CreditCard, Settings, LogOut, Layers, Users2 } from 'lucide-react';
-import { UserContext } from '@/App';
+import {
+  Sidebar as SidebarComponent,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from '@/components/ui/sidebar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { UserContext } from '@/App';
+import { useToast } from '@/hooks/use-toast';
 
-const SidebarLink = ({
-  to,
-  icon: Icon,
-  label,
-  active,
-}: {
-  to: string;
-  icon: React.ElementType;
-  label: string;
-  active: boolean;
-}) => {
-  return (
-    <Link
-      to={to}
-      className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 transition-all',
-        active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground'
-      )}
-    >
-      <Icon className="h-5 w-5" />
-      <span>{label}</span>
-    </Link>
-  );
-};
-
-const Sidebar = () => {
-  const { open } = useSidebar(); // Use 'open' property from SidebarContext
-  const location = useLocation();
-  const navigate = useNavigate();
+export function Sidebar() {
   const { user, setUser } = useContext(UserContext);
-  
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
   const handleLogout = () => {
+    // Clear user data from localStorage
     localStorage.removeItem('user');
+    
+    // Update authentication context
     setUser(null);
+    
+    // Show logout notification
+    toast({
+      title: "Logged out successfully",
+      description: "You have been logged out of your account."
+    });
+    
+    // Trigger storage event to synchronize across tabs
+    window.dispatchEvent(new Event('storage'));
+    
+    // Redirect to login page
     navigate('/login');
   };
-  
-  const links = [
-    { to: '/', icon: Home, label: 'Dashboard' },
-    { to: '/students', icon: Users, label: 'Students' },
-    { to: '/courses', icon: BookOpen, label: 'Courses' },
-    { to: '/calendar', icon: Calendar, label: 'Calendar' },
-    { to: '/payments', icon: CreditCard, label: 'Payments' },
-    { to: '/team-access', icon: Users2, label: 'Team Access' },
-    { to: '/reports', icon: Layers, label: 'Reports' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
-  ];
-  
+
+  // Generate avatar fallback from user's name
+  const generateAvatarFallback = () => {
+    if (!user || !user.firstName || !user.lastName) return 'TP';
+    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
+  };
+
   return (
-    <div className={cn(
-      "border-r bg-background h-screen fixed top-0 left-0 z-40 transition-all duration-300",
-      open ? "w-64" : "w-[70px]"
-    )}>
-      <div className="h-full px-3 py-4 flex flex-col">
-        <div className="mb-4 flex items-center justify-between">
-          {open ? (
-            <div className="font-bold text-xl">EduManage</div>
-          ) : (
-            <div className="font-bold text-xl mx-auto">EM</div>
-          )}
+    <SidebarComponent className="hidden lg:flex">
+      <SidebarHeader className="p-4">
+        <div className="flex items-center gap-2">
+          <GraduationCap className="h-6 w-6 text-primary" />
+          <h1 className="text-xl font-semibold">TutorPro</h1>
         </div>
+      </SidebarHeader>
+      
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Main</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Home className="h-5 w-5" />
+                    <span>Dashboard</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/students"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Users className="h-5 w-5" />
+                    <span>Students</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/calendar"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Calendar className="h-5 w-5" />
+                    <span>Calendar</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/payments"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <DollarSign className="h-5 w-5" />
+                    <span>Payments</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/reports"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <BarChart2 className="h-5 w-5" />
+                    <span>States & Reports</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         
-        <div className="space-y-1 flex-1">
-          {links.map((link) => (
-            <SidebarLink
-              key={link.to}
-              to={link.to}
-              icon={link.icon}
-              label={link.label}
-              active={location.pathname === link.to}
-            />
-          ))}
-        </div>
-        
-        <div className="pt-2">
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-3 text-red-500" onClick={handleLogout}>
-            <LogOut className="h-5 w-5" />
-            <span className={cn(!open && "hidden")}>Log out</span>
-          </Button>
+        <SidebarGroup>
+          <SidebarGroupLabel>Account</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/school-setup"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <School className="h-5 w-5" />
+                    <span>School Setup</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-3 mt-2">
-            <span className={cn(!open && "hidden")}>v1.0.0</span>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/team-access"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    <span>Team Access</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/settings"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Settings className="h-5 w-5" />
+                    <span>Settings</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      
+      <SidebarFooter>
+        <div className="p-4 flex flex-col gap-4">
+          <Button className="gap-2 w-full">
+            <PlusCircle className="h-4 w-4" />
+            <span>New Lesson</span>
           </Button>
+          
+          <div className="flex items-center justify-between p-2 rounded-md border">
+            <div className="flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback>{generateAvatarFallback()}</AvatarFallback>
+              </Avatar>
+              <div className="text-sm">
+                <div className="font-medium">{user ? `${user.firstName} ${user.lastName}` : 'Tutor Name'}</div>
+                <div className="text-xs text-muted-foreground">{user ? `${user.email || 'tutor@example.com'}` : 'tutor@example.com'}</div>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleLogout}
+              title="Logout"
+              aria-label="Logout from your account"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </SidebarFooter>
+    </SidebarComponent>
   );
-};
-
-export default Sidebar;
+}

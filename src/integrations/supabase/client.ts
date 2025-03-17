@@ -49,20 +49,12 @@ export interface Course {
   lesson_type: 'Individual' | 'Group';
 }
 
-export interface CreateCourseRequest {
+export interface CreateCourseResponse {
+  id: string;
+  school_id: string;
   name: string;
   lesson_type: string;
-}
-
-export interface CreateCourseResponse {
-  success: boolean;
-  course?: {
-    id: string;
-    school_id: string;
-    name: string;
-    lesson_type: string;
-  };
-  message?: string;
+  error?: string;
   detail?: string;
 }
 
@@ -345,67 +337,97 @@ export async function getSchoolCourses(schoolId: string) {
 }
 
 // Create a course
-export const createCourse = async (
-  schoolId: string,
-  courseName: string,
-  lessonType: string
-): Promise<{ data: CreateCourseResponse | null; error: Error | null }> => {
+export async function createCourse(schoolId: string, name: string, lessonType: 'Individual' | 'Group') {
+  console.log("Creating course with:", { schoolId, name, lessonType });
+  
   try {
-    const userData = getUserData();
-    if (!userData || !userData.id || !userData.schoolId || userData.role !== 'admin') {
-      return {
-        data: null,
-        error: new Error('Only school admins can create courses')
-      };
-    }
-
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create_course`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'x-user-id': userData.id,
-          'x-school-id': userData.schoolId,
-          'x-user-role': userData.role
-        },
-        body: JSON.stringify({
-          name: courseName,
-          lesson_type: lessonType
-        })
+    // Check for stored authentication data in localStorage
+    const storedUser = localStorage.getItem('user');
+    let userData = null;
+    
+    if (storedUser) {
+      try {
+        userData = JSON.parse(storedUser);
+        console.log("Found user data in localStorage:", userData);
+      } catch (parseError) {
+        console.error("Error parsing user data from localStorage:", parseError);
       }
-    );
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      return {
-        data: null,
-        error: new Error(result.message || 'Failed to create course')
+    }
+    
+    if (!userData || !userData.id || !userData.schoolId) {
+      console.error("Missing user data for authentication");
+      return { 
+        data: null, 
+        error: new Error("Authentication required. Please sign in again.") 
       };
     }
-
-    return { data: result, error: null };
-  } catch (error) {
-    console.error('Error creating course:', error);
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unknown error creating course')
+    
+    console.log("Session verified, proceeding with course creation");
+    
+    // Create the request body object
+    const requestBody = {
+      school_id: schoolId,
+      course_name: name,
+      lesson_type: lessonType
     };
-  }
-};
+    
+    console.log("Request body object:", requestBody);
+    
+    // Create headers with the right content type
+    const headers = {
+      'x-user-id': userData.id,
+      'x-school-id': userData.schoolId,
+      'x-user-role': userData.role || 'admin',
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_PUBLISHABLE_KEY,
+      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+    };
+    
+    console.log("Request headers:", headers);
+    
+    // Use our Edge Function to create the course with improved error handling
+    const response = await supabase.functions.invoke<CreateCourseResponse>('create_course', {
+      body: JSON.stringify(requestBody), // Ensure proper stringification
+      headers: headers
+    });
 
-// Helper function to get user data from localStorage
-function getUserData() {
-  try {
-    const user = localStorage.getItem('user');
-    if (!user) return null;
-    return JSON.parse(user);
+    console.log("Edge function response:", response);
+
+    if (response.error) {
+      console.error("Error creating course:", response.error);
+      
+      // Handle auth errors
+      if (response.error.message?.includes('JWT') || response.error.message?.includes('401')) {
+        return { 
+          data: null, 
+          error: new Error("Your session has expired. Please sign in again.") 
+        };
+      }
+      
+      return { data: null, error: response.error };
+    }
+    
+    const data = response.data;
+    
+    if (!data) {
+      return { 
+        data: null, 
+        error: new Error("Failed to create course, no data returned") 
+      };
+    }
+    
+    // Convert the response to a Course object
+    const courseData: Course = {
+      id: data.id,
+      school_id: data.school_id,
+      name: data.name,
+      lesson_type: data.lesson_type as 'Individual' | 'Group'
+    };
+    
+    return { data: courseData, error: null };
   } catch (error) {
-    console.error('Error parsing user data:', error);
-    return null;
+    console.error("Exception creating course:", error);
+    return { data: null, error: error as Error };
   }
 }
 
