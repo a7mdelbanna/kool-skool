@@ -137,30 +137,26 @@ export async function getStudentsWithDetails(schoolId: string) {
   }
 
   try {
-    // Direct query instead of using RPC function
-    const { data: students, error: studentsError } = await supabase
-      .from('students')
-      .select(`
-        *,
-        users:user_id (first_name, last_name, email),
-        courses:course_id (name, lesson_type)
-      `)
-      .eq('school_id', schoolId);
+    // Use the RPC function - updated to use properly typed table function
+    const { data, error } = await supabase
+      .rpc('get_students_with_details', {
+        p_school_id: schoolId
+      });
     
-    if (studentsError) {
-      console.error('Error fetching students:', studentsError);
-      return { data: null, error: studentsError };
+    if (error) {
+      console.error('Error fetching students:', error);
+      return { data: null, error };
     }
     
-    console.log('Raw students data:', students);
+    console.log('Raw students data from RPC:', data);
     
-    if (!students || students.length === 0) {
+    if (!data || data.length === 0) {
       console.log('No students found for school ID:', schoolId);
       return { data: [], error: null };
     }
     
-    // Transform data to match expected StudentRecord format
-    const mappedData = students.map(student => {
+    // Map the data to our StudentRecord interface
+    const mappedData = data.map((student: StudentDetails) => {
       return {
         id: student.id,
         school_id: student.school_id,
@@ -171,11 +167,11 @@ export async function getStudentsWithDetails(schoolId: string) {
         level: student.level,
         phone: student.phone,
         created_at: student.created_at,
-        first_name: student.users?.first_name || '',
-        last_name: student.users?.last_name || '',
-        email: student.users?.email || '',
-        course_name: student.courses?.name || '',
-        lessonType: student.courses?.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
+        first_name: student.first_name || '',
+        last_name: student.last_name || '',
+        email: student.email || '',
+        course_name: student.course_name || '',
+        lessonType: student.lesson_type?.toLowerCase() === 'individual' ? 'individual' : 'group'
       } as StudentRecord;
     });
     

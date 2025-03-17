@@ -339,7 +339,22 @@ export type Database = {
         Args: {
           p_school_id: string
         }
-        Returns: Json[]
+        Returns: {
+          id: string
+          school_id: string
+          user_id: string
+          teacher_id: string
+          course_id: string
+          age_group: string
+          level: string
+          phone: string
+          created_at: string
+          first_name: string
+          last_name: string
+          email: string
+          course_name: string
+          lesson_type: string
+        }[]
       }
       get_user_license_id: {
         Args: {
