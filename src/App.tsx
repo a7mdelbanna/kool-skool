@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,9 +16,9 @@ import TeamAccess from "./pages/TeamAccess";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import LicenseManagement from "./pages/LicenseManagement";
+import Courses from "./pages/Courses";
 import { PaymentProvider } from "./contexts/PaymentContext";
 
-// Create a context for the user
 export const UserContext = createContext<{
   user: any;
   isAuthenticated: boolean;
@@ -32,13 +31,12 @@ export const UserContext = createContext<{
 
 const queryClient = new QueryClient();
 
-const App = () => {
+function App() {
   const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check if user is authenticated
     const checkAuth = () => {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
@@ -55,7 +53,6 @@ const App = () => {
     
     checkAuth();
     
-    // Listen for storage events to handle authentication across tabs
     window.addEventListener('storage', checkAuth);
     
     return () => {
@@ -78,21 +75,18 @@ const App = () => {
               <Toaster />
               <Sonner />
               <Routes>
-                {/* Authentication routes */}
                 <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
-                {/* School setup is only accessible if user is NOT authenticated */}
                 <Route path="/school-setup" element={isAuthenticated ? <Navigate to="/license" replace /> : <SchoolSetup />} />
-                
-                {/* Protected routes */}
                 <Route element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/students" element={<Students />} />
-                  <Route path="/calendar" element={<Calendar />} />
-                  <Route path="/payments" element={<Payments />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/reports" element={<StatesReports />} />
-                  <Route path="/team-access" element={<TeamAccess />} />
-                  <Route path="/license" element={<LicenseManagement />} />
+                  <Route index element={<Index />} />
+                  <Route path="students" element={<Students />} />
+                  <Route path="courses" element={<Courses />} />
+                  <Route path="calendar" element={<Calendar />} />
+                  <Route path="payments" element={<Payments />} />
+                  <Route path="team-access" element={<TeamAccess />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="reports" element={<StatesReports />} />
+                  <Route path="license" element={<LicenseManagement />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
