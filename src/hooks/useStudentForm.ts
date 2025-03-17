@@ -151,7 +151,7 @@ export const useStudentForm = (
         console.log('Fetching teachers directly from users table');
         const { data: directTeachersData, error: directTeachersError } = await supabase
           .from('users')
-          .select('id, first_name, last_name')
+          .select('id, first_name, last_name, email')
           .eq('school_id', schoolId)
           .eq('role', 'teacher');
           
@@ -160,9 +160,11 @@ export const useStudentForm = (
           
           const formattedTeachers = directTeachersData.map(teacher => ({
             id: teacher.id,
-            first_name: teacher.first_name || 'Unnamed',
-            last_name: teacher.last_name || 'Teacher',
-            display_name: `${teacher.first_name || 'Unnamed'} ${teacher.last_name || 'Teacher'}`
+            first_name: teacher.first_name || '',
+            last_name: teacher.last_name || '',
+            display_name: teacher.first_name && teacher.last_name 
+              ? `${teacher.first_name} ${teacher.last_name}`
+              : teacher.email || teacher.id
           }));
           
           console.log('Formatted teachers data:', formattedTeachers);
@@ -210,25 +212,31 @@ export const useStudentForm = (
           if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
             uniqueTeacherIds.add(student.teacher_id);
             
-            const { data: teacherData, error: teacherFetchError } = await supabase
+            const { data: teacherData, error: teacherError } = await supabase
               .from('users')
-              .select('first_name, last_name')
+              .select('id, first_name, last_name, email, role')
               .eq('id', student.teacher_id)
               .maybeSingle();
-              
-            let firstName = 'Teacher';
-            let lastName = '#' + uniqueTeachers.length + 1;
             
-            if (teacherData && teacherData.first_name) {
-              firstName = teacherData.first_name;
-              lastName = teacherData.last_name || '';
+            if (teacherError) {
+              console.error(`Error fetching teacher with ID ${student.teacher_id}:`, teacherError);
+            }
+            
+            let displayName;
+            
+            if (teacherData && (teacherData.first_name || teacherData.last_name)) {
+              displayName = [teacherData.first_name, teacherData.last_name].filter(Boolean).join(' ');
+            } else if (teacherData && teacherData.email) {
+              displayName = teacherData.email;
+            } else {
+              displayName = `Teacher ID: ${student.teacher_id.substring(0, 8)}`;
             }
             
             uniqueTeachers.push({
               id: student.teacher_id,
-              first_name: firstName,
-              last_name: lastName,
-              display_name: `${firstName} ${lastName}`.trim()
+              first_name: teacherData?.first_name || '',
+              last_name: teacherData?.last_name || '',
+              display_name: displayName
             });
           }
         }
