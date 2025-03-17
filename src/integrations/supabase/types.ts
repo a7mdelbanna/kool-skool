@@ -331,6 +331,10 @@ export type Database = {
         }
         Returns: Json
       }
+      current_user_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_role_constraint_values: {
         Args: Record<PropertyKey, never>
         Returns: string

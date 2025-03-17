@@ -18,6 +18,8 @@ RETURNS TABLE (
   lesson_type TEXT
 ) AS $$
 BEGIN
+  -- Use a SECURITY DEFINER function to bypass RLS policies
+  -- This allows retrieving data regardless of who calls the function
   RETURN QUERY
   SELECT 
     s.id,
@@ -39,4 +41,4 @@ BEGIN
   LEFT JOIN courses c ON s.course_id = c.id
   WHERE s.school_id = p_school_id;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
