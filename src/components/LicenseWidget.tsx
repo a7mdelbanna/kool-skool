@@ -36,6 +36,17 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     
     console.log('Fetching license details for school ID:', schoolId);
     
+    // First, let's debug what schools exist
+    const { data: allSchools, error: debugError } = await supabase
+      .from('schools')
+      .select('id, name, license_id')
+      .limit(5);
+    
+    console.log('Debug - All schools:', allSchools);
+    if (debugError) {
+      console.error('Debug error:', debugError);
+    }
+    
     // Get school details including license_id and name
     const { data: schoolData, error: schoolError } = await supabase
       .from('schools')
@@ -50,14 +61,31 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     
     if (!schoolData) {
       console.log('No school data found for ID:', schoolId);
-      return null;
+      // Return fallback data so the widget doesn't break
+      return {
+        id: 'fallback',
+        license_number: 'No License Key',
+        is_active: false,
+        duration_days: 0,
+        days_remaining: 0,
+        expires_at: null,
+        school_name: 'Your School'
+      };
     }
     
     console.log('School data found:', schoolData);
     
     if (!schoolData.license_id) {
-      console.log('No license ID found for school');
-      return null;
+      console.log('No license ID found for school, using fallback data');
+      return {
+        id: 'no-license',
+        license_number: 'No License Key',
+        is_active: false,
+        duration_days: 0,
+        days_remaining: 0,
+        expires_at: null,
+        school_name: schoolData.name
+      };
     }
     
     // Get license details
@@ -220,7 +248,7 @@ const LicenseWidget: React.FC = () => {
             <Alert variant="destructive" className="w-full bg-red-50 border-red-200">
               <AlertTitle className="text-red-600">License information unavailable</AlertTitle>
               <AlertDescription className="text-red-500">
-                There was a problem loading your license details.
+                There was a problem loading your license details. This might be because your school setup is incomplete.
               </AlertDescription>
               <Button 
                 variant="outline" 
@@ -250,9 +278,9 @@ const LicenseWidget: React.FC = () => {
         <div className="flex items-center justify-center h-12">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
         </div>
-      ) : error ? (
+      ) : error || !licenseDetails ? (
         <Alert variant="destructive" className="bg-red-50 border-red-200">
-          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
+          <AlertTitle className="text-red-600">License information unavailable</AlertTitle>
           <AlertDescription className="text-red-500">
             Please refresh the page or contact support if this issue persists.
           </AlertDescription>
@@ -266,7 +294,7 @@ const LicenseWidget: React.FC = () => {
             Refresh Data
           </Button>
         </Alert>
-      ) : licenseDetails ? (
+      ) : (
         <div className="space-y-2">
           {licenseDetails.license_number && (
             <p className="text-sm text-gray-500">License: {licenseDetails.license_number}</p>
@@ -288,26 +316,9 @@ const LicenseWidget: React.FC = () => {
             )}
           </div>
         </div>
-      ) : (
-        <Alert variant="destructive" className="bg-red-50 border-red-200">
-          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
-          <AlertDescription className="text-red-500">
-            Please refresh the page or contact support if this issue persists.
-          </AlertDescription>
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="mt-2"
-            onClick={() => refetch()}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh Data
-          </Button>
-        </Alert>
       )}
     </div>
   );
 };
 
 export default LicenseWidget;
-

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { School, Clock, KeyRound, CreditCard, Calendar, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
@@ -33,6 +34,17 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
     
     console.log('Fetching school info for ID:', schoolId);
     
+    // First, let's check if any schools exist at all
+    const { data: allSchools, error: allSchoolsError } = await supabase
+      .from('schools')
+      .select('id, name')
+      .limit(5);
+    
+    console.log('All schools in database:', allSchools);
+    if (allSchoolsError) {
+      console.error('Error fetching all schools:', allSchoolsError);
+    }
+    
     const { data, error } = await supabase
       .from('schools')
       .select('id, name, contact_info, logo')
@@ -46,7 +58,13 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
     
     if (!data) {
       console.log('No school data found for ID:', schoolId);
-      return null;
+      // Return a fallback school object so the UI doesn't break
+      return {
+        id: schoolId,
+        name: "Your School",
+        contact_info: null,
+        logo: null
+      };
     }
     
     console.log('Successfully fetched school data:', data);
@@ -97,14 +115,14 @@ const LicenseManagement: React.FC = () => {
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-              ) : schoolError && !schoolInfo ? (
+              ) : !schoolInfo ? (
                 <div className="p-4 bg-red-50 rounded-lg border border-red-100 text-red-800">
                   <div className="flex items-center mb-2">
                     <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
                     <h3 className="font-medium text-red-700">Error Loading School Information</h3>
                   </div>
                   <p className="text-sm text-red-600">
-                    We couldn't retrieve your school information. Please try refreshing the page or contact support.
+                    We couldn't retrieve your school information. This might be because your school hasn't been set up yet or there's a database issue.
                   </p>
                   <Button 
                     variant="outline" 
@@ -130,7 +148,7 @@ const LicenseManagement: React.FC = () => {
                   <div className="flex items-center space-x-3">
                     <School className="h-8 w-8 text-primary" />
                     <div>
-                      <h3 className="text-lg font-medium">{schoolInfo?.name || "Loading..."}</h3>
+                      <h3 className="text-lg font-medium">{schoolInfo.name}</h3>
                       <p className="text-sm text-gray-500">School Account</p>
                     </div>
                   </div>
