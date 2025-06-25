@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -100,7 +101,7 @@ const Students = () => {
       lastName: record.last_name || '',
       email: record.email || '',
       courseName: record.course_name || '',
-      lessonType: (record.lessonType as 'individual' | 'group') || 'individual',
+      lessonType: (record.lesson_type as 'individual' | 'group') || 'individual',
       ageGroup: (record.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
       level: (record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
       phone: record.phone,
@@ -114,9 +115,9 @@ const Students = () => {
   
   useEffect(() => {
     console.log('Current students data:', studentsData);
-    if (studentsData?.data && studentsData.data.length > 0) {
-      console.log('Students found in data:', studentsData.data.length);
-    } else if (studentsData?.data) {
+    if (studentsData && studentsData.length > 0) {
+      console.log('Students found in data:', studentsData.length);
+    } else if (studentsData) {
       console.log('Students data array is empty');
     } else {
       console.log('No students data available');
@@ -125,8 +126,8 @@ const Students = () => {
   
   const students: Student[] = USE_MOCK_DATA 
     ? getMockStudents() 
-    : (studentsData?.data ? 
-      studentsData.data.map(mapStudentRecordToStudent) : 
+    : (studentsData ? 
+      studentsData.map(mapStudentRecordToStudent) : 
       []);
   
   console.log('Mapped students for UI:', students);
@@ -285,29 +286,16 @@ const Students = () => {
       
       toast.loading("Creating course...");
       
-      const { data, error } = await createCourse(
-        user.schoolId,
-        newCourseName.trim(),
-        newCourseType
-      );
+      const courseData = await createCourse({
+        school_id: user.schoolId,
+        course_name: newCourseName.trim(),
+        lesson_type: newCourseType
+      });
       
       toast.dismiss();
       
-      if (error) {
-        console.error("Error creating course:", error);
-        
-        if (error.message?.includes("Authentication required") || 
-            error.message?.includes("expired") || 
-            error.message?.includes("JWT")) {
-          toast.error("Your session has expired. Please log in again.");
-          
-          localStorage.removeItem('user');
-          setUser(null);
-          navigate('/login');
-          return;
-        }
-        
-        toast.error(error.message || "Failed to create course");
+      if (!courseData) {
+        toast.error("Failed to create course");
         return;
       }
       
@@ -320,7 +308,23 @@ const Students = () => {
     } catch (error) {
       toast.dismiss();
       console.error("Error adding course:", error);
-      toast.error("An error occurred while creating the course");
+      
+      if (error instanceof Error) {
+        if (error.message?.includes("Authentication required") || 
+            error.message?.includes("expired") || 
+            error.message?.includes("JWT")) {
+          toast.error("Your session has expired. Please log in again.");
+          
+          localStorage.removeItem('user');
+          setUser(null);
+          navigate('/login');
+          return;
+        }
+        
+        toast.error(error.message || "Failed to create course");
+      } else {
+        toast.error("An error occurred while creating the course");
+      }
     } finally {
       setSavingCourse(false);
     }
@@ -647,7 +651,7 @@ const Students = () => {
                     <p>School ID: {schoolId || 'Not set'}</p>
                     <p>User role: {user?.role || 'Not set'}</p>
                     <p>Data fetch status: {studentsLoading ? 'Loading' : 'Complete'}</p>
-                    <p>Students data array: {studentsData?.data ? `${studentsData.data.length} records` : 'Undefined'}</p>
+                    <p>Students data array: {studentsData ? `${studentsData.length} records` : 'Undefined'}</p>
                   </div>
                 </details>
               </div>

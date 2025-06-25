@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -323,34 +324,34 @@ export const useStudentForm = (
 
         console.log("Using password for student:", studentPassword);
         
-        const { data, error } = await createStudent(
-          studentData.email as string,
-          studentPassword,
-          studentData.firstName as string,
-          studentData.lastName as string,
-          teacher.id,
-          course.id,
-          studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
-          studentData.level === 'beginner' ? 'Beginner' : 
+        const response = await createStudent({
+          student_email: studentData.email as string,
+          student_password: studentPassword,
+          first_name: studentData.firstName as string,
+          last_name: studentData.lastName as string,
+          teacher_id: teacher.id,
+          course_id: course.id,
+          age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
+          level: studentData.level === 'beginner' ? 'Beginner' : 
             studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
-          studentData.phone
-        );
+          phone: studentData.phone
+        });
         
         toast.dismiss();
         
-        if (error || !data || !data.success) {
-          console.error("Error creating student:", error || (data && data.message));
-          toast.error(data && data.message ? data.message : "Failed to create student");
+        if (!response || !response.success) {
+          console.error("Error creating student:", response?.message);
+          toast.error(response?.message || "Failed to create student");
           setSaving(false);
           return;
         }
         
-        console.log("Student created successfully:", data);
+        console.log("Student created successfully:", response);
         toast.success("Student added successfully");
         
-        if (onStudentAdded && data.success) {
+        if (onStudentAdded && response.success) {
           const newStudent: Student = {
-            id: data.student_id as string,
+            id: response.student_id as string,
             firstName: studentData.firstName as string,
             lastName: studentData.lastName as string,
             email: studentData.email as string,
