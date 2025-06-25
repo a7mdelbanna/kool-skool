@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { School, Clock, KeyRound, CreditCard, Calendar, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
@@ -32,53 +31,55 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
       return null;
     }
     
+    console.log('=== SCHOOL INFO DEBUG START ===');
     console.log('Fetching school info for ID:', schoolId);
     
-    // First, let's check if any schools exist at all and find the correct one
+    // Get all schools to debug
     const { data: allSchools, error: allSchoolsError } = await supabase
       .from('schools')
       .select('id, name, contact_info, logo');
     
     console.log('All schools in database:', allSchools);
+    console.log('Schools query error:', allSchoolsError);
+    
     if (allSchoolsError) {
       console.error('Error fetching all schools:', allSchoolsError);
-    }
-    
-    // Try exact match first
-    let schoolData = allSchools?.find(school => school.id === schoolId);
-    
-    // If no exact match and we have schools, let's try to find a similar ID or use the first one
-    if (!schoolData && allSchools && allSchools.length > 0) {
-      console.log('No exact match found, checking for similar IDs...');
-      // Look for similar IDs (in case of typos)
-      schoolData = allSchools.find(school => 
-        school.id.toLowerCase().includes(schoolId.toLowerCase().substring(0, 8)) ||
-        schoolId.toLowerCase().includes(school.id.toLowerCase().substring(0, 8))
-      );
-      
-      // If still no match, use the first school (assuming single school setup)
-      if (!schoolData) {
-        console.log('Using first available school as fallback');
-        schoolData = allSchools[0];
-        
-        // Update localStorage with correct school ID
-        const updatedUser = { ...user, schoolId: schoolData.id };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        console.log('Updated localStorage with correct school ID:', schoolData.id);
-      }
-    }
-    
-    if (!schoolData) {
-      console.log('No school data found');
       return {
         id: schoolId,
-        name: "Your School",
+        name: "Database Error",
         contact_info: null,
         logo: null
       };
     }
     
+    // If no schools exist, return appropriate message
+    if (!allSchools || allSchools.length === 0) {
+      console.log('No schools found in database');
+      return {
+        id: 'no-schools',
+        name: "School Setup Required",
+        contact_info: { message: "Please complete school setup to continue" },
+        logo: null
+      };
+    }
+    
+    // Try exact match first
+    let schoolData = allSchools.find(school => school.id === schoolId);
+    
+    // If no exact match, use first school and update localStorage
+    if (!schoolData) {
+      console.log('No exact match found, using first available school');
+      schoolData = allSchools[0];
+      
+      // Update localStorage with correct school ID
+      const updatedUser = { ...user, schoolId: schoolData.id };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('Updated localStorage with correct school ID:', schoolData.id);
+    }
+    
     console.log('Successfully fetched school data:', schoolData);
+    console.log('=== SCHOOL INFO DEBUG END ===');
+    
     return {
       id: schoolData.id,
       name: schoolData.name,
@@ -87,7 +88,12 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
     };
   } catch (error) {
     console.error('Error in fetchSchoolInfo:', error);
-    return null;
+    return {
+      id: 'error',
+      name: "Error Loading School",
+      contact_info: null,
+      logo: null
+    };
   }
 };
 
@@ -100,8 +106,8 @@ const LicenseManagement: React.FC = () => {
     queryKey: ['schoolInfo'],
     queryFn: fetchSchoolInfo,
     enabled: !!localStorage.getItem('user'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3, // Retry failed requests 3 times
+    staleTime: 5 * 60 * 1000,
+    retry: 1, // Reduce retries
   });
 
   const handleRefresh = async () => {
@@ -159,6 +165,40 @@ const LicenseManagement: React.FC = () => {
                     )}
                   </Button>
                 </div>
+              ) : schoolInfo.id === 'no-schools' ? (
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-100">
+                  <div className="flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 text-amber-600 mr-2" />
+                    <h3 className="font-medium text-amber-700">School Setup Required</h3>
+                  </div>
+                  <p className="text-sm text-amber-600 mb-4">
+                    Your school hasn't been set up in the system yet. To access license information, you need to complete the initial school setup.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => navigate('/school-setup')}
+                    >
+                      Complete School Setup
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                    >
+                      {isRefreshing ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Refreshing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Check Again
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="space-y-6">
                   <div className="flex items-center space-x-3">
@@ -175,7 +215,7 @@ const LicenseManagement: React.FC = () => {
                       <h3 className="font-medium">Subscription Details</h3>
                     </div>
                     
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid md:grid-cols-1 gap-4">
                       <LicenseWidget />
                     </div>
                   </div>

@@ -34,64 +34,67 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
       return null;
     }
     
+    console.log('=== LICENSE DEBUG START ===');
+    console.log('User from localStorage:', user);
     console.log('Fetching license details for school ID:', schoolId);
     
-    // First, let's get all schools to debug and find the correct one
-    const { data: allSchools, error: debugError } = await supabase
+    // Check if any schools exist at all
+    const { data: allSchools, error: schoolsError } = await supabase
       .from('schools')
-      .select('id, name, license_id');
+      .select('*');
     
-    console.log('Debug - All schools:', allSchools);
-    if (debugError) {
-      console.error('Debug error:', debugError);
-    }
+    console.log('All schools query result:', { data: allSchools, error: schoolsError });
     
-    // Try to find the school by exact ID first
-    let schoolData = allSchools?.find(school => school.id === schoolId);
-    
-    // If no exact match, try to find similar ID or use first available
-    if (!schoolData && allSchools && allSchools.length > 0) {
-      console.log('No exact school match, looking for similar or using first available...');
-      
-      // Look for similar IDs
-      schoolData = allSchools.find(school => 
-        school.id.toLowerCase().includes(schoolId.toLowerCase().substring(0, 8)) ||
-        schoolId.toLowerCase().includes(school.id.toLowerCase().substring(0, 8))
-      );
-      
-      // If still no match, use the first school
-      if (!schoolData) {
-        console.log('Using first available school');
-        schoolData = allSchools[0];
-        
-        // Update localStorage with correct school ID
-        const updatedUser = { ...user, schoolId: schoolData.id };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        console.log('Updated localStorage with correct school ID:', schoolData.id);
-        schoolId = schoolData.id;
-      }
-    }
-    
-    if (!schoolData) {
-      console.log('No school data found, using fallback');
+    if (schoolsError) {
+      console.error('Error fetching schools:', schoolsError);
       return {
-        id: 'fallback',
-        license_number: 'No License Key',
+        id: 'error-schools',
+        license_number: 'Database Error',
         is_active: false,
         duration_days: 0,
         days_remaining: 0,
         expires_at: null,
-        school_name: 'Your School'
+        school_name: 'Error loading school data'
       };
     }
     
-    console.log('School data found:', schoolData);
-    
-    if (!schoolData.license_id) {
-      console.log('No license ID found for school, returning basic info');
+    // If no schools exist at all, this indicates the school setup wasn't completed
+    if (!allSchools || allSchools.length === 0) {
+      console.warn('No schools found in database - school setup may not be complete');
       return {
-        id: 'no-license',
-        license_number: 'No License Key',
+        id: 'no-schools',
+        license_number: 'Setup Required',
+        is_active: false,
+        duration_days: 0,
+        days_remaining: 0,
+        expires_at: null,
+        school_name: 'School Setup Required'
+      };
+    }
+    
+    // Try to find the specific school
+    let schoolData = allSchools.find(school => school.id === schoolId);
+    
+    // If no exact match, use first school and update localStorage
+    if (!schoolData) {
+      console.log('School ID not found, using first available school');
+      schoolData = allSchools[0];
+      
+      // Update localStorage with correct school ID
+      const updatedUser = { ...user, schoolId: schoolData.id };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('Updated localStorage with correct school ID:', schoolData.id);
+      schoolId = schoolData.id;
+    }
+    
+    console.log('Using school data:', schoolData);
+    
+    // Check if school has a license
+    if (!schoolData.license_id) {
+      console.log('School has no license ID');
+      return {
+        id: 'no-license-id',
+        license_number: 'No License Assigned',
         is_active: false,
         duration_days: 365,
         days_remaining: 365,
@@ -103,19 +106,29 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     // Get license details
     const { data: licenseData, error: licenseError } = await supabase
       .from('licenses')
-      .select('id, license_key, expires_at, duration_days, created_at, is_active')
+      .select('*')
       .eq('id', schoolData.license_id)
       .maybeSingle();
     
+    console.log('License query result:', { data: licenseData, error: licenseError });
+    
     if (licenseError) {
       console.error('Error fetching license:', licenseError);
-      return null;
+      return {
+        id: 'license-error',
+        license_number: 'License Error',
+        is_active: false,
+        duration_days: 0,
+        days_remaining: 0,
+        expires_at: null,
+        school_name: schoolData.name
+      };
     }
     
     if (!licenseData) {
       console.log('No license data found for license ID:', schoolData.license_id);
       return {
-        id: 'no-license-data',
+        id: 'license-not-found',
         license_number: 'License Not Found',
         is_active: false,
         duration_days: 365,
@@ -125,9 +138,7 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
       };
     }
     
-    console.log('License data found:', licenseData);
-    
-    // Calculate days remaining more accurately
+    // Calculate days remaining
     const now = new Date();
     const expiryDate = licenseData.expires_at ? new Date(licenseData.expires_at) : null;
     const createdDate = licenseData.created_at ? new Date(licenseData.created_at) : null;
@@ -137,23 +148,18 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     let isActive = licenseData.is_active || false;
     
     if (expiryDate) {
-      // If we have an expiry date, calculate from that
       daysRemaining = Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       isActive = expiryDate > now && licenseData.is_active;
     } else if (createdDate && licenseData.is_active) {
-      // If no expiry date but we have created date and license is active, calculate from creation
       const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
       daysRemaining = Math.max(0, durationDays - daysSinceCreation);
       isActive = daysSinceCreation < durationDays && licenseData.is_active;
     } else if (licenseData.is_active) {
-      // Fallback: assume it's a new license with full duration if active
       daysRemaining = durationDays;
       isActive = true;
     }
     
-    console.log('Calculated days remaining:', daysRemaining, 'Active:', isActive);
-    
-    return {
+    const result = {
       id: licenseData.id,
       license_number: licenseData.license_key,
       is_active: isActive,
@@ -162,9 +168,22 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
       expires_at: licenseData.expires_at,
       school_name: schoolData.name
     };
+    
+    console.log('Final license result:', result);
+    console.log('=== LICENSE DEBUG END ===');
+    
+    return result;
   } catch (error) {
-    console.error('Error fetching license details:', error);
-    return null;
+    console.error('Error in fetchLicenseDetails:', error);
+    return {
+      id: 'catch-error',
+      license_number: 'System Error',
+      is_active: false,
+      duration_days: 0,
+      days_remaining: 0,
+      expires_at: null,
+      school_name: 'Error loading data'
+    };
   }
 };
 
@@ -177,9 +196,9 @@ const LicenseWidget: React.FC = () => {
   const { data: licenseDetails, isLoading, error, refetch, isError } = useQuery({
     queryKey: ['licenseDetails'],
     queryFn: fetchLicenseDetails,
-    enabled: !isSchoolSetupPage && !!localStorage.getItem('user'), // Don't run on setup page
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3, // Retry failed requests 3 times
+    enabled: !isSchoolSetupPage && !!localStorage.getItem('user'),
+    staleTime: 5 * 60 * 1000,
+    retry: 1, // Reduce retries to avoid spam
   });
 
   // Show a different version of the widget on the school setup page
@@ -200,6 +219,43 @@ const LicenseWidget: React.FC = () => {
 
   // Expanded view for the license management page
   if (isLicensePage && licenseDetails) {
+    // Show specific message for setup required case
+    if (licenseDetails.id === 'no-schools') {
+      return (
+        <div className="bg-white p-6 rounded-lg border border-amber-200 w-full">
+          <Alert variant="default" className="bg-amber-50 border-amber-200">
+            <AlertTitle className="text-amber-700">School Setup Required</AlertTitle>
+            <AlertDescription className="text-amber-600 space-y-2">
+              <p>It looks like your school hasn't been set up in the system yet.</p>
+              <p>To get started, you'll need to:</p>
+              <ul className="list-disc list-inside ml-4 space-y-1">
+                <li>Complete the school setup process</li>
+                <li>Enter your license key</li>
+                <li>Verify your school information</li>
+              </ul>
+            </AlertDescription>
+            <div className="mt-4 flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.location.href = '/school-setup'}
+              >
+                Go to School Setup
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => refetch()}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Check Again
+              </Button>
+            </div>
+          </Alert>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-white p-6 rounded-lg border border-gray-200 w-full">
         <div className="grid grid-cols-2 gap-4">
