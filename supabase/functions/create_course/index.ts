@@ -9,24 +9,30 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    console.log('Handling CORS preflight request')
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 200
+    })
   }
   
   try {
-    console.log("Create course function called with method:", req.method);
-    console.log("Request headers:", Object.fromEntries(req.headers.entries()));
+    console.log("Create course function called with method:", req.method)
+    console.log("Request headers:", Object.fromEntries(req.headers.entries()))
     
     // Get request headers for validation
     const userId = req.headers.get('x-user-id')
     const schoolId = req.headers.get('x-school-id')
     const userRole = req.headers.get('x-user-role')
     
-    console.log("Extracted headers:", { userId, schoolId, userRole });
+    console.log("Extracted headers:", { userId, schoolId, userRole })
     
     if (!userId || !schoolId) {
-      console.error("Missing required headers");
+      console.error("Missing required headers")
       return new Response(
         JSON.stringify({ 
           error: "Missing required headers",
@@ -36,7 +42,7 @@ serve(async (req) => {
       )
     }
     
-    // Get request body as text
+    // Get request body
     let requestBody;
     try {
       const requestText = await req.text();
@@ -64,11 +70,17 @@ serve(async (req) => {
     }
     
     // Create Supabase client with service role key
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    console.log("Environment check:", {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+      url: supabaseUrl
+    })
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("Missing Supabase configuration");
+      console.error("Missing Supabase configuration")
       return new Response(
         JSON.stringify({ 
           error: "Server configuration error", 
@@ -85,12 +97,6 @@ serve(async (req) => {
         auth: {
           persistSession: false,
           autoRefreshToken: false
-        },
-        global: {
-          headers: {
-            apikey: supabaseServiceKey,
-            Authorization: `Bearer ${supabaseServiceKey}`
-          }
         }
       }
     )
@@ -125,6 +131,7 @@ serve(async (req) => {
     }
     
     // Insert course record directly into the database
+    console.log("Attempting to insert course into database...")
     const { data, error } = await supabaseClient
       .from('courses')
       .insert({
@@ -136,9 +143,13 @@ serve(async (req) => {
       .single();
     
     if (error) {
-      console.error("Error creating course:", error);
+      console.error("Database error creating course:", error);
       return new Response(
-        JSON.stringify({ error: error.message, detail: error.details }),
+        JSON.stringify({ 
+          error: "Database error", 
+          detail: error.message,
+          code: error.code 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -151,14 +162,26 @@ serve(async (req) => {
         id: data.id,
         school_id: data.school_id,
         name: data.name,
-        lesson_type: data.lesson_type
+        lesson_type: data.lesson_type,
+        created_at: data.created_at,
+        updated_at: data.updated_at
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        }, 
+        status: 201 
+      }
     )
   } catch (error) {
-    console.error("Unhandled error:", error);
+    console.error("Unhandled error in create_course function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: "Internal server error", 
+        detail: error.message,
+        stack: error.stack 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
