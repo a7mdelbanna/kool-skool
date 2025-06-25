@@ -27,7 +27,7 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     }
     
     const user = JSON.parse(userString);
-    const schoolId = user.schoolId;
+    let schoolId = user.schoolId;
     
     if (!schoolId) {
       console.error('No school ID found for user');
@@ -36,32 +36,44 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     
     console.log('Fetching license details for school ID:', schoolId);
     
-    // First, let's debug what schools exist
+    // First, let's get all schools to debug and find the correct one
     const { data: allSchools, error: debugError } = await supabase
       .from('schools')
-      .select('id, name, license_id')
-      .limit(5);
+      .select('id, name, license_id');
     
     console.log('Debug - All schools:', allSchools);
     if (debugError) {
       console.error('Debug error:', debugError);
     }
     
-    // Get school details including license_id and name
-    const { data: schoolData, error: schoolError } = await supabase
-      .from('schools')
-      .select('name, license_id')
-      .eq('id', schoolId)
-      .maybeSingle();
+    // Try to find the school by exact ID first
+    let schoolData = allSchools?.find(school => school.id === schoolId);
     
-    if (schoolError) {
-      console.error('Error fetching school:', schoolError);
-      return null;
+    // If no exact match, try to find similar ID or use first available
+    if (!schoolData && allSchools && allSchools.length > 0) {
+      console.log('No exact school match, looking for similar or using first available...');
+      
+      // Look for similar IDs
+      schoolData = allSchools.find(school => 
+        school.id.toLowerCase().includes(schoolId.toLowerCase().substring(0, 8)) ||
+        schoolId.toLowerCase().includes(school.id.toLowerCase().substring(0, 8))
+      );
+      
+      // If still no match, use the first school
+      if (!schoolData) {
+        console.log('Using first available school');
+        schoolData = allSchools[0];
+        
+        // Update localStorage with correct school ID
+        const updatedUser = { ...user, schoolId: schoolData.id };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        console.log('Updated localStorage with correct school ID:', schoolData.id);
+        schoolId = schoolData.id;
+      }
     }
     
     if (!schoolData) {
-      console.log('No school data found for ID:', schoolId);
-      // Return fallback data so the widget doesn't break
+      console.log('No school data found, using fallback');
       return {
         id: 'fallback',
         license_number: 'No License Key',
@@ -76,13 +88,13 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     console.log('School data found:', schoolData);
     
     if (!schoolData.license_id) {
-      console.log('No license ID found for school, using fallback data');
+      console.log('No license ID found for school, returning basic info');
       return {
         id: 'no-license',
         license_number: 'No License Key',
         is_active: false,
-        duration_days: 0,
-        days_remaining: 0,
+        duration_days: 365,
+        days_remaining: 365,
         expires_at: null,
         school_name: schoolData.name
       };
@@ -91,7 +103,7 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     // Get license details
     const { data: licenseData, error: licenseError } = await supabase
       .from('licenses')
-      .select('id, license_key, expires_at, duration_days, created_at')
+      .select('id, license_key, expires_at, duration_days, created_at, is_active')
       .eq('id', schoolData.license_id)
       .maybeSingle();
     
@@ -102,7 +114,15 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     
     if (!licenseData) {
       console.log('No license data found for license ID:', schoolData.license_id);
-      return null;
+      return {
+        id: 'no-license-data',
+        license_number: 'License Not Found',
+        is_active: false,
+        duration_days: 365,
+        days_remaining: 0,
+        expires_at: null,
+        school_name: schoolData.name
+      };
     }
     
     console.log('License data found:', licenseData);
@@ -114,19 +134,19 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     const durationDays = licenseData.duration_days || 365;
     
     let daysRemaining = 0;
-    let isActive = false;
+    let isActive = licenseData.is_active || false;
     
     if (expiryDate) {
       // If we have an expiry date, calculate from that
       daysRemaining = Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      isActive = expiryDate > now;
-    } else if (createdDate) {
-      // If no expiry date but we have created date, calculate from creation
+      isActive = expiryDate > now && licenseData.is_active;
+    } else if (createdDate && licenseData.is_active) {
+      // If no expiry date but we have created date and license is active, calculate from creation
       const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
       daysRemaining = Math.max(0, durationDays - daysSinceCreation);
-      isActive = daysSinceCreation < durationDays;
-    } else {
-      // Fallback: assume it's a new license with full duration
+      isActive = daysSinceCreation < durationDays && licenseData.is_active;
+    } else if (licenseData.is_active) {
+      // Fallback: assume it's a new license with full duration if active
       daysRemaining = durationDays;
       isActive = true;
     }

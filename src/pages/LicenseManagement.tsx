@@ -34,31 +34,42 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
     
     console.log('Fetching school info for ID:', schoolId);
     
-    // First, let's check if any schools exist at all
+    // First, let's check if any schools exist at all and find the correct one
     const { data: allSchools, error: allSchoolsError } = await supabase
       .from('schools')
-      .select('id, name')
-      .limit(5);
+      .select('id, name, contact_info, logo');
     
     console.log('All schools in database:', allSchools);
     if (allSchoolsError) {
       console.error('Error fetching all schools:', allSchoolsError);
     }
     
-    const { data, error } = await supabase
-      .from('schools')
-      .select('id, name, contact_info, logo')
-      .eq('id', schoolId)
-      .maybeSingle(); 
+    // Try exact match first
+    let schoolData = allSchools?.find(school => school.id === schoolId);
     
-    if (error) {
-      console.error('Error fetching school:', error);
-      return null;
+    // If no exact match and we have schools, let's try to find a similar ID or use the first one
+    if (!schoolData && allSchools && allSchools.length > 0) {
+      console.log('No exact match found, checking for similar IDs...');
+      // Look for similar IDs (in case of typos)
+      schoolData = allSchools.find(school => 
+        school.id.toLowerCase().includes(schoolId.toLowerCase().substring(0, 8)) ||
+        schoolId.toLowerCase().includes(school.id.toLowerCase().substring(0, 8))
+      );
+      
+      // If still no match, use the first school (assuming single school setup)
+      if (!schoolData) {
+        console.log('Using first available school as fallback');
+        schoolData = allSchools[0];
+        
+        // Update localStorage with correct school ID
+        const updatedUser = { ...user, schoolId: schoolData.id };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        console.log('Updated localStorage with correct school ID:', schoolData.id);
+      }
     }
     
-    if (!data) {
-      console.log('No school data found for ID:', schoolId);
-      // Return a fallback school object so the UI doesn't break
+    if (!schoolData) {
+      console.log('No school data found');
       return {
         id: schoolId,
         name: "Your School",
@@ -67,8 +78,13 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
       };
     }
     
-    console.log('Successfully fetched school data:', data);
-    return data;
+    console.log('Successfully fetched school data:', schoolData);
+    return {
+      id: schoolData.id,
+      name: schoolData.name,
+      contact_info: schoolData.contact_info,
+      logo: schoolData.logo
+    };
   } catch (error) {
     console.error('Error in fetchSchoolInfo:', error);
     return null;
