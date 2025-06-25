@@ -34,22 +34,9 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
       return null;
     }
     
-    // For demo/test purposes - if we're using a known demo ID
-    if (schoolId === "fbc27415-c205-4d6e-b549-9370f386a004") {
-      console.log('Using sample license data for demo ID');
-      // Return sample license data
-      return {
-        id: "license-123",
-        license_number: "DEMO-LICENSE-2025",
-        is_active: true,
-        duration_days: 365,
-        days_remaining: 273,
-        expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-        school_name: "Demo School"
-      };
-    }
+    console.log('Fetching license details for school ID:', schoolId);
     
-    // Get school details including license_id
+    // Get school details including license_id and name
     const { data: schoolData, error: schoolError } = await supabase
       .from('schools')
       .select('name, license_id')
@@ -61,24 +48,22 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
       return null;
     }
     
-    if (!schoolData || !schoolData.license_id) {
-      console.log('No license ID found for school, using fallback data');
-      // Provide fallback data for testing/demo purposes
-      return {
-        id: "license-fallback",
-        license_number: "DEMO-LICENSE-KEY",
-        is_active: true,
-        duration_days: 365,
-        days_remaining: 325,
-        expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-        school_name: schoolData?.name || "Your School"
-      };
+    if (!schoolData) {
+      console.log('No school data found for ID:', schoolId);
+      return null;
+    }
+    
+    console.log('School data found:', schoolData);
+    
+    if (!schoolData.license_id) {
+      console.log('No license ID found for school');
+      return null;
     }
     
     // Get license details
     const { data: licenseData, error: licenseError } = await supabase
       .from('licenses')
-      .select('id, license_key, expires_at, duration_days')
+      .select('id, license_key, expires_at, duration_days, created_at')
       .eq('id', schoolData.license_id)
       .maybeSingle();
     
@@ -88,32 +73,43 @@ const fetchLicenseDetails = async (): Promise<LicenseDetails | null> => {
     }
     
     if (!licenseData) {
-      console.log('No license data found, using fallback data');
-      // Provide fallback data
-      return {
-        id: schoolData.license_id,
-        license_number: "SCHOOL-LICENSE-KEY",
-        is_active: true,
-        duration_days: 365,
-        days_remaining: 300,
-        expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-        school_name: schoolData.name
-      };
+      console.log('No license data found for license ID:', schoolData.license_id);
+      return null;
     }
     
-    // Calculate days remaining
+    console.log('License data found:', licenseData);
+    
+    // Calculate days remaining more accurately
     const now = new Date();
     const expiryDate = licenseData.expires_at ? new Date(licenseData.expires_at) : null;
-    const daysRemaining = expiryDate 
-      ? Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) 
-      : 0;
-    const isActive = expiryDate ? expiryDate > now : false;
+    const createdDate = licenseData.created_at ? new Date(licenseData.created_at) : null;
+    const durationDays = licenseData.duration_days || 365;
+    
+    let daysRemaining = 0;
+    let isActive = false;
+    
+    if (expiryDate) {
+      // If we have an expiry date, calculate from that
+      daysRemaining = Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      isActive = expiryDate > now;
+    } else if (createdDate) {
+      // If no expiry date but we have created date, calculate from creation
+      const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+      daysRemaining = Math.max(0, durationDays - daysSinceCreation);
+      isActive = daysSinceCreation < durationDays;
+    } else {
+      // Fallback: assume it's a new license with full duration
+      daysRemaining = durationDays;
+      isActive = true;
+    }
+    
+    console.log('Calculated days remaining:', daysRemaining, 'Active:', isActive);
     
     return {
       id: licenseData.id,
       license_number: licenseData.license_key,
       is_active: isActive,
-      duration_days: licenseData.duration_days || 365,
+      duration_days: durationDays,
       days_remaining: daysRemaining,
       expires_at: licenseData.expires_at,
       school_name: schoolData.name
@@ -314,3 +310,4 @@ const LicenseWidget: React.FC = () => {
 };
 
 export default LicenseWidget;
+

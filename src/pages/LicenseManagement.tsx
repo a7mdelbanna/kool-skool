@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { School, Clock, KeyRound, CreditCard, Calendar, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
@@ -32,22 +31,7 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
       return null;
     }
     
-    // Check if we're using a test/demo school ID that doesn't exist in the database
-    // In a real app, this would be handled differently - this is just a fallback
-    if (schoolId === "fbc27415-c205-4d6e-b549-9370f386a004") {
-      // Return sample data for demo/test purposes
-      console.log('Using sample school data for demo ID');
-      return {
-        id: schoolId,
-        name: "Demo School",
-        contact_info: {
-          address: "123 Education St",
-          phone: "555-123-4567",
-          email: "demo@school.edu"
-        },
-        logo: null
-      };
-    }
+    console.log('Fetching school info for ID:', schoolId);
     
     const { data, error } = await supabase
       .from('schools')
@@ -61,20 +45,11 @@ const fetchSchoolInfo = async (): Promise<SchoolInfo | null> => {
     }
     
     if (!data) {
-      console.log('No school data found, using fallback data');
-      // Return fallback data if no school data is found
-      return {
-        id: schoolId,
-        name: "Your School",
-        contact_info: {
-          address: "School Address",
-          phone: "School Phone",
-          email: "school@example.com"
-        },
-        logo: null
-      };
+      console.log('No school data found for ID:', schoolId);
+      return null;
     }
     
+    console.log('Successfully fetched school data:', data);
     return data;
   } catch (error) {
     console.error('Error in fetchSchoolInfo:', error);
@@ -155,7 +130,7 @@ const LicenseManagement: React.FC = () => {
                   <div className="flex items-center space-x-3">
                     <School className="h-8 w-8 text-primary" />
                     <div>
-                      <h3 className="text-lg font-medium">{schoolInfo?.name || "Your School"}</h3>
+                      <h3 className="text-lg font-medium">{schoolInfo?.name || "Loading..."}</h3>
                       <p className="text-sm text-gray-500">School Account</p>
                     </div>
                   </div>
