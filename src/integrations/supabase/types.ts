@@ -9,13 +9,306 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      courses: {
+        Row: {
+          created_at: string
+          id: string
+          lesson_type: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lesson_type: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lesson_type?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      licenses: {
+        Row: {
+          created_at: string
+          duration_days: number | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          license_key: string
+        }
+        Insert: {
+          created_at?: string
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_key: string
+        }
+        Update: {
+          created_at?: string
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_key?: string
+        }
+        Relationships: []
+      }
+      schools: {
+        Row: {
+          contact_info: Json | null
+          created_at: string
+          id: string
+          license_id: string | null
+          logo: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          contact_info?: Json | null
+          created_at?: string
+          id?: string
+          license_id?: string | null
+          logo?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          contact_info?: Json | null
+          created_at?: string
+          id?: string
+          license_id?: string | null
+          logo?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schools_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          age_group: string | null
+          course_id: string | null
+          created_at: string
+          id: string
+          level: string | null
+          phone: string | null
+          school_id: string
+          teacher_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          age_group?: string | null
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          level?: string | null
+          phone?: string | null
+          school_id: string
+          teacher_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          age_group?: string | null
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          level?: string | null
+          phone?: string | null
+          school_id?: string
+          teacher_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          password_hash: string | null
+          phone: string | null
+          role: string
+          school_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          password_hash?: string | null
+          phone?: string | null
+          role: string
+          school_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          password_hash?: string | null
+          phone?: string | null
+          role?: string
+          school_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "users_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      add_team_member: {
+        Args: {
+          member_first_name: string
+          member_last_name: string
+          member_email: string
+          member_role: string
+          member_password: string
+        }
+        Returns: Json
+      }
+      create_student: {
+        Args: {
+          student_email: string
+          student_password: string
+          student_first_name: string
+          student_last_name: string
+          teacher_id: string
+          course_id: string
+          age_group: string
+          level: string
+          phone?: string
+        }
+        Returns: Json
+      }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_current_user_school_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_role_constraint_values: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_students_with_details: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          school_id: string
+          user_id: string
+          teacher_id: string
+          course_id: string
+          age_group: string
+          level: string
+          phone: string
+          created_at: string
+          first_name: string
+          last_name: string
+          email: string
+          course_name: string
+          lesson_type: string
+          teacher_first_name: string
+          teacher_last_name: string
+          teacher_email: string
+        }[]
+      }
+      hash_password: {
+        Args: { password: string }
+        Returns: string
+      }
+      user_login: {
+        Args: { user_email: string; user_password: string }
+        Returns: Json
+      }
+      verify_license_and_create_school: {
+        Args: {
+          license_key: string
+          school_name: string
+          admin_first_name: string
+          admin_last_name: string
+          admin_email: string
+          admin_password: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
