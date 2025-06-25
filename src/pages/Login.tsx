@@ -61,11 +61,12 @@ const Login = () => {
           throw new Error(response.message || 'Invalid email or password');
         }
         
-        // Store user information in local storage
+        // Store user information in local storage - now including email
         const userData = {
           id: response.user_id,
           firstName: response.first_name,
           lastName: response.last_name,
+          email: email, // Add the email here
           role: response.role,
           schoolId: response.school_id
         };
@@ -114,11 +115,12 @@ const Login = () => {
           throw new Error(response.message || 'Invalid email or password');
         }
         
-        // Store user information in local storage
+        // Store user information in local storage - now including email
         const userData = {
           id: response.user_id,
           firstName: response.first_name,
           lastName: response.last_name,
+          email: email, // Add the email here
           role: response.role,
           schoolId: response.school_id
         };

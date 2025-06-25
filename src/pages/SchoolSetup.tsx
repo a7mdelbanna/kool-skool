@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -156,11 +155,12 @@ const SchoolSetup = () => {
         return;
       }
       
-      // Store user information in local storage
+      // Store user information in local storage - now including email
       localStorage.setItem('user', JSON.stringify({
         id: response.user_id,
         firstName: formData.adminFirstName,
         lastName: formData.adminLastName,
+        email: formData.adminEmail, // Add the email here
         role: 'admin',
         schoolId: response.school_id
       }));
