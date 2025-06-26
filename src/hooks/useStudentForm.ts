@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -26,7 +27,8 @@ export const useStudentForm = (
     ageGroup: "adult",
     courseName: "",
     level: "beginner",
-    paymentStatus: "pending"
+    paymentStatus: "pending",
+    teacherId: ""
   });
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState("defaultPassword123");
@@ -98,7 +100,7 @@ export const useStudentForm = (
     error: teachersError,
     refetch: refetchTeachers
   } = useQuery({
-    queryKey: ['teachers', schoolId],
+    queryKey: ['teachers', schoolId, 'student-form'],
     queryFn: async () => {
       console.log('Executing teacher query function with schoolId:', schoolId);
       if (!schoolId) {
@@ -107,62 +109,19 @@ export const useStudentForm = (
       }
       
       try {
-        console.log('Fetching teachers from updated get_students_with_details RPC function');
-        const { data: studentsWithTeacherData, error: rpcError } = await supabase
-          .rpc('get_students_with_details', {
-            p_school_id: schoolId
-          });
-        
-        if (rpcError) {
-          console.error('Error fetching students with teacher details:', rpcError);
-        } else if (studentsWithTeacherData && Array.isArray(studentsWithTeacherData) && studentsWithTeacherData.length > 0) {
-          console.log('Successfully got students data with teacher details:', studentsWithTeacherData);
-          
-          const uniqueTeacherIds = new Set<string>();
-          const uniqueTeachers: Array<{id: string, first_name: string, last_name: string, display_name: string}> = [];
-          
-          for (const student of studentsWithTeacherData) {
-            if (student.teacher_id && !uniqueTeacherIds.has(student.teacher_id)) {
-              uniqueTeacherIds.add(student.teacher_id);
-              
-              const firstName = student.teacher_first_name || '';
-              const lastName = student.teacher_last_name || '';
-              const email = student.teacher_email || '';
-              
-              let displayName;
-              if (firstName && lastName) {
-                displayName = `${firstName} ${lastName}`;
-              } else if (email) {
-                displayName = email;
-              } else {
-                displayName = `Teacher ID: ${student.teacher_id.substring(0, 8)}`;
-              }
-              
-              console.log(`Constructed teacher: ID=${student.teacher_id}, Name=${displayName}`);
-              
-              uniqueTeachers.push({
-                id: student.teacher_id,
-                first_name: firstName,
-                last_name: lastName,
-                display_name: displayName
-              });
-            }
-          }
-          
-          if (uniqueTeachers.length > 0) {
-            console.log('Extracted teachers with display names:', uniqueTeachers);
-            return { data: uniqueTeachers };
-          }
-        }
-        
-        console.log('Fetching teachers directly from users table');
+        console.log('Fetching teachers directly from users table for student form');
         const { data: directTeachersData, error: directTeachersError } = await supabase
           .from('users')
           .select('id, first_name, last_name, email')
           .eq('school_id', schoolId)
           .eq('role', 'teacher');
           
-        if (!directTeachersError && directTeachersData && directTeachersData.length > 0) {
+        if (directTeachersError) {
+          console.error('Error fetching teachers directly:', directTeachersError);
+          throw directTeachersError;
+        }
+        
+        if (directTeachersData && directTeachersData.length > 0) {
           console.log('Successfully fetched teachers directly:', directTeachersData);
           
           const formattedTeachers = directTeachersData.map(teacher => {
@@ -180,38 +139,21 @@ export const useStudentForm = (
             };
           });
           
-          console.log('Formatted teachers data:', formattedTeachers);
+          console.log('Formatted teachers data for student form:', formattedTeachers);
           return { data: formattedTeachers };
         }
         
-        if (directTeachersError) {
-          console.error('Error fetching teachers directly:', directTeachersError);
-        }
-        
-        console.log('No teachers found, returning default teacher');
-        return { 
-          data: [{
-            id: '946f2802-74df-4409-99a7-b295687dd0cc',
-            first_name: 'Default',
-            last_name: 'Teacher',
-            display_name: 'Default Teacher'
-          }] 
-        };
+        console.log('No teachers found for student form');
+        return { data: [] };
       } catch (error) {
-        console.error('Exception in teachers query:', error);
-        return { 
-          data: [{
-            id: '946f2802-74df-4409-99a7-b295687dd0cc',
-            first_name: 'Default',
-            last_name: 'Teacher',
-            display_name: 'Default Teacher'
-          }] 
-        };
+        console.error('Exception in teachers query for student form:', error);
+        toast.error("Failed to load teachers: " + (error as Error).message);
+        return { data: [] };
       }
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: 0,
     enabled: !!schoolId && open,
-    retry: 3,
+    retry: 1,
   });
   
   useEffect(() => {
@@ -245,7 +187,8 @@ export const useStudentForm = (
         ageGroup: "adult",
         courseName: "",
         level: "beginner",
-        paymentStatus: "pending"
+        paymentStatus: "pending",
+        teacherId: ""
       });
       setPassword("defaultPassword123");
       setCreatePassword(true);
@@ -288,12 +231,21 @@ export const useStudentForm = (
           return;
         }
         
-        const teacher = teachersData?.data?.[0];
-        if (!teacher) {
+        // Use the selected teacher ID or fall back to the first available teacher
+        let selectedTeacherId = studentData.teacherId;
+        
+        if (!selectedTeacherId && teachersData?.data && teachersData.data.length > 0) {
+          selectedTeacherId = teachersData.data[0].id;
+          console.log("No teacher selected, using first available teacher:", selectedTeacherId);
+        }
+        
+        if (!selectedTeacherId) {
           toast.error("No teachers available. Please add a teacher first.");
           setSaving(false);
           return;
         }
+        
+        const selectedTeacher = teachersData?.data?.find(t => t.id === selectedTeacherId);
         
         console.log("Creating student with admin credentials:", { 
           userId: userData.id,
@@ -302,7 +254,7 @@ export const useStudentForm = (
         });
         
         console.log("Using course:", course);
-        console.log("Using teacher:", teacher);
+        console.log("Using teacher:", selectedTeacher);
         
         toast.loading("Creating student...");
 
@@ -313,7 +265,7 @@ export const useStudentForm = (
           student_password: studentPassword,
           first_name: studentData.firstName as string,
           last_name: studentData.lastName as string,
-          teacher_id: teacher.id,
+          teacher_id: selectedTeacherId,
           course_id: course.id,
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
           level: studentData.level === 'beginner' ? 'Beginner' : 
@@ -344,7 +296,7 @@ export const useStudentForm = (
             courseName: studentData.courseName as string,
             level: (studentData.level as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
             paymentStatus: "pending",
-            teacherId: teacher.id,
+            teacherId: selectedTeacherId,
             lessonsCompleted: 0,
             nextLesson: 'Not scheduled'
           };
@@ -364,11 +316,12 @@ export const useStudentForm = (
   };
 
   console.log('useStudentForm returning coursesData:', coursesData);
+  console.log('useStudentForm returning teachersData:', teachersData);
   if (coursesData?.data) {
     console.log('Courses count to return:', coursesData.data.length);
-    console.log('First course:', coursesData.data[0]);
-  } else {
-    console.log('No courses data available to return');
+  }
+  if (teachersData?.data) {
+    console.log('Teachers count to return:', teachersData.data.length);
   }
 
   return {
