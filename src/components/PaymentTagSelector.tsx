@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,7 +75,6 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   paymentId,
   onTagsChange
 }) => {
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const queryClient = useQueryClient();
 
   console.log('🏷️ PaymentTagSelector - Payment ID:', paymentId);
@@ -222,7 +220,6 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
       return;
     }
     addTagMutation.mutate(tagId);
-    setIsPopoverOpen(false);
   };
 
   const handleRemoveTag = (tagId: string) => {
@@ -250,7 +247,7 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
     );
   }
 
-  // Ensure we have arrays to work with - this is critical!
+  // Ensure we have arrays to work with
   const safeAvailableTags = Array.isArray(availableTags) ? availableTags : [];
   const safeCurrentTags = Array.isArray(currentTags) ? currentTags : [];
   
@@ -262,36 +259,6 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   );
   
   console.log('🔍 Filtered available tags:', filteredAvailableTags);
-
-  // Don't render if we don't have proper data structure
-  if (!safeAvailableTags || !Array.isArray(safeAvailableTags)) {
-    console.log('⚠️ Available tags is not a proper array, not rendering popover content');
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Current tags */}
-        {safeCurrentTags.map((tag) => (
-          <Badge
-            key={tag.id}
-            variant="outline"
-            className="flex items-center gap-1 pr-1"
-            style={{ borderColor: tag.color, color: tag.color }}
-          >
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
-            {tag.name}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 ml-1 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={() => handleRemoveTag(tag.id)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </Badge>
-        ))}
-        <div className="text-sm text-muted-foreground">Tags not available</div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -316,40 +283,33 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
         </Badge>
       ))}
 
-      {/* Add tag button - only render if we have valid data */}
-      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-        <PopoverTrigger asChild>
+      {/* Add tag dropdown - simpler approach */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1">
             <Plus className="h-3 w-3" />
             Add Tag
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-0">
-          {/* Only render Command if we have proper data */}
-          {Array.isArray(filteredAvailableTags) && filteredAvailableTags.length >= 0 ? (
-            <Command>
-              <CommandInput placeholder="Search tags..." />
-              <CommandEmpty>No tags found.</CommandEmpty>
-              <CommandGroup>
-                {filteredAvailableTags.map((tag) => (
-                  <CommandItem
-                    key={tag.id}
-                    onSelect={() => handleAddTag(tag.id)}
-                    className="flex items-center gap-2"
-                  >
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                    {tag.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </Command>
-          ) : (
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-64 max-h-60 overflow-y-auto">
+          {filteredAvailableTags.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
               No tags available
             </div>
+          ) : (
+            filteredAvailableTags.map((tag) => (
+              <DropdownMenuItem
+                key={tag.id}
+                onClick={() => handleAddTag(tag.id)}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                {tag.name}
+              </DropdownMenuItem>
+            ))
           )}
-        </PopoverContent>
-      </Popover>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };
