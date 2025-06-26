@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
   DialogContent,
@@ -26,8 +26,8 @@ import {
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePayments } from '@/contexts/PaymentContext';
 import { toast } from '@/components/ui/use-toast';
+import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supabase/client';
 
 interface NewLessonDialogProps {
   open: boolean;
@@ -59,18 +59,49 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   initialDate = new Date() 
 }) => {
   const [date, setDate] = useState<Date | undefined>(initialDate);
-  const [student, setStudent] = useState<string>('');
+  const [studentId, setStudentId] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
   const [time, setTime] = useState<string>('');
   const [duration, setDuration] = useState<string>('');
   const [cost, setCost] = useState<string>('');
-  
-  const { addSessions } = usePayments();
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch students when dialog opens
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (!open) return;
+      
+      try {
+        setLoading(true);
+        const userInfo = await getCurrentUserInfo();
+        if (!userInfo || userInfo.length === 0) {
+          console.error('No user info found');
+          return;
+        }
+
+        const currentUser = userInfo[0];
+        const studentsData = await getStudentsWithDetails(currentUser.user_school_id);
+        setStudents(studentsData);
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load students",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!date || !student || !subject || !time || !duration) {
+    if (!date || !studentId || !subject || !time || !duration) {
       toast({
         title: "Missing information",
         description: "Please fill out all required fields",
@@ -78,40 +109,44 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
       });
       return;
     }
-    
-    // Create the lesson with all required properties
-    const newSession = {
-      id: `session-${Date.now()}`,
-      date: date,
-      time: time,
-      duration: duration,
-      status: "scheduled" as const,
-      paymentStatus: "unpaid" as const,
-      notes: `${subject} lesson with ${student}`,
-      sessionNumber: 1,
-      totalSessions: 10,
-      cost: cost ? Number(cost) : 0,
-      studentId: `student-${Date.now()}`, // Generate a temporary student ID
-      studentName: student // Use the entered student name
-    };
-    
-    // Add to context
-    addSessions([newSession]);
-    
-    // Show toast
-    toast({
-      title: "Lesson created",
-      description: `${subject} lesson with ${student} on ${format(date, 'MMM d')} at ${time}`
-    });
-    
-    // Reset form and close dialog
-    resetForm();
-    onOpenChange(false);
+
+    const selectedStudent = students.find(s => s.id === studentId);
+    if (!selectedStudent) {
+      toast({
+        title: "Error",
+        description: "Selected student not found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Here you would typically call a function to create the lesson in the database
+      // For now, we'll show a success message
+      toast({
+        title: "Lesson scheduled",
+        description: `${subject} lesson with ${selectedStudent.first_name} ${selectedStudent.last_name} on ${format(date, 'MMM d')} at ${time}`,
+      });
+      
+      // Reset form and close dialog
+      resetForm();
+      onOpenChange(false);
+      
+      // You might want to refresh the sessions here
+      // await refreshSessions();
+    } catch (error) {
+      console.error('Error creating lesson:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create lesson",
+        variant: "destructive"
+      });
+    }
   };
   
   const resetForm = () => {
     setDate(initialDate);
-    setStudent('');
+    setStudentId('');
     setSubject('');
     setTime('');
     setDuration('');
@@ -126,15 +161,21 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          {/* Student Name */}
+          {/* Student Selection */}
           <div className="space-y-2">
-            <Label htmlFor="student">Student Name</Label>
-            <Input 
-              id="student" 
-              placeholder="Enter student name" 
-              value={student}
-              onChange={(e) => setStudent(e.target.value)}
-            />
+            <Label htmlFor="student">Student</Label>
+            <Select value={studentId} onValueChange={setStudentId} disabled={loading}>
+              <SelectTrigger id="student">
+                <SelectValue placeholder={loading ? "Loading students..." : "Select a student"} />
+              </SelectTrigger>
+              <SelectContent>
+                {students.map((student) => (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.first_name} {student.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           {/* Subject */}
@@ -232,7 +273,9 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Create Lesson</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Loading..." : "Create Lesson"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

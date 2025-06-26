@@ -72,7 +72,6 @@ interface PaymentContextType {
   removeExpense: (id: string) => void;
   updateSessionStatus: (id: string, status: Session['status']) => void;
   rescheduleSession: (id: string) => void;
-  addSessions: (sessions: Session[]) => void;
 }
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
@@ -155,7 +154,7 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
                 status: session.status === 'completed' ? 'completed' : 
                        session.status === 'cancelled' ? 'canceled' : 
                        session.status === 'missed' ? 'missed' : 'scheduled',
-                notes: session.notes || `${student.course_name} session with ${student.first_name} ${student.last_name}`,
+                notes: session.notes || `Session with ${student.first_name} ${student.last_name}`,
                 sessionNumber: session.index_in_sub,
                 totalSessions: undefined, // We'd need subscription info for this
                 studentId: session.student_id,
@@ -229,10 +228,6 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
     console.log('Rescheduling session:', id);
   };
 
-  const addSessions = (newSessions: Session[]) => {
-    setSessions(prev => [...prev, ...newSessions]);
-  };
-
   useEffect(() => {
     fetchAllSessions();
   }, []);
@@ -253,8 +248,7 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
       updateExpense,
       removeExpense,
       updateSessionStatus,
-      rescheduleSession,
-      addSessions
+      rescheduleSession
     }}>
       {children}
     </PaymentContext.Provider>
