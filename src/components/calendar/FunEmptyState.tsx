@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Party, Coffee, Sparkles } from 'lucide-react';
+import { PartyPopper, Coffee, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 const FunEmptyState: React.FC = () => {
@@ -43,7 +43,7 @@ const FunEmptyState: React.FC = () => {
         <CardContent className="p-8 text-center">
           <div className="flex justify-center mb-4">
             <div className="relative">
-              <Party className="h-16 w-16 text-primary animate-bounce" />
+              <PartyPopper className="h-16 w-16 text-primary animate-bounce" />
               <Sparkles className="h-6 w-6 text-amber-500 absolute -top-2 -right-2 animate-pulse" />
             </div>
           </div>
