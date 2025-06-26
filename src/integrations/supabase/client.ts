@@ -387,23 +387,95 @@ export const addStudentSubscription = async (subscriptionData: {
 };
 
 export const deleteStudentSubscription = async (subscriptionId: string) => {
-  console.log('deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  console.log('🗑️ ENHANCED deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  
+  if (!subscriptionId) {
+    console.error('❌ No subscription ID provided');
+    throw new Error('Subscription ID is required');
+  }
   
   try {
-    const { error } = await supabase
+    // First, let's check if the subscription exists and get its details
+    console.log('🔍 Checking if subscription exists before deletion...');
+    const { data: existingSubscription, error: checkError } = await supabase
       .from('subscriptions')
-      .delete()
-      .eq('id', subscriptionId);
+      .select('id, student_id')
+      .eq('id', subscriptionId)
+      .single();
 
-    if (error) {
-      console.error('Error deleting student subscription:', error);
-      throw error;
+    if (checkError) {
+      console.error('❌ Error checking subscription existence:', checkError);
+      throw new Error(`Failed to verify subscription: ${checkError.message}`);
     }
 
-    console.log('Successfully deleted student subscription');
+    if (!existingSubscription) {
+      console.log('⚠️ Subscription not found, may have been already deleted');
+      return; // Already deleted, no error needed
+    }
+
+    console.log('✅ Found subscription to delete:', existingSubscription);
+
+    // Delete associated lesson sessions first (if any exist)
+    console.log('🗑️ Deleting associated lesson sessions...');
+    const { error: sessionsError } = await supabase
+      .from('lesson_sessions')
+      .delete()
+      .eq('subscription_id', subscriptionId);
+
+    if (sessionsError) {
+      console.error('❌ Error deleting lesson sessions:', sessionsError);
+      // Don't throw here, continue with subscription deletion
+      console.log('⚠️ Continuing with subscription deletion despite session deletion error');
+    } else {
+      console.log('✅ Successfully deleted associated lesson sessions');
+    }
+
+    // Now delete the subscription
+    console.log('🗑️ Deleting subscription from database...');
+    const { error: deleteError, data } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('id', subscriptionId)
+      .select(); // This will return the deleted record(s)
+
+    if (deleteError) {
+      console.error('❌ Error deleting subscription:', deleteError);
+      throw new Error(`Failed to delete subscription: ${deleteError.message}`);
+    }
+
+    // Verify the deletion worked
+    if (!data || data.length === 0) {
+      console.error('❌ Subscription deletion failed - no records were deleted');
+      throw new Error('Subscription deletion failed - no records were affected');
+    }
+
+    console.log('✅ Successfully deleted subscription:', data);
+    console.log('🎉 ENHANCED DELETION COMPLETED SUCCESSFULLY');
+
+    // Double-check by trying to fetch the deleted subscription
+    console.log('🔍 Verifying deletion by attempting to fetch deleted subscription...');
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('id', subscriptionId)
+      .single();
+
+    if (verifyError && verifyError.code === 'PGRST116') {
+      console.log('✅ Deletion verified - subscription no longer exists');
+    } else if (verifyData) {
+      console.error('❌ CRITICAL: Subscription still exists after deletion!', verifyData);
+      throw new Error('Subscription deletion failed - record still exists in database');
+    }
+
   } catch (error) {
-    console.error('Error in deleteStudentSubscription:', error);
-    throw error;
+    console.error('❌ Error in enhanced deleteStudentSubscription:', error);
+    
+    // Re-throw with more context if it's a generic error
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    throw new Error('An unexpected error occurred while deleting the subscription');
   }
 };
 
