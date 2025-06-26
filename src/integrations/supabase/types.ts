@@ -402,22 +402,42 @@ export type Database = {
     }
     Functions: {
       add_student_subscription: {
-        Args: {
-          p_student_id: string
-          p_session_count: number
-          p_duration_months: number
-          p_start_date: string
-          p_schedule: Json
-          p_price_mode: string
-          p_price_per_session: number
-          p_fixed_price: number
-          p_total_price: number
-          p_currency: string
-          p_notes: string
-          p_status: string
-          p_current_user_id: string
-          p_current_school_id: string
-        }
+        Args:
+          | {
+              p_student_id: string
+              p_session_count: number
+              p_duration_months: number
+              p_start_date: string
+              p_schedule: Json
+              p_price_mode: string
+              p_price_per_session: number
+              p_fixed_price: number
+              p_total_price: number
+              p_currency: string
+              p_notes: string
+              p_status: string
+              p_current_user_id: string
+              p_current_school_id: string
+            }
+          | {
+              p_student_id: string
+              p_session_count: number
+              p_duration_months: number
+              p_start_date: string
+              p_schedule: Json
+              p_price_mode: string
+              p_price_per_session: number
+              p_fixed_price: number
+              p_total_price: number
+              p_currency: string
+              p_notes: string
+              p_status: string
+              p_current_user_id: string
+              p_current_school_id: string
+              p_initial_payment_amount?: number
+              p_payment_method?: string
+              p_payment_notes?: string
+            }
         Returns: {
           id: string
           student_id: string
