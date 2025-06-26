@@ -76,11 +76,19 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   });
 
   // Fetch student payments from database
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading, error: paymentsError } = useQuery({
     queryKey: ['student-payments', studentData.id],
     queryFn: () => getStudentPayments(studentData.id as string),
     enabled: !!studentData.id,
   });
+
+  // Show error if there's an issue loading payments
+  React.useEffect(() => {
+    if (paymentsError) {
+      console.error("Error loading payments:", paymentsError);
+      toast.error("Failed to load payment history. Please check your authentication.");
+    }
+  }, [paymentsError]);
 
   // Mutation to add new payment
   const addPaymentMutation = useMutation({
@@ -92,7 +100,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     },
     onError: (error) => {
       console.error("Error adding payment:", error);
-      toast.error("Failed to add payment");
+      toast.error("Failed to add payment. Please make sure you are logged in and try again.");
     },
   });
 
@@ -105,7 +113,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     },
     onError: (error) => {
       console.error("Error deleting payment:", error);
-      toast.error("Failed to delete payment");
+      toast.error("Failed to delete payment. Please make sure you are logged in and try again.");
     },
   });
   
@@ -115,6 +123,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       return;
     }
 
+    console.log("Adding payment with data:", data);
     addPaymentMutation.mutate({
       student_id: studentData.id,
       amount: data.amount,
@@ -127,6 +136,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   };
 
   const handleDeletePayment = (paymentId: string) => {
+    console.log("Deleting payment with ID:", paymentId);
     deletePaymentMutation.mutate(paymentId);
   };
 
