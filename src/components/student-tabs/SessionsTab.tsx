@@ -83,20 +83,61 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     
     try {
       setLoading(true);
+      console.log('=== LOADING SESSIONS ===');
       console.log('Loading sessions for student:', studentData.id);
+      
       const data = await getStudentLessonSessions(studentData.id);
-      console.log('Loaded sessions:', data);
+      console.log('Raw sessions data received:', data);
       
       // Ensure data is an array and properly typed
       const sessionsArray = Array.isArray(data) ? data as DatabaseSession[] : [];
+      
+      // Enhanced duplicate detection and logging
+      if (sessionsArray.length > 0) {
+        console.log('=== DUPLICATE DETECTION ===');
+        const duplicateCheck = new Map();
+        const duplicates: DatabaseSession[] = [];
+        
+        sessionsArray.forEach((session, index) => {
+          const dateKey = session.scheduled_date;
+          console.log(`Session ${index + 1}:`, {
+            id: session.id,
+            scheduled_date: session.scheduled_date,
+            notes: session.notes,
+            index_in_sub: session.index_in_sub
+          });
+          
+          if (duplicateCheck.has(dateKey)) {
+            console.warn(`DUPLICATE FOUND: Session at ${dateKey}`);
+            console.warn('Original:', duplicateCheck.get(dateKey));
+            console.warn('Duplicate:', session);
+            duplicates.push(session);
+          } else {
+            duplicateCheck.set(dateKey, session);
+          }
+        });
+        
+        if (duplicates.length > 0) {
+          console.error(`❌ FOUND ${duplicates.length} DUPLICATE SESSIONS:`, duplicates);
+          toast({
+            title: "Warning: Duplicate Sessions Detected",
+            description: `Found ${duplicates.length} duplicate session(s). The database trigger should have prevented this.`,
+            variant: "destructive",
+          });
+        } else {
+          console.log('✅ NO DUPLICATES FOUND - All sessions are unique');
+        }
+      }
+      
       setSessions(sessionsArray);
       
-      console.log(`Successfully loaded ${sessionsArray.length} sessions`);
+      console.log(`✅ Successfully loaded ${sessionsArray.length} sessions`);
+      console.log('=== END SESSION LOADING ===');
     } catch (error) {
-      console.error('Error loading sessions:', error);
+      console.error('❌ Error loading sessions:', error);
       toast({
         title: "Error",
-        description: "Failed to load sessions",
+        description: "Failed to load sessions. Please try refreshing.",
         variant: "destructive",
       });
       setSessions([]); // Set empty array on error
@@ -106,7 +147,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   };
 
   const handleRefreshSessions = async () => {
-    console.log('Manual refresh sessions triggered');
+    console.log('=== MANUAL REFRESH TRIGGERED ===');
     setRefreshing(true);
     
     try {
@@ -138,6 +179,8 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const handleUpdateSessionStatus = async (sessionId: string, newStatus: string) => {
     try {
       setLoading(true);
+      console.log(`Updating session ${sessionId} to status: ${newStatus}`);
+      
       await updateLessonSessionStatus(sessionId, newStatus);
       
       toast({
@@ -145,6 +188,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         description: `Session status updated to ${newStatus}`,
       });
       
+      // Reload sessions to reflect changes
       await loadSessions();
     } catch (error) {
       console.error('Error updating session status:', error);
@@ -382,7 +426,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             Sessions are automatically generated when you add a subscription in the Subscriptions tab.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length} | Duplicates have been removed
+            Total sessions: {sessions.length} | Enhanced duplicate prevention active
           </p>
         </div>
       </div>
