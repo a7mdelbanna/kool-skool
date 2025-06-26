@@ -40,7 +40,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
   const filteredSessions = sessions
     .filter(session => {
       if (!searchQuery) return true;
-      return session.notes?.toLowerCase().includes(searchQuery.toLowerCase());
+      return session.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             session.studentName?.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
   // Group sessions by date
@@ -84,6 +85,20 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     }
   };
 
+  // Extract subject from notes
+  const getSubject = (session: Session) => {
+    return session.notes?.includes('Mathematics') ? 'Mathematics' :
+           session.notes?.includes('Science') ? 'Science' :
+           session.notes?.includes('English') ? 'English' :
+           session.notes?.includes('Physics') ? 'Physics' :
+           session.notes?.includes('Chemistry') ? 'Chemistry' :
+           session.notes?.includes('Biology') ? 'Biology' :
+           session.notes?.includes('Geography') ? 'Geography' :
+           session.notes?.includes('Literature') ? 'Literature' :
+           session.notes?.includes('Computer Science') ? 'Computer Science' :
+           'General';
+  };
+
   // Render sessions for a specific date group
   const renderSessionGroup = (title: string, sessions: Session[]) => {
     if (sessions.length === 0) return null;
@@ -100,9 +115,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
                 ? 'Tomorrow' 
                 : format(sessionDate, 'EEEE, MMMM d');
             
-            // Parse subject from notes
-            const noteParts = session.notes?.split(' ') || [];
-            const subject = noteParts.length > 0 ? noteParts[0] : 'Untitled';
+            const subject = getSubject(session);
+            const studentName = session.studentName || 'Unknown Student';
             
             return (
               <div 
@@ -112,8 +126,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="font-medium">{subject} Lesson</div>
-                    <div className="text-sm text-muted-foreground">{session.notes}</div>
+                    <div className="font-medium">{studentName}</div>
+                    <div className="text-sm text-muted-foreground">{subject} Lesson</div>
                   </div>
                   <Badge 
                     variant="outline" 
