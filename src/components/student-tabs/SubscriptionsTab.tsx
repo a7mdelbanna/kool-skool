@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt } from "lucide-react";
 import { format, addDays, startOfWeek } from "date-fns";
@@ -601,7 +602,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                 />
               </div>
               <div>
-                <Label htmlFor="lessonDurationMinutes" className="text-sm font-semibold text-gray-700">Lesson Duration (Minutes)</Label>
+                <Label htmlFor="lessonDurationMinutes" className="text-sm font-semibold text-gray-700">Lesson Duration</Label>
                 <Input 
                   type="number" 
                   id="lessonDurationMinutes" 
