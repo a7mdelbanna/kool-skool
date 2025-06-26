@@ -314,7 +314,16 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       console.log('🗑️ Starting subscription deletion for ID:', subscriptionId);
       setDeletingSubscriptionId(subscriptionId);
       
+      // Optimistically remove from UI first
+      console.log('🔄 Optimistically removing subscription from UI');
+      setSubscriptions(prevSubs => {
+        const filtered = prevSubs.filter(sub => sub.id !== subscriptionId);
+        console.log('📊 Subscriptions after optimistic removal:', filtered.length);
+        return filtered;
+      });
+      
       // Call the delete function
+      console.log('🗑️ Calling deleteStudentSubscription...');
       await deleteStudentSubscription(subscriptionId);
       
       console.log('✅ Subscription deleted successfully from database');
@@ -325,12 +334,23 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         description: "Subscription deleted successfully",
       });
       
-      // Force reload subscriptions from database
-      console.log('🔄 Forcing reload of subscriptions after deletion');
-      await loadSubscriptions();
+      // Double-check by reloading from database after a short delay
+      console.log('🔄 Reloading subscriptions after deletion to verify...');
+      setTimeout(async () => {
+        try {
+          await loadSubscriptions();
+        } catch (error) {
+          console.error('❌ Error during verification reload:', error);
+        }
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Error deleting subscription:', error);
+      
+      // Revert optimistic update on error
+      console.log('🔄 Reverting optimistic update due to error');
+      await loadSubscriptions();
+      
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete subscription",
