@@ -99,6 +99,12 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
            'General';
   };
 
+  // Check if session is in the past
+  const isSessionPast = (session: Session) => {
+    const sessionDate = new Date(session.date);
+    return isPast(sessionDate) && !isToday(sessionDate);
+  };
+
   // Render sessions for a specific date group
   const renderSessionGroup = (title: string, sessions: Session[]) => {
     if (sessions.length === 0) return null;
@@ -117,41 +123,60 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
             
             const subject = getSubject(session);
             const studentName = session.studentName || 'Unknown Student';
+            const isPastSession = isSessionPast(session);
             
             return (
               <div 
                 key={session.id} 
-                className="border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors"
+                className={`border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors ${
+                  isPastSession 
+                    ? 'opacity-60 bg-gray-50/50 border-gray-200' 
+                    : 'bg-white border-border'
+                }`}
                 onClick={() => handleLessonClick(session)}
               >
                 <div className="flex items-center gap-4">
                   {/* Time Section - Left Side */}
                   <div className="flex-shrink-0 text-center min-w-[80px]">
-                    <div className="text-2xl font-bold text-primary">
+                    <div className={`text-2xl font-bold ${
+                      isPastSession ? 'text-gray-400' : 'text-primary'
+                    }`}>
                       {session.time.split(':')[0]}
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className={`text-sm ${
+                      isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+                    }`}>
                       :{session.time.split(':')[1]}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className={`text-xs mt-1 ${
+                      isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+                    }`}>
                       {session.duration}
                     </div>
                   </div>
                   
                   {/* Divider */}
-                  <div className="w-px h-16 bg-border"></div>
+                  <div className={`w-px h-16 ${
+                    isPastSession ? 'bg-gray-200' : 'bg-border'
+                  }`}></div>
                   
                   {/* Main Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-lg text-foreground truncate">
+                        <div className={`font-semibold text-lg truncate ${
+                          isPastSession ? 'text-gray-500' : 'text-foreground'
+                        }`}>
                           {studentName}
                         </div>
-                        <div className="text-sm text-muted-foreground mb-2">
+                        <div className={`text-sm mb-2 ${
+                          isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+                        }`}>
                           {subject} Lesson
                         </div>
-                        <div className="flex items-center text-sm text-muted-foreground">
+                        <div className={`flex items-center text-sm ${
+                          isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+                        }`}>
                           <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                           {dateLabel}
                         </div>
@@ -162,10 +187,12 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
                         <Badge 
                           variant="outline" 
                           className={
-                            session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
-                            session.status === "canceled" ? "bg-orange-50 text-orange-700 border-orange-300" :
-                            session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
-                            "bg-blue-50 text-blue-700 border-blue-300"
+                            isPastSession 
+                              ? "bg-gray-100 text-gray-500 border-gray-300 opacity-70"
+                              : session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
+                                session.status === "canceled" ? "bg-orange-50 text-orange-700 border-orange-300" :
+                                session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
+                                "bg-blue-50 text-blue-700 border-blue-300"
                           }
                         >
                           <span className="mr-1">{renderStatusIcon(session.status)}</span>
