@@ -289,6 +289,14 @@ export const createStudent = async (studentData: {
   level: string;
   phone?: string;
 }): Promise<CreateStudentResponse> => {
+  // Get current user info from localStorage
+  const userInfo = getCurrentUserFromStorage();
+  
+  if (!userInfo) {
+    console.error('No user info found in localStorage');
+    throw new Error('User not authenticated - please log in again');
+  }
+  
   const { data, error } = await supabase.rpc('create_student', {
     student_email: studentData.student_email,
     student_password: studentData.student_password,
@@ -298,7 +306,8 @@ export const createStudent = async (studentData: {
     course_id: studentData.course_id,
     age_group: studentData.age_group,
     level: studentData.level,
-    phone: studentData.phone
+    phone: studentData.phone,
+    current_user_id: userInfo.user_id
   });
   
   if (error) {

@@ -1,4 +1,5 @@
 
+
 -- Remove unnecessary social media columns and date_of_birth from users table
 ALTER TABLE public.users 
 DROP COLUMN IF EXISTS date_of_birth,
@@ -10,7 +11,7 @@ DROP COLUMN IF EXISTS facebook,
 DROP COLUMN IF EXISTS skype,
 DROP COLUMN IF EXISTS zoom;
 
--- Update the create_student function to remove social media parameters
+-- Update the create_student function to work with local auth (not Supabase auth)
 CREATE OR REPLACE FUNCTION public.create_student(
   student_email text, 
   student_password text, 
@@ -20,7 +21,8 @@ CREATE OR REPLACE FUNCTION public.create_student(
   course_id uuid, 
   age_group text, 
   level text, 
-  phone text DEFAULT NULL::text
+  phone text DEFAULT NULL::text,
+  current_user_id uuid DEFAULT NULL::uuid
 )
 RETURNS json
 LANGUAGE plpgsql
@@ -32,8 +34,8 @@ DECLARE
   student_id UUID;
   hashed_password TEXT;
 BEGIN
-  -- Get current user info
-  SELECT * INTO current_user_record FROM public.users WHERE id = auth.uid();
+  -- Get current user info using the passed user ID
+  SELECT * INTO current_user_record FROM public.users WHERE id = current_user_id;
   
   IF current_user_record.id IS NULL THEN
     RETURN json_build_object(
@@ -78,7 +80,7 @@ BEGIN
     current_user_record.school_id, 
     phone, 
     hashed_password, 
-    auth.uid()
+    current_user_id
   )
   RETURNING id INTO student_user_id;
   
@@ -113,3 +115,4 @@ $function$;
 
 -- Drop the old function with social media parameters if it exists
 DROP FUNCTION IF EXISTS public.create_student_with_profile(uuid, text, text, text, text, uuid, uuid, text, text, text, text, text, text, text, text, text, text, text);
+
