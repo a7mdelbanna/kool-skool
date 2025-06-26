@@ -34,6 +34,44 @@ interface PaymentWithTags {
   tags: TransactionTag[];
 }
 
+// Helper function to safely convert Json to TransactionTag[]
+const parseTagsFromJson = (tags: any): TransactionTag[] => {
+  if (!tags) return [];
+  
+  try {
+    // If it's already a properly structured array
+    if (Array.isArray(tags)) {
+      // Validate that each item has the required properties
+      return tags.filter((tag): tag is TransactionTag => 
+        tag && 
+        typeof tag === 'object' && 
+        typeof tag.id === 'string' && 
+        typeof tag.name === 'string' && 
+        typeof tag.color === 'string'
+      );
+    }
+    
+    // If it's a string, try to parse it as JSON
+    if (typeof tags === 'string') {
+      const parsed = JSON.parse(tags);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((tag): tag is TransactionTag => 
+          tag && 
+          typeof tag === 'object' && 
+          typeof tag.id === 'string' && 
+          typeof tag.name === 'string' && 
+          typeof tag.color === 'string'
+        );
+      }
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error parsing tags:', error);
+    return [];
+  }
+};
+
 const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   paymentId,
   onTagsChange
@@ -61,25 +99,8 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
       
       const payment = data[0];
       
-      // Parse the tags JSONB data
-      let parsedTags: TransactionTag[] = [];
-      if (payment.tags) {
-        try {
-          // If tags is already an array, use it directly
-          if (Array.isArray(payment.tags)) {
-            parsedTags = payment.tags as TransactionTag[];
-          } else if (typeof payment.tags === 'string') {
-            // If tags is a string, parse it as JSON
-            parsedTags = JSON.parse(payment.tags);
-          } else {
-            // If tags is an object, it might be a single tag or already parsed
-            parsedTags = payment.tags as TransactionTag[];
-          }
-        } catch (error) {
-          console.error('Error parsing tags:', error);
-          parsedTags = [];
-        }
-      }
+      // Parse the tags using our helper function
+      const parsedTags = parseTagsFromJson(payment.tags);
       
       return {
         ...payment,
