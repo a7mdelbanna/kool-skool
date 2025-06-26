@@ -59,6 +59,154 @@ interface ScheduleItem {
   time: string;
 }
 
+// Modern Time Picker Component
+const ModernTimePicker = ({ value, onChange }: { value: string; onChange: (time: string) => void }) => {
+  const [hour, setHour] = useState("09");
+  const [minute, setMinute] = useState("00");
+  const [period, setPeriod] = useState("AM");
+
+  // Parse existing time value
+  useEffect(() => {
+    if (value) {
+      const [time, meridiem] = value.split(' ');
+      if (time && meridiem) {
+        const [h, m] = time.split(':');
+        setHour(h.padStart(2, '0'));
+        setMinute(m.padStart(2, '0'));
+        setPeriod(meridiem);
+      } else if (time) {
+        // Handle 24-hour format
+        const [h, m] = time.split(':');
+        const hourNum = parseInt(h);
+        const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
+        const displayPeriod = hourNum >= 12 ? 'PM' : 'AM';
+        setHour(displayHour.toString().padStart(2, '0'));
+        setMinute(m.padStart(2, '0'));
+        setPeriod(displayPeriod);
+      }
+    }
+  }, [value]);
+
+  // Update parent when time changes
+  useEffect(() => {
+    const timeString = `${hour}:${minute} ${period}`;
+    onChange(timeString);
+  }, [hour, minute, period, onChange]);
+
+  const hours = Array.from({ length: 12 }, (_, i) => {
+    const h = i + 1;
+    return h.toString().padStart(2, '0');
+  });
+
+  const minutes = Array.from({ length: 60 }, (_, i) => {
+    return i.toString().padStart(2, '0');
+  });
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal",
+            !value && "text-muted-foreground"
+          )}
+        >
+          <Clock className="mr-2 h-4 w-4" />
+          {value || "Select time"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <div className="p-4 space-y-4">
+          <div className="text-sm font-medium text-center">Select Time</div>
+          <div className="flex items-center justify-center space-x-2">
+            {/* Hour Selector */}
+            <div className="flex flex-col items-center">
+              <Label className="text-xs text-muted-foreground mb-1">Hour</Label>
+              <Select value={hour} onValueChange={setHour}>
+                <SelectTrigger className="w-16 h-12 text-center">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-48">
+                  {hours.map((h) => (
+                    <SelectItem key={h} value={h} className="text-center">
+                      {h}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="text-2xl font-bold text-muted-foreground mt-6">:</div>
+
+            {/* Minute Selector */}
+            <div className="flex flex-col items-center">
+              <Label className="text-xs text-muted-foreground mb-1">Min</Label>
+              <Select value={minute} onValueChange={setMinute}>
+                <SelectTrigger className="w-16 h-12 text-center">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-48">
+                  {minutes.filter((_, i) => i % 5 === 0).map((m) => (
+                    <SelectItem key={m} value={m} className="text-center">
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* AM/PM Selector */}
+            <div className="flex flex-col items-center">
+              <Label className="text-xs text-muted-foreground mb-1">Period</Label>
+              <Select value={period} onValueChange={setPeriod}>
+                <SelectTrigger className="w-16 h-12 text-center">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AM" className="text-center">AM</SelectItem>
+                  <SelectItem value="PM" className="text-center">PM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Quick Time Presets */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Quick Select</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: "9:00 AM", value: "09:00 AM" },
+                { label: "10:00 AM", value: "10:00 AM" },
+                { label: "2:00 PM", value: "02:00 PM" },
+                { label: "3:00 PM", value: "03:00 PM" },
+                { label: "4:00 PM", value: "04:00 PM" },
+                { label: "5:00 PM", value: "05:00 PM" },
+              ].map((preset) => (
+                <Button
+                  key={preset.value}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    const [time, meridiem] = preset.value.split(' ');
+                    const [h, m] = time.split(':');
+                    setHour(h);
+                    setMinute(m);
+                    setPeriod(meridiem);
+                  }}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ 
   studentData, 
   setStudentData, 
@@ -520,10 +668,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   </div>
                   <div className="flex-1">
                     <Label className="text-xs text-gray-600">Time</Label>
-                    <Input 
-                      type="time" 
+                    <ModernTimePicker 
                       value={schedule.time}
-                      onChange={(e) => updateScheduleItem(index, 'time', e.target.value)}
+                      onChange={(time) => updateScheduleItem(index, 'time', time)}
                     />
                   </div>
                   <Button 
