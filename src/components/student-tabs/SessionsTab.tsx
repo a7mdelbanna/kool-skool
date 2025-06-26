@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { 
@@ -74,30 +75,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     if (studentData.id) {
       loadSessions();
     }
-  }, [studentData.id]);
-
-  // Add a periodic refresh to catch newly generated sessions
-  useEffect(() => {
-    if (studentData.id) {
-      const interval = setInterval(() => {
-        loadSessions();
-      }, 3000); // Refresh every 3 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [studentData.id]);
-
-  // Add a listener for when subscriptions might be added
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && studentData.id) {
-        // Refresh when user comes back to the tab
-        loadSessions();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [studentData.id]);
 
   const loadSessions = async () => {
