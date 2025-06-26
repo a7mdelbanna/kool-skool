@@ -50,6 +50,7 @@ export type Database = {
           created_at: string
           duration_minutes: number | null
           id: string
+          index_in_sub: number | null
           notes: string | null
           payment_status: string
           scheduled_date: string
@@ -63,6 +64,7 @@ export type Database = {
           created_at?: string
           duration_minutes?: number | null
           id?: string
+          index_in_sub?: number | null
           notes?: string | null
           payment_status?: string
           scheduled_date: string
@@ -76,6 +78,7 @@ export type Database = {
           created_at?: string
           duration_minutes?: number | null
           id?: string
+          index_in_sub?: number | null
           notes?: string | null
           payment_status?: string
           scheduled_date?: string
