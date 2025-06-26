@@ -150,7 +150,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
             </Select>
           </div>
           
-          {/* Modern Date Picker */}
+          {/* Date */}
           <div className="space-y-2">
             <Label htmlFor="date">Date</Label>
             <Popover>
@@ -159,21 +159,20 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
                   id="date"
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal bg-background hover:bg-accent hover:text-accent-foreground transition-colors",
+                    "w-full justify-start text-left font-normal",
                     !date && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4 opacity-70" />
-                  {date ? format(date, "EEEE, MMMM do, yyyy") : <span>Pick a date</span>}
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-background border shadow-lg" align="start">
+              <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
                   selected={date}
                   onSelect={setDate}
                   initialFocus
-                  className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
