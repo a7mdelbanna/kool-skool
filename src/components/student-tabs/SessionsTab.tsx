@@ -54,6 +54,7 @@ interface DatabaseSession {
   cost: number;
   notes: string | null;
   created_at: string;
+  index_in_sub?: number | null;
 }
 
 const SessionsTab: React.FC<SessionsTabProps> = ({ 
@@ -63,6 +64,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
 }) => {
   const [sessions, setSessions] = useState<DatabaseSession[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
   const [selectedSession, setSelectedSession] = React.useState<DatabaseSession | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
@@ -88,6 +90,8 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       // Ensure data is an array and properly typed
       const sessionsArray = Array.isArray(data) ? data as DatabaseSession[] : [];
       setSessions(sessionsArray);
+      
+      console.log(`Successfully loaded ${sessionsArray.length} sessions`);
     } catch (error) {
       console.error('Error loading sessions:', error);
       toast({
@@ -101,9 +105,26 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     }
   };
 
-  const handleRefreshSessions = () => {
-    console.log('Manual refresh triggered');
-    loadSessions();
+  const handleRefreshSessions = async () => {
+    console.log('Manual refresh sessions triggered');
+    setRefreshing(true);
+    
+    try {
+      await loadSessions();
+      toast({
+        title: "Sessions Refreshed",
+        description: "Session data has been updated successfully",
+      });
+    } catch (error) {
+      console.error('Error during manual refresh:', error);
+      toast({
+        title: "Refresh Failed",
+        description: "Could not refresh session data",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshing(false);
+    }
   };
   
   const upcomingSessions = sessions.filter(
@@ -220,11 +241,11 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           variant="outline"
           size="sm"
           onClick={handleRefreshSessions}
-          disabled={loading}
+          disabled={loading || refreshing}
           className="gap-2"
         >
-          <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          <RefreshCcw className={`h-4 w-4 ${(loading || refreshing) ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
       {sessionsList.length === 0 ? (
@@ -252,6 +273,11 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                     <span className="font-medium">
                       {format(new Date(session.scheduled_date), "EEEE, MMMM d, yyyy")}
                     </span>
+                    {session.index_in_sub && (
+                      <Badge variant="secondary" className="text-xs">
+                        #{session.index_in_sub}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                     <Clock className="h-3 w-3" />
@@ -356,7 +382,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             Sessions are automatically generated when you add a subscription in the Subscriptions tab.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length}
+            Total sessions: {sessions.length} | Duplicates have been removed
           </p>
         </div>
       </div>
