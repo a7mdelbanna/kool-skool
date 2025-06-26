@@ -35,7 +35,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Payment, Expense, usePayments } from '@/contexts/PaymentContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -43,37 +42,118 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import PaymentDialog from '@/components/PaymentDialog';
 import ExpenseDialog from '@/components/ExpenseDialog';
 
-const Payments = () => {
-  const { payments, expenses, removePayment, removeExpense } = usePayments();
-  const { toast } = useToast();
+interface StudentPayment {
+  id: string;
+  student_id: string;
+  amount: number;
+  currency: string;
+  payment_date: string;
+  payment_method: string;
+  status: string;
+  notes: string;
+  created_at: string;
+  student_name?: string;
+}
 
+interface Expense {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  date: Date;
+  notes?: string;
+  recurring: boolean;
+  frequency?: string;
+}
+
+const Payments = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('payments');
-  const [sortColumn, setSortColumn] = useState('date');
+  const [sortColumn, setSortColumn] = useState('payment_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
   // Dialog states
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<Payment | undefined>(undefined);
+  const [selectedPayment, setSelectedPayment] = useState<any>(undefined);
   const [selectedExpense, setSelectedExpense] = useState<Expense | undefined>(undefined);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
+
+  // Fetch user info
+  const { data: userInfo } = useQuery({
+    queryKey: ['current-user-info'],
+    queryFn: getCurrentUserInfo,
+  });
+
+  // Fetch students to get student payments
+  const { data: students = [], isLoading: studentsLoading } = useQuery({
+    queryKey: ['students-with-details', userInfo?.[0]?.user_school_id],
+    queryFn: () => getStudentsWithDetails(userInfo?.[0]?.user_school_id as string),
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
+
+  // Fetch all student payments
+  const { data: allPayments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ['all-student-payments', students],
+    queryFn: async () => {
+      if (!students.length) return [];
+      
+      const payments: StudentPayment[] = [];
+      
+      for (const student of students) {
+        try {
+          const response = await fetch('/api/supabase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: 'get_student_payments',
+              params: { p_student_id: student.id }
+            })
+          });
+          
+          if (response.ok) {
+            const studentPayments = await response.json();
+            const paymentsWithStudentName = studentPayments.map((payment: any) => ({
+              ...payment,
+              student_name: `${student.first_name} ${student.last_name}`
+            }));
+            payments.push(...paymentsWithStudentName);
+          }
+        } catch (error) {
+          console.error(`Error fetching payments for student ${student.id}:`, error);
+        }
+      }
+      
+      return payments;
+    },
+    enabled: students.length > 0,
+  });
+
+  // Mock expenses data (you can replace this with real data later)
+  const expenses: Expense[] = [];
+  
+  const isLoading = studentsLoading || paymentsLoading;
   
   // Calculate totals for payments
-  const calculatePaymentTotal = (status: string) => {
-    return payments
-      .filter(payment => payment.status === status)
-      .reduce((sum, payment) => sum + payment.amount, 0);
-  };
-  
-  const totalPaid = calculatePaymentTotal('completed');
-  const totalPending = calculatePaymentTotal('pending');
-  const totalOverdue = calculatePaymentTotal('failed');
-  const totalPayments = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalPaid = allPayments
+    .filter(payment => payment.status === 'completed')
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+    
+  const totalPending = allPayments
+    .filter(payment => payment.status === 'pending')
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+    
+  const totalOverdue = allPayments
+    .filter(payment => payment.status === 'failed')
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+    
+  const totalPayments = allPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   
   // Calculate total for expenses
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -98,19 +178,16 @@ const Payments = () => {
   };
   
   // Open payment dialog for editing
-  const handleEditPayment = (payment: Payment) => {
+  const handleEditPayment = (payment: StudentPayment) => {
     setSelectedPayment(payment);
     setDialogMode('edit');
     setPaymentDialogOpen(true);
   };
   
   // Delete payment with confirmation
-  const handleDeletePayment = (payment: Payment) => {
-    removePayment(payment.id);
-    toast({
-      title: "Payment deleted",
-      description: `Payment of $${payment.amount} has been removed.`,
-    });
+  const handleDeletePayment = (payment: StudentPayment) => {
+    // This would need to be implemented with actual delete functionality
+    toast.success(`Payment of $${payment.amount} would be deleted`);
   };
   
   // Open expense dialog for adding
@@ -129,11 +206,7 @@ const Payments = () => {
   
   // Delete expense with confirmation
   const handleDeleteExpense = (expense: Expense) => {
-    removeExpense(expense.id);
-    toast({
-      title: "Expense deleted",
-      description: `Expense of $${expense.amount} has been removed.`,
-    });
+    toast.success(`Expense of $${expense.amount} would be deleted`);
   };
   
   // Get status badge for payments
@@ -166,58 +239,48 @@ const Payments = () => {
   };
   
   // Filter and sort payments
-  const filteredPayments = payments
+  const filteredPayments = allPayments
     .filter(payment => 
       payment.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.method?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.studentName?.toLowerCase().includes(searchTerm.toLowerCase())
+      payment.payment_method?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.student_name?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
-      if (sortColumn === 'date') {
+      if (sortColumn === 'payment_date') {
         return sortDirection === 'asc' 
-          ? new Date(a.date).getTime() - new Date(b.date).getTime()
-          : new Date(b.date).getTime() - new Date(a.date).getTime();
+          ? new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+          : new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime();
       } else if (sortColumn === 'amount') {
         return sortDirection === 'asc' 
-          ? a.amount - b.amount
-          : b.amount - a.amount;
-      } else if (sortColumn === 'studentName') {
-        const nameA = a.studentName || '';
-        const nameB = b.studentName || '';
+          ? Number(a.amount) - Number(b.amount)
+          : Number(b.amount) - Number(a.amount);
+      } else if (sortColumn === 'student_name') {
+        const nameA = a.student_name || '';
+        const nameB = b.student_name || '';
         return sortDirection === 'asc'
           ? nameA.localeCompare(nameB)
           : nameB.localeCompare(nameA);
-      } else if (sortColumn === 'notes') {
-        return sortDirection === 'asc'
-          ? a.notes.localeCompare(b.notes)
-          : b.notes.localeCompare(a.notes);
       }
       return 0;
     });
   
-  // Filter and sort expenses
+  // Filter and sort expenses (empty for now)
   const filteredExpenses = expenses
     .filter(expense => 
       expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortColumn === 'date') {
-        return sortDirection === 'asc' 
-          ? new Date(a.date).getTime() - new Date(b.date).getTime()
-          : new Date(b.date).getTime() - new Date(a.date).getTime();
-      } else if (sortColumn === 'amount') {
-        return sortDirection === 'asc' 
-          ? a.amount - b.amount
-          : b.amount - a.amount;
-      } else if (sortColumn === 'category') {
-        return sortDirection === 'asc'
-          ? a.category.localeCompare(b.category)
-          : b.category.localeCompare(a.category);
-      }
-      return 0;
-    });
+    );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-muted-foreground">Loading payments...</div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -317,11 +380,11 @@ const Payments = () => {
           <TabsList>
             <TabsTrigger value="payments" className="gap-2">
               <DollarSign className="h-4 w-4" />
-              Payments
+              Payments ({allPayments.length})
             </TabsTrigger>
             <TabsTrigger value="expenses" className="gap-2">
               <ReceiptIcon className="h-4 w-4" />
-              Expenses
+              Expenses ({expenses.length})
             </TabsTrigger>
           </TabsList>
           
@@ -351,7 +414,7 @@ const Payments = () => {
                   <TableHead className="w-[250px]">
                     <Button 
                       variant="ghost" 
-                      onClick={() => handleSort('studentName')}
+                      onClick={() => handleSort('student_name')}
                       className="gap-1 font-medium"
                     >
                       Student
@@ -372,7 +435,7 @@ const Payments = () => {
                   <TableHead>
                     <Button 
                       variant="ghost" 
-                      onClick={() => handleSort('date')}
+                      onClick={() => handleSort('payment_date')}
                       className="gap-1 font-medium"
                     >
                       Date
@@ -397,28 +460,28 @@ const Payments = () => {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src="" alt={payment.studentName || ''} />
+                            <AvatarImage src="" alt={payment.student_name || ''} />
                             <AvatarFallback className="bg-primary/10 text-primary">
-                              {payment.studentName ? payment.studentName.split(' ').map(n => n[0]).join('') : '?'}
+                              {payment.student_name ? payment.student_name.split(' ').map(n => n[0]).join('') : '?'}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium">{payment.studentName || 'Unknown Student'}</div>
+                            <div className="font-medium">{payment.student_name || 'Unknown Student'}</div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell className="font-medium">
-                        ${payment.amount.toFixed(2)}
+                        {payment.currency === 'EUR' ? '€' : payment.currency === 'RUB' ? '₽' : '$'}{Number(payment.amount).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(payment.date), 'MMM d, yyyy')}</span>
+                          <span>{format(new Date(payment.payment_date), 'MMM d, yyyy')}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{payment.method}</TableCell>
-                      <TableCell>{payment.notes}</TableCell>
+                      <TableCell>{payment.payment_method}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{payment.notes}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -450,99 +513,21 @@ const Payments = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('category')}
-                      className="gap-1 font-medium"
-                    >
-                      Category
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('amount')}
-                      className="gap-1 font-medium"
-                    >
-                      Amount
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('date')}
-                      className="gap-1 font-medium"
-                    >
-                      Date
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Date</TableHead>
                   <TableHead>Recurring</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExpenses.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
-                      No expenses found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredExpenses.map((expense) => (
-                    <TableRow key={expense.id} className="cursor-pointer hover:bg-accent/30">
-                      <TableCell>
-                        <Badge variant="outline" className="bg-slate-100">
-                          {expense.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{expense.name}</TableCell>
-                      <TableCell className="font-medium text-red-600">
-                        ${expense.amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(expense.date), 'MMM d, yyyy')}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {expense.recurring ? (
-                          <Badge variant="outline" className="gap-1 bg-purple-100 text-purple-800 border-purple-200">
-                            <Repeat className="h-3 w-3" />
-                            <span className="capitalize">{expense.frequency || 'Yes'}</span>
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">One-time</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate">{expense.notes}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditExpense(expense)}
-                          >
-                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteExpense(expense)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    No expenses found.
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
