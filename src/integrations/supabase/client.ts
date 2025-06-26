@@ -86,19 +86,22 @@ export const getStudentsWithDetails = async (schoolId: string): Promise<StudentR
 };
 
 export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
-  // First try the RPC function, if it fails, fall back to direct query
+  console.log('getSchoolCourses called with schoolId:', schoolId);
+  
   try {
-    const { data, error } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('name');
+    // Use the RPC function to bypass RLS
+    const { data, error } = await supabase.rpc('get_school_courses', {
+      p_school_id: schoolId
+    });
+
+    console.log('RPC get_school_courses result:', { data, error });
 
     if (error) {
-      console.error('Error fetching courses via direct query:', error);
+      console.error('Error fetching courses via RPC:', error);
       throw error;
     }
 
+    console.log('Successfully fetched courses:', data);
     return data || [];
   } catch (error) {
     console.error('Error in getSchoolCourses:', error);
