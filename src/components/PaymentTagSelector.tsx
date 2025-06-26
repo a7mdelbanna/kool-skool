@@ -79,28 +79,43 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  console.log('🏷️ PaymentTagSelector - Payment ID:', paymentId);
+
   // Fetch user info
-  const { data: userInfo, isLoading: userInfoLoading } = useQuery({
+  const { data: userInfo, isLoading: userInfoLoading, error: userInfoError } = useQuery({
     queryKey: ['current-user-info'],
     queryFn: getCurrentUserInfo,
   });
 
+  console.log('👤 User info:', userInfo, 'Loading:', userInfoLoading, 'Error:', userInfoError);
+
   // Fetch payment with its tags
-  const { data: paymentWithTags, isLoading: paymentLoading } = useQuery({
+  const { data: paymentWithTags, isLoading: paymentLoading, error: paymentError } = useQuery({
     queryKey: ['payment-with-tags', paymentId],
     queryFn: async (): Promise<PaymentWithTags | null> => {
+      console.log('🔍 Fetching payment with tags for ID:', paymentId);
+      
       const { data, error } = await supabase.rpc('get_payment_with_tags', {
         p_payment_id: paymentId
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching payment with tags:', error);
+        throw error;
+      }
       
-      if (!data || data.length === 0) return null;
+      console.log('📊 Raw payment data:', data);
+      
+      if (!data || data.length === 0) {
+        console.log('⚠️ No payment data found');
+        return null;
+      }
       
       const payment = data[0];
       
       // Parse the tags using our helper function
       const parsedTags = parseTagsFromJson(payment.tags);
+      console.log('🏷️ Parsed tags:', parsedTags);
       
       return {
         ...payment,
@@ -110,34 +125,55 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
     enabled: !!paymentId,
   });
 
+  console.log('💰 Payment with tags:', paymentWithTags, 'Loading:', paymentLoading, 'Error:', paymentError);
+
   // Fetch available tags
-  const { data: availableTags = [], isLoading: tagsLoading } = useQuery({
+  const { data: availableTags, isLoading: tagsLoading, error: tagsError } = useQuery({
     queryKey: ['school-tags', userInfo?.[0]?.user_school_id],
-    queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
+    queryFn: async (): Promise<TransactionTag[]> => {
+      if (!userInfo?.[0]?.user_school_id) {
+        console.log('⚠️ No school ID available');
+        return [];
+      }
+      
+      console.log('🔍 Fetching school tags for school ID:', userInfo[0].user_school_id);
       
       const { data, error } = await supabase.rpc('get_school_tags', {
         p_school_id: userInfo[0].user_school_id
       });
       
-      if (error) throw error;
-      return data as TransactionTag[];
+      if (error) {
+        console.error('❌ Error fetching school tags:', error);
+        throw error;
+      }
+      
+      console.log('🏷️ Available tags:', data);
+      return (data as TransactionTag[]) || [];
     },
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
+  console.log('🏷️ Available tags:', availableTags, 'Loading:', tagsLoading, 'Error:', tagsError);
+
   // Current tags from the payment - ensure it's always an array
   const currentTags: TransactionTag[] = paymentWithTags?.tags || [];
+  console.log('🏷️ Current tags:', currentTags);
 
   // Add tag mutation
   const addTagMutation = useMutation({
     mutationFn: async (tagId: string) => {
+      console.log('➕ Adding tag:', tagId, 'to payment:', paymentId);
+      
       const { data, error } = await supabase.rpc('add_payment_tag', {
         p_payment_id: paymentId,
         p_tag_id: tagId
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error adding tag:', error);
+        throw error;
+      }
+      console.log('✅ Tag added successfully:', data);
       return data;
     },
     onSuccess: () => {
@@ -146,6 +182,7 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
       onTagsChange?.(currentTags);
     },
     onError: (error: any) => {
+      console.error('❌ Failed to add tag:', error);
       toast.error('Failed to add tag: ' + error.message);
     },
   });
@@ -153,12 +190,18 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   // Remove tag mutation
   const removeTagMutation = useMutation({
     mutationFn: async (tagId: string) => {
+      console.log('➖ Removing tag:', tagId, 'from payment:', paymentId);
+      
       const { data, error } = await supabase.rpc('remove_payment_tag', {
         p_payment_id: paymentId,
         p_tag_id: tagId
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error removing tag:', error);
+        throw error;
+      }
+      console.log('✅ Tag removed successfully:', data);
       return data;
     },
     onSuccess: () => {
@@ -167,11 +210,13 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
       onTagsChange?.(currentTags);
     },
     onError: (error: any) => {
+      console.error('❌ Failed to remove tag:', error);
       toast.error('Failed to remove tag: ' + error.message);
     },
   });
 
   const handleAddTag = (tagId: string) => {
+    console.log('🎯 Handle add tag:', tagId);
     if (currentTags.some(tag => tag.id === tagId)) {
       toast.error('Tag already added to this payment');
       return;
@@ -181,11 +226,13 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   };
 
   const handleRemoveTag = (tagId: string) => {
+    console.log('🎯 Handle remove tag:', tagId);
     removeTagMutation.mutate(tagId);
   };
 
   // Show loading state while data is being fetched
   if (userInfoLoading || paymentLoading || tagsLoading) {
+    console.log('⏳ Loading state - userInfo:', userInfoLoading, 'payment:', paymentLoading, 'tags:', tagsLoading);
     return (
       <div className="flex items-center gap-2">
         <div className="text-sm text-muted-foreground">Loading tags...</div>
@@ -193,15 +240,33 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
     );
   }
 
+  // Show error state if there are errors
+  if (userInfoError || paymentError || tagsError) {
+    console.error('❌ Error state:', { userInfoError, paymentError, tagsError });
+    return (
+      <div className="flex items-center gap-2">
+        <div className="text-sm text-red-500">Error loading tags</div>
+      </div>
+    );
+  }
+
+  // Ensure we have arrays to work with
+  const safeAvailableTags = Array.isArray(availableTags) ? availableTags : [];
+  const safeCurrentTags = Array.isArray(currentTags) ? currentTags : [];
+  
+  console.log('🔒 Safe arrays - available:', safeAvailableTags.length, 'current:', safeCurrentTags.length);
+
   // Filter available tags to exclude already assigned tags
-  const filteredAvailableTags = availableTags.filter(
-    tag => !currentTags.some(currentTag => currentTag.id === tag.id)
+  const filteredAvailableTags = safeAvailableTags.filter(
+    tag => !safeCurrentTags.some(currentTag => currentTag.id === tag.id)
   );
+  
+  console.log('🔍 Filtered available tags:', filteredAvailableTags);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* Current tags */}
-      {currentTags.map((tag) => (
+      {safeCurrentTags.map((tag) => (
         <Badge
           key={tag.id}
           variant="outline"
