@@ -79,7 +79,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
       return;
     }
     
-    // Create the lesson
+    // Create the lesson with all required properties
     const newSession = {
       id: `session-${Date.now()}`,
       date: date,
@@ -90,7 +90,9 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
       notes: `${subject} lesson with ${student}`,
       sessionNumber: 1,
       totalSessions: 10,
-      cost: cost ? Number(cost) : 0 // Add cost property
+      cost: cost ? Number(cost) : 0,
+      studentId: `student-${Date.now()}`, // Generate a temporary student ID
+      studentName: student // Use the entered student name
     };
     
     // Add to context
