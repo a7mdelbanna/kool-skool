@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { UserContext } from '@/App';
 import { getSchoolCourses, createCourse, Course, supabase } from '@/integrations/supabase/client';
@@ -21,6 +31,10 @@ const Courses = () => {
   const [newCourseType, setNewCourseType] = useState<'individual' | 'group'>('individual');
   const [editCourseName, setEditCourseName] = useState('');
   const [editCourseType, setEditCourseType] = useState<'individual' | 'group'>('individual');
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; course: Course | null }>({
+    isOpen: false,
+    course: null
+  });
 
   // Fetch courses when user is ready
   useEffect(() => {
@@ -98,18 +112,21 @@ const Courses = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('courses')
-        .update({
-          name: editCourseName.trim(),
-          lesson_type: editCourseType,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', courseId);
+      console.log('Updating course:', { id: courseId, name: editCourseName, type: editCourseType });
+      
+      // Use RPC function to bypass RLS for updates
+      const { error } = await supabase.rpc('update_course', {
+        p_course_id: courseId,
+        p_name: editCourseName.trim(),
+        p_lesson_type: editCourseType
+      });
 
       if (error) {
+        console.error('RPC update_course error:', error);
         throw error;
       }
+
+      console.log('Course updated successfully via RPC');
 
       toast({
         title: "Success",
@@ -128,16 +145,24 @@ const Courses = () => {
     }
   };
 
-  const handleDeleteCourse = async (courseId: string, courseName: string) => {
-    if (!confirm(`Are you sure you want to delete "${courseName}"? This action cannot be undone.`)) {
-      return;
-    }
+  const openDeleteDialog = (course: Course) => {
+    setDeleteDialog({ isOpen: true, course });
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog({ isOpen: false, course: null });
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!deleteDialog.course) return;
 
     try {
+      console.log('Deleting course:', deleteDialog.course.id);
+      
       const { error } = await supabase
         .from('courses')
         .delete()
-        .eq('id', courseId);
+        .eq('id', deleteDialog.course.id);
 
       if (error) {
         throw error;
@@ -148,6 +173,7 @@ const Courses = () => {
         description: "Course deleted successfully"
       });
 
+      closeDeleteDialog();
       fetchCourses(); // Refresh the courses list
     } catch (error) {
       console.error('Error deleting course:', error);
@@ -334,7 +360,7 @@ const Courses = () => {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDeleteCourse(course.id, course.name)}
+                        onClick={() => openDeleteDialog(course)}
                         className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -361,6 +387,24 @@ const Courses = () => {
           </p>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.isOpen} onOpenChange={closeDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Course</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteDialog.course?.name}"? This action cannot be undone and may affect students enrolled in this course.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeDeleteDialog}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteCourse} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Course
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
