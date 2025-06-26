@@ -246,6 +246,172 @@ export const deleteStudentPayment = async (paymentId: string) => {
   }
 };
 
+export const getStudentSubscriptions = async (studentId: string) => {
+  console.log('getStudentSubscriptions called with studentId:', studentId);
+  
+  try {
+    const { data, error } = await supabase.rpc('get_student_subscriptions', {
+      p_student_id: studentId
+    });
+
+    console.log('Student subscriptions RPC result:', { data, error });
+
+    if (error) {
+      console.error('Error fetching student subscriptions:', error);
+      throw error;
+    }
+
+    console.log('Successfully fetched student subscriptions:', data);
+    return data || [];
+  } catch (error) {
+    console.error('Error in getStudentSubscriptions:', error);
+    throw error;
+  }
+};
+
+export const addStudentSubscription = async (subscriptionData: {
+  student_id: string;
+  session_count: number;
+  duration_months: number;
+  start_date: string;
+  schedule: any;
+  price_mode: string;
+  price_per_session?: number;
+  fixed_price?: number;
+  total_price: number;
+  currency: string;
+  notes?: string;
+  status?: string;
+}) => {
+  console.log('addStudentSubscription called with:', subscriptionData);
+  
+  try {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .insert(subscriptionData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding student subscription:', error);
+      throw error;
+    }
+
+    console.log('Successfully added student subscription:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in addStudentSubscription:', error);
+    throw error;
+  }
+};
+
+export const deleteStudentSubscription = async (subscriptionId: string) => {
+  console.log('deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  
+  try {
+    const { error } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('id', subscriptionId);
+
+    if (error) {
+      console.error('Error deleting student subscription:', error);
+      throw error;
+    }
+
+    console.log('Successfully deleted student subscription');
+  } catch (error) {
+    console.error('Error in deleteStudentSubscription:', error);
+    throw error;
+  }
+};
+
+export const addLessonSessions = async (sessions: Array<{
+  subscription_id: string;
+  student_id: string;
+  scheduled_date: string;
+  duration_minutes?: number;
+  status?: string;
+  payment_status?: string;
+  cost: number;
+  notes?: string;
+}>) => {
+  console.log('addLessonSessions called with:', sessions);
+  
+  try {
+    const { data, error } = await supabase
+      .from('lesson_sessions')
+      .insert(sessions)
+      .select();
+
+    if (error) {
+      console.error('Error adding lesson sessions:', error);
+      throw error;
+    }
+
+    console.log('Successfully added lesson sessions:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in addLessonSessions:', error);
+    throw error;
+  }
+};
+
+export const getStudentLessonSessions = async (studentId: string) => {
+  console.log('getStudentLessonSessions called with studentId:', studentId);
+  
+  try {
+    const { data, error } = await supabase
+      .from('lesson_sessions')
+      .select(`
+        id,
+        subscription_id,
+        student_id,
+        scheduled_date,
+        duration_minutes,
+        status,
+        payment_status,
+        cost,
+        notes,
+        created_at
+      `)
+      .eq('student_id', studentId)
+      .order('scheduled_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching lesson sessions:', error);
+      throw error;
+    }
+
+    console.log('Successfully fetched lesson sessions:', data);
+    return data || [];
+  } catch (error) {
+    console.error('Error in getStudentLessonSessions:', error);
+    throw error;
+  }
+};
+
+export const updateLessonSessionStatus = async (sessionId: string, status: string) => {
+  console.log('updateLessonSessionStatus called with:', { sessionId, status });
+  
+  try {
+    const { error } = await supabase
+      .from('lesson_sessions')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', sessionId);
+
+    if (error) {
+      console.error('Error updating lesson session status:', error);
+      throw error;
+    }
+
+    console.log('Successfully updated lesson session status');
+  } catch (error) {
+    console.error('Error in updateLessonSessionStatus:', error);
+    throw error;
+  }
+};
+
 export const createStudent = async (studentData: {
   student_email: string;
   student_password: string;

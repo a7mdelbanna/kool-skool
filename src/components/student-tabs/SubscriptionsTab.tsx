@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { 
   Form,
@@ -12,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, addMonths, addDays, parse, getDay } from "date-fns";
+import { format, addMonths, addDays, getDay } from "date-fns";
 import { CalendarIcon, Plus, Trash, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
@@ -30,7 +31,14 @@ import {
   ToggleGroup,
   ToggleGroupItem
 } from "@/components/ui/toggle-group";
-import { usePayments } from "@/contexts/PaymentContext";
+import { 
+  getStudentSubscriptions, 
+  addStudentSubscription, 
+  deleteStudentSubscription,
+  addLessonSessions,
+  addStudentPayment
+} from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -43,18 +51,21 @@ interface DaySchedule {
   time: string;
 }
 
-interface Subscription {
+interface DatabaseSubscription {
   id: string;
-  sessionCount: number;
-  duration: string;
-  startDate: Date;
-  schedule: DaySchedule[];
-  priceMode: "perSession" | "fixed";
-  pricePerSession: number;
-  fixedPrice: number;
-  totalPrice: number;
+  student_id: string;
+  session_count: number;
+  duration_months: number;
+  start_date: string;
+  schedule: any;
+  price_mode: string;
+  price_per_session: number | null;
+  fixed_price: number | null;
+  total_price: number;
   currency: string;
-  notes: string;
+  notes: string | null;
+  status: string;
+  created_at: string;
 }
 
 const daysOfWeek = [
@@ -94,10 +105,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   setStudentData, 
   isViewMode = false 
 }) => {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptions, setSubscriptions] = useState<DatabaseSubscription[]>([]);
   const [selectedDays, setSelectedDays] = useState<DaySchedule[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
-  const { addPayment, addSessions, removeSessionsBySubscriptionId } = usePayments();
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
   
   const form = useForm<SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
@@ -119,6 +131,32 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const watchFixedPrice = form.watch("fixedPrice");
   const watchSessionCount = form.watch("sessionCount");
   const watchCurrency = form.watch("currency");
+  
+  // Load subscriptions when component mounts or studentData changes
+  useEffect(() => {
+    if (studentData.id) {
+      loadSubscriptions();
+    }
+  }, [studentData.id]);
+  
+  const loadSubscriptions = async () => {
+    if (!studentData.id) return;
+    
+    try {
+      setLoading(true);
+      const data = await getStudentSubscriptions(studentData.id);
+      setSubscriptions(data);
+    } catch (error) {
+      console.error('Error loading subscriptions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load subscriptions",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const getCurrencySymbol = (currencyCode: string) => {
     const currency = currencyOptions.find(c => c.code === currencyCode);
@@ -161,12 +199,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     form.setValue("schedule", updatedDays);
   };
   
-  const generateSessions = (subscription: Subscription) => {
-    const { sessionCount, startDate, schedule, pricePerSession, fixedPrice, priceMode, duration, id } = subscription;
+  const generateSessions = (subscription: DatabaseSubscription) => {
+    const { session_count, start_date, schedule, price_per_session, fixed_price, price_mode, duration_months, id, student_id } = subscription;
     
-    const durationMonths = parseInt(duration.split(" ")[0]);
-    
-    const endDate = addMonths(startDate, durationMonths);
+    const startDate = new Date(start_date);
+    const endDate = addMonths(startDate, duration_months);
     
     const dayMapping: { [key: string]: number } = {
       "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, 
@@ -176,15 +213,18 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     const sessionDates: Date[] = [];
     let currentDate = new Date(startDate);
     
-    while (currentDate < endDate && sessionDates.length < sessionCount) {
-      for (const { day, time } of schedule) {
+    const scheduleArray = Array.isArray(schedule) ? schedule : [];
+    
+    while (currentDate < endDate && sessionDates.length < session_count) {
+      for (const { day, time } of scheduleArray) {
         const dayNumber = dayMapping[day];
         const currentDayNumber = getDay(currentDate);
         
         let daysToAdd = dayNumber - currentDayNumber;
         if (daysToAdd < 0) daysToAdd += 7;
         
-        if (daysToAdd === 0 && currentDate === startDate) {
+        if (daysToAdd === 0 && currentDate.getTime() === startDate.getTime()) {
+          // Same day as start date
         } else if (daysToAdd === 0) {
           daysToAdd = 7;
         }
@@ -194,7 +234,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         const [hours, minutes] = time.split(':').map(Number);
         sessionDate.setHours(hours, minutes);
         
-        if (sessionDate <= endDate && sessionDates.length < sessionCount) {
+        if (sessionDate <= endDate && sessionDates.length < session_count) {
           sessionDates.push(sessionDate);
         }
       }
@@ -202,67 +242,135 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       currentDate = addDays(currentDate, 7);
     }
     
-    const sessions = sessionDates.slice(0, sessionCount).map(date => {
-      const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][getDay(date)];
-      const scheduleItem = schedule.find(s => s.day === dayName);
+    const cost = price_mode === "perSession" 
+      ? (price_per_session || 0)
+      : (fixed_price || 0) / session_count;
+    
+    return sessionDates.slice(0, session_count).map(date => ({
+      subscription_id: id,
+      student_id: student_id,
+      scheduled_date: date.toISOString(),
+      duration_minutes: 60,
+      status: "scheduled" as const,
+      payment_status: "paid" as const,
+      cost,
+      notes: subscription.notes || undefined,
+    }));
+  };
+  
+  const handleAddSubscription = async (data: SubscriptionFormValues) => {
+    if (!studentData.id) {
+      toast({
+        title: "Error",
+        description: "Student ID is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const calculatedTotalPrice = calculateTotalPrice();
+      const durationMonths = parseInt(data.duration.split(" ")[0]);
       
-      const cost = priceMode === "perSession" 
-        ? pricePerSession 
-        : fixedPrice / sessionCount;
-      
-      return {
-        date,
-        time: scheduleItem ? scheduleItem.time : "00:00",
-        duration: "1 hour",
-        status: "scheduled" as const,
-        paymentStatus: "paid" as const,
-        cost,
-        notes: subscription.notes,
-        subscriptionId: id
+      const subscriptionData = {
+        student_id: studentData.id,
+        session_count: data.sessionCount,
+        duration_months: durationMonths,
+        start_date: format(data.startDate, "yyyy-MM-dd"),
+        schedule: data.schedule,
+        price_mode: data.priceMode,
+        price_per_session: data.priceMode === "perSession" ? Number(data.pricePerSession) : null,
+        fixed_price: data.priceMode === "fixed" ? Number(data.fixedPrice) : null,
+        total_price: calculatedTotalPrice,
+        currency: data.currency,
+        notes: data.notes || null,
       };
-    });
-    
-    return sessions;
+      
+      // Add the subscription to database
+      const newSubscription = await addStudentSubscription(subscriptionData);
+      
+      // Generate and add lesson sessions
+      const sessions = generateSessions(newSubscription);
+      if (sessions.length > 0) {
+        await addLessonSessions(sessions);
+      }
+      
+      // Add payment record
+      await addStudentPayment({
+        student_id: studentData.id,
+        amount: calculatedTotalPrice,
+        currency: data.currency,
+        payment_date: format(new Date(), "yyyy-MM-dd"),
+        payment_method: "Credit Card",
+        status: "completed",
+        notes: `Payment for ${data.sessionCount} lessons (${data.duration}) starting on ${format(data.startDate, "PPP")}`,
+      });
+      
+      toast({
+        title: "Success",
+        description: "Subscription added successfully",
+      });
+      
+      // Reload subscriptions and reset form
+      await loadSubscriptions();
+      form.reset();
+      setSelectedDays([]);
+      
+    } catch (error) {
+      console.error('Error adding subscription:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add subscription",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const handleAddSubscription = (data: SubscriptionFormValues) => {
-    const calculatedTotalPrice = calculateTotalPrice();
-    
-    const newSubscription: Subscription = {
-      id: Date.now().toString(),
-      sessionCount: data.sessionCount,
-      duration: data.duration,
-      startDate: data.startDate,
-      schedule: data.schedule as DaySchedule[],
-      priceMode: data.priceMode,
-      pricePerSession: Number(data.pricePerSession),
-      fixedPrice: Number(data.fixedPrice),
-      totalPrice: calculatedTotalPrice,
-      currency: data.currency,
-      notes: data.notes || "",
-    };
-    
-    const sessions = generateSessions(newSubscription);
-    addSessions(sessions);
-    
-    addPayment({
-      amount: calculatedTotalPrice,
-      date: new Date(),
-      method: "Credit Card",
-      notes: `Payment for ${data.sessionCount} lessons (${data.duration}) starting on ${format(data.startDate, "PPP")}`,
-      status: "completed",
-      relatedSubscriptionId: newSubscription.id,
-    });
-    
-    setSubscriptions([...subscriptions, newSubscription]);
-    form.reset();
-    setSelectedDays([]);
+  const handleRemoveSubscription = async (id: string) => {
+    try {
+      setLoading(true);
+      await deleteStudentSubscription(id);
+      
+      toast({
+        title: "Success",
+        description: "Subscription removed successfully",
+      });
+      
+      await loadSubscriptions();
+    } catch (error) {
+      console.error('Error removing subscription:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove subscription",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  const handleRemoveSubscription = (id: string) => {
-    setSubscriptions(subscriptions.filter(sub => sub.id !== id));
-    removeSessionsBySubscriptionId(id);
+
+  const formatDuration = (months: number) => {
+    return `${months} month${months !== 1 ? 's' : ''}`;
   };
+
+  const formatSchedule = (schedule: any) => {
+    if (!Array.isArray(schedule)) return '';
+    return schedule.map(s => `${s.day} at ${s.time}`).join(", ");
+  };
+
+  if (loading && subscriptions.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading subscriptions...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -284,36 +392,40 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <h4 className="font-medium">{subscription.sessionCount} Sessions</h4>
-                    <span className="text-sm text-muted-foreground">({subscription.duration})</span>
+                    <h4 className="font-medium">{subscription.session_count} Sessions</h4>
+                    <span className="text-sm text-muted-foreground">({formatDuration(subscription.duration_months)})</span>
                   </div>
                   <p className="text-sm my-1">
-                    Starting {format(subscription.startDate, "PPP")}
+                    Starting {format(new Date(subscription.start_date), "PPP")}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {subscription.schedule.map(s => `${s.day} at ${s.time}`).join(", ")}
+                    {formatSchedule(subscription.schedule)}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-sm font-medium">
-                      {getCurrencySymbol(subscription.currency)}{subscription.totalPrice.toFixed(2)}
+                      {getCurrencySymbol(subscription.currency)}{subscription.total_price.toFixed(2)}
                     </span>
-                    {subscription.priceMode === "perSession" && (
+                    {subscription.price_mode === "perSession" && subscription.price_per_session && (
                       <span className="text-xs text-muted-foreground">
-                        ({getCurrencySymbol(subscription.currency)}{subscription.pricePerSession.toFixed(2)} per session)
+                        ({getCurrencySymbol(subscription.currency)}{subscription.price_per_session.toFixed(2)} per session)
                       </span>
                     )}
-                    {subscription.priceMode === "fixed" && (
+                    {subscription.price_mode === "fixed" && (
                       <span className="text-xs text-muted-foreground">
                         (Fixed price)
                       </span>
                     )}
                   </div>
+                  {subscription.notes && (
+                    <p className="text-sm text-muted-foreground mt-1">{subscription.notes}</p>
+                  )}
                 </div>
                 {!isViewMode && (
                   <Button 
                     variant="ghost" 
                     size="icon"
                     onClick={() => handleRemoveSubscription(subscription.id)}
+                    disabled={loading}
                   >
                     <Trash className="h-4 w-4 text-destructive" />
                   </Button>
@@ -405,7 +517,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                             selected={field.value}
                             onSelect={field.onChange}
                             initialFocus
-                            className={cn("p-3 pointer-events-auto")}
+                            className={cn("p-3")}
                           />
                         </PopoverContent>
                       </Popover>
@@ -603,9 +715,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                 )}
               />
               
-              <Button type="submit" className="w-full mt-4">
+              <Button type="submit" className="w-full mt-4" disabled={loading}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Subscription
+                {loading ? "Adding..." : "Add Subscription"}
               </Button>
             </form>
           </Form>

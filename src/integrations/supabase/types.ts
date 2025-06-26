@@ -44,6 +44,63 @@ export type Database = {
           },
         ]
       }
+      lesson_sessions: {
+        Row: {
+          cost: number
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          notes: string | null
+          payment_status: string
+          scheduled_date: string
+          status: string
+          student_id: string
+          subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost: number
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          scheduled_date: string
+          status?: string
+          student_id: string
+          subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          payment_status?: string
+          scheduled_date?: string
+          status?: string
+          student_id?: string
+          subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_sessions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       licenses: {
         Row: {
           created_at: string
@@ -224,6 +281,68 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          created_at: string
+          currency: string
+          duration_months: number
+          fixed_price: number | null
+          id: string
+          notes: string | null
+          price_mode: string
+          price_per_session: number | null
+          schedule: Json
+          session_count: number
+          start_date: string
+          status: string
+          student_id: string
+          total_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          duration_months: number
+          fixed_price?: number | null
+          id?: string
+          notes?: string | null
+          price_mode: string
+          price_per_session?: number | null
+          schedule: Json
+          session_count: number
+          start_date: string
+          status?: string
+          student_id: string
+          total_price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          duration_months?: number
+          fixed_price?: number | null
+          id?: string
+          notes?: string | null
+          price_mode?: string
+          price_per_session?: number | null
+          schedule?: Json
+          session_count?: number
+          start_date?: string
+          status?: string
+          student_id?: string
+          total_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -341,6 +460,25 @@ export type Database = {
           payment_method: string
           status: string
           notes: string
+          created_at: string
+        }[]
+      }
+      get_student_subscriptions: {
+        Args: { p_student_id: string }
+        Returns: {
+          id: string
+          student_id: string
+          session_count: number
+          duration_months: number
+          start_date: string
+          schedule: Json
+          price_mode: string
+          price_per_session: number
+          fixed_price: number
+          total_price: number
+          currency: string
+          notes: string
+          status: string
           created_at: string
         }[]
       }
