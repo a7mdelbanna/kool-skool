@@ -69,6 +69,7 @@ export interface StudentRecord {
   next_session_date: string | null;
   next_payment_date: string | null;
   next_payment_amount: number | null;
+  subscription_progress: string;
 }
 
 // Updated interface to match the new function signature
@@ -449,23 +450,44 @@ export const getStudentLessonSessions = async (studentId: string) => {
   return data;
 };
 
-export const updateLessonSessionStatus = async (sessionId: string, newStatus: string) => {
-  console.log(`Updating lesson session ${sessionId} status to: ${newStatus}`);
+export const handleSessionAction = async (sessionId: string, action: string, newDatetime?: string) => {
+  console.log(`🎯 CLIENT: handleSessionAction called - Session: ${sessionId}, Action: ${action}, New DateTime: ${newDatetime}`);
   
-  const { data, error } = await supabase
-    .from('lesson_sessions')
-    .update({ status: newStatus })
-    .eq('id', sessionId)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('handle_session_action', {
+    p_session_id: sessionId,
+    p_action: action,
+    p_new_datetime: newDatetime || null
+  });
   
   if (error) {
-    console.error('Error updating lesson session status:', error);
+    console.error('❌ CLIENT: Error handling session action:', error);
     throw new Error(error.message);
   }
   
-  console.log('Lesson session status updated:', data);
+  console.log('✅ CLIENT: Session action completed:', data);
   return data;
+};
+
+export const updateLessonSessionStatus = async (sessionId: string, newStatus: string) => {
+  console.log(`📝 CLIENT: Updating lesson session ${sessionId} status to: ${newStatus}`);
+  
+  // Map status to appropriate action
+  let action: string;
+  switch (newStatus) {
+    case 'completed':
+      action = 'attended';
+      break;
+    case 'cancelled':
+      action = 'cancelled';
+      break;
+    case 'scheduled':
+      action = 'rescheduled';
+      break;
+    default:
+      throw new Error(`Unsupported status: ${newStatus}`);
+  }
+  
+  return await handleSessionAction(sessionId, action);
 };
 
 export const addStudentPayment = async (paymentData: {

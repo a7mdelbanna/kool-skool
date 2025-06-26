@@ -169,8 +169,8 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
           <div className="flex items-center gap-2">
             <CheckSquare className="h-4 w-4 text-primary" />
             <div className="text-xs">
-              <p className="text-muted-foreground">Lessons</p>
-              <p className="font-medium">{student.lessonsCompleted || 0}</p>
+              <p className="text-muted-foreground">Progress</p>
+              <p className="font-medium">{(student as any).subscriptionProgress || '0/0'}</p>
             </div>
           </div>
           

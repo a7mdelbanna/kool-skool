@@ -47,11 +47,14 @@ export type Database = {
       lesson_sessions: {
         Row: {
           cost: number
+          counts_toward_completion: boolean | null
           created_at: string
           duration_minutes: number | null
           id: string
           index_in_sub: number | null
+          moved_from_session_id: string | null
           notes: string | null
+          original_session_index: number | null
           payment_status: string
           scheduled_date: string
           status: string
@@ -61,11 +64,14 @@ export type Database = {
         }
         Insert: {
           cost: number
+          counts_toward_completion?: boolean | null
           created_at?: string
           duration_minutes?: number | null
           id?: string
           index_in_sub?: number | null
+          moved_from_session_id?: string | null
           notes?: string | null
+          original_session_index?: number | null
           payment_status?: string
           scheduled_date: string
           status?: string
@@ -75,11 +81,14 @@ export type Database = {
         }
         Update: {
           cost?: number
+          counts_toward_completion?: boolean | null
           created_at?: string
           duration_minutes?: number | null
           id?: string
           index_in_sub?: number | null
+          moved_from_session_id?: string | null
           notes?: string | null
+          original_session_index?: number | null
           payment_status?: string
           scheduled_date?: string
           status?: string
@@ -88,6 +97,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lesson_sessions_moved_from_session_id_fkey"
+            columns: ["moved_from_session_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lesson_sessions_student_id_fkey"
             columns: ["student_id"]
@@ -295,6 +311,7 @@ export type Database = {
           created_at: string
           currency: string
           duration_months: number
+          end_date: string | null
           fixed_price: number | null
           id: string
           notes: string | null
@@ -302,6 +319,7 @@ export type Database = {
           price_per_session: number | null
           schedule: Json
           session_count: number
+          sessions_completed: number | null
           start_date: string
           status: string
           student_id: string
@@ -312,6 +330,7 @@ export type Database = {
           created_at?: string
           currency?: string
           duration_months: number
+          end_date?: string | null
           fixed_price?: number | null
           id?: string
           notes?: string | null
@@ -319,6 +338,7 @@ export type Database = {
           price_per_session?: number | null
           schedule: Json
           session_count: number
+          sessions_completed?: number | null
           start_date: string
           status?: string
           student_id: string
@@ -329,6 +349,7 @@ export type Database = {
           created_at?: string
           currency?: string
           duration_months?: number
+          end_date?: string | null
           fixed_price?: number | null
           id?: string
           notes?: string | null
@@ -336,6 +357,7 @@ export type Database = {
           price_per_session?: number | null
           schedule?: Json
           session_count?: number
+          sessions_completed?: number | null
           start_date?: string
           status?: string
           student_id?: string
@@ -533,6 +555,10 @@ export type Database = {
           cost: number
           notes: string
           created_at: string
+          index_in_sub: number
+          counts_toward_completion: boolean
+          original_session_index: number
+          moved_from_session_id: string
         }[]
       }
       get_role_constraint_values: {
@@ -608,6 +634,7 @@ export type Database = {
           next_session_date: string
           next_payment_date: string
           next_payment_amount: number
+          subscription_progress: string
         }[]
       }
       get_team_members: {
@@ -621,9 +648,21 @@ export type Database = {
           created_at: string
         }[]
       }
+      handle_session_action: {
+        Args: {
+          p_session_id: string
+          p_action: string
+          p_new_datetime?: string
+        }
+        Returns: Json
+      }
       hash_password: {
         Args: { password: string }
         Returns: string
+      }
+      recalculate_subscription_progress: {
+        Args: { p_subscription_id: string }
+        Returns: undefined
       }
       update_course: {
         Args: { p_course_id: string; p_name: string; p_lesson_type: string }

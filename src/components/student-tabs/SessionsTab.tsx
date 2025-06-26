@@ -55,6 +55,9 @@ interface DatabaseSession {
   notes: string | null;
   created_at: string;
   index_in_sub?: number | null;
+  counts_toward_completion?: boolean;
+  original_session_index?: number | null;
+  moved_from_session_id?: string | null;
 }
 
 const SessionsTab: React.FC<SessionsTabProps> = ({ 
@@ -182,22 +185,72 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const handleUpdateSessionStatus = async (sessionId: string, newStatus: string) => {
     try {
       setLoading(true);
-      console.log(`Updating session ${sessionId} to status: ${newStatus}`);
+      console.log(`🎯 Updating session ${sessionId} with action for status: ${newStatus}`);
       
-      await updateLessonSessionStatus(sessionId, newStatus);
+      // Map status to appropriate action
+      let action: string;
+      switch (newStatus) {
+        case 'completed':
+          action = 'attended';
+          break;
+        case 'cancelled':
+          action = 'cancelled';
+          break;
+        case 'scheduled':
+          action = 'rescheduled';
+          break;
+        default:
+          throw new Error(`Unsupported status: ${newStatus}`);
+      }
       
-      toast({
-        title: "Success",
-        description: `Session status updated to ${newStatus}`,
-      });
+      const result = await handleSessionAction(sessionId, action);
       
-      // Reload sessions to reflect changes
-      await loadSessions();
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: result.message || `Session ${action} successfully`,
+        });
+        
+        // Reload sessions to reflect changes including any new sessions created
+        await loadSessions();
+      } else {
+        throw new Error(result.message || 'Session action failed');
+      }
     } catch (error) {
-      console.error('Error updating session status:', error);
+      console.error('❌ Error handling session action:', error);
       toast({
         title: "Error",
-        description: "Failed to update session status",
+        description: error instanceof Error ? error.message : "Failed to update session",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoveSession = async (sessionId: string) => {
+    try {
+      setLoading(true);
+      console.log(`🔄 Moving session ${sessionId} to next available slot`);
+      
+      const result = await handleSessionAction(sessionId, 'moved');
+      
+      if (result.success) {
+        toast({
+          title: "Session Moved",
+          description: result.message + (result.new_session_id ? ' New session created.' : ''),
+        });
+        
+        // Reload sessions to show both the moved session and new session
+        await loadSessions();
+      } else {
+        throw new Error(result.message || 'Failed to move session');
+      }
+    } catch (error) {
+      console.error('❌ Error moving session:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to move session",
         variant: "destructive",
       });
     } finally {
@@ -230,38 +283,49 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   };
   
   const getStatusBadge = (session: DatabaseSession) => {
-    switch(session.status) {
-      case "scheduled":
-        return (
-          <Badge variant="outline" className="flex items-center gap-1 border-blue-500 text-blue-500">
-            <Calendar className="h-3 w-3" />
-            Scheduled
-          </Badge>
-        );
-      case "completed":
-        return (
-          <Badge variant="outline" className="flex items-center gap-1 border-green-500 text-green-500">
-            <CheckCircle className="h-3 w-3" />
-            Completed
-          </Badge>
-        );
-      case "cancelled":
-        return (
-          <Badge variant="outline" className="flex items-center gap-1 border-orange-500 text-orange-500">
-            <CalendarX className="h-3 w-3" />
-            Cancelled
-          </Badge>
-        );
-      case "rescheduled":
-        return (
-          <Badge variant="outline" className="flex items-center gap-1 border-purple-500 text-purple-500">
-            <ArrowRight className="h-3 w-3" />
-            Rescheduled
-          </Badge>
-        );
-      default:
-        return null;
-    }
+    const getBadgeContent = () => {
+      switch(session.status) {
+        case "scheduled":
+          return {
+            icon: <Calendar className="h-3 w-3" />,
+            text: "Scheduled",
+            className: "border-blue-500 text-blue-500"
+          };
+        case "completed":
+          return {
+            icon: <CheckCircle className="h-3 w-3" />,
+            text: "Completed",
+            className: "border-green-500 text-green-500"
+          };
+        case "cancelled":
+          return {
+            icon: <CalendarX className="h-3 w-3" />,
+            text: "Cancelled",
+            className: "border-orange-500 text-orange-500"
+          };
+        case "rescheduled":
+          return {
+            icon: <ArrowRight className="h-3 w-3" />,
+            text: session.moved_from_session_id ? "Moved" : "Rescheduled",
+            className: "border-purple-500 text-purple-500"
+          };
+        default:
+          return null;
+      }
+    };
+
+    const badgeContent = getBadgeContent();
+    if (!badgeContent) return null;
+
+    return (
+      <Badge variant="outline" className={`flex items-center gap-1 ${badgeContent.className}`}>
+        {badgeContent.icon}
+        {badgeContent.text}
+        {!session.counts_toward_completion && (
+          <span className="text-xs opacity-70">(replaced)</span>
+        )}
+      </Badge>
+    );
   };
   
   const getPaymentBadge = (session: DatabaseSession) => {
@@ -311,7 +375,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
               key={session.id}
               className={cn(
                 "border rounded-md p-4",
-                session.status === "cancelled" && "bg-muted/30"
+                (session.status === "cancelled" || !session.counts_toward_completion) && "bg-muted/30"
               )}
             >
               <div className="flex flex-wrap justify-between gap-2">
@@ -322,7 +386,12 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                     </span>
                     {session.index_in_sub && (
                       <Badge variant="secondary" className="text-xs">
-                        #{session.index_in_sub}
+                        #{session.original_session_index || session.index_in_sub}
+                      </Badge>
+                    )}
+                    {session.moved_from_session_id && (
+                      <Badge variant="outline" className="text-xs border-blue-500 text-blue-500">
+                        Replacement
                       </Badge>
                     )}
                   </div>
@@ -379,6 +448,16 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                         <X className="h-3.5 w-3.5 mr-1" />
                         Cancel Session
                       </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                        onClick={() => handleMoveSession(session.id)}
+                        disabled={loading}
+                      >
+                        <ArrowRight className="h-3.5 w-3.5 mr-1" />
+                        Move to End
+                      </Button>
                     </>
                   )}
                   
@@ -426,10 +505,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4 inline mr-1" />
-            Sessions are automatically generated when you add a subscription in the Subscriptions tab.
+            Sessions are automatically generated when you add a subscription. Use actions to manage attendance and scheduling.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length} | Comprehensive duplicate prevention: Active ✅
+            Total sessions: {sessions.length} | Session actions: Attend, Cancel, Move ✅
           </p>
         </div>
       </div>
