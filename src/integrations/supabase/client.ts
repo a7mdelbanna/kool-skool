@@ -393,7 +393,7 @@ export const addStudentSubscription = async (subscriptionData: {
 };
 
 export const deleteStudentSubscription = async (subscriptionId: string) => {
-  console.log('🗑️ DATABASE FUNCTION: deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  console.log('🗑️ ENHANCED: deleteStudentSubscription called with subscriptionId:', subscriptionId);
   
   if (!subscriptionId) {
     console.error('❌ No subscription ID provided');
@@ -401,22 +401,22 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
   }
   
   try {
-    console.log('🔧 Using database function for secure deletion...');
+    console.log('🔧 Using enhanced database function for secure deletion...');
     
-    // Use the database function for secure deletion with all cascading operations
+    // Use the enhanced database function for secure deletion with proper authentication
     const { data, error } = await supabase.rpc('delete_student_subscription', {
       p_subscription_id: subscriptionId
     });
 
-    console.log('Database function result:', { data, error });
+    console.log('Enhanced database function result:', { data, error });
 
     if (error) {
-      console.error('❌ Database function error:', error);
+      console.error('❌ Enhanced database function error:', error);
       throw new Error(`Database deletion failed: ${error.message}`);
     }
 
-    // Safely cast the data to the proper type - first to unknown, then to our interface
-    const result = data as unknown as DeleteSubscriptionResponse;
+    // Parse the JSON response from the database function
+    const result = data as DeleteSubscriptionResponse;
 
     if (!result || !result.success) {
       const errorMessage = result?.message || 'Unknown deletion error';
@@ -424,13 +424,13 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
       throw new Error(errorMessage);
     }
 
-    console.log('✅ SUCCESS: Subscription deleted via database function');
+    console.log('✅ SUCCESS: Subscription deleted via enhanced database function');
     console.log(`📊 Deletion summary: ${result.sessions_deleted} sessions deleted`);
     
     return result;
 
   } catch (error) {
-    console.error('❌ Error in deleteStudentSubscription:', error);
+    console.error('❌ Error in enhanced deleteStudentSubscription:', error);
     
     // Re-throw with more context if it's a generic error
     if (error instanceof Error) {
