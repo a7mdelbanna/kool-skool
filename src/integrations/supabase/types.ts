@@ -593,6 +593,7 @@ export type Database = {
           teacher_first_name: string
           teacher_last_name: string
           teacher_email: string
+          payment_status: string
         }[]
       }
       get_team_members: {

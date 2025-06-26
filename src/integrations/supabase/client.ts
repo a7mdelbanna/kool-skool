@@ -64,7 +64,7 @@ export interface StudentRecord {
   teacher_first_name: string;
   teacher_last_name: string;
   teacher_email: string;
-  payment_status?: string;
+  payment_status: string;
 }
 
 // Updated interface to match the new function signature
