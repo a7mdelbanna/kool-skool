@@ -301,7 +301,7 @@ export const createStudent = async (studentData: {
   console.log('Creating student with user info:', userInfo);
   console.log('Student data:', studentData);
   
-  // Call the RPC function with all required parameters including current_user_id
+  // Call the RPC function with the correct parameter name
   const { data, error } = await supabase.rpc('create_student', {
     student_email: studentData.student_email,
     student_password: studentData.student_password,
