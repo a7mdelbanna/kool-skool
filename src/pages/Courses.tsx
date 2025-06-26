@@ -159,14 +159,17 @@ const Courses = () => {
     try {
       console.log('Deleting course:', deleteDialog.course.id);
       
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', deleteDialog.course.id);
+      // Use RPC function to bypass RLS for deletions - using type assertion to work around TypeScript
+      const { error } = await (supabase.rpc as any)('delete_course', {
+        p_course_id: deleteDialog.course.id
+      });
 
       if (error) {
+        console.error('RPC delete_course error:', error);
         throw error;
       }
+
+      console.log('Course deleted successfully via RPC');
 
       toast({
         title: "Success",

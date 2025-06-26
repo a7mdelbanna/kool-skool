@@ -256,6 +256,10 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_course: {
+        Args: { p_course_id: string }
+        Returns: undefined
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
