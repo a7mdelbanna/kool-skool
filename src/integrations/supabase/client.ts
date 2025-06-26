@@ -297,6 +297,7 @@ export const createStudent = async (studentData: {
     throw new Error('User not authenticated - please log in again');
   }
   
+  // Call the RPC function with all required parameters including current_user_id
   const { data, error } = await supabase.rpc('create_student', {
     student_email: studentData.student_email,
     student_password: studentData.student_password,
@@ -306,7 +307,7 @@ export const createStudent = async (studentData: {
     course_id: studentData.course_id,
     age_group: studentData.age_group,
     level: studentData.level,
-    phone: studentData.phone,
+    phone: studentData.phone || null,
     current_user_id: userInfo.user_id
   });
   
