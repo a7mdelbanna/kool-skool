@@ -283,7 +283,7 @@ export const addStudentSubscription = async (subscriptionData: {
   notes?: string;
   status?: string;
 }) => {
-  console.log('addStudentSubscription called with ENHANCED DUPLICATE PREVENTION:', subscriptionData);
+  console.log('addStudentSubscription called with ENHANCED ERROR HANDLING:', subscriptionData);
   
   try {
     // Get current user from localStorage for validation
@@ -295,8 +295,7 @@ export const addStudentSubscription = async (subscriptionData: {
     const user = JSON.parse(userString);
     console.log('Current user for subscription:', user);
     
-    // Enhanced logging before calling RPC with new database structure
-    console.log('=== CALLING ENHANCED add_student_subscription RPC ===');
+    console.log('=== CALLING IMPROVED add_student_subscription RPC ===');
     console.log('About to call add_student_subscription RPC with parameters:', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -305,10 +304,10 @@ export const addStudentSubscription = async (subscriptionData: {
       p_schedule: subscriptionData.schedule,
       p_current_user_id: user.id,
       p_current_school_id: user.schoolId,
-      note: 'Using enhanced RPC with bulletproof duplicate prevention'
+      note: 'Using improved RPC with better error handling'
     });
     
-    // Use enhanced RPC function with bulletproof duplicate prevention
+    // Use improved RPC function with better error handling
     const { data, error } = await supabase.rpc('add_student_subscription', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -327,44 +326,43 @@ export const addStudentSubscription = async (subscriptionData: {
     });
 
     if (error) {
-      console.error('❌ Error adding student subscription via enhanced RPC:', error);
+      console.error('❌ Error adding student subscription via improved RPC:', error);
       
-      // Handle specific duplicate error with enhanced messaging
+      // More specific error handling
+      if (error.message && error.message.includes('No sessions were created')) {
+        throw new Error('Cannot create subscription: All requested session times conflict with existing sessions. Please choose different dates or times.');
+      }
+      
       if (error.message && error.message.includes('Duplicate session prevented')) {
-        console.error('🚫 DUPLICATE SESSION ERROR - Database trigger prevented creation:', error.message);
-        throw new Error('Cannot create subscription: The database prevented duplicate session creation. This is working as expected. Please refresh and check existing sessions.');
+        throw new Error('Cannot create subscription: Some sessions would conflict with existing ones. Please check the student\'s current schedule.');
       }
       
-      // Handle unique constraint violations
       if (error.message && error.message.includes('unique constraint')) {
-        console.error('🚫 UNIQUE CONSTRAINT VIOLATION:', error.message);
-        throw new Error('Cannot create subscription: This would create sessions that conflict with existing ones. Please check existing subscriptions and sessions.');
+        throw new Error('Cannot create subscription: Session scheduling conflict detected. Please verify existing sessions.');
       }
       
-      throw error;
+      // Generic error fallback
+      throw new Error(error.message || 'Failed to create subscription');
     }
 
-    console.log('✅ Successfully added student subscription via enhanced RPC:', data);
-    
-    // Log session creation success with enhanced messaging
-    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with enhanced duplicate prevention');
-    console.log('Database triggers and constraints are actively preventing duplicates');
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      throw new Error('Subscription creation failed: No data returned from server');
+    }
+
+    console.log('✅ Successfully added student subscription via improved RPC:', data);
+    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with improved error handling');
     
     // Return the first item from the array since RPC returns an array
     return Array.isArray(data) && data.length > 0 ? data[0] : data;
   } catch (error) {
-    console.error('❌ Error in addStudentSubscription with enhanced prevention:', error);
+    console.error('❌ Error in addStudentSubscription with improved handling:', error);
     
-    // Provide more specific error messages for the enhanced system
-    if (error.message && error.message.includes('duplicate')) {
-      throw new Error('Cannot create subscription: The enhanced duplicate prevention system blocked this operation. Please refresh and verify existing sessions.');
+    // Re-throw with more context if it's a generic error
+    if (error instanceof Error) {
+      throw error;
     }
     
-    if (error.message && error.message.includes('constraint')) {
-      throw new Error('Cannot create subscription: Database constraints prevented this operation to maintain data integrity.');
-    }
-    
-    throw error;
+    throw new Error('An unexpected error occurred while creating the subscription');
   }
 };
 
