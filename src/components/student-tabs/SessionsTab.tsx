@@ -10,12 +10,15 @@ import {
   ArrowRight,
   Check,
   XCircle,
-  RefreshCcw
+  RefreshCcw,
+  CalendarClock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -79,6 +82,9 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = React.useState(false);
   const [changeStatusDialogOpen, setChangeStatusDialogOpen] = React.useState(false);
+  const [rescheduleDialogOpen, setRescheduleDialogOpen] = React.useState(false);
+  const [rescheduleDate, setRescheduleDate] = React.useState("");
+  const [rescheduleTime, setRescheduleTime] = React.useState("");
   
   // Load sessions when component mounts or studentData changes
   useEffect(() => {
@@ -263,6 +269,53 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to move session",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRescheduleSession = async () => {
+    if (!selectedSession || !rescheduleDate || !rescheduleTime) {
+      toast({
+        title: "Error",
+        description: "Please select both date and time for rescheduling",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const newDateTime = `${rescheduleDate}T${rescheduleTime}:00`;
+      console.log(`📅 Rescheduling session ${selectedSession.id} to ${newDateTime}`);
+      
+      const rawResult = await handleSessionAction(selectedSession.id, 'rescheduled', newDateTime);
+      
+      // Type cast the JSON response to our expected interface
+      const result = rawResult as unknown as SessionActionResponse;
+      
+      if (result.success) {
+        toast({
+          title: "Session Rescheduled",
+          description: result.message || "Session has been rescheduled successfully",
+        });
+        
+        // Reload sessions to reflect changes
+        await loadSessions();
+        setRescheduleDialogOpen(false);
+        setSelectedSession(null);
+        setRescheduleDate("");
+        setRescheduleTime("");
+      } else {
+        throw new Error(result.message || 'Failed to reschedule session');
+      }
+    } catch (error) {
+      console.error('❌ Error rescheduling session:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to reschedule session",
         variant: "destructive",
       });
     } finally {
@@ -463,6 +516,19 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                       <Button 
                         variant="outline" 
                         size="sm" 
+                        className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                        onClick={() => {
+                          setSelectedSession(session);
+                          setRescheduleDialogOpen(true);
+                        }}
+                        disabled={loading}
+                      >
+                        <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                        Reschedule
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
                         className="border-blue-500 text-blue-500 hover:bg-blue-50"
                         onClick={() => handleMoveSession(session.id)}
                         disabled={loading}
@@ -564,6 +630,53 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={rescheduleDialogOpen} onOpenChange={setRescheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reschedule Session</DialogTitle>
+            <DialogDescription>
+              Select a new date and time for this session.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="reschedule-date" className="text-right">
+                Date
+              </Label>
+              <Input
+                id="reschedule-date"
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="reschedule-time" className="text-right">
+                Time
+              </Label>
+              <Input
+                id="reschedule-time"
+                type="time"
+                value={rescheduleTime}
+                onChange={(e) => setRescheduleTime(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRescheduleDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRescheduleSession} disabled={loading}>
+              {loading ? 'Rescheduling...' : 'Reschedule Session'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={changeStatusDialogOpen} onOpenChange={setChangeStatusDialogOpen}>
         <DialogContent>
