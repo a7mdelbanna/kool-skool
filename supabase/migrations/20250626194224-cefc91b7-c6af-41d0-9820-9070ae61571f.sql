@@ -1,5 +1,4 @@
 
-
 -- Remove unnecessary social media columns and date_of_birth from users table
 ALTER TABLE public.users 
 DROP COLUMN IF EXISTS date_of_birth,
@@ -11,7 +10,7 @@ DROP COLUMN IF EXISTS facebook,
 DROP COLUMN IF EXISTS skype,
 DROP COLUMN IF EXISTS zoom;
 
--- Update the create_student function to work with local auth (not Supabase auth)
+-- Update the create_student function to work with local auth and accept current_user_id
 CREATE OR REPLACE FUNCTION public.create_student(
   student_email text, 
   student_password text, 
@@ -115,4 +114,3 @@ $function$;
 
 -- Drop the old function with social media parameters if it exists
 DROP FUNCTION IF EXISTS public.create_student_with_profile(uuid, text, text, text, text, uuid, uuid, text, text, text, text, text, text, text, text, text, text, text);
-

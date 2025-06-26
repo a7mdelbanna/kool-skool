@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -297,6 +298,9 @@ export const createStudent = async (studentData: {
     throw new Error('User not authenticated - please log in again');
   }
   
+  console.log('Creating student with user info:', userInfo);
+  console.log('Student data:', studentData);
+  
   // Call the RPC function with all required parameters including current_user_id
   const { data, error } = await supabase.rpc('create_student', {
     student_email: studentData.student_email,
@@ -316,6 +320,7 @@ export const createStudent = async (studentData: {
     throw new Error(error.message);
   }
   
+  console.log('Student creation response:', data);
   return data as unknown as CreateStudentResponse;
 };
 
