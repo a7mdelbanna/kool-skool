@@ -21,6 +21,19 @@ interface PaymentTagSelectorProps {
   onTagsChange?: (tags: TransactionTag[]) => void;
 }
 
+interface PaymentWithTags {
+  id: string;
+  student_id: string;
+  amount: number;
+  currency: string;
+  payment_date: string;
+  payment_method: string;
+  status: string;
+  notes: string;
+  created_at: string;
+  tags: TransactionTag[];
+}
+
 const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   paymentId,
   onTagsChange
@@ -37,13 +50,41 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   // Fetch payment with its tags
   const { data: paymentWithTags } = useQuery({
     queryKey: ['payment-with-tags', paymentId],
-    queryFn: async () => {
+    queryFn: async (): Promise<PaymentWithTags | null> => {
       const { data, error } = await supabase.rpc('get_payment_with_tags', {
         p_payment_id: paymentId
       });
       
       if (error) throw error;
-      return data?.[0] || null;
+      
+      if (!data || data.length === 0) return null;
+      
+      const payment = data[0];
+      
+      // Parse the tags JSONB data
+      let parsedTags: TransactionTag[] = [];
+      if (payment.tags) {
+        try {
+          // If tags is already an array, use it directly
+          if (Array.isArray(payment.tags)) {
+            parsedTags = payment.tags as TransactionTag[];
+          } else if (typeof payment.tags === 'string') {
+            // If tags is a string, parse it as JSON
+            parsedTags = JSON.parse(payment.tags);
+          } else {
+            // If tags is an object, it might be a single tag or already parsed
+            parsedTags = payment.tags as TransactionTag[];
+          }
+        } catch (error) {
+          console.error('Error parsing tags:', error);
+          parsedTags = [];
+        }
+      }
+      
+      return {
+        ...payment,
+        tags: parsedTags
+      } as PaymentWithTags;
     },
     enabled: !!paymentId,
   });
@@ -64,8 +105,8 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
-  // Current tags from the payment
-  const currentTags = paymentWithTags?.tags || [];
+  // Current tags from the payment - ensure it's always an array
+  const currentTags: TransactionTag[] = paymentWithTags?.tags || [];
 
   // Add tag mutation
   const addTagMutation = useMutation({
