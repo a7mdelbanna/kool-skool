@@ -115,7 +115,8 @@ const Students = () => {
     };
     
     const mappedStudent = {
-      id: record.id,
+      id: record.id, // This is the student record ID
+      user_id: record.user_id, // This is the actual user ID we need for fetching user data
       firstName: record.first_name || '',
       lastName: record.last_name || '',
       email: record.email || '',
@@ -131,8 +132,8 @@ const Students = () => {
       nextPaymentDate: record.next_payment_date,
       nextPaymentAmount: record.next_payment_amount,
       subscriptionProgress: record.subscription_progress || '0/0',
-      // Map social media fields from the user record - we need to get these from the users table
-      telegram: undefined, // We'll need to get this from the users table
+      // Initialize social media fields as undefined - they'll be fetched when editing
+      telegram: undefined,
       whatsapp: undefined,
       instagram: undefined,
       viber: undefined,
@@ -141,7 +142,7 @@ const Students = () => {
       zoom: undefined
     };
     
-    console.log('Mapped student with subscription progress:', mappedStudent.subscriptionProgress);
+    console.log('Mapped student with user_id:', mappedStudent.user_id);
     return mappedStudent;
   };
   
@@ -267,19 +268,22 @@ const Students = () => {
   
   const handleEditStudent = async (student: Student) => {
     console.log('🔍 handleEditStudent called with student:', student);
+    console.log('🔑 Student ID:', student.id);
+    console.log('🔑 User ID from student record:', student.user_id);
     
     try {
       // Fetch complete student data including social media fields from users table
+      // Use user_id from the student record, not the student.id
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('id', student.id)
+        .eq('id', student.user_id) // This was the bug - using student.id instead of student.user_id
         .single();
       
       console.log('📊 User data from database:', userData);
       console.log('❌ User error:', userError);
       
-      if (userData) {
+      if (userData && !userError) {
         // Create enriched student object with all social media fields
         const enrichedStudent: Student = {
           ...student,
@@ -297,6 +301,7 @@ const Students = () => {
         setSelectedStudent(enrichedStudent);
       } else {
         console.log('⚠️ Using original student data (no additional user data found)');
+        console.log('⚠️ Error details:', userError);
         setSelectedStudent(student);
       }
       
@@ -846,6 +851,7 @@ function getMockStudents(): Student[] {
   return [
     {
       id: '1',
+      user_id: 'user1',
       firstName: 'John',
       lastName: 'Doe',
       email: 'john.doe@example.com',
@@ -862,6 +868,7 @@ function getMockStudents(): Student[] {
     },
     {
       id: '2',
+      user_id: 'user2',
       firstName: 'Jane',
       lastName: 'Smith',
       email: 'jane.smith@example.com',
@@ -878,6 +885,7 @@ function getMockStudents(): Student[] {
     },
     {
       id: '3',
+      user_id: 'user3',
       firstName: 'Michael',
       lastName: 'Johnson',
       email: 'michael.j@example.com',

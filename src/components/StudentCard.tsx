@@ -3,6 +3,7 @@ import React from 'react';
 
 export interface Student {
   id: string;
+  user_id?: string; // Add user_id to properly track the user record
   firstName: string;
   lastName: string;
   email: string;
