@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -538,7 +539,8 @@ export const deleteStudentPayment = async (paymentId: string) => {
   
   console.log('🔑 Using user info for payment deletion:', { currentUserId, currentSchoolId });
   
-  const { data, error } = await supabase.rpc('delete_student_payment', {
+  // Use the supabase client to call the function directly
+  const { data, error } = await supabase.rpc('delete_student_payment' as any, {
     p_payment_id: paymentId,
     p_current_user_id: currentUserId,
     p_current_school_id: currentSchoolId

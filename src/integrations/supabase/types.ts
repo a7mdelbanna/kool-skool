@@ -483,6 +483,14 @@ export type Database = {
         Args: { p_course_id: string }
         Returns: undefined
       }
+      delete_student_payment: {
+        Args: {
+          p_payment_id: string
+          p_current_user_id: string
+          p_current_school_id: string
+        }
+        Returns: Json
+      }
       delete_student_subscription: {
         Args: { p_subscription_id: string }
         Returns: Json
