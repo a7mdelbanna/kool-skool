@@ -71,6 +71,27 @@ export interface StudentRecord {
   teacher_email: string;
 }
 
+// Helper function to set up Supabase auth with user data
+export const setupSupabaseAuth = async (userData: any) => {
+  try {
+    // Create a session manually by setting auth state
+    const { data, error } = await supabase.auth.setSession({
+      access_token: `user-${userData.id}`,
+      refresh_token: `refresh-${userData.id}`,
+    });
+    
+    if (error) {
+      console.error('Error setting up auth session:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in setupSupabaseAuth:', error);
+    return false;
+  }
+};
+
 // Helper functions for interacting with the database
 export const getStudentsWithDetails = async (schoolId: string): Promise<StudentRecord[]> => {
   const { data, error } = await supabase.rpc('get_students_with_details', {

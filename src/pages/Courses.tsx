@@ -7,8 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { UserContext } from '@/App';
-import { getSchoolCourses, createCourse, Course } from '@/integrations/supabase/client';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, setupSupabaseAuth, Course } from '@/integrations/supabase/client';
 
 const Courses = () => {
   const { user } = useContext(UserContext);
@@ -22,19 +21,46 @@ const Courses = () => {
   const [newCourseType, setNewCourseType] = useState<'individual' | 'group'>('individual');
   const [editCourseName, setEditCourseName] = useState('');
   const [editCourseType, setEditCourseType] = useState<'individual' | 'group'>('individual');
+  const [authSetup, setAuthSetup] = useState(false);
 
-  // Fetch courses on component mount
+  // Set up Supabase authentication when component mounts
   useEffect(() => {
-    if (user?.schoolId) {
+    const initializeAuth = async () => {
+      if (user && !authSetup) {
+        console.log('Setting up Supabase auth with user:', user);
+        await setupSupabaseAuth(user);
+        setAuthSetup(true);
+      }
+    };
+    
+    initializeAuth();
+  }, [user, authSetup]);
+
+  // Fetch courses when user and auth are ready
+  useEffect(() => {
+    if (user?.schoolId && authSetup) {
       fetchCourses();
     }
-  }, [user?.schoolId]);
+  }, [user?.schoolId, authSetup]);
 
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const coursesData = await getSchoolCourses(user.schoolId);
-      setCourses(coursesData);
+      console.log('Fetching courses for school:', user.schoolId);
+      
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('school_id', user.schoolId)
+        .order('name');
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Fetched courses:', data);
+      setCourses(data || []);
     } catch (error) {
       console.error('Error fetching courses:', error);
       toast({
@@ -58,12 +84,25 @@ const Courses = () => {
     }
 
     try {
-      const courseData = await createCourse({
-        school_id: user.schoolId,
-        course_name: newCourseName.trim(),
-        lesson_type: newCourseType
-      });
+      console.log('Creating course:', { name: newCourseName, type: newCourseType });
+      
+      const { data, error } = await supabase
+        .from('courses')
+        .insert({
+          school_id: user.schoolId,
+          name: newCourseName.trim(),
+          lesson_type: newCourseType
+        })
+        .select()
+        .single();
 
+      if (error) {
+        console.error('Error creating course:', error);
+        throw error;
+      }
+
+      console.log('Course created:', data);
+      
       toast({
         title: "Success",
         description: "Course created successfully"
