@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { 
@@ -77,12 +76,38 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     }
   }, [studentData.id]);
 
+  // Add a periodic refresh to catch newly generated sessions
+  useEffect(() => {
+    if (studentData.id) {
+      const interval = setInterval(() => {
+        loadSessions();
+      }, 3000); // Refresh every 3 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [studentData.id]);
+
+  // Add a listener for when subscriptions might be added
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && studentData.id) {
+        // Refresh when user comes back to the tab
+        loadSessions();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [studentData.id]);
+
   const loadSessions = async () => {
     if (!studentData.id) return;
     
     try {
       setLoading(true);
+      console.log('Loading sessions for student:', studentData.id);
       const data = await getStudentLessonSessions(studentData.id);
+      console.log('Loaded sessions:', data);
       setSessions(data);
     } catch (error) {
       console.error('Error loading sessions:', error);
@@ -94,6 +119,11 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefreshSessions = () => {
+    console.log('Manual refresh triggered');
+    loadSessions();
   };
   
   const upcomingSessions = sessions.filter(
@@ -204,10 +234,27 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   
   const renderSessionsList = (sessionsList: DatabaseSession[], title: string) => (
     <div className="space-y-4">
-      <h3 className="text-lg font-medium">{title}</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">{title}</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefreshSessions}
+          disabled={loading}
+          className="gap-2"
+        >
+          <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
       {sessionsList.length === 0 ? (
         <div className="text-center py-6 border rounded-md bg-muted/30">
           <p className="text-muted-foreground">No {title.toLowerCase()}</p>
+          {title === "Upcoming Sessions" && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Sessions will appear here after adding a subscription
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -323,10 +370,15 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       {renderSessionsList(pastSessions, "Past Sessions")}
       
       <div className="border-t pt-4 mt-6">
-        <p className="text-sm text-muted-foreground">
-          <AlertTriangle className="h-4 w-4 inline mr-1" />
-          Sessions are automatically generated when you add a subscription in the Subscriptions tab.
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            <AlertTriangle className="h-4 w-4 inline mr-1" />
+            Sessions are automatically generated when you add a subscription in the Subscriptions tab.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Total sessions: {sessions.length}
+          </p>
+        </div>
       </div>
 
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
