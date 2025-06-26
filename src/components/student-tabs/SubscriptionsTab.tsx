@@ -82,6 +82,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [subscriptionToDelete, setSubscriptionToDelete] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingSubscriptionId, setDeletingSubscriptionId] = useState<string | null>(null);
 
   const currencies = [
     { value: 'USD', label: 'USD ($)' },
@@ -107,10 +108,12 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     
     try {
       setLoading(true);
+      console.log('🔄 Loading subscriptions for student:', studentData.id);
       const data = await getStudentSubscriptions(studentData.id);
+      console.log('📊 Loaded subscriptions:', data);
       setSubscriptions(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading subscriptions:', error);
+      console.error('❌ Error loading subscriptions:', error);
       toast({
         title: "Error",
         description: "Failed to load subscriptions",
@@ -145,7 +148,6 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     });
   };
 
-  // Enhanced session distribution calculation
   const calculateIntelligentSessionDistribution = () => {
     if (formData.schedule.length === 0 || formData.sessionCount === 0 || !formData.startDate) {
       return [];
@@ -303,29 +305,46 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   });
 
   const handleDeleteSubscription = async (subscriptionId: string) => {
+    if (!subscriptionId) {
+      console.error('❌ No subscription ID provided for deletion');
+      return;
+    }
+
     try {
-      setLoading(true);
+      console.log('🗑️ Starting subscription deletion for ID:', subscriptionId);
+      setDeletingSubscriptionId(subscriptionId);
+      
+      // Call the delete function
       await deleteStudentSubscription(subscriptionId);
+      
+      console.log('✅ Subscription deleted successfully from database');
+      
+      // Show success message
       toast({
         title: "Success",
         description: "Subscription deleted successfully",
       });
+      
+      // Force reload subscriptions from database
+      console.log('🔄 Forcing reload of subscriptions after deletion');
       await loadSubscriptions();
+      
     } catch (error) {
-      console.error('Error deleting subscription:', error);
+      console.error('❌ Error deleting subscription:', error);
       toast({
         title: "Error",
-        description: "Failed to delete subscription",
+        description: error instanceof Error ? error.message : "Failed to delete subscription",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setDeletingSubscriptionId(null);
       setDeleteDialogOpen(false);
       setSubscriptionToDelete(null);
     }
   };
 
   const handleOpenDeleteDialog = (subscriptionId: string) => {
+    console.log('🗑️ Opening delete dialog for subscription:', subscriptionId);
     setSubscriptionToDelete(subscriptionId);
     setDeleteDialogOpen(true);
   };
@@ -633,9 +652,19 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                         variant="destructive" 
                         size="sm"
                         onClick={() => handleOpenDeleteDialog(subscription.id)}
+                        disabled={deletingSubscriptionId === subscription.id}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
+                        {deletingSubscriptionId === subscription.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>
@@ -668,8 +697,16 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             <AlertDialogAction 
               onClick={() => handleDeleteSubscription(subscriptionToDelete || '')}
               className="bg-red-500 hover:bg-red-600"
+              disabled={deletingSubscriptionId !== null}
             >
-              Delete
+              {deletingSubscriptionId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
