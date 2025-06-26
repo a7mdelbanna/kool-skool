@@ -221,6 +221,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [formData, setFormData] = useState({
     sessionCount: 4,
     durationMonths: 1,
+    lessonDurationMinutes: 60, // New field for lesson duration
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
     priceMode: 'perSession',
@@ -429,9 +430,19 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       return;
     }
 
+    // Validate lesson duration
+    if (formData.lessonDurationMinutes <= 0) {
+      toast({
+        title: "Error",
+        description: "Lesson duration must be greater than 0 minutes",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
-      console.log('🚀 SUBMITTING ENHANCED SUBSCRIPTION WITH INITIAL PAYMENT');
+      console.log('🚀 SUBMITTING ENHANCED SUBSCRIPTION WITH LESSON DURATION');
       
       const subscriptionData = {
         student_id: studentData.id,
@@ -449,22 +460,25 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         // Initial payment data
         initial_payment_amount: formData.initialPaymentAmount,
         payment_method: formData.paymentMethod,
-        payment_notes: formData.paymentNotes
+        payment_notes: formData.paymentNotes,
+        // Lesson duration
+        lesson_duration_minutes: formData.lessonDurationMinutes
       };
 
-      console.log('📝 Enhanced subscription data with initial payment:', subscriptionData);
+      console.log('📝 Enhanced subscription data with lesson duration:', subscriptionData);
       
       await addStudentSubscription(subscriptionData);
       
       toast({
         title: "Success",
-        description: `Subscription created successfully with ${formData.initialPaymentAmount > 0 ? `initial payment of ${getCurrencySymbol(formData.currency)}${formData.initialPaymentAmount}` : 'no initial payment'}`,
+        description: `Subscription created successfully with ${formData.lessonDurationMinutes}-minute lessons${formData.initialPaymentAmount > 0 ? ` and initial payment of ${getCurrencySymbol(formData.currency)}${formData.initialPaymentAmount}` : ''}`,
       });
       
       // Reset form
       setFormData({
         sessionCount: 4,
         durationMonths: 1,
+        lessonDurationMinutes: 60,
         startDate: undefined,
         schedule: [],
         priceMode: 'perSession',
@@ -564,8 +578,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 p-6">
-            {/* Session Count and Duration */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Session Count, Duration, and Lesson Duration */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
                 <Input 
@@ -585,6 +599,21 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   onChange={(e) => setFormData({ ...formData, durationMonths: parseInt(e.target.value) || 0 })}
                   className="mt-1"
                 />
+              </div>
+              <div>
+                <Label htmlFor="lessonDurationMinutes" className="text-sm font-semibold text-gray-700">Lesson Duration (Minutes)</Label>
+                <Input 
+                  type="number" 
+                  id="lessonDurationMinutes" 
+                  value={formData.lessonDurationMinutes} 
+                  onChange={(e) => setFormData({ ...formData, lessonDurationMinutes: parseInt(e.target.value) || 60 })}
+                  className="mt-1"
+                  min="1"
+                  step="1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Default: 60 minutes
+                </p>
               </div>
               <div>
                 <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
@@ -698,7 +727,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <h4 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  Smart Session Schedule Preview
+                  Smart Session Schedule Preview ({formData.lessonDurationMinutes} min each)
                 </h4>
                 <p className="text-sm text-green-700 mb-3">
                   Sessions will be distributed intelligently across your selected days, starting from the first available slot:
@@ -713,7 +742,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                         {session.day}, {session.date}
                       </div>
                       <div className="text-green-500 text-xs">
-                        at {session.time}
+                        at {session.time} ({formData.lessonDurationMinutes} min)
                       </div>
                     </div>
                   ))}
