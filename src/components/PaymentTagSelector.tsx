@@ -3,14 +3,12 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Check, Plus, Tag, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserInfo } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 interface TransactionTag {
   id: string;
@@ -20,13 +18,11 @@ interface TransactionTag {
 
 interface PaymentTagSelectorProps {
   paymentId: string;
-  currentTags: TransactionTag[];
-  onTagsChange: (tags: TransactionTag[]) => void;
+  onTagsChange?: (tags: TransactionTag[]) => void;
 }
 
 const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   paymentId,
-  currentTags,
   onTagsChange
 }) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -36,6 +32,20 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   const { data: userInfo } = useQuery({
     queryKey: ['current-user-info'],
     queryFn: getCurrentUserInfo,
+  });
+
+  // Fetch payment with its tags
+  const { data: paymentWithTags } = useQuery({
+    queryKey: ['payment-with-tags', paymentId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_payment_with_tags', {
+        p_payment_id: paymentId
+      });
+      
+      if (error) throw error;
+      return data?.[0] || null;
+    },
+    enabled: !!paymentId,
   });
 
   // Fetch available tags
@@ -54,6 +64,9 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
+  // Current tags from the payment
+  const currentTags = paymentWithTags?.tags || [];
+
   // Add tag mutation
   const addTagMutation = useMutation({
     mutationFn: async (tagId: string) => {
@@ -65,12 +78,10 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, tagId) => {
-      const addedTag = availableTags.find(tag => tag.id === tagId);
-      if (addedTag) {
-        onTagsChange([...currentTags, addedTag]);
-        toast.success('Tag added to payment');
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-with-tags', paymentId] });
+      toast.success('Tag added to payment');
+      onTagsChange?.(currentTags);
     },
     onError: (error: any) => {
       toast.error('Failed to add tag: ' + error.message);
@@ -88,10 +99,10 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, tagId) => {
-      const updatedTags = currentTags.filter(tag => tag.id !== tagId);
-      onTagsChange(updatedTags);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payment-with-tags', paymentId] });
       toast.success('Tag removed from payment');
+      onTagsChange?.(currentTags);
     },
     onError: (error: any) => {
       toast.error('Failed to remove tag: ' + error.message);

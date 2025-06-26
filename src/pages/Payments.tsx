@@ -41,7 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCurrentUserInfo, getStudentsWithDetails, getStudentPayments } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import PaymentDialog from '@/components/PaymentDialog';
@@ -75,6 +75,8 @@ const Payments = () => {
   const [selectedPayment, setSelectedPayment] = useState<any>(undefined);
   const [selectedExpense, setSelectedExpense] = useState<Expense | undefined>(undefined);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
+
+  const queryClient = useQueryClient();
 
   // Fetch user info
   const { data: userInfo } = useQuery({
@@ -266,6 +268,11 @@ const Payments = () => {
       expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.notes?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+  // Handle tag changes to refresh the payments list
+  const handleTagsChange = () => {
+    queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
+  };
 
   if (isLoading) {
     return (
@@ -483,11 +490,7 @@ const Payments = () => {
                       <TableCell>
                         <PaymentTagSelector
                           paymentId={payment.id}
-                          currentTags={[]} // This will be populated when we fetch tags for each payment
-                          onTagsChange={(tags) => {
-                            // Handle tag changes - could invalidate queries to refresh the list
-                            console.log('Tags updated for payment:', payment.id, tags);
-                          }}
+                          onTagsChange={handleTagsChange}
                         />
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate">{payment.notes}</TableCell>
