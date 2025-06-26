@@ -39,7 +39,7 @@ const FunEmptyState: React.FC = () => {
         </div>
       )}
 
-      <Card className="border-2 border-dashed border-primary/20 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <Card className="border-2 border-dashed border-primary/20 bg-white">
         <CardContent className="p-8 text-center">
           <div className="flex justify-center mb-4">
             <div className="relative">
