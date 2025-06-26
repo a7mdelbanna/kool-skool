@@ -51,6 +51,16 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   console.log('ProfileTab render - teachers data:', teachers);
   console.log('ProfileTab render - courses data:', courses);
   console.log('ProfileTab render - studentData:', studentData);
+  console.log('🔍 ProfileTab - Social media data check:', {
+    telegram: studentData.telegram,
+    whatsapp: studentData.whatsapp,
+    instagram: studentData.instagram,
+    viber: studentData.viber,
+    facebook: studentData.facebook,
+    skype: studentData.skype,
+    zoom: studentData.zoom,
+    dateOfBirth: studentData.dateOfBirth
+  });
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -319,6 +329,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <CollapsibleContent className="space-y-4 mt-4">
           {socialPlatforms.map((platform) => {
             const Icon = platform.icon;
+            const fieldValue = studentData[platform.key as keyof Student] as string || "";
+            
+            console.log(`🔍 Social field ${platform.key}:`, fieldValue);
+            
             return (
               <div key={platform.key} className="space-y-2">
                 <Label htmlFor={platform.key} className="flex items-center gap-2">
@@ -327,11 +341,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                 </Label>
                 <Input
                   id={platform.key}
-                  value={studentData[platform.key as keyof Student] as string || ""}
+                  value={fieldValue}
                   onChange={(e) => handleSocialChange(platform.key, e.target.value)}
                   disabled={isViewMode}
                   placeholder={platform.placeholder}
                 />
+                {fieldValue && (
+                  <p className="text-xs text-gray-500">Current value: {fieldValue}</p>
+                )}
               </div>
             );
           })}

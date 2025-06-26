@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import StudentDialogContent from "./student/StudentDialogContent";
@@ -23,6 +22,9 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   onStudentAdded
 }) => {
   const queryClient = useQueryClient();
+  
+  console.log('🔍 AddStudentDialog - Received student data:', student);
+  console.log('🔍 AddStudentDialog - Edit mode:', isEditMode);
   
   useEffect(() => {
     // Invalidate query when dialog opens or closes to ensure fresh data
