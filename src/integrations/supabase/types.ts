@@ -475,6 +475,21 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_lesson_sessions: {
+        Args: { p_student_id: string }
+        Returns: {
+          id: string
+          subscription_id: string
+          student_id: string
+          scheduled_date: string
+          duration_minutes: number
+          status: string
+          payment_status: string
+          cost: number
+          notes: string
+          created_at: string
+        }[]
+      }
       get_role_constraint_values: {
         Args: Record<PropertyKey, never>
         Returns: string

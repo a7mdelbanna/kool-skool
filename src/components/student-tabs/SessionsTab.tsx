@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { 
@@ -85,7 +84,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       console.log('Loading sessions for student:', studentData.id);
       const data = await getStudentLessonSessions(studentData.id);
       console.log('Loaded sessions:', data);
-      setSessions(data);
+      
+      // Ensure data is an array and properly typed
+      const sessionsArray = Array.isArray(data) ? data as DatabaseSession[] : [];
+      setSessions(sessionsArray);
     } catch (error) {
       console.error('Error loading sessions:', error);
       toast({
@@ -93,6 +95,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         description: "Failed to load sessions",
         variant: "destructive",
       });
+      setSessions([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
