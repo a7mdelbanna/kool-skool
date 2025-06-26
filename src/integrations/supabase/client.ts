@@ -595,3 +595,89 @@ export const deleteStudentPayment = async (paymentId: string) => {
   console.log('✅ CLIENT: Payment deleted successfully:', data);
   return data;
 };
+
+// Add new functions for tag management
+export const getSchoolTags = async (schoolId: string) => {
+  const { data, error } = await supabase.rpc('get_school_tags', {
+    p_school_id: schoolId
+  });
+
+  if (error) {
+    console.error('Error fetching school tags:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const getPaymentWithTags = async (paymentId: string) => {
+  const { data, error } = await supabase.rpc('get_payment_with_tags', {
+    p_payment_id: paymentId
+  });
+
+  if (error) {
+    console.error('Error fetching payment with tags:', error);
+    throw error;
+  }
+
+  return data?.[0] || null;
+};
+
+export const addPaymentTag = async (paymentId: string, tagId: string) => {
+  const { data, error } = await supabase.rpc('add_payment_tag', {
+    p_payment_id: paymentId,
+    p_tag_id: tagId
+  });
+
+  if (error) {
+    console.error('Error adding payment tag:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const removePaymentTag = async (paymentId: string, tagId: string) => {
+  const { data, error } = await supabase.rpc('remove_payment_tag', {
+    p_payment_id: paymentId,
+    p_tag_id: tagId
+  });
+
+  if (error) {
+    console.error('Error removing payment tag:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const createTransactionTag = async (name: string, color: string, schoolId: string) => {
+  const { data, error } = await supabase
+    .from('transaction_tags')
+    .insert({
+      name,
+      color,
+      school_id: schoolId
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating transaction tag:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const deleteTransactionTag = async (tagId: string) => {
+  const { error } = await supabase
+    .from('transaction_tags')
+    .delete()
+    .eq('id', tagId);
+
+  if (error) {
+    console.error('Error deleting transaction tag:', error);
+    throw error;
+  }
+};

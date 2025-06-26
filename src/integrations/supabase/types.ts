@@ -147,6 +147,42 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_tags: {
+        Row: {
+          created_at: string
+          id: string
+          payment_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payment_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payment_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_tags_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "student_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           contact_info: Json | null
@@ -374,6 +410,33 @@ export type Database = {
           },
         ]
       }
+      transaction_tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           created_at: string
@@ -429,6 +492,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_payment_tag: {
+        Args: { p_payment_id: string; p_tag_id: string }
+        Returns: Json
+      }
       add_student_subscription: {
         Args:
           | {
@@ -574,6 +641,21 @@ export type Database = {
           moved_from_session_id: string
         }[]
       }
+      get_payment_with_tags: {
+        Args: { p_payment_id: string }
+        Returns: {
+          id: string
+          student_id: string
+          amount: number
+          currency: string
+          payment_date: string
+          payment_method: string
+          status: string
+          notes: string
+          created_at: string
+          tags: Json
+        }[]
+      }
       get_role_constraint_values: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -587,6 +669,16 @@ export type Database = {
           lesson_type: string
           created_at: string
           updated_at: string
+        }[]
+      }
+      get_school_tags: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          name: string
+          color: string
+          created_at: string
+          usage_count: number
         }[]
       }
       get_student_payments: {
@@ -676,6 +768,10 @@ export type Database = {
       recalculate_subscription_progress: {
         Args: { p_subscription_id: string }
         Returns: undefined
+      }
+      remove_payment_tag: {
+        Args: { p_payment_id: string; p_tag_id: string }
+        Returns: Json
       }
       update_course: {
         Args: { p_course_id: string; p_name: string; p_lesson_type: string }

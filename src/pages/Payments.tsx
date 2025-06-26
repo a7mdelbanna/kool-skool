@@ -47,6 +47,8 @@ import { toast } from 'sonner';
 import PaymentDialog from '@/components/PaymentDialog';
 import ExpenseDialog from '@/components/ExpenseDialog';
 import { Expense } from '@/contexts/PaymentContext';
+import PaymentTagSelector from '@/components/PaymentTagSelector';
+import TagManager from '@/components/TagManager';
 
 interface StudentPayment {
   id: string;
@@ -368,6 +370,9 @@ const Payments = () => {
         </Card>
       </div>
       
+      {/* Add Tag Manager */}
+      <TagManager />
+      
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <TabsList>
@@ -436,6 +441,7 @@ const Payments = () => {
                     </Button>
                   </TableHead>
                   <TableHead>Method</TableHead>
+                  <TableHead>Tags</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -443,7 +449,7 @@ const Payments = () => {
               <TableBody>
                 {filteredPayments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={8} className="h-24 text-center">
                       {allPayments.length === 0 ? 'No payments found.' : 'No payments match your search.'}
                     </TableCell>
                   </TableRow>
@@ -474,6 +480,16 @@ const Payments = () => {
                         </div>
                       </TableCell>
                       <TableCell>{payment.payment_method}</TableCell>
+                      <TableCell>
+                        <PaymentTagSelector
+                          paymentId={payment.id}
+                          currentTags={[]} // This will be populated when we fetch tags for each payment
+                          onTagsChange={(tags) => {
+                            // Handle tag changes - could invalidate queries to refresh the list
+                            console.log('Tags updated for payment:', payment.id, tags);
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="max-w-[200px] truncate">{payment.notes}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
