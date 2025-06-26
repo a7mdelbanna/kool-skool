@@ -517,17 +517,38 @@ export const updateStudentPayment = async (paymentId: string, updates: {
 };
 
 export const deleteStudentPayment = async (paymentId: string) => {
-  console.log('Deleting student payment:', paymentId);
+  console.log('🗑️ CLIENT: deleteStudentPayment called with ID:', paymentId);
   
-  const { error } = await supabase
-    .from('student_payments')
-    .delete()
-    .eq('id', paymentId);
+  // Get current user info from localStorage
+  const userInfo = getCurrentUserFromStorage();
+  console.log('🔑 User info for payment deletion:', userInfo);
+  
+  if (!userInfo) {
+    console.error('❌ No user info found in localStorage for payment deletion');
+    throw new Error('User not authenticated - please log in again');
+  }
+  
+  const currentUserId = userInfo.user_id;
+  const currentSchoolId = userInfo.user_school_id;
+  
+  if (!currentUserId || !currentSchoolId) {
+    console.error('❌ User information incomplete for payment deletion:', { currentUserId, currentSchoolId });
+    throw new Error('User information incomplete');
+  }
+  
+  console.log('🔑 Using user info for payment deletion:', { currentUserId, currentSchoolId });
+  
+  const { data, error } = await supabase.rpc('delete_student_payment', {
+    p_payment_id: paymentId,
+    p_current_user_id: currentUserId,
+    p_current_school_id: currentSchoolId
+  });
   
   if (error) {
-    console.error('Error deleting student payment:', error);
+    console.error('❌ CLIENT: Error deleting payment:', error);
     throw new Error(error.message);
   }
   
-  console.log('Student payment deleted');
+  console.log('✅ CLIENT: Payment deletion response:', data);
+  return data;
 };
