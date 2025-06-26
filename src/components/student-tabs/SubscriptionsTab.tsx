@@ -280,18 +280,37 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         start_date: format(data.startDate, "yyyy-MM-dd"),
         schedule: data.schedule,
         price_mode: data.priceMode,
-        price_per_session: data.priceMode === "perSession" ? Number(data.pricePerSession) : null,
-        fixed_price: data.priceMode === "fixed" ? Number(data.fixedPrice) : null,
+        price_per_session: data.priceMode === "perSession" ? Number(data.pricePerSession) : undefined,
+        fixed_price: data.priceMode === "fixed" ? Number(data.fixedPrice) : undefined,
         total_price: calculatedTotalPrice,
         currency: data.currency,
-        notes: data.notes || null,
+        notes: data.notes || undefined,
       };
       
       // Add the subscription to database
       const newSubscription = await addStudentSubscription(subscriptionData);
+      console.log('New subscription created:', newSubscription);
+      
+      // Convert the returned subscription to the expected format
+      const subscriptionForSessions: DatabaseSubscription = {
+        id: newSubscription.id,
+        student_id: newSubscription.student_id,
+        session_count: newSubscription.session_count,
+        duration_months: newSubscription.duration_months,
+        start_date: newSubscription.start_date,
+        schedule: newSubscription.schedule,
+        price_mode: newSubscription.price_mode,
+        price_per_session: newSubscription.price_per_session,
+        fixed_price: newSubscription.fixed_price,
+        total_price: newSubscription.total_price,
+        currency: newSubscription.currency,
+        notes: newSubscription.notes,
+        status: newSubscription.status,
+        created_at: newSubscription.created_at
+      };
       
       // Generate and add lesson sessions
-      const sessions = generateSessions(newSubscription);
+      const sessions = generateSessions(subscriptionForSessions);
       if (sessions.length > 0) {
         await addLessonSessions(sessions);
       }

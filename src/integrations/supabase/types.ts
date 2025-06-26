@@ -398,6 +398,40 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_student_subscription: {
+        Args: {
+          p_student_id: string
+          p_session_count: number
+          p_duration_months: number
+          p_start_date: string
+          p_schedule: Json
+          p_price_mode: string
+          p_price_per_session: number
+          p_fixed_price: number
+          p_total_price: number
+          p_currency: string
+          p_notes: string
+          p_status: string
+          p_current_user_id: string
+          p_current_school_id: string
+        }
+        Returns: {
+          id: string
+          student_id: string
+          session_count: number
+          duration_months: number
+          start_date: string
+          schedule: Json
+          price_mode: string
+          price_per_session: number
+          fixed_price: number
+          total_price: number
+          currency: string
+          notes: string
+          status: string
+          created_at: string
+        }[]
+      }
       add_team_member: {
         Args: {
           member_first_name: string

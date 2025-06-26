@@ -304,11 +304,11 @@ export const addStudentSubscription = async (subscriptionData: {
       p_start_date: subscriptionData.start_date,
       p_schedule: subscriptionData.schedule,
       p_price_mode: subscriptionData.price_mode,
-      p_price_per_session: subscriptionData.price_per_session,
-      p_fixed_price: subscriptionData.fixed_price,
+      p_price_per_session: subscriptionData.price_per_session || null,
+      p_fixed_price: subscriptionData.fixed_price || null,
       p_total_price: subscriptionData.total_price,
       p_currency: subscriptionData.currency,
-      p_notes: subscriptionData.notes,
+      p_notes: subscriptionData.notes || null,
       p_status: subscriptionData.status || 'active',
       p_current_user_id: user.id,
       p_current_school_id: user.schoolId
@@ -320,7 +320,8 @@ export const addStudentSubscription = async (subscriptionData: {
     }
 
     console.log('Successfully added student subscription via RPC:', data);
-    return data;
+    // Return the first item from the array since RPC returns an array
+    return Array.isArray(data) && data.length > 0 ? data[0] : data;
   } catch (error) {
     console.error('Error in addStudentSubscription:', error);
     throw error;
