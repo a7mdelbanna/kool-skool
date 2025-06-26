@@ -394,7 +394,7 @@ export const addStudentSubscription = async (subscriptionData: {
 };
 
 export const deleteStudentSubscription = async (subscriptionId: string) => {
-  console.log('🗑️ ENHANCED: deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  console.log('🗑️ SIMPLIFIED: deleteStudentSubscription called with subscriptionId:', subscriptionId);
   
   if (!subscriptionId) {
     console.error('❌ No subscription ID provided');
