@@ -289,7 +289,13 @@ export const createStudent = async (studentData: {
   level: string;
   phone?: string;
   date_of_birth?: string;
-  socials?: { [key: string]: string };
+  telegram?: string;
+  whatsapp?: string;
+  instagram?: string;
+  viber?: string;
+  facebook?: string;
+  skype?: string;
+  zoom?: string;
 }): Promise<CreateStudentResponse> => {
   // Use a direct RPC call with explicit typing to avoid TypeScript errors
   const { data, error } = await supabase.rpc('create_student_with_profile' as any, {
@@ -303,7 +309,13 @@ export const createStudent = async (studentData: {
     level: studentData.level,
     phone: studentData.phone,
     date_of_birth: studentData.date_of_birth,
-    socials: studentData.socials
+    telegram: studentData.telegram,
+    whatsapp: studentData.whatsapp,
+    instagram: studentData.instagram,
+    viber: studentData.viber,
+    facebook: studentData.facebook,
+    skype: studentData.skype,
+    zoom: studentData.zoom
   });
   
   if (error) {

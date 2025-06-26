@@ -29,7 +29,13 @@ export const useStudentForm = (
     paymentStatus: "pending",
     teacherId: "",
     dateOfBirth: "",
-    socials: {}
+    telegram: "",
+    whatsapp: "",
+    instagram: "",
+    viber: "",
+    facebook: "",
+    skype: "",
+    zoom: ""
   });
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState("defaultPassword123");
@@ -167,7 +173,13 @@ export const useStudentForm = (
         paymentStatus: "pending",
         teacherId: "",
         dateOfBirth: "",
-        socials: {}
+        telegram: "",
+        whatsapp: "",
+        instagram: "",
+        viber: "",
+        facebook: "",
+        skype: "",
+        zoom: ""
       });
       setPassword("defaultPassword123");
       setCreatePassword(true);
@@ -252,7 +264,13 @@ export const useStudentForm = (
             studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
           phone: studentData.phone,
           date_of_birth: studentData.dateOfBirth,
-          socials: studentData.socials
+          telegram: studentData.telegram,
+          whatsapp: studentData.whatsapp,
+          instagram: studentData.instagram,
+          viber: studentData.viber,
+          facebook: studentData.facebook,
+          skype: studentData.skype,
+          zoom: studentData.zoom
         });
         
         toast.dismiss();
@@ -290,7 +308,13 @@ export const useStudentForm = (
             lessonsCompleted: 0,
             nextLesson: 'Not scheduled',
             dateOfBirth: studentData.dateOfBirth,
-            socials: studentData.socials
+            telegram: studentData.telegram,
+            whatsapp: studentData.whatsapp,
+            instagram: studentData.instagram,
+            viber: studentData.viber,
+            facebook: studentData.facebook,
+            skype: studentData.skype,
+            zoom: studentData.zoom
           };
           onStudentAdded(newStudent);
         }

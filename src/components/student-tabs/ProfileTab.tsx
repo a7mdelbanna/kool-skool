@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,16 +72,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   };
 
   const handleSocialChange = (platform: string, value: string) => {
-    const currentSocials = studentData.socials || {};
-    const updatedSocials = { ...currentSocials };
-    
-    if (value.trim() === '') {
-      delete updatedSocials[platform];
-    } else {
-      updatedSocials[platform] = value;
-    }
-    
-    setStudentData({ socials: updatedSocials });
+    setStudentData({ [platform]: value.trim() === '' ? undefined : value });
   };
 
   const socialPlatforms = [
@@ -93,7 +83,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     { key: 'facebook', label: 'Facebook', icon: User, placeholder: 'Facebook username or profile', color: 'text-blue-600' },
     { key: 'skype', label: 'Skype', icon: User, placeholder: 'Skype username', color: 'text-blue-400' },
     { key: 'zoom', label: 'Zoom', icon: User, placeholder: 'Zoom username or ID', color: 'text-blue-500' },
-    { key: 'email_alt', label: 'Alternative Email', icon: Mail, placeholder: 'Alternative email address', color: 'text-gray-500' },
   ];
 
   if (isLoading) {
@@ -338,7 +327,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                 </Label>
                 <Input
                   id={platform.key}
-                  value={studentData.socials?.[platform.key] || ""}
+                  value={studentData[platform.key as keyof Student] as string || ""}
                   onChange={(e) => handleSocialChange(platform.key, e.target.value)}
                   disabled={isViewMode}
                   placeholder={platform.placeholder}
