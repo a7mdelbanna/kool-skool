@@ -498,17 +498,30 @@ export type Database = {
         Returns: undefined
       }
       create_student: {
-        Args: {
-          student_email: string
-          student_password: string
-          student_first_name: string
-          student_last_name: string
-          teacher_id: string
-          course_id: string
-          age_group: string
-          level: string
-          phone?: string
-        }
+        Args:
+          | {
+              student_email: string
+              student_password: string
+              student_first_name: string
+              student_last_name: string
+              teacher_id: string
+              course_id: string
+              age_group: string
+              level: string
+              phone?: string
+            }
+          | {
+              student_email: string
+              student_password: string
+              student_first_name: string
+              student_last_name: string
+              teacher_id: string
+              course_id: string
+              age_group: string
+              level: string
+              phone?: string
+              current_user_id?: string
+            }
         Returns: Json
       }
       delete_course: {

@@ -301,8 +301,8 @@ export const createStudent = async (studentData: {
   console.log('Creating student with user info:', userInfo);
   console.log('Student data:', studentData);
   
-  // Call the RPC function directly without type checking for the new parameter
-  const { data, error } = await supabase.rpc('create_student' as any, {
+  // Call the RPC function with the updated parameter
+  const { data, error } = await supabase.rpc('create_student', {
     student_email: studentData.student_email,
     student_password: studentData.student_password,
     student_first_name: studentData.first_name,
@@ -313,7 +313,7 @@ export const createStudent = async (studentData: {
     level: studentData.level,
     phone: studentData.phone || null,
     current_user_id: userInfo.user_id
-  } as any);
+  });
   
   if (error) {
     console.error('Error creating student:', error);
