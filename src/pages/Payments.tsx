@@ -42,7 +42,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supabase/client';
+import { getCurrentUserInfo, getStudentsWithDetails, getStudentPayments } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import PaymentDialog from '@/components/PaymentDialog';
 import ExpenseDialog from '@/components/ExpenseDialog';
@@ -87,38 +87,36 @@ const Payments = () => {
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
-  // Fetch all student payments
+  // Fetch all student payments using the proper Supabase client function
   const { data: allPayments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ['all-student-payments', students],
     queryFn: async () => {
       if (!students.length) return [];
       
+      console.log('🔄 Fetching payments for', students.length, 'students');
       const payments: StudentPayment[] = [];
       
       for (const student of students) {
         try {
-          const response = await fetch('/api/supabase', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: 'get_student_payments',
-              params: { p_student_id: student.id }
-            })
-          });
+          console.log('📝 Fetching payments for student:', student.id, student.first_name, student.last_name);
           
-          if (response.ok) {
-            const studentPayments = await response.json();
-            const paymentsWithStudentName = studentPayments.map((payment: any) => ({
-              ...payment,
-              student_name: `${student.first_name} ${student.last_name}`
-            }));
-            payments.push(...paymentsWithStudentName);
-          }
+          // Use the existing getStudentPayments function from the client
+          const studentPayments = await getStudentPayments(student.id);
+          
+          console.log('💰 Found', studentPayments.length, 'payments for', student.first_name, student.last_name);
+          
+          const paymentsWithStudentName = studentPayments.map((payment: any) => ({
+            ...payment,
+            student_name: `${student.first_name} ${student.last_name}`
+          }));
+          
+          payments.push(...paymentsWithStudentName);
         } catch (error) {
-          console.error(`Error fetching payments for student ${student.id}:`, error);
+          console.error(`❌ Error fetching payments for student ${student.id}:`, error);
         }
       }
       
+      console.log('✅ Total payments fetched:', payments.length);
       return payments;
     },
     enabled: students.length > 0,
@@ -128,6 +126,12 @@ const Payments = () => {
   const expenses: Expense[] = [];
   
   const isLoading = studentsLoading || paymentsLoading;
+  
+  console.log('📊 Payments data:', { 
+    allPayments: allPayments.length, 
+    isLoading, 
+    studentsCount: students.length 
+  });
   
   // Calculate totals for payments
   const totalPaid = allPayments
@@ -440,7 +444,7 @@ const Payments = () => {
                 {filteredPayments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
-                      No payments found.
+                      {allPayments.length === 0 ? 'No payments found.' : 'No payments match your search.'}
                     </TableCell>
                   </TableRow>
                 ) : (
