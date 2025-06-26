@@ -109,6 +109,32 @@ export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
   }
 };
 
+export const getSchoolTeamMembers = async (schoolId: string) => {
+  console.log('getSchoolTeamMembers called with schoolId:', schoolId);
+  
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, email, role, created_at')
+      .eq('school_id', schoolId)
+      .neq('role', 'student')
+      .order('created_at', { ascending: false });
+
+    console.log('Team members query result:', { data, error });
+
+    if (error) {
+      console.error('Error fetching team members:', error);
+      throw error;
+    }
+
+    console.log('Successfully fetched team members:', data);
+    return data || [];
+  } catch (error) {
+    console.error('Error in getSchoolTeamMembers:', error);
+    throw error;
+  }
+};
+
 export const getSchoolTeachers = async (schoolId: string) => {
   const { data, error } = await supabase
     .from('users')

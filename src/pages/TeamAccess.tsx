@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,15 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Users, UserPlus, Mail, Key, User, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, TeamMemberResponse } from "@/integrations/supabase/client";
+import { supabase, TeamMemberResponse, getSchoolTeamMembers } from "@/integrations/supabase/client";
 
 interface TeamMember {
   id: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   email: string;
   role: string;
-  createdAt: Date;
+  created_at: string;
 }
 
 const TeamAccess = () => {
@@ -40,6 +39,19 @@ const TeamAccess = () => {
     password: '',
     confirmPassword: ''
   });
+
+  const getUserData = () => {
+    try {
+      const user = localStorage.getItem('user');
+      if (!user) return null;
+      
+      const userData = JSON.parse(user);
+      return userData;
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return null;
+    }
+  };
   
   useEffect(() => {
     fetchTeamMembers();
@@ -48,24 +60,18 @@ const TeamAccess = () => {
   const fetchTeamMembers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, email, role, created_at');
+      const userData = getUserData();
       
-      if (error) {
-        throw error;
+      if (!userData || !userData.schoolId) {
+        console.error('No school ID available for fetching team members');
+        return;
       }
+
+      console.log('Fetching team members for school:', userData.schoolId);
+      const data = await getSchoolTeamMembers(userData.schoolId);
       
-      const formattedMembers = data.map(member => ({
-        id: member.id,
-        firstName: member.first_name,
-        lastName: member.last_name,
-        email: member.email,
-        role: member.role,
-        createdAt: new Date(member.created_at)
-      }));
-      
-      setTeamMembers(formattedMembers);
+      console.log('Team members fetched:', data);
+      setTeamMembers(data);
     } catch (error) {
       console.error('Error fetching team members:', error);
       toast({
@@ -181,6 +187,7 @@ const TeamAccess = () => {
         description: `${formData.firstName} ${formData.lastName} has been added successfully.`,
       });
       
+      // Refresh the team members list
       fetchTeamMembers();
       
     } catch (error) {
@@ -379,7 +386,7 @@ const TeamAccess = () => {
                         <User className="h-5 w-5" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-medium">{member.firstName} {member.lastName}</h4>
+                        <h4 className="font-medium">{member.first_name} {member.last_name}</h4>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span>{member.email}</span>
                           <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs">
