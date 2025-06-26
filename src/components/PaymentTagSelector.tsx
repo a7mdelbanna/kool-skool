@@ -80,13 +80,13 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   const queryClient = useQueryClient();
 
   // Fetch user info
-  const { data: userInfo } = useQuery({
+  const { data: userInfo, isLoading: userInfoLoading } = useQuery({
     queryKey: ['current-user-info'],
     queryFn: getCurrentUserInfo,
   });
 
   // Fetch payment with its tags
-  const { data: paymentWithTags } = useQuery({
+  const { data: paymentWithTags, isLoading: paymentLoading } = useQuery({
     queryKey: ['payment-with-tags', paymentId],
     queryFn: async (): Promise<PaymentWithTags | null> => {
       const { data, error } = await supabase.rpc('get_payment_with_tags', {
@@ -111,7 +111,7 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   });
 
   // Fetch available tags
-  const { data: availableTags = [] } = useQuery({
+  const { data: availableTags = [], isLoading: tagsLoading } = useQuery({
     queryKey: ['school-tags', userInfo?.[0]?.user_school_id],
     queryFn: async () => {
       if (!userInfo?.[0]?.user_school_id) return [];
@@ -184,6 +184,20 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
     removeTagMutation.mutate(tagId);
   };
 
+  // Show loading state while data is being fetched
+  if (userInfoLoading || paymentLoading || tagsLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="text-sm text-muted-foreground">Loading tags...</div>
+      </div>
+    );
+  }
+
+  // Filter available tags to exclude already assigned tags
+  const filteredAvailableTags = availableTags.filter(
+    tag => !currentTags.some(currentTag => currentTag.id === tag.id)
+  );
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* Current tags */}
@@ -220,19 +234,16 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
             <CommandInput placeholder="Search tags..." />
             <CommandEmpty>No tags found.</CommandEmpty>
             <CommandGroup>
-              {availableTags
-                .filter(tag => !currentTags.some(currentTag => currentTag.id === tag.id))
-                .map((tag) => (
-                  <CommandItem
-                    key={tag.id}
-                    onSelect={() => handleAddTag(tag.id)}
-                    className="flex items-center gap-2"
-                  >
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                    {tag.name}
-                  </CommandItem>
-                ))
-              }
+              {filteredAvailableTags.map((tag) => (
+                <CommandItem
+                  key={tag.id}
+                  onSelect={() => handleAddTag(tag.id)}
+                  className="flex items-center gap-2"
+                >
+                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                  {tag.name}
+                </CommandItem>
+              ))}
             </CommandGroup>
           </Command>
         </PopoverContent>
