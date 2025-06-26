@@ -378,6 +378,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          date_of_birth: string | null
           email: string
           first_name: string | null
           id: string
@@ -386,11 +387,13 @@ export type Database = {
           phone: string | null
           role: string
           school_id: string | null
+          socials: Json | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          date_of_birth?: string | null
           email: string
           first_name?: string | null
           id?: string
@@ -399,11 +402,13 @@ export type Database = {
           phone?: string | null
           role: string
           school_id?: string | null
+          socials?: Json | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          date_of_birth?: string | null
           email?: string
           first_name?: string | null
           id?: string
@@ -412,6 +417,7 @@ export type Database = {
           phone?: string | null
           role?: string
           school_id?: string | null
+          socials?: Json | null
           updated_at?: string
         }
         Relationships: [

@@ -288,8 +288,10 @@ export const createStudent = async (studentData: {
   age_group: string;
   level: string;
   phone?: string;
+  date_of_birth?: string;
+  socials?: { [key: string]: string };
 }): Promise<CreateStudentResponse> => {
-  const { data, error } = await supabase.rpc('create_student', {
+  const { data, error } = await supabase.rpc('create_student_with_profile', {
     student_email: studentData.student_email,
     student_password: studentData.student_password,
     student_first_name: studentData.first_name,
@@ -298,7 +300,9 @@ export const createStudent = async (studentData: {
     course_id: studentData.course_id,
     age_group: studentData.age_group,
     level: studentData.level,
-    phone: studentData.phone
+    phone: studentData.phone,
+    date_of_birth: studentData.date_of_birth,
+    socials: studentData.socials
   });
   
   if (error) {

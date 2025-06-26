@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -27,7 +26,9 @@ export const useStudentForm = (
     courseName: "",
     level: "beginner",
     paymentStatus: "pending",
-    teacherId: ""
+    teacherId: "",
+    dateOfBirth: "",
+    socials: {}
   });
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState("defaultPassword123");
@@ -163,7 +164,9 @@ export const useStudentForm = (
         courseName: "",
         level: "beginner",
         paymentStatus: "pending",
-        teacherId: ""
+        teacherId: "",
+        dateOfBirth: "",
+        socials: {}
       });
       setPassword("defaultPassword123");
       setCreatePassword(true);
@@ -230,6 +233,7 @@ export const useStudentForm = (
         
         console.log("Using course:", course);
         console.log("Using teacher:", selectedTeacher);
+        console.log("Student data being saved:", studentData);
         
         toast.loading("Creating student...");
 
@@ -245,7 +249,9 @@ export const useStudentForm = (
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
           level: studentData.level === 'beginner' ? 'Beginner' : 
             studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
-          phone: studentData.phone
+          phone: studentData.phone,
+          date_of_birth: studentData.dateOfBirth,
+          socials: studentData.socials
         });
         
         toast.dismiss();
@@ -273,7 +279,9 @@ export const useStudentForm = (
             paymentStatus: "pending",
             teacherId: selectedTeacherId,
             lessonsCompleted: 0,
-            nextLesson: 'Not scheduled'
+            nextLesson: 'Not scheduled',
+            dateOfBirth: studentData.dateOfBirth,
+            socials: studentData.socials
           };
           onStudentAdded(newStudent);
         }
