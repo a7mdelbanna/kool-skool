@@ -394,7 +394,7 @@ export const addStudentSubscription = async (subscriptionData: {
 };
 
 export const deleteStudentSubscription = async (subscriptionId: string) => {
-  console.log('🗑️ ENHANCED: deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  console.log('🗑️ FIXED: deleteStudentSubscription called with subscriptionId:', subscriptionId);
   
   if (!subscriptionId) {
     console.error('❌ No subscription ID provided');
@@ -402,36 +402,101 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
   }
   
   try {
-    console.log('🔧 Using enhanced database function for secure deletion...');
-    
-    // Use the enhanced database function for secure deletion with proper authentication
-    const { data, error } = await supabase.rpc('delete_student_subscription', {
-      p_subscription_id: subscriptionId
+    // Get current user data from localStorage for authentication
+    const userString = localStorage.getItem('user');
+    if (!userString) {
+      console.error('❌ No user found in localStorage');
+      throw new Error('User not authenticated - please log in again');
+    }
+
+    const user = JSON.parse(userString);
+    console.log('✅ Found user in localStorage:', { 
+      id: user.id, 
+      schoolId: user.schoolId, 
+      role: user.role 
     });
 
-    console.log('Enhanced database function result:', { data, error });
-
-    if (error) {
-      console.error('❌ Enhanced database function error:', error);
-      throw new Error(`Database deletion failed: ${error.message}`);
+    if (!user.id || !user.schoolId) {
+      console.error('❌ Invalid user data:', user);
+      throw new Error('Invalid user data - please log in again');
     }
 
-    // Parse the JSON response from the database function with proper type casting
-    const result = data as unknown as DeleteSubscriptionResponse;
-
-    if (!result || !result.success) {
-      const errorMessage = result?.message || 'Unknown deletion error';
-      console.error('❌ Deletion failed:', errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    console.log('✅ SUCCESS: Subscription deleted via enhanced database function');
-    console.log(`📊 Deletion summary: ${result.sessions_deleted} sessions deleted`);
+    console.log('🔧 Using direct database operations with user validation...');
     
-    return result;
+    // First, verify the subscription exists and get student info
+    const { data: subscriptionData, error: subError } = await supabase
+      .from('subscriptions')
+      .select(`
+        id,
+        student_id,
+        students!inner(
+          id,
+          school_id
+        )
+      `)
+      .eq('id', subscriptionId)
+      .single();
+
+    if (subError) {
+      console.error('❌ Error fetching subscription:', subError);
+      throw new Error('Subscription not found');
+    }
+
+    if (!subscriptionData) {
+      throw new Error('Subscription not found');
+    }
+
+    // Verify user has permission (same school)
+    if (subscriptionData.students.school_id !== user.schoolId) {
+      console.error('❌ School mismatch:', {
+        subscriptionSchool: subscriptionData.students.school_id,
+        userSchool: user.schoolId
+      });
+      throw new Error('Access denied: You do not have permission to delete this subscription');
+    }
+
+    // Verify user role
+    if (!['admin', 'teacher'].includes(user.role)) {
+      console.error('❌ Invalid role:', user.role);
+      throw new Error('Access denied: Only admins and teachers can delete subscriptions');
+    }
+
+    console.log('✅ Permission checks passed, proceeding with deletion');
+
+    // Delete associated lesson sessions first
+    const { error: sessionsDeleteError } = await supabase
+      .from('lesson_sessions')
+      .delete()
+      .eq('subscription_id', subscriptionId);
+
+    if (sessionsDeleteError) {
+      console.error('❌ Error deleting lesson sessions:', sessionsDeleteError);
+      throw new Error(`Failed to delete lesson sessions: ${sessionsDeleteError.message}`);
+    }
+
+    console.log('✅ Lesson sessions deleted successfully');
+
+    // Delete the subscription
+    const { error: subscriptionDeleteError } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('id', subscriptionId);
+
+    if (subscriptionDeleteError) {
+      console.error('❌ Error deleting subscription:', subscriptionDeleteError);
+      throw new Error(`Failed to delete subscription: ${subscriptionDeleteError.message}`);
+    }
+
+    console.log('✅ SUCCESS: Subscription deleted successfully');
+    
+    return {
+      success: true,
+      message: 'Subscription deleted successfully',
+      sessions_deleted: 'Unknown' // We don't get the count with direct delete
+    };
 
   } catch (error) {
-    console.error('❌ Error in enhanced deleteStudentSubscription:', error);
+    console.error('❌ Error in deleteStudentSubscription:', error);
     
     // Re-throw with more context if it's a generic error
     if (error instanceof Error) {
