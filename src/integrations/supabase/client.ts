@@ -41,6 +41,12 @@ export interface CreateStudentResponse {
   user_id?: string;
 }
 
+export interface DeleteSubscriptionResponse {
+  success: boolean;
+  message: string;
+  sessions_deleted: number;
+}
+
 export interface Course {
   id: string;
   school_id: string;
@@ -409,16 +415,19 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
       throw new Error(`Database deletion failed: ${error.message}`);
     }
 
-    if (!data || !data.success) {
-      const errorMessage = data?.message || 'Unknown deletion error';
+    // Cast the data to the proper type since we know what the database function returns
+    const result = data as DeleteSubscriptionResponse;
+
+    if (!result || !result.success) {
+      const errorMessage = result?.message || 'Unknown deletion error';
       console.error('❌ Deletion failed:', errorMessage);
       throw new Error(errorMessage);
     }
 
     console.log('✅ SUCCESS: Subscription deleted via database function');
-    console.log(`📊 Deletion summary: ${data.sessions_deleted} sessions deleted`);
+    console.log(`📊 Deletion summary: ${result.sessions_deleted} sessions deleted`);
     
-    return data;
+    return result;
 
   } catch (error) {
     console.error('❌ Error in deleteStudentSubscription:', error);
