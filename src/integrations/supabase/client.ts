@@ -269,6 +269,9 @@ export const getStudentSubscriptions = async (studentId: string) => {
   }
 };
 
+// Global tracking for subscription creation to prevent duplicates
+const subscriptionCreationTracker = new Map<string, boolean>();
+
 export const addStudentSubscription = async (subscriptionData: {
   student_id: string;
   session_count: number;
@@ -283,10 +286,24 @@ export const addStudentSubscription = async (subscriptionData: {
   notes?: string;
   status?: string;
 }) => {
-  console.log('=== USING FINAL FIXED add_student_subscription RPC ===');
-  console.log('addStudentSubscription called with COMPREHENSIVE DUPLICATE PREVENTION:', subscriptionData);
+  // Create a unique key for this subscription request
+  const subscriptionKey = `${subscriptionData.student_id}-${subscriptionData.start_date}-${subscriptionData.session_count}-${JSON.stringify(subscriptionData.schedule)}`;
+  
+  console.log('🔍 DUPLICATE PREVENTION: Checking for ongoing subscription creation:', subscriptionKey);
+  
+  // Check if this exact subscription is already being created
+  if (subscriptionCreationTracker.has(subscriptionKey)) {
+    console.error('🚫 DUPLICATE CALL PREVENTED: Subscription creation already in progress for:', subscriptionKey);
+    throw new Error('Subscription creation already in progress. Please wait.');
+  }
+  
+  // Mark this subscription as being created
+  subscriptionCreationTracker.set(subscriptionKey, true);
   
   try {
+    console.log('=== STARTING SUBSCRIPTION CREATION WITH DUPLICATE PREVENTION ===');
+    console.log('addStudentSubscription called with DUPLICATE PREVENTION:', subscriptionData);
+    
     // Get current user from localStorage for validation
     const userString = localStorage.getItem('user');
     if (!userString) {
@@ -296,7 +313,7 @@ export const addStudentSubscription = async (subscriptionData: {
     const user = JSON.parse(userString);
     console.log('Current user for subscription:', user);
     
-    console.log('=== CALLING COMPREHENSIVE FIXED add_student_subscription RPC ===');
+    console.log('=== CALLING FIXED add_student_subscription RPC WITH DUPLICATE PREVENTION ===');
     console.log('About to call add_student_subscription RPC with parameters:', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -307,7 +324,10 @@ export const addStudentSubscription = async (subscriptionData: {
       p_current_school_id: user.schoolId
     });
     
-    // Use the comprehensively fixed RPC function with final duplicate prevention
+    // Add a small delay to prevent rapid successive calls
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Use the fixed RPC function with comprehensive duplicate prevention
     const { data, error } = await supabase.rpc('add_student_subscription', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -326,9 +346,9 @@ export const addStudentSubscription = async (subscriptionData: {
     });
 
     if (error) {
-      console.error('❌ Error adding student subscription via COMPREHENSIVE FIXED RPC:', error);
+      console.error('❌ Error adding student subscription via RPC:', error);
       
-      // Enhanced error handling for the comprehensive fix
+      // Enhanced error handling
       if (error.message && error.message.includes('duplicate key value violates unique constraint')) {
         throw new Error('Cannot create subscription: A session already exists at this time. Please choose a different schedule.');
       }
@@ -345,13 +365,13 @@ export const addStudentSubscription = async (subscriptionData: {
       throw new Error('Subscription creation failed: No data returned from server');
     }
 
-    console.log('✅ Successfully added student subscription via COMPREHENSIVE FIXED RPC:', data);
-    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with comprehensive duplicate prevention');
+    console.log('✅ Successfully added student subscription with duplicate prevention:', data);
+    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with client-side duplicate prevention');
     
     // Return the first item from the array since RPC returns an array
     return Array.isArray(data) && data.length > 0 ? data[0] : data;
   } catch (error) {
-    console.error('❌ Error in addStudentSubscription with comprehensive duplicate prevention:', error);
+    console.error('❌ Error in addStudentSubscription with duplicate prevention:', error);
     
     // Re-throw with more context if it's a generic error
     if (error instanceof Error) {
@@ -359,6 +379,10 @@ export const addStudentSubscription = async (subscriptionData: {
     }
     
     throw new Error('An unexpected error occurred while creating the subscription');
+  } finally {
+    // Always remove the tracking key after completion (success or failure)
+    console.log('🧹 CLEANUP: Removing subscription creation tracking for:', subscriptionKey);
+    subscriptionCreationTracker.delete(subscriptionKey);
   }
 };
 
