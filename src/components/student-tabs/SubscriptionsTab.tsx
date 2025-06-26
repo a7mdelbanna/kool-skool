@@ -286,9 +286,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         notes: data.notes || undefined,
       };
       
+      console.log('Creating subscription with data:', subscriptionData);
+      
       // Add the subscription to database
       const newSubscriptionResult = await addStudentSubscription(subscriptionData);
-      console.log('New subscription created:', newSubscriptionResult);
+      console.log('Subscription creation result:', newSubscriptionResult);
       
       // The RPC function returns an array, so we need to get the first item
       const newSubscription = Array.isArray(newSubscriptionResult) ? newSubscriptionResult[0] : newSubscriptionResult;
@@ -297,6 +299,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       if (!newSubscription || typeof newSubscription !== 'object') {
         throw new Error('Invalid subscription data returned');
       }
+
+      console.log('New subscription created successfully:', newSubscription);
 
       // Convert the returned subscription to the expected format
       const subscriptionForSessions: DatabaseSubscription = {
@@ -316,26 +320,53 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         created_at: newSubscription.created_at
       };
       
-      // Generate and add lesson sessions
-      const sessions = generateSessions(subscriptionForSessions);
-      if (sessions.length > 0) {
-        await addLessonSessions(sessions);
+      // Track whether additional operations succeeded
+      let sessionsCreated = false;
+      let paymentAdded = false;
+      
+      // Try to generate and add lesson sessions (non-critical)
+      try {
+        const sessions = generateSessions(subscriptionForSessions);
+        if (sessions.length > 0) {
+          console.log('Attempting to create lesson sessions:', sessions);
+          await addLessonSessions(sessions);
+          sessionsCreated = true;
+          console.log('Lesson sessions created successfully');
+        }
+      } catch (sessionError) {
+        console.warn('Failed to create lesson sessions (non-critical):', sessionError);
       }
       
-      // Add payment record
-      await addStudentPayment({
-        student_id: studentData.id,
-        amount: calculatedTotalPrice,
-        currency: data.currency,
-        payment_date: format(new Date(), "yyyy-MM-dd"),
-        payment_method: "Credit Card",
-        status: "completed",
-        notes: `Payment for ${data.sessionCount} lessons (${data.duration}) starting on ${format(data.startDate, "PPP")}`,
-      });
+      // Try to add payment record (non-critical)
+      try {
+        await addStudentPayment({
+          student_id: studentData.id,
+          amount: calculatedTotalPrice,
+          currency: data.currency,
+          payment_date: format(new Date(), "yyyy-MM-dd"),
+          payment_method: "Credit Card",
+          status: "completed",
+          notes: `Payment for ${data.sessionCount} lessons (${data.duration}) starting on ${format(data.startDate, "PPP")}`,
+        });
+        paymentAdded = true;
+        console.log('Payment record added successfully');
+      } catch (paymentError) {
+        console.warn('Failed to create payment record (non-critical):', paymentError);
+      }
+      
+      // Show success message with details about what was created
+      let successMessage = "Subscription added successfully";
+      if (!sessionsCreated && !paymentAdded) {
+        successMessage += " (lesson sessions and payment record may need to be added manually)";
+      } else if (!sessionsCreated) {
+        successMessage += " (lesson sessions may need to be added manually)";
+      } else if (!paymentAdded) {
+        successMessage += " (payment record may need to be added manually)";
+      }
       
       toast({
         title: "Success",
-        description: "Subscription added successfully",
+        description: successMessage,
       });
       
       // Reload subscriptions and reset form
@@ -345,11 +376,32 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       
     } catch (error) {
       console.error('Error adding subscription:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add subscription",
-        variant: "destructive",
-      });
+      
+      // Check if the error is related to the subscription creation itself
+      if (error instanceof Error && error.message.includes('subscription')) {
+        toast({
+          title: "Error",
+          description: "Failed to add subscription: " + error.message,
+          variant: "destructive",
+        });
+      } else {
+        // If the error doesn't seem related to subscription creation, 
+        // check if the subscription was actually created
+        console.log('Checking if subscription was created despite error...');
+        setTimeout(async () => {
+          try {
+            await loadSubscriptions();
+          } catch (reloadError) {
+            console.error('Error reloading subscriptions:', reloadError);
+          }
+        }, 1000);
+        
+        toast({
+          title: "Partial Success",
+          description: "Subscription may have been created. Please refresh to check.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
