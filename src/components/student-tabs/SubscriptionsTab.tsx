@@ -107,6 +107,42 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
   ];
 
+  // Enhanced time slots with better formatting
+  const timeSlots = [
+    { value: "06:00", label: "6:00 AM", period: "AM" },
+    { value: "06:30", label: "6:30 AM", period: "AM" },
+    { value: "07:00", label: "7:00 AM", period: "AM" },
+    { value: "07:30", label: "7:30 AM", period: "AM" },
+    { value: "08:00", label: "8:00 AM", period: "AM" },
+    { value: "08:30", label: "8:30 AM", period: "AM" },
+    { value: "09:00", label: "9:00 AM", period: "AM" },
+    { value: "09:30", label: "9:30 AM", period: "AM" },
+    { value: "10:00", label: "10:00 AM", period: "AM" },
+    { value: "10:30", label: "10:30 AM", period: "AM" },
+    { value: "11:00", label: "11:00 AM", period: "AM" },
+    { value: "11:30", label: "11:30 AM", period: "AM" },
+    { value: "12:00", label: "12:00 PM", period: "PM" },
+    { value: "12:30", label: "12:30 PM", period: "PM" },
+    { value: "13:00", label: "1:00 PM", period: "PM" },
+    { value: "13:30", label: "1:30 PM", period: "PM" },
+    { value: "14:00", label: "2:00 PM", period: "PM" },
+    { value: "14:30", label: "2:30 PM", period: "PM" },
+    { value: "15:00", label: "3:00 PM", period: "PM" },
+    { value: "15:30", label: "3:30 PM", period: "PM" },
+    { value: "16:00", label: "4:00 PM", period: "PM" },
+    { value: "16:30", label: "4:30 PM", period: "PM" },
+    { value: "17:00", label: "5:00 PM", period: "PM" },
+    { value: "17:30", label: "5:30 PM", period: "PM" },
+    { value: "18:00", label: "6:00 PM", period: "PM" },
+    { value: "18:30", label: "6:30 PM", period: "PM" },
+    { value: "19:00", label: "7:00 PM", period: "PM" },
+    { value: "19:30", label: "7:30 PM", period: "PM" },
+    { value: "20:00", label: "8:00 PM", period: "PM" },
+    { value: "20:30", label: "8:30 PM", period: "PM" },
+    { value: "21:00", label: "9:00 PM", period: "PM" },
+    { value: "21:30", label: "9:30 PM", period: "PM" },
+  ];
+
   // Load subscriptions when component mounts or studentData changes
   useEffect(() => {
     if (studentData.id) {
@@ -484,7 +520,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               </Popover>
             </div>
 
-            {/* Schedule Section */}
+            {/* Enhanced Schedule Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold text-gray-700">Schedule</Label>
@@ -501,14 +537,14 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               </div>
               
               {formData.schedule.map((schedule, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex-1">
-                    <Label className="text-xs text-gray-600">Day</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">Day</Label>
                     <Select 
                       value={schedule.day}
                       onValueChange={(value) => updateScheduleItem(index, 'day', value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Select day" />
                       </SelectTrigger>
                       <SelectContent>
@@ -518,20 +554,70 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                       </SelectContent>
                     </Select>
                   </div>
+                  
                   <div className="flex-1">
-                    <Label className="text-xs text-gray-600">Time</Label>
-                    <Input 
-                      type="time" 
-                      value={schedule.time}
-                      onChange={(e) => updateScheduleItem(index, 'time', e.target.value)}
-                    />
+                    <Label className="text-xs text-gray-600 mb-1 block">Time</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal bg-white hover:bg-accent hover:text-accent-foreground transition-colors",
+                            !schedule.time && "text-muted-foreground"
+                          )}
+                        >
+                          <Clock className="mr-2 h-4 w-4 opacity-70" />
+                          {schedule.time ? 
+                            timeSlots.find(slot => slot.value === schedule.time)?.label || schedule.time :
+                            <span>Select time</span>
+                          }
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0 bg-background border shadow-xl" align="start">
+                        <div className="p-4">
+                          <h4 className="font-semibold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            Select Time
+                          </h4>
+                          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                            {timeSlots.map((slot) => (
+                              <Button
+                                key={slot.value}
+                                variant={schedule.time === slot.value ? "default" : "ghost"}
+                                className={cn(
+                                  "h-10 justify-start text-left font-normal",
+                                  schedule.time === slot.value && "bg-blue-600 text-white hover:bg-blue-700",
+                                  slot.period === "AM" && schedule.time !== slot.value && "hover:bg-blue-50",
+                                  slot.period === "PM" && schedule.time !== slot.value && "hover:bg-indigo-50"
+                                )}
+                                onClick={() => updateScheduleItem(index, 'time', slot.value)}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{slot.label.split(' ')[0]}</span>
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={cn(
+                                      "text-xs px-1.5 py-0.5",
+                                      slot.period === "AM" ? "bg-blue-100 text-blue-700" : "bg-indigo-100 text-indigo-700"
+                                    )}
+                                  >
+                                    {slot.period}
+                                  </Badge>
+                                </div>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
+                  
                   <Button 
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => removeScheduleItem(index)}
-                    className="text-red-600 hover:text-red-800"
+                    className="text-red-600 hover:text-red-800 hover:bg-red-50 border-red-200"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -539,7 +625,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               ))}
 
               {formData.schedule.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
                   <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p>No schedules added yet. Click "Add Schedule" to begin.</p>
                 </div>
