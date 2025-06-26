@@ -109,6 +109,53 @@ export type Database = {
           },
         ]
       }
+      student_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string | null
+          payment_date: string
+          payment_method: string
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           age_group: string | null
@@ -281,6 +328,20 @@ export type Database = {
           lesson_type: string
           created_at: string
           updated_at: string
+        }[]
+      }
+      get_student_payments: {
+        Args: { p_student_id: string }
+        Returns: {
+          id: string
+          student_id: string
+          amount: number
+          currency: string
+          payment_date: string
+          payment_method: string
+          status: string
+          notes: string
+          created_at: string
         }[]
       }
       get_students_with_details: {

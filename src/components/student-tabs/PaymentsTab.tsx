@@ -20,7 +20,6 @@ import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { usePayments, Payment } from "@/contexts/PaymentContext";
 import {
   Select,
   SelectContent,
@@ -28,6 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getStudentPayments, addStudentPayment, deleteStudentPayment } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface PaymentsTabProps {
   studentData: Partial<Student>;
@@ -59,8 +61,8 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   setStudentData, 
   isViewMode = false 
 }) => {
-  const { payments, addPayment, removePayment } = usePayments();
   const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]);
+  const queryClient = useQueryClient();
   
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -72,18 +74,60 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       currency: "USD",
     },
   });
+
+  // Fetch student payments from database
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ['student-payments', studentData.id],
+    queryFn: () => getStudentPayments(studentData.id as string),
+    enabled: !!studentData.id,
+  });
+
+  // Mutation to add new payment
+  const addPaymentMutation = useMutation({
+    mutationFn: addStudentPayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-payments', studentData.id] });
+      toast.success("Payment added successfully");
+      form.reset();
+    },
+    onError: (error) => {
+      console.error("Error adding payment:", error);
+      toast.error("Failed to add payment");
+    },
+  });
+
+  // Mutation to delete payment
+  const deletePaymentMutation = useMutation({
+    mutationFn: deleteStudentPayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-payments', studentData.id] });
+      toast.success("Payment deleted successfully");
+    },
+    onError: (error) => {
+      console.error("Error deleting payment:", error);
+      toast.error("Failed to delete payment");
+    },
+  });
   
   const handleAddPayment = (data: PaymentFormValues) => {
-    addPayment({
+    if (!studentData.id) {
+      toast.error("Student ID is required");
+      return;
+    }
+
+    addPaymentMutation.mutate({
+      student_id: studentData.id,
       amount: data.amount,
-      date: data.date,
-      method: data.method,
-      notes: data.notes || "",
-      status: "completed",
       currency: data.currency,
+      payment_date: format(data.date, 'yyyy-MM-dd'),
+      payment_method: data.method,
+      status: 'completed',
+      notes: data.notes || '',
     });
-    
-    form.reset();
+  };
+
+  const handleDeletePayment = (paymentId: string) => {
+    deletePaymentMutation.mutate(paymentId);
   };
 
   const handleCurrencyChange = (currencyCode: string) => {
@@ -91,6 +135,16 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     setSelectedCurrency(currency);
     form.setValue("currency", currencyCode);
   };
+
+  if (paymentsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading payment history...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -115,19 +169,22 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                     <h4 className="font-medium">
                       {payment.currency ? 
                         currencies.find(c => c.code === payment.currency)?.symbol || '$' 
-                        : '$'}{payment.amount.toFixed(2)}
+                        : '$'}{Number(payment.amount).toFixed(2)}
                     </h4>
                     <span className="text-sm text-muted-foreground">
-                      via {payment.method}
+                      via {payment.payment_method}
                     </span>
-                    {payment.relatedSubscriptionId && (
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
-                        Subscription
-                      </span>
-                    )}
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-xs",
+                      payment.status === 'completed' ? "bg-green-100 text-green-800" :
+                      payment.status === 'pending' ? "bg-yellow-100 text-yellow-800" :
+                      "bg-red-100 text-red-800"
+                    )}>
+                      {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                    </span>
                   </div>
                   <p className="text-sm my-1">
-                    Paid on {format(payment.date, "PPP")}
+                    Paid on {format(new Date(payment.payment_date), "PPP")}
                   </p>
                   {payment.notes && (
                     <p className="text-sm text-muted-foreground mt-1">{payment.notes}</p>
@@ -137,7 +194,8 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => removePayment(payment.id)}
+                    onClick={() => handleDeletePayment(payment.id)}
+                    disabled={deletePaymentMutation.isPending}
                   >
                     <Trash className="h-4 w-4 text-destructive" />
                   </Button>
@@ -298,9 +356,13 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                 )}
               />
               
-              <Button type="submit" className="w-full">
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={addPaymentMutation.isPending}
+              >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Payment
+                {addPaymentMutation.isPending ? "Adding Payment..." : "Add Payment"}
               </Button>
             </form>
           </Form>

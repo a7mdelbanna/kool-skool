@@ -171,6 +171,81 @@ export const getSchoolTeachers = async (schoolId: string) => {
   }
 };
 
+export const getStudentPayments = async (studentId: string) => {
+  console.log('getStudentPayments called with studentId:', studentId);
+  
+  try {
+    const { data, error } = await supabase.rpc('get_student_payments', {
+      p_student_id: studentId
+    });
+
+    console.log('Student payments RPC result:', { data, error });
+
+    if (error) {
+      console.error('Error fetching student payments:', error);
+      throw error;
+    }
+
+    console.log('Successfully fetched student payments:', data);
+    return data || [];
+  } catch (error) {
+    console.error('Error in getStudentPayments:', error);
+    throw error;
+  }
+};
+
+export const addStudentPayment = async (paymentData: {
+  student_id: string;
+  amount: number;
+  currency: string;
+  payment_date: string;
+  payment_method: string;
+  status: string;
+  notes?: string;
+}) => {
+  console.log('addStudentPayment called with:', paymentData);
+  
+  try {
+    const { data, error } = await supabase
+      .from('student_payments')
+      .insert(paymentData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding student payment:', error);
+      throw error;
+    }
+
+    console.log('Successfully added student payment:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in addStudentPayment:', error);
+    throw error;
+  }
+};
+
+export const deleteStudentPayment = async (paymentId: string) => {
+  console.log('deleteStudentPayment called with paymentId:', paymentId);
+  
+  try {
+    const { error } = await supabase
+      .from('student_payments')
+      .delete()
+      .eq('id', paymentId);
+
+    if (error) {
+      console.error('Error deleting student payment:', error);
+      throw error;
+    }
+
+    console.log('Successfully deleted student payment');
+  } catch (error) {
+    console.error('Error in deleteStudentPayment:', error);
+    throw error;
+  }
+};
+
 export const createStudent = async (studentData: {
   student_email: string;
   student_password: string;
