@@ -19,7 +19,7 @@ export interface Student {
   subscriptionProgress?: string;
   nextPaymentDate?: string;
   nextPaymentAmount?: number;
-  // Separate social media fields
+  // Individual social media fields to match database structure
   telegram?: string;
   whatsapp?: string;
   instagram?: string;

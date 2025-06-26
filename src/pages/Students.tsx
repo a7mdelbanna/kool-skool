@@ -130,7 +130,15 @@ const Students = () => {
       nextLesson: formatNextSession(record.next_session_date),
       nextPaymentDate: record.next_payment_date,
       nextPaymentAmount: record.next_payment_amount,
-      subscriptionProgress: record.subscription_progress || '0/0'
+      subscriptionProgress: record.subscription_progress || '0/0',
+      // Map social media fields from the user record - we need to get these from the users table
+      telegram: undefined, // We'll need to get this from the users table
+      whatsapp: undefined,
+      instagram: undefined,
+      viber: undefined,
+      facebook: undefined,
+      skype: undefined,
+      zoom: undefined
     };
     
     console.log('Mapped student with subscription progress:', mappedStudent.subscriptionProgress);
@@ -257,10 +265,50 @@ const Students = () => {
     setIsAddStudentOpen(true);
   };
   
-  const handleEditStudent = (student: Student) => {
-    setSelectedStudent(student);
-    setIsEditMode(true);
-    setIsAddStudentOpen(true);
+  const handleEditStudent = async (student: Student) => {
+    console.log('🔍 handleEditStudent called with student:', student);
+    
+    try {
+      // Fetch complete student data including social media fields from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', student.id)
+        .single();
+      
+      console.log('📊 User data from database:', userData);
+      console.log('❌ User error:', userError);
+      
+      if (userData) {
+        // Create enriched student object with all social media fields
+        const enrichedStudent: Student = {
+          ...student,
+          telegram: userData.telegram || '',
+          whatsapp: userData.whatsapp || '',
+          instagram: userData.instagram || '',
+          viber: userData.viber || '',
+          facebook: userData.facebook || '',
+          skype: userData.skype || '',
+          zoom: userData.zoom || '',
+          dateOfBirth: userData.date_of_birth || ''
+        };
+        
+        console.log('✅ Enriched student data for editing:', enrichedStudent);
+        setSelectedStudent(enrichedStudent);
+      } else {
+        console.log('⚠️ Using original student data (no additional user data found)');
+        setSelectedStudent(student);
+      }
+      
+      setIsEditMode(true);
+      setIsAddStudentOpen(true);
+    } catch (error) {
+      console.error('💥 Error fetching complete student data:', error);
+      // Fallback to original student data
+      setSelectedStudent(student);
+      setIsEditMode(true);
+      setIsAddStudentOpen(true);
+    }
   };
   
   const handleDeleteStudent = async (student: Student) => {
