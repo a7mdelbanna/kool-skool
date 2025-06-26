@@ -415,8 +415,8 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
       throw new Error(`Database deletion failed: ${error.message}`);
     }
 
-    // Cast the data to the proper type since we know what the database function returns
-    const result = data as DeleteSubscriptionResponse;
+    // Safely cast the data to the proper type - first to unknown, then to our interface
+    const result = data as unknown as DeleteSubscriptionResponse;
 
     if (!result || !result.success) {
       const errorMessage = result?.message || 'Unknown deletion error';
