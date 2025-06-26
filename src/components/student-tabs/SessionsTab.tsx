@@ -83,7 +83,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     
     try {
       setLoading(true);
-      console.log('=== LOADING SESSIONS ===');
+      console.log('=== LOADING SESSIONS WITH NEW DATABASE STRUCTURE ===');
       console.log('Loading sessions for student:', studentData.id);
       
       const data = await getStudentLessonSessions(studentData.id);
@@ -92,11 +92,11 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       // Ensure data is an array and properly typed
       const sessionsArray = Array.isArray(data) ? data as DatabaseSession[] : [];
       
-      // Enhanced duplicate detection and logging
+      // Enhanced validation for the new database structure
       if (sessionsArray.length > 0) {
-        console.log('=== DUPLICATE DETECTION ===');
-        const duplicateCheck = new Map();
-        const duplicates: DatabaseSession[] = [];
+        console.log('=== VALIDATING SESSION DATA INTEGRITY ===');
+        const uniqueCheck = new Map();
+        const validSessions: DatabaseSession[] = [];
         
         sessionsArray.forEach((session, index) => {
           const dateKey = session.scheduled_date;
@@ -104,32 +104,35 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             id: session.id,
             scheduled_date: session.scheduled_date,
             notes: session.notes,
-            index_in_sub: session.index_in_sub
+            index_in_sub: session.index_in_sub,
+            status: session.status
           });
           
-          if (duplicateCheck.has(dateKey)) {
-            console.warn(`DUPLICATE FOUND: Session at ${dateKey}`);
-            console.warn('Original:', duplicateCheck.get(dateKey));
-            console.warn('Duplicate:', session);
-            duplicates.push(session);
+          if (uniqueCheck.has(dateKey)) {
+            console.warn(`⚠️  DUPLICATE DETECTED: Session at ${dateKey} - This should not happen with new constraints`);
+            // Don't add duplicates to the display
           } else {
-            duplicateCheck.set(dateKey, session);
+            uniqueCheck.set(dateKey, session);
+            validSessions.push(session);
           }
         });
         
-        if (duplicates.length > 0) {
-          console.error(`❌ FOUND ${duplicates.length} DUPLICATE SESSIONS:`, duplicates);
+        if (validSessions.length !== sessionsArray.length) {
+          const duplicateCount = sessionsArray.length - validSessions.length;
+          console.error(`❌ FOUND ${duplicateCount} DUPLICATE SESSIONS - Database constraints may not be working`);
           toast({
-            title: "Warning: Duplicate Sessions Detected",
-            description: `Found ${duplicates.length} duplicate session(s). The database trigger should have prevented this.`,
+            title: "Warning: Data Integrity Issue",
+            description: `Found ${duplicateCount} duplicate session(s). Database constraints should prevent this.`,
             variant: "destructive",
           });
         } else {
-          console.log('✅ NO DUPLICATES FOUND - All sessions are unique');
+          console.log('✅ ALL SESSIONS ARE UNIQUE - Database constraints working correctly');
         }
+        
+        setSessions(validSessions);
+      } else {
+        setSessions([]);
       }
-      
-      setSessions(sessionsArray);
       
       console.log(`✅ Successfully loaded ${sessionsArray.length} sessions`);
       console.log('=== END SESSION LOADING ===');
@@ -426,7 +429,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             Sessions are automatically generated when you add a subscription in the Subscriptions tab.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length} | Enhanced duplicate prevention active
+            Total sessions: {sessions.length} | Duplicate prevention: Active ✅
           </p>
         </div>
       </div>

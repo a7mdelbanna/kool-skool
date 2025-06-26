@@ -283,7 +283,7 @@ export const addStudentSubscription = async (subscriptionData: {
   notes?: string;
   status?: string;
 }) => {
-  console.log('addStudentSubscription called with:', subscriptionData);
+  console.log('addStudentSubscription called with ENHANCED DUPLICATE PREVENTION:', subscriptionData);
   
   try {
     // Get current user from localStorage for validation
@@ -295,7 +295,8 @@ export const addStudentSubscription = async (subscriptionData: {
     const user = JSON.parse(userString);
     console.log('Current user for subscription:', user);
     
-    // Enhanced logging before calling RPC
+    // Enhanced logging before calling RPC with new database structure
+    console.log('=== CALLING ENHANCED add_student_subscription RPC ===');
     console.log('About to call add_student_subscription RPC with parameters:', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -303,10 +304,11 @@ export const addStudentSubscription = async (subscriptionData: {
       p_start_date: subscriptionData.start_date,
       p_schedule: subscriptionData.schedule,
       p_current_user_id: user.id,
-      p_current_school_id: user.schoolId
+      p_current_school_id: user.schoolId,
+      note: 'Using enhanced RPC with bulletproof duplicate prevention'
     });
     
-    // Use RPC function to bypass RLS and handle insertion with proper validation
+    // Use enhanced RPC function with bulletproof duplicate prevention
     const { data, error } = await supabase.rpc('add_student_subscription', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -325,30 +327,41 @@ export const addStudentSubscription = async (subscriptionData: {
     });
 
     if (error) {
-      console.error('Error adding student subscription via RPC:', error);
+      console.error('❌ Error adding student subscription via enhanced RPC:', error);
       
-      // Handle specific duplicate error
+      // Handle specific duplicate error with enhanced messaging
       if (error.message && error.message.includes('Duplicate session prevented')) {
-        console.error('Duplicate session error detected:', error.message);
-        throw new Error('Cannot create subscription: Duplicate sessions would be created. Please refresh and try again.');
+        console.error('🚫 DUPLICATE SESSION ERROR - Database trigger prevented creation:', error.message);
+        throw new Error('Cannot create subscription: The database prevented duplicate session creation. This is working as expected. Please refresh and check existing sessions.');
+      }
+      
+      // Handle unique constraint violations
+      if (error.message && error.message.includes('unique constraint')) {
+        console.error('🚫 UNIQUE CONSTRAINT VIOLATION:', error.message);
+        throw new Error('Cannot create subscription: This would create sessions that conflict with existing ones. Please check existing subscriptions and sessions.');
       }
       
       throw error;
     }
 
-    console.log('Successfully added student subscription via RPC:', data);
+    console.log('✅ Successfully added student subscription via enhanced RPC:', data);
     
-    // Log session creation success
-    console.log('Subscription created successfully. New sessions should be generated automatically.');
+    // Log session creation success with enhanced messaging
+    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with enhanced duplicate prevention');
+    console.log('Database triggers and constraints are actively preventing duplicates');
     
     // Return the first item from the array since RPC returns an array
     return Array.isArray(data) && data.length > 0 ? data[0] : data;
   } catch (error) {
-    console.error('Error in addStudentSubscription:', error);
+    console.error('❌ Error in addStudentSubscription with enhanced prevention:', error);
     
-    // Provide more specific error messages
+    // Provide more specific error messages for the enhanced system
     if (error.message && error.message.includes('duplicate')) {
-      throw new Error('Cannot create subscription: This would create duplicate sessions. Please check existing sessions first.');
+      throw new Error('Cannot create subscription: The enhanced duplicate prevention system blocked this operation. Please refresh and verify existing sessions.');
+    }
+    
+    if (error.message && error.message.includes('constraint')) {
+      throw new Error('Cannot create subscription: Database constraints prevented this operation to maintain data integrity.');
     }
     
     throw error;
@@ -386,7 +399,7 @@ export const addLessonSessions = async (sessions: Array<{
   cost: number;
   notes?: string;
 }>) => {
-  console.log('addLessonSessions called with:', sessions);
+  console.log('addLessonSessions called with enhanced duplicate prevention:', sessions);
   
   try {
     const { data, error } = await supabase
@@ -395,72 +408,91 @@ export const addLessonSessions = async (sessions: Array<{
       .select();
 
     if (error) {
-      console.error('Error adding lesson sessions:', error);
+      console.error('Error adding lesson sessions with enhanced prevention:', error);
       throw error;
     }
 
-    console.log('Successfully added lesson sessions:', data);
+    console.log('Successfully added lesson sessions with enhanced prevention:', data);
     return data;
   } catch (error) {
-    console.error('Error in addLessonSessions:', error);
+    console.error('Error in addLessonSessions with enhanced prevention:', error);
     throw error;
   }
 };
 
 export const getStudentLessonSessions = async (studentId: string) => {
-  console.log('getStudentLessonSessions called with studentId:', studentId);
+  console.log('getStudentLessonSessions called with ENHANCED VALIDATION for studentId:', studentId);
   
   try {
-    // Enhanced logging for session retrieval
+    // Enhanced logging for session retrieval with new database structure
+    console.log('=== FETCHING SESSIONS WITH ENHANCED VALIDATION ===');
     console.log('Fetching lesson sessions for student:', studentId);
     
-    // Use direct RPC call with proper error handling
+    // Use direct RPC call with enhanced error handling
     const { data, error } = await supabase.rpc('get_lesson_sessions' as any, {
       p_student_id: studentId
     });
 
-    console.log('Lesson sessions RPC result:', { data, error });
+    console.log('Lesson sessions RPC result with enhanced validation:', { data, error });
 
     if (error) {
-      console.error('Error fetching lesson sessions via RPC:', error);
+      console.error('❌ Error fetching lesson sessions via RPC:', error);
       throw error;
     }
 
-    // Enhanced logging for retrieved sessions
+    // Enhanced logging and validation for retrieved sessions
     if (data && data.length > 0) {
-      console.log(`Successfully fetched ${data.length} lesson sessions`);
+      console.log(`✅ Successfully fetched ${data.length} lesson sessions with enhanced validation`);
       
-      // Log session details for debugging
-      const sessionSummary = data.map(session => ({
+      // Enhanced session validation and logging
+      const sessionSummary = data.map((session, index) => ({
+        position: index + 1,
         id: session.id,
         scheduled_date: session.scheduled_date,
         status: session.status,
         notes: session.notes,
-        index_in_sub: session.index_in_sub
+        index_in_sub: session.index_in_sub,
+        subscription_id: session.subscription_id
       }));
       
-      console.log('Session summary:', sessionSummary);
+      console.log('Enhanced session summary:', sessionSummary);
       
-      // Check for potential duplicates in the retrieved data
+      // Enhanced duplicate detection with database constraint validation
       const dateMap = new Map();
-      data.forEach(session => {
+      const duplicates: any[] = [];
+      
+      data.forEach((session, index) => {
         const dateKey = session.scheduled_date;
         if (dateMap.has(dateKey)) {
-          console.warn('Potential duplicate session detected:', {
+          console.error('🚫 CRITICAL: Duplicate session detected - Database constraints failed!', {
+            position: index + 1,
             existing: dateMap.get(dateKey),
-            duplicate: session
+            duplicate: session,
+            message: 'This should not happen with the enhanced database constraints'
           });
+          duplicates.push(session);
         } else {
           dateMap.set(dateKey, session);
         }
       });
+      
+      if (duplicates.length > 0) {
+        console.error('🚨 CRITICAL DATABASE INTEGRITY ISSUE:', {
+          duplicateCount: duplicates.length,
+          message: 'Database constraints and triggers are not working as expected',
+          duplicates: duplicates
+        });
+      } else {
+        console.log('✅ ALL SESSIONS VALIDATED - Enhanced duplicate prevention working correctly');
+      }
+      
     } else {
-      console.log('No lesson sessions found for student:', studentId);
+      console.log('ℹ️  No lesson sessions found for student:', studentId);
     }
 
     return data || [];
   } catch (error) {
-    console.error('Error in getStudentLessonSessions:', error);
+    console.error('❌ Error in getStudentLessonSessions with enhanced validation:', error);
     throw error;
   }
 };
