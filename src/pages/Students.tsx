@@ -104,8 +104,8 @@ const Students = () => {
       ageGroup: (record.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
       level: (record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
       phone: record.phone,
-      // Use the calculated payment status from the database
-      paymentStatus: record.payment_status || 'pending',
+      // Use the calculated payment status from the database, with fallback
+      paymentStatus: (record.payment_status || 'pending') as 'paid' | 'pending' | 'overdue',
       teacherId: record.teacher_id,
       lessonsCompleted: 0,
       nextLesson: 'Not scheduled',
@@ -291,11 +291,7 @@ const Students = () => {
       
       toast.loading("Creating course...");
       
-      const courseData = await createCourse({
-        school_id: user.schoolId,
-        course_name: newCourseName.trim(),
-        lesson_type: newCourseType // Now sending lowercase values
-      });
+      const courseData = await createCourse(newCourseName.trim(), newCourseType);
       
       toast.dismiss();
       

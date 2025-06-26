@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -65,6 +64,7 @@ export interface StudentRecord {
   teacher_first_name: string;
   teacher_last_name: string;
   teacher_email: string;
+  payment_status?: string;
 }
 
 export const user_login = async (email: string, password: string): Promise<UserLoginResponse> => {
@@ -78,7 +78,7 @@ export const user_login = async (email: string, password: string): Promise<UserL
     throw new Error(error.message);
   }
   
-  return data as UserLoginResponse;
+  return data as unknown as UserLoginResponse;
 };
 
 export const verify_license_and_create_school = async (
@@ -103,7 +103,7 @@ export const verify_license_and_create_school = async (
     throw new Error(error.message);
   }
   
-  return data as SchoolSetupResponse;
+  return data as unknown as SchoolSetupResponse;
 };
 
 export const getCurrentUserInfo = async () => {
@@ -230,7 +230,7 @@ export const addTeamMember = async (
     throw new Error(error.message);
   }
   
-  return data as TeamMemberResponse;
+  return data as unknown as TeamMemberResponse;
 };
 
 export const createStudent = async (studentData: {
@@ -261,7 +261,7 @@ export const createStudent = async (studentData: {
     throw new Error(error.message);
   }
   
-  return data as CreateStudentResponse;
+  return data as unknown as CreateStudentResponse;
 };
 
 export const getStudentsWithDetails = async (schoolId: string): Promise<StudentRecord[]> => {
