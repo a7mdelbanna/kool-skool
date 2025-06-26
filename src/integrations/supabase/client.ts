@@ -394,7 +394,7 @@ export const addStudentSubscription = async (subscriptionData: {
 };
 
 export const deleteStudentSubscription = async (subscriptionId: string) => {
-  console.log('🗑️ FIXED: deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  console.log('🗑️ ENHANCED: deleteStudentSubscription called with subscriptionId:', subscriptionId);
   
   if (!subscriptionId) {
     console.error('❌ No subscription ID provided');
@@ -421,10 +421,10 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
       throw new Error('Invalid user data - please log in again');
     }
 
-    console.log('🔧 Using direct database operations with user validation...');
+    console.log('🔧 Checking if subscription exists before deletion...');
     
-    // First, verify the subscription exists and get student info
-    const { data: subscriptionData, error: subError } = await supabase
+    // First, check if the subscription exists using maybeSingle() to avoid errors
+    const { data: subscriptionCheck, error: checkError } = await supabase
       .from('subscriptions')
       .select(`
         id,
@@ -435,21 +435,27 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
         )
       `)
       .eq('id', subscriptionId)
-      .single();
+      .maybeSingle();
 
-    if (subError) {
-      console.error('❌ Error fetching subscription:', subError);
-      throw new Error('Subscription not found');
+    if (checkError) {
+      console.error('❌ Error checking subscription existence:', checkError);
+      throw new Error('Failed to verify subscription');
     }
 
-    if (!subscriptionData) {
-      throw new Error('Subscription not found');
+    // If subscription doesn't exist, consider it already deleted
+    if (!subscriptionCheck) {
+      console.log('⚠️ Subscription not found - may already be deleted');
+      return {
+        success: true,
+        message: 'Subscription already deleted or not found',
+        sessions_deleted: 0
+      };
     }
 
     // Verify user has permission (same school)
-    if (subscriptionData.students.school_id !== user.schoolId) {
+    if (subscriptionCheck.students.school_id !== user.schoolId) {
       console.error('❌ School mismatch:', {
-        subscriptionSchool: subscriptionData.students.school_id,
+        subscriptionSchool: subscriptionCheck.students.school_id,
         userSchool: user.schoolId
       });
       throw new Error('Access denied: You do not have permission to delete this subscription');
