@@ -6,9 +6,12 @@ import {
   isPast, 
   isFuture, 
   isToday, 
-  addDays 
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  isWithinInterval
 } from 'date-fns';
-import { Session, usePayments } from '@/contexts/PaymentContext';
+import { Session } from '@/contexts/PaymentContext';
 import { Badge } from '@/components/ui/badge';
 import { 
   Calendar as CalendarIcon,
@@ -18,37 +21,35 @@ import {
   XCircle,
   CalendarDays
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { 
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle 
 } from '@/components/ui/card';
 
 interface UpcomingLessonsListProps {
-  searchQuery?: string;
+  sessions: Session[];
   onLessonClick?: (session: Session) => void;
+  viewMode: 'day' | 'week' | 'month';
+  currentDate: Date;
+  currentWeekStart: Date;
 }
 
-const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery = '', onLessonClick }) => {
-  const { sessions } = usePayments();
-
-  // Filter sessions based on search query
-  const filteredSessions = sessions
-    .filter(session => {
-      if (!searchQuery) return true;
-      return session.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             session.studentName?.toLowerCase().includes(searchQuery.toLowerCase());
-    });
-
+const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ 
+  sessions, 
+  onLessonClick,
+  viewMode,
+  currentDate,
+  currentWeekStart
+}) => {
+  
   // Group sessions by date
   const today = new Date();
   const tomorrow = addDays(today, 1);
   
-  const upcomingSessions = filteredSessions
+  const upcomingSessions = sessions
     .filter(session => !isPast(new Date(session.date)) || isToday(new Date(session.date)))
     .sort((a, b) => {
       const dateA = new Date(a.date);
@@ -56,7 +57,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
       return dateA.getTime() - dateB.getTime();
     });
     
-  const pastSessions = filteredSessions
+  const pastSessions = sessions
     .filter(session => isPast(new Date(session.date)) && !isToday(new Date(session.date)))
     .sort((a, b) => {
       const dateA = new Date(a.date);
@@ -105,8 +106,20 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
     return isPast(sessionDate) && !isToday(sessionDate);
   };
 
+  // Get title based on view mode
+  const getViewTitle = () => {
+    if (viewMode === 'day') {
+      return format(currentDate, 'EEEE, MMMM d, yyyy');
+    } else if (viewMode === 'week') {
+      const weekEnd = addDays(currentWeekStart, 6);
+      return `Week of ${format(currentWeekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
+    } else {
+      return format(currentDate, 'MMMM yyyy');
+    }
+  };
+
   // Render sessions for a specific date group
-  const renderSessionGroup = (title: string, sessions: Session[]) => {
+  const renderSessionGroup = (title: string, sessions: Session[], showDateLabels: boolean = true) => {
     if (sessions.length === 0) return null;
     
     return (
@@ -115,11 +128,13 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
         <div className="grid gap-3">
           {sessions.map(session => {
             const sessionDate = new Date(session.date);
-            const dateLabel = isToday(sessionDate) 
-              ? 'Today' 
-              : isSameDay(sessionDate, tomorrow) 
-                ? 'Tomorrow' 
-                : format(sessionDate, 'EEEE, MMMM d');
+            const dateLabel = showDateLabels ? (
+              isToday(sessionDate) 
+                ? 'Today' 
+                : isSameDay(sessionDate, tomorrow) 
+                  ? 'Tomorrow' 
+                  : format(sessionDate, 'EEEE, MMMM d')
+            ) : format(sessionDate, 'EEEE, MMMM d');
             
             const subject = getSubject(session);
             const studentName = session.studentName || 'Unknown Student';
@@ -212,11 +227,21 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
 
   return (
     <div className="space-y-4">
+      {/* Show view mode specific title */}
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold mb-2">
+          Lessons for {getViewTitle()}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {sessions.length} lesson{sessions.length !== 1 ? 's' : ''} found
+        </p>
+      </div>
+
       {/* Render upcoming sessions */}
-      {renderSessionGroup("Upcoming Lessons", upcomingSessions)}
+      {renderSessionGroup("Upcoming Lessons", upcomingSessions, viewMode !== 'day')}
       
       {/* Render past sessions if any */}
-      {renderSessionGroup("Past Lessons", pastSessions)}
+      {renderSessionGroup("Past Lessons", pastSessions, viewMode !== 'day')}
       
       {/* Empty state */}
       {upcomingSessions.length === 0 && pastSessions.length === 0 && (
@@ -224,7 +249,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
           <CardHeader>
             <CardTitle>No lessons found</CardTitle>
             <CardDescription>
-              There are no lessons matching your search criteria.
+              There are no lessons for the selected {viewMode} view.
             </CardDescription>
           </CardHeader>
         </Card>

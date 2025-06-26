@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   Calendar as CalendarIcon, 
@@ -8,7 +9,7 @@ import {
   LayoutGrid,
   List
 } from 'lucide-react';
-import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
+import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, isSameDay, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -87,13 +88,44 @@ const Calendar = () => {
     setDetailsDialogOpen(true);
   };
 
-  const filteredSessions = sessions.filter(session => {
-    if (!searchQuery) return true;
-    return session.notes?.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  // Filter sessions based on view mode and search query
+  const getFilteredSessions = () => {
+    let filtered = sessions.filter(session => {
+      if (!searchQuery) return true;
+      return session.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             session.studentName?.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+
+    // Apply date filtering based on view mode
+    if (viewMode === 'day') {
+      filtered = filtered.filter(session => {
+        const sessionDate = new Date(session.date);
+        return isSameDay(sessionDate, currentDate);
+      });
+    } else if (viewMode === 'week') {
+      const weekEnd = addDays(currentWeekStart, 6);
+      filtered = filtered.filter(session => {
+        const sessionDate = new Date(session.date);
+        return isWithinInterval(sessionDate, { start: currentWeekStart, end: weekEnd });
+      });
+    } else if (viewMode === 'month') {
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(currentDate);
+      filtered = filtered.filter(session => {
+        const sessionDate = new Date(session.date);
+        return isWithinInterval(sessionDate, { start: monthStart, end: monthEnd });
+      });
+    }
+
+    return filtered;
+  };
+
+  const filteredSessions = getFilteredSessions();
 
   console.log("Sessions available:", sessions.length);
   console.log("Filtered sessions:", filteredSessions.length);
+  console.log("Current view mode:", viewMode);
+  console.log("Current display mode:", displayMode);
 
   return (
     <div className="space-y-6">
@@ -173,8 +205,11 @@ const Calendar = () => {
       <div className="bg-card rounded-lg border shadow-sm p-4">
         {displayMode === 'list' ? (
           <UpcomingLessonsList 
-            searchQuery={searchQuery}
+            sessions={filteredSessions}
             onLessonClick={handleLessonClick}
+            viewMode={viewMode}
+            currentDate={currentDate}
+            currentWeekStart={currentWeekStart}
           />
         ) : (
           <CalendarView 
