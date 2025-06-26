@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -258,7 +259,15 @@ export const useStudentForm = (
         
         if (!response || !response.success) {
           console.error("Error creating student:", response?.message);
-          toast.error(response?.message || "Failed to create student");
+          
+          // Handle specific error cases with user-friendly messages
+          if (response?.message?.includes('duplicate key value violates unique constraint "users_email_key"')) {
+            toast.error(`A student with email "${studentData.email}" already exists. Please use a different email address.`);
+          } else if (response?.message?.includes('duplicate') || response?.message?.includes('already exists')) {
+            toast.error("This student already exists. Please check the email address and try again.");
+          } else {
+            toast.error(response?.message || "Failed to create student");
+          }
           setSaving(false);
           return;
         }
@@ -292,7 +301,19 @@ export const useStudentForm = (
       }
     } catch (error) {
       console.error("Error saving student:", error);
-      toast.error("An error occurred while saving the student");
+      
+      // Handle specific database constraint errors
+      if (error instanceof Error) {
+        if (error.message.includes('duplicate key value violates unique constraint "users_email_key"')) {
+          toast.error(`A student with email "${studentData.email}" already exists. Please use a different email address.`);
+        } else if (error.message.includes('duplicate') || error.message.includes('already exists')) {
+          toast.error("This student already exists. Please check the information and try again.");
+        } else {
+          toast.error("An error occurred while saving the student: " + error.message);
+        }
+      } else {
+        toast.error("An unexpected error occurred while saving the student");
+      }
     } finally {
       setSaving(false);
     }
