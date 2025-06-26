@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,48 +48,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   const [socialsOpen, setSocialsOpen] = useState(false);
   const [emailError, setEmailError] = useState("");
 
-  // Debug logging for data population
-  useEffect(() => {
-    console.log('🔍 ProfileTab - studentData changed:', studentData);
-    console.log('📅 Date of birth value:', studentData.dateOfBirth);
-    console.log('📱 Social media values:', {
-      telegram: studentData.telegram,
-      whatsapp: studentData.whatsapp,
-      instagram: studentData.instagram,
-      viber: studentData.viber,
-      facebook: studentData.facebook,
-      skype: studentData.skype,
-      zoom: studentData.zoom
-    });
-  }, [studentData]);
-
-  // Auto-expand sections if they contain data
-  useEffect(() => {
-    // Check if Additional Information section has data
-    const hasAdditionalInfo = studentData.dateOfBirth && studentData.dateOfBirth.trim() !== '';
-    
-    // Check if Social Media section has data
-    const hasSocialData = !!(
-      studentData.telegram || studentData.whatsapp || studentData.instagram || 
-      studentData.viber || studentData.facebook || studentData.skype || studentData.zoom
-    );
-
-    console.log('📊 Data check results:', {
-      hasAdditionalInfo,
-      hasSocialData,
-      dateOfBirth: studentData.dateOfBirth
-    });
-
-    // Auto-expand sections if they have data
-    if (hasAdditionalInfo && !isNewStudent) {
-      setAdditionalInfoOpen(true);
-    }
-    
-    if (hasSocialData && !isNewStudent) {
-      setSocialsOpen(true);
-    }
-  }, [studentData, isNewStudent]);
-
   console.log('ProfileTab render - teachers data:', teachers);
   console.log('ProfileTab render - courses data:', courses);
   console.log('ProfileTab render - studentData:', studentData);
@@ -115,7 +72,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   };
 
   const handleSocialChange = (platform: string, value: string) => {
-    console.log(`🔄 Updating ${platform} to:`, value);
     setStudentData({ [platform]: value.trim() === '' ? undefined : value });
   };
 
@@ -331,11 +287,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             <span className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Additional Information
-              {studentData.dateOfBirth && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                  Has data
-                </span>
-              )}
             </span>
             {additionalInfoOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
@@ -347,17 +298,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               id="dateOfBirth"
               type="date"
               value={studentData.dateOfBirth || ""}
-              onChange={(e) => {
-                console.log('📅 Date of birth changed to:', e.target.value);
-                setStudentData({ dateOfBirth: e.target.value });
-              }}
+              onChange={(e) => setStudentData({ dateOfBirth: e.target.value })}
               disabled={isViewMode}
             />
-            {studentData.dateOfBirth && (
-              <p className="text-xs text-green-600 mt-1">
-                Current value: {studentData.dateOfBirth}
-              </p>
-            )}
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -369,12 +312,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             <span className="flex items-center gap-2">
               <MessageCircle className="h-4 w-4" />
               Social Media & Contacts
-              {(studentData.telegram || studentData.whatsapp || studentData.instagram || 
-                studentData.viber || studentData.facebook || studentData.skype || studentData.zoom) && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                  Has data
-                </span>
-              )}
             </span>
             {socialsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
@@ -382,31 +319,19 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <CollapsibleContent className="space-y-4 mt-4">
           {socialPlatforms.map((platform) => {
             const Icon = platform.icon;
-            const currentValue = studentData[platform.key as keyof Student] as string || "";
-            
             return (
               <div key={platform.key} className="space-y-2">
                 <Label htmlFor={platform.key} className="flex items-center gap-2">
                   <Icon className={`h-4 w-4 ${platform.color}`} />
                   {platform.label}
-                  {currentValue && (
-                    <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">
-                      ✓
-                    </span>
-                  )}
                 </Label>
                 <Input
                   id={platform.key}
-                  value={currentValue}
+                  value={studentData[platform.key as keyof Student] as string || ""}
                   onChange={(e) => handleSocialChange(platform.key, e.target.value)}
                   disabled={isViewMode}
                   placeholder={platform.placeholder}
                 />
-                {currentValue && (
-                  <p className="text-xs text-green-600">
-                    Current: {currentValue}
-                  </p>
-                )}
               </div>
             );
           })}
