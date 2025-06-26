@@ -287,8 +287,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       };
       
       // Add the subscription to database
-      const newSubscription = await addStudentSubscription(subscriptionData);
-      console.log('New subscription created:', newSubscription);
+      const newSubscriptionResult = await addStudentSubscription(subscriptionData);
+      console.log('New subscription created:', newSubscriptionResult);
+      
+      // The RPC function returns an array, so we need to get the first item
+      const newSubscription = Array.isArray(newSubscriptionResult) ? newSubscriptionResult[0] : newSubscriptionResult;
       
       // Ensure we have a valid subscription object
       if (!newSubscription || typeof newSubscription !== 'object') {
