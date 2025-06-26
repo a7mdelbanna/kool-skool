@@ -48,6 +48,7 @@ const subjectColorMap: Record<string, { bg: string, border: string, text: string
   'Literature': { bg: 'bg-indigo-100', border: 'border-indigo-300', text: 'text-indigo-700' },
   'History': { bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-700' },
   'Computer Science': { bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-700' },
+  'General': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' },
   'default': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' }
 };
 
@@ -62,13 +63,20 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
 
   if (!session) return null;
 
-  // Parse subject from notes
-  const noteParts = session.notes?.split(' ') || [];
-  const subject = noteParts.length > 0 ? noteParts[0] : 'default';
+  // Extract subject from notes if available, otherwise default to 'General'
+  const subject = session.notes?.includes('Mathematics') ? 'Mathematics' :
+                 session.notes?.includes('Science') ? 'Science' :
+                 session.notes?.includes('English') ? 'English' :
+                 session.notes?.includes('Physics') ? 'Physics' :
+                 session.notes?.includes('Chemistry') ? 'Chemistry' :
+                 session.notes?.includes('Biology') ? 'Biology' :
+                 session.notes?.includes('Geography') ? 'Geography' :
+                 session.notes?.includes('Literature') ? 'Literature' :
+                 session.notes?.includes('Computer Science') ? 'Computer Science' :
+                 'General';
   
-  // Parse student name from notes
-  const studentNameMatch = session.notes?.match(/with\s+(.*?)$/);
-  const studentName = studentNameMatch ? studentNameMatch[1] : `Student ${session.id.slice(-1)}`;
+  // Use the real student name from the session data
+  const studentName = session.studentName || 'Unknown Student';
 
   // Get colors for the subject
   const colors = subjectColorMap[subject] || subjectColorMap.default;
@@ -160,13 +168,13 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
           <div className="flex items-center gap-3 mb-2">
             <Avatar className={cn("h-10 w-10", colors.border)}>
               <AvatarFallback className={cn(colors.bg, colors.text)}>
-                {subject.substring(0, 2).toUpperCase()}
+                {studentName.split(' ').map(name => name.charAt(0)).join('').substring(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div>
-              <DialogTitle className="text-xl">{subject} Lesson</DialogTitle>
+              <DialogTitle className="text-xl">{studentName}</DialogTitle>
               <DialogDescription>
-                with {studentName}
+                {subject} Lesson
               </DialogDescription>
             </div>
             <div className="ml-auto">
