@@ -1,12 +1,13 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
 import { 
   createStudent, 
   getSchoolCourses, 
+  getSchoolTeachers,
   Course,
-  CreateStudentResponse,
-  supabase
+  CreateStudentResponse
 } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -107,38 +108,14 @@ export const useStudentForm = (
       }
       
       try {
-        console.log('Fetching teachers directly from users table for student form');
-        const { data: directTeachersData, error: directTeachersError } = await supabase
-          .from('users')
-          .select('id, first_name, last_name, email')
-          .eq('school_id', schoolId)
-          .eq('role', 'teacher');
-          
-        if (directTeachersError) {
-          console.error('Error fetching teachers directly:', directTeachersError);
-          throw directTeachersError;
-        }
+        console.log('Fetching teachers using getSchoolTeachers function for student form');
+        const teachersData = await getSchoolTeachers(schoolId);
         
-        if (directTeachersData && directTeachersData.length > 0) {
-          console.log('Successfully fetched teachers directly:', directTeachersData);
-          
-          const formattedTeachers = directTeachersData.map(teacher => {
-            const displayName = teacher.first_name && teacher.last_name 
-              ? `${teacher.first_name} ${teacher.last_name}`
-              : teacher.email || `ID: ${teacher.id.substring(0, 8)}`;
-            
-            console.log(`Teacher ${teacher.id} display name: ${displayName}`);
-            
-            return {
-              id: teacher.id,
-              first_name: teacher.first_name || '',
-              last_name: teacher.last_name || '',
-              display_name: displayName
-            };
-          });
-          
-          console.log('Formatted teachers data for student form:', formattedTeachers);
-          return { data: formattedTeachers };
+        console.log('getSchoolTeachers response for student form:', teachersData);
+        
+        if (teachersData && teachersData.length > 0) {
+          console.log('Successfully fetched teachers for student form:', teachersData);
+          return { data: teachersData };
         }
         
         console.log('No teachers found for student form');
