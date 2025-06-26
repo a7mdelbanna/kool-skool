@@ -38,6 +38,7 @@ interface StudentCardProps {
 const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCardProps) => {
   // Debug log to see what data is being passed to the component
   console.log('Rendering StudentCard with data:', student);
+  console.log('Subscription progress value:', student.subscriptionProgress);
   
   // ... keep existing code (getPaymentStatusColor function)
   const getPaymentStatusColor = (status: Student['paymentStatus']) => {
