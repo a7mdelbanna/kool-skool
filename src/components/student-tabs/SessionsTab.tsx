@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { getStudentLessonSessions, updateLessonSessionStatus } from "@/integrations/supabase/client";
+import { getStudentLessonSessions, handleSessionAction } from "@/integrations/supabase/client";
 
 interface SessionsTabProps {
   studentData: Partial<Student>;
