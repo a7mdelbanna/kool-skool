@@ -104,7 +104,8 @@ const Students = () => {
       ageGroup: (record.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
       level: (record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
       phone: record.phone,
-      paymentStatus: 'pending',
+      // Use the calculated payment status from the database
+      paymentStatus: record.payment_status || 'pending',
       teacherId: record.teacher_id,
       lessonsCompleted: 0,
       nextLesson: 'Not scheduled',
@@ -130,6 +131,11 @@ const Students = () => {
       []);
   
   console.log('Mapped students for UI:', students);
+  console.log('Payment status breakdown:', {
+    paid: students.filter(s => s.paymentStatus === 'paid').length,
+    pending: students.filter(s => s.paymentStatus === 'pending').length,
+    overdue: students.filter(s => s.paymentStatus === 'overdue').length
+  });
   
   const courses = Array.from(new Set(students.map(s => s.courseName)));
   const lessonTypes = Array.from(new Set(students.map(s => s.lessonType)));
@@ -630,6 +636,16 @@ const Students = () => {
             <div className="text-center py-10">
               <h3 className="text-lg font-medium">No students match your filters</h3>
               <p className="text-muted-foreground mt-1">Try adjusting your search or filters</p>
+              {selectedTab === 'paid' && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-700">
+                    <strong>Paid Filter:</strong> Shows students whose total payments are greater than or equal to their active subscription costs.
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Students appear here when they have fully paid for their current subscriptions.
+                  </p>
+                </div>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 

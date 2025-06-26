@@ -74,6 +74,9 @@ export interface StudentRecord {
   teacher_first_name: string;
   teacher_last_name: string;
   teacher_email: string;
+  total_paid?: number;
+  total_subscription_cost?: number;
+  payment_status?: 'paid' | 'pending' | 'overdue';
 }
 
 // Helper functions for interacting with the database
@@ -87,7 +90,67 @@ export const getStudentsWithDetails = async (schoolId: string): Promise<StudentR
     throw error;
   }
 
-  return data || [];
+  const students = data || [];
+  
+  // Calculate payment status for each student
+  const studentsWithPaymentStatus = await Promise.all(
+    students.map(async (student) => {
+      try {
+        // Get total payments for this student
+        const { data: payments } = await supabase.rpc('get_student_payments', {
+          p_student_id: student.id
+        });
+        
+        const totalPaid = payments?.reduce((sum, payment) => sum + Number(payment.amount), 0) || 0;
+        
+        // Get active subscriptions total for this student
+        const { data: subscriptions } = await supabase.rpc('get_student_subscriptions', {
+          p_student_id: student.id
+        });
+        
+        const activeSubscriptions = subscriptions?.filter(sub => sub.status === 'active') || [];
+        const totalSubscriptionCost = activeSubscriptions.reduce((sum, sub) => sum + Number(sub.total_price), 0);
+        
+        // Determine payment status
+        let paymentStatus: 'paid' | 'pending' | 'overdue' = 'pending';
+        
+        if (totalSubscriptionCost === 0) {
+          // No active subscriptions
+          paymentStatus = 'pending';
+        } else if (totalPaid >= totalSubscriptionCost) {
+          // Fully paid
+          paymentStatus = 'paid';
+        } else {
+          // Not fully paid - check if overdue (simplified logic for now)
+          const hasOverdueSubscription = activeSubscriptions.some(sub => {
+            const startDate = new Date(sub.start_date);
+            const now = new Date();
+            const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            return daysSinceStart > 30; // Consider overdue if more than 30 days since start
+          });
+          
+          paymentStatus = hasOverdueSubscription ? 'overdue' : 'pending';
+        }
+        
+        return {
+          ...student,
+          total_paid: totalPaid,
+          total_subscription_cost: totalSubscriptionCost,
+          payment_status: paymentStatus
+        };
+      } catch (error) {
+        console.error(`Error calculating payment status for student ${student.id}:`, error);
+        return {
+          ...student,
+          total_paid: 0,
+          total_subscription_cost: 0,
+          payment_status: 'pending' as const
+        };
+      }
+    })
+  );
+
+  return studentsWithPaymentStatus;
 };
 
 export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
