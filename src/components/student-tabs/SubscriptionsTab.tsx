@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { 
   Form,
@@ -291,6 +290,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       const newSubscription = await addStudentSubscription(subscriptionData);
       console.log('New subscription created:', newSubscription);
       
+      // Ensure we have a valid subscription object
+      if (!newSubscription || typeof newSubscription !== 'object') {
+        throw new Error('Invalid subscription data returned');
+      }
+
       // Convert the returned subscription to the expected format
       const subscriptionForSessions: DatabaseSubscription = {
         id: newSubscription.id,
