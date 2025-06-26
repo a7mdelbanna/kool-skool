@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X } from "lucide-react";
+import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon } from "lucide-react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +29,7 @@ import {
   addStudentSubscription, 
   deleteStudentSubscription 
 } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -66,11 +69,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const { toast } = useToast();
   const { isCreating, preventRapidCalls } = useSubscriptionCreation();
   
-  // Enhanced form state with multiple schedule support
+  // Enhanced form state with Date object for better date handling
   const [formData, setFormData] = useState({
     sessionCount: 4,
     durationMonths: 1,
-    startDate: '',
+    startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
     priceMode: 'perSession',
     pricePerSession: 0,
@@ -84,12 +87,14 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [deletingSubscriptionId, setDeletingSubscriptionId] = useState<string | null>(null);
 
+  // Enhanced currency options with proper symbols and codes
   const currencies = [
-    { value: 'USD', label: 'USD ($)' },
-    { value: 'EUR', label: 'EUR (€)' },
-    { value: 'GBP', label: 'GBP (£)' },
-    { value: 'CAD', label: 'CAD (C$)' },
-    { value: 'AUD', label: 'AUD (A$)' },
+    { value: 'USD', label: 'US Dollar ($)', symbol: '$' },
+    { value: 'EUR', label: 'Euro (€)', symbol: '€' },
+    { value: 'RUB', label: 'Russian Ruble (₽)', symbol: '₽' },
+    { value: 'GBP', label: 'British Pound (£)', symbol: '£' },
+    { value: 'CAD', label: 'Canadian Dollar (C$)', symbol: 'C$' },
+    { value: 'AUD', label: 'Australian Dollar (A$)', symbol: 'A$' },
   ];
 
   const daysOfWeek = [
@@ -256,7 +261,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         student_id: studentData.id,
         session_count: formData.sessionCount,
         duration_months: formData.durationMonths,
-        start_date: formData.startDate,
+        start_date: format(formData.startDate, 'yyyy-MM-dd'),
         schedule: formData.schedule,
         price_mode: formData.priceMode,
         price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
@@ -280,7 +285,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       setFormData({
         sessionCount: 4,
         durationMonths: 1,
-        startDate: '',
+        startDate: undefined,
         schedule: [],
         priceMode: 'perSession',
         pricePerSession: 0,
@@ -360,6 +365,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     }
   };
 
+  const getCurrencySymbol = (currencyCode: string) => {
+    const currency = currencies.find(c => c.value === currencyCode);
+    return currency?.symbol || currencyCode;
+  };
+
   return (
     <div className="space-y-6">
       {!isViewMode && (
@@ -395,7 +405,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               </div>
               <div>
                 <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
-                <Select onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
@@ -410,16 +420,33 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               </div>
             </div>
 
-            {/* Start Date */}
+            {/* Modern Date Picker */}
             <div>
-              <Label htmlFor="startDate" className="text-sm font-semibold text-gray-700">Start Date</Label>
-              <Input 
-                type="date" 
-                id="startDate" 
-                value={formData.startDate} 
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="mt-1 max-w-xs"
-              />
+              <Label className="text-sm font-semibold text-gray-700">Start Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal mt-1",
+                      !formData.startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.startDate ? format(formData.startDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={formData.startDate}
+                    onSelect={(date) => setFormData({ ...formData, startDate: date })}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Schedule Section */}
@@ -443,6 +470,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   <div className="flex-1">
                     <Label className="text-xs text-gray-600">Day</Label>
                     <Select 
+                      value={schedule.day}
                       onValueChange={(value) => updateScheduleItem(index, 'day', value)}
                     >
                       <SelectTrigger>
@@ -519,7 +547,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             <div className="space-y-4">
               <div>
                 <Label className="text-sm font-semibold text-gray-700">Price Mode</Label>
-                <Select onValueChange={(value) => setFormData({ ...formData, priceMode: value })}>
+                <Select value={formData.priceMode} onValueChange={(value) => setFormData({ ...formData, priceMode: value })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select price mode" />
                   </SelectTrigger>
@@ -533,7 +561,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               {formData.priceMode === 'perSession' && (
                 <div>
                   <Label htmlFor="pricePerSession" className="text-sm font-semibold text-gray-700">
-                    Price Per Session ({formData.currency})
+                    Price Per Session ({getCurrencySymbol(formData.currency)})
                   </Label>
                   <Input 
                     type="number" 
@@ -544,7 +572,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   />
                   {formData.pricePerSession > 0 && (
                     <p className="text-sm text-gray-600 mt-1">
-                      Total: {formData.currency} {(formData.pricePerSession * formData.sessionCount).toFixed(2)}
+                      Total: {getCurrencySymbol(formData.currency)} {(formData.pricePerSession * formData.sessionCount).toFixed(2)}
                     </p>
                   )}
                 </div>
@@ -553,7 +581,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               {formData.priceMode === 'fixed' && (
                 <div>
                   <Label htmlFor="fixedPrice" className="text-sm font-semibold text-gray-700">
-                    Fixed Price ({formData.currency})
+                    Fixed Price ({getCurrencySymbol(formData.currency)})
                   </Label>
                   <Input 
                     type="number" 
@@ -564,7 +592,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   />
                   {formData.fixedPrice > 0 && formData.sessionCount > 0 && (
                     <p className="text-sm text-gray-600 mt-1">
-                      Per session: {formData.currency} {(formData.fixedPrice / formData.sessionCount).toFixed(2)}
+                      Per session: {getCurrencySymbol(formData.currency)} {(formData.fixedPrice / formData.sessionCount).toFixed(2)}
                     </p>
                   )}
                 </div>
@@ -588,7 +616,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             <div className="flex justify-end pt-4">
               <Button 
                 onClick={handleSubmit} 
-                disabled={submitting || isCreating || formData.schedule.length === 0}
+                disabled={submitting || isCreating || formData.schedule.length === 0 || !formData.startDate}
                 className="min-w-[160px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 size="lg"
               >
@@ -642,7 +670,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                       </p>
                       <div className="flex gap-2">
                         <Badge variant="secondary">
-                          Total: {subscription.currency} {subscription.total_price}
+                          Total: {getCurrencySymbol(subscription.currency)} {subscription.total_price}
                         </Badge>
                         <Badge variant="outline" className="capitalize">
                           {subscription.status}
