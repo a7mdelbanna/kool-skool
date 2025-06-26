@@ -271,23 +271,13 @@ const Students = () => {
     console.log('🔑 Student ID:', student.id);
     console.log('🔑 User ID from student record:', student.user_id);
     
-    // Validate that we have a user_id
-    if (!student.user_id) {
-      console.error('❌ No user_id found in student record:', student);
-      toast.error('Unable to load student details - missing user ID');
-      setSelectedStudent(student);
-      setIsEditMode(true);
-      setIsAddStudentOpen(true);
-      return;
-    }
-    
     try {
       // Fetch complete student data including social media fields from users table
       // Use user_id from the student record, not the student.id
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('id', student.user_id)
+        .eq('id', student.user_id) // This was the bug - using student.id instead of student.user_id
         .single();
       
       console.log('📊 User data from database:', userData);
@@ -308,33 +298,17 @@ const Students = () => {
         };
         
         console.log('✅ Enriched student data for editing:', enrichedStudent);
-        console.log('🔍 Social media fields:', {
-          telegram: enrichedStudent.telegram,
-          whatsapp: enrichedStudent.whatsapp,
-          instagram: enrichedStudent.instagram,
-          viber: enrichedStudent.viber,
-          facebook: enrichedStudent.facebook,
-          skype: enrichedStudent.skype,
-          zoom: enrichedStudent.zoom
-        });
         setSelectedStudent(enrichedStudent);
       } else {
         console.log('⚠️ Using original student data (no additional user data found)');
         console.log('⚠️ Error details:', userError);
-        
-        // Still try to edit with original data
         setSelectedStudent(student);
-        
-        if (userError) {
-          toast.error(`Error loading student details: ${userError.message}`);
-        }
       }
       
       setIsEditMode(true);
       setIsAddStudentOpen(true);
     } catch (error) {
       console.error('💥 Error fetching complete student data:', error);
-      toast.error('Error loading student details');
       // Fallback to original student data
       setSelectedStudent(student);
       setIsEditMode(true);
