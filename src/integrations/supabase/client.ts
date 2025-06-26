@@ -299,25 +299,38 @@ export const addStudentSubscription = async (subscriptionData: {
 }) => {
   console.log('🚀 ENHANCED: Starting subscription creation with initial payment:', subscriptionData);
   
-  const { data: currentUserInfo, error: userError } = await supabase.rpc('get_current_user_info');
+  // Get the current authenticated user from Supabase auth
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
   
-  if (userError) {
-    console.error('❌ Error getting current user info:', userError);
-    throw new Error('Failed to get user information');
+  if (authError) {
+    console.error('❌ Authentication error:', authError);
+    throw new Error(`Authentication error: ${authError.message}`);
   }
-  
-  if (!currentUserInfo || currentUserInfo.length === 0) {
-    throw new Error('User not found or not authenticated');
-  }
-  
-  const { user_school_id, user_role } = currentUserInfo[0];
-  const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-    throw new Error('Authentication required');
+    console.error('❌ No authenticated user found');
+    throw new Error('No authenticated user found. Please log in again.');
   }
 
-  console.log('✅ User authenticated, creating subscription with payment...');
+  // Get user info from localStorage to get school_id and role
+  const userString = localStorage.getItem('user');
+  if (!userString) {
+    console.error('❌ No user data in localStorage');
+    throw new Error('User session expired. Please log in again.');
+  }
+
+  const userData = JSON.parse(userString);
+  
+  if (!userData.schoolId) {
+    console.error('❌ No school ID found in user data');
+    throw new Error('User school information missing. Please contact support.');
+  }
+
+  console.log('✅ User authenticated successfully:', {
+    userId: user.id,
+    schoolId: userData.schoolId,
+    role: userData.role
+  });
   
   try {
     // Call the enhanced function with payment support
@@ -335,7 +348,7 @@ export const addStudentSubscription = async (subscriptionData: {
       p_notes: subscriptionData.notes,
       p_status: subscriptionData.status,
       p_current_user_id: user.id,
-      p_current_school_id: user_school_id,
+      p_current_school_id: userData.schoolId,
       // New payment parameters
       p_initial_payment_amount: subscriptionData.initial_payment_amount,
       p_payment_method: subscriptionData.payment_method,
