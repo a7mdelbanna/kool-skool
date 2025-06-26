@@ -283,7 +283,10 @@ export const addStudentSubscription = async (subscriptionData: {
   notes?: string;
   status?: string;
 }) => {
-  console.log('addStudentSubscription called with ENHANCED ERROR HANDLING:', subscriptionData);
+  console.log('addStudentSubscription called with DUPLICATE PREVENTION:', subscriptionData);
+  
+  // Prevent rapid successive calls
+  const callKey = `add_subscription_${subscriptionData.student_id}_${Date.now()}`;
   
   try {
     // Get current user from localStorage for validation
@@ -295,7 +298,7 @@ export const addStudentSubscription = async (subscriptionData: {
     const user = JSON.parse(userString);
     console.log('Current user for subscription:', user);
     
-    console.log('=== CALLING IMPROVED add_student_subscription RPC ===');
+    console.log('=== CALLING CLEAN add_student_subscription RPC ===');
     console.log('About to call add_student_subscription RPC with parameters:', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -304,10 +307,10 @@ export const addStudentSubscription = async (subscriptionData: {
       p_schedule: subscriptionData.schedule,
       p_current_user_id: user.id,
       p_current_school_id: user.schoolId,
-      note: 'Using improved RPC with better error handling'
+      call_key: callKey
     });
     
-    // Use improved RPC function with better error handling
+    // Use the clean RPC function with enhanced duplicate prevention
     const { data, error } = await supabase.rpc('add_student_subscription', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -326,19 +329,19 @@ export const addStudentSubscription = async (subscriptionData: {
     });
 
     if (error) {
-      console.error('❌ Error adding student subscription via improved RPC:', error);
+      console.error('❌ Error adding student subscription via clean RPC:', error);
       
       // More specific error handling
+      if (error.message && error.message.includes('duplicate key value violates unique constraint')) {
+        throw new Error('Cannot create subscription: A session already exists at this time. Please choose a different schedule.');
+      }
+      
       if (error.message && error.message.includes('No sessions were created')) {
         throw new Error('Cannot create subscription: All requested session times conflict with existing sessions. Please choose different dates or times.');
       }
       
       if (error.message && error.message.includes('Duplicate session prevented')) {
         throw new Error('Cannot create subscription: Some sessions would conflict with existing ones. Please check the student\'s current schedule.');
-      }
-      
-      if (error.message && error.message.includes('unique constraint')) {
-        throw new Error('Cannot create subscription: Session scheduling conflict detected. Please verify existing sessions.');
       }
       
       // Generic error fallback
@@ -349,13 +352,13 @@ export const addStudentSubscription = async (subscriptionData: {
       throw new Error('Subscription creation failed: No data returned from server');
     }
 
-    console.log('✅ Successfully added student subscription via improved RPC:', data);
-    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with improved error handling');
+    console.log('✅ Successfully added student subscription via clean RPC:', data);
+    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with duplicate prevention');
     
     // Return the first item from the array since RPC returns an array
     return Array.isArray(data) && data.length > 0 ? data[0] : data;
   } catch (error) {
-    console.error('❌ Error in addStudentSubscription with improved handling:', error);
+    console.error('❌ Error in addStudentSubscription with duplicate prevention:', error);
     
     // Re-throw with more context if it's a generic error
     if (error instanceof Error) {
