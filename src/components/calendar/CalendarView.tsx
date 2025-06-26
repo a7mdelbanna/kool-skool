@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   format, 
@@ -25,7 +26,6 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import LessonDetailsDialog from './LessonDetailsDialog';
 
 const subjectColorMap: Record<string, { bg: string, border: string, text: string }> = {
   'Mathematics': { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
@@ -65,12 +65,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   
   console.log("CalendarView rendering with sessions:", sessions.length);
   
+  // Process sessions to extract subject and use the real student name from the database
   const processedSessions = sessions.map(session => {
-    const noteParts = session.notes?.split(' ') || [];
-    const subject = noteParts.length > 0 ? noteParts[0] : 'default';
+    // Extract subject from notes if available, otherwise default to 'General'
+    const subject = session.notes?.includes('Mathematics') ? 'Mathematics' :
+                   session.notes?.includes('Science') ? 'Science' :
+                   session.notes?.includes('English') ? 'English' :
+                   session.notes?.includes('Physics') ? 'Physics' :
+                   session.notes?.includes('Chemistry') ? 'Chemistry' :
+                   session.notes?.includes('Biology') ? 'Biology' :
+                   session.notes?.includes('Geography') ? 'Geography' :
+                   session.notes?.includes('Literature') ? 'Literature' :
+                   session.notes?.includes('Computer Science') ? 'Computer Science' :
+                   'General';
     
-    const studentNameMatch = session.notes?.match(/with\s+(.*?)$/);
-    const studentName = studentNameMatch ? studentNameMatch[1] : `Student ${session.id.slice(-1)}`;
+    // Use the real student name from the session data
+    const studentName = session.studentName || 'Unknown Student';
     
     return { ...session, subject, studentName } as SessionWithSubject;
   });
