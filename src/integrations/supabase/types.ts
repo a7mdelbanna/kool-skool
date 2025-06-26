@@ -426,6 +426,13 @@ export type Database = {
         Args: { p_course_id: string }
         Returns: undefined
       }
+      get_current_user_info: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          user_school_id: string
+          user_role: string
+        }[]
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
