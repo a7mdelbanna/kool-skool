@@ -395,13 +395,13 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
   }
   
   try {
-    // First, let's check if the subscription exists and get its details
+    // First, let's check if the subscription exists - use maybeSingle() instead of single()
     console.log('🔍 Checking if subscription exists before deletion...');
     const { data: existingSubscription, error: checkError } = await supabase
       .from('subscriptions')
       .select('id, student_id')
       .eq('id', subscriptionId)
-      .single();
+      .maybeSingle(); // This won't throw an error if no rows are found
 
     if (checkError) {
       console.error('❌ Error checking subscription existence:', checkError);
@@ -458,11 +458,14 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
       .from('subscriptions')
       .select('id')
       .eq('id', subscriptionId)
-      .single();
+      .maybeSingle(); // Use maybeSingle here too
 
-    if (verifyError && verifyError.code === 'PGRST116') {
+    if (verifyError) {
+      console.error('❌ Error during verification:', verifyError);
+      // Don't throw here as the main deletion likely succeeded
+    } else if (!verifyData) {
       console.log('✅ Deletion verified - subscription no longer exists');
-    } else if (verifyData) {
+    } else {
       console.error('❌ CRITICAL: Subscription still exists after deletion!', verifyData);
       throw new Error('Subscription deletion failed - record still exists in database');
     }
