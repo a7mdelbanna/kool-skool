@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon } from "lucide-react";
+import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt } from "lucide-react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,7 +79,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     pricePerSession: 0,
     fixedPrice: 0,
     currency: 'USD',
-    notes: ''
+    notes: '',
+    // New payment fields
+    initialPaymentAmount: 0,
+    paymentMethod: 'Cash',
+    paymentNotes: ''
   });
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -96,6 +100,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     { value: 'CAD', label: 'Canadian Dollar (C$)', symbol: 'C$' },
     { value: 'AUD', label: 'Australian Dollar (A$)', symbol: 'A$' },
   ];
+
+  const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
 
   const daysOfWeek = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
@@ -218,6 +224,12 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
 
   const intelligentSessionDistribution = calculateIntelligentSessionDistribution();
 
+  const getTotalPrice = () => {
+    return formData.priceMode === 'perSession' 
+      ? formData.pricePerSession * formData.sessionCount 
+      : formData.fixedPrice;
+  };
+
   const handleSubmit = preventRapidCalls(async () => {
     if (!studentData.id) {
       toast({
@@ -249,14 +261,30 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       return;
     }
 
+    // Validate initial payment amount
+    if (formData.initialPaymentAmount < 0) {
+      toast({
+        title: "Error",
+        description: "Initial payment amount cannot be negative",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalPrice = getTotalPrice();
+    if (formData.initialPaymentAmount > totalPrice) {
+      toast({
+        title: "Error",
+        description: "Initial payment amount cannot exceed total subscription price",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
-      console.log('🚀 SUBMITTING ENHANCED SUBSCRIPTION WITH MULTIPLE DAYS');
+      console.log('🚀 SUBMITTING ENHANCED SUBSCRIPTION WITH INITIAL PAYMENT');
       
-      const totalPrice = formData.priceMode === 'perSession' 
-        ? formData.pricePerSession * formData.sessionCount 
-        : formData.fixedPrice;
-
       const subscriptionData = {
         student_id: studentData.id,
         session_count: formData.sessionCount,
@@ -269,16 +297,20 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         total_price: totalPrice,
         currency: formData.currency,
         notes: formData.notes,
-        status: 'active'
+        status: 'active',
+        // Initial payment data
+        initial_payment_amount: formData.initialPaymentAmount,
+        payment_method: formData.paymentMethod,
+        payment_notes: formData.paymentNotes
       };
 
-      console.log('📝 Enhanced subscription data prepared:', subscriptionData);
+      console.log('📝 Enhanced subscription data with initial payment:', subscriptionData);
       
       await addStudentSubscription(subscriptionData);
       
       toast({
         title: "Success",
-        description: "Subscription created successfully with multiple schedules",
+        description: `Subscription created successfully with ${formData.initialPaymentAmount > 0 ? `initial payment of ${getCurrencySymbol(formData.currency)}${formData.initialPaymentAmount}` : 'no initial payment'}`,
       });
       
       // Reset form
@@ -291,7 +323,10 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         pricePerSession: 0,
         fixedPrice: 0,
         currency: 'USD',
-        notes: ''
+        notes: '',
+        initialPaymentAmount: 0,
+        paymentMethod: 'Cash',
+        paymentNotes: ''
       });
       
       // Reload subscriptions
@@ -599,9 +634,99 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               )}
             </div>
 
+            {/* Initial Payment Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+              <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Initial Payment
+              </h4>
+              <p className="text-sm text-blue-700 mb-3">
+                Specify how much the student is paying upfront. This can be the full amount, partial payment, or $0 for unpaid subscriptions.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="initialPaymentAmount" className="text-sm font-semibold text-gray-700">
+                    Payment Amount ({getCurrencySymbol(formData.currency)})
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      {getCurrencySymbol(formData.currency)}
+                    </span>
+                    <Input 
+                      type="number" 
+                      id="initialPaymentAmount" 
+                      value={formData.initialPaymentAmount} 
+                      onChange={(e) => setFormData({ ...formData, initialPaymentAmount: parseFloat(e.target.value) || 0 })}
+                      className="mt-1 pl-7"
+                      min="0"
+                      max={getTotalPrice()}
+                      step="0.01"
+                    />
+                  </div>
+                  {getTotalPrice() > 0 && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Total subscription: {getCurrencySymbol(formData.currency)}{getTotalPrice().toFixed(2)}
+                      {formData.initialPaymentAmount > 0 && (
+                        <span className="ml-2">
+                          ({formData.initialPaymentAmount >= getTotalPrice() ? 'Fully paid' : 
+                           `Remaining: ${getCurrencySymbol(formData.currency)}${(getTotalPrice() - formData.initialPaymentAmount).toFixed(2)}`})
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700">Payment Method</Label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {paymentMethods.map((method) => (
+                      <Button
+                        key={method}
+                        type="button"
+                        variant={formData.paymentMethod === method ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setFormData({ ...formData, paymentMethod: method })}
+                        className={cn(
+                          "h-8 text-xs",
+                          method === "Credit Card" && formData.paymentMethod === method && "bg-blue-600",
+                          method === "PayPal" && formData.paymentMethod === method && "bg-indigo-600"
+                        )}
+                      >
+                        {method === "Credit Card" && <CreditCard className="h-3 w-3 mr-1" />}
+                        {method === "Cash" && <Receipt className="h-3 w-3 mr-1" />}
+                        {method}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="paymentNotes" className="text-sm font-semibold text-gray-700">Payment Notes (Optional)</Label>
+                <Textarea 
+                  id="paymentNotes" 
+                  placeholder="Add notes about this initial payment..."
+                  value={formData.paymentNotes} 
+                  onChange={(e) => setFormData({ ...formData, paymentNotes: e.target.value })}
+                  className="mt-1"
+                  rows={2}
+                />
+              </div>
+
+              {formData.initialPaymentAmount === 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                  <p className="text-sm text-yellow-800">
+                    <strong>No Initial Payment:</strong> This subscription will be created without any payment. 
+                    You can add payments later via the Payments tab.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Notes */}
             <div>
-              <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Notes</Label>
+              <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Subscription Notes</Label>
               <Textarea 
                 id="notes" 
                 placeholder="Add any additional notes about this subscription..."
