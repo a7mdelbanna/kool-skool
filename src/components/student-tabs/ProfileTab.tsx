@@ -4,8 +4,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Plus, Calendar, MessageCircle, Phone, Instagram, Mail, Video } from "lucide-react";
 import { Student } from "../StudentCard";
 import { Course } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 interface Teacher {
   id: string;
@@ -41,6 +44,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   teachers = [],
   isLoading = false
 }) => {
+  const [additionalInfoOpen, setAdditionalInfoOpen] = React.useState(false);
+  const [socialsOpen, setSocialsOpen] = React.useState(false);
+  
   console.log('ProfileTab render - teachers data:', teachers);
   console.log('ProfileTab render - courses data:', courses);
   console.log('ProfileTab render - studentData:', studentData);
@@ -48,6 +54,27 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   const handleInputChange = (field: keyof Student, value: string) => {
     setStudentData({ [field]: value });
   };
+
+  const handleSocialChange = (platform: string, value: string) => {
+    const socials = studentData.socials || {};
+    setStudentData({ 
+      socials: {
+        ...socials,
+        [platform]: value
+      }
+    });
+  };
+
+  const socialPlatforms = [
+    { key: 'telegram', label: 'Telegram', icon: MessageCircle, color: 'bg-blue-500' },
+    { key: 'whatsapp', label: 'WhatsApp', icon: Phone, color: 'bg-green-500' },
+    { key: 'instagram', label: 'Instagram', icon: Instagram, color: 'bg-pink-500' },
+    { key: 'viber', label: 'Viber', icon: MessageCircle, color: 'bg-purple-500' },
+    { key: 'facebook', label: 'Facebook', icon: MessageCircle, color: 'bg-blue-600' },
+    { key: 'skype', label: 'Skype', icon: Video, color: 'bg-blue-400' },
+    { key: 'zoom', label: 'Zoom', icon: Video, color: 'bg-blue-500' },
+    { key: 'email', label: 'Alternative Email', icon: Mail, color: 'bg-gray-500' }
+  ];
 
   return (
     <div className="space-y-6">
@@ -100,6 +127,78 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               disabled={isViewMode}
             />
           </div>
+
+          {/* Additional Information Collapsible */}
+          <Collapsible open={additionalInfoOpen} onOpenChange={setAdditionalInfoOpen}>
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="flex items-center justify-between w-full p-2 hover:bg-gray-50 rounded-lg"
+                disabled={isViewMode}
+              >
+                <div className="flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-gray-700">Additional Information</span>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${additionalInfoOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="dateOfBirth" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Date of Birth
+                </Label>
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  value={studentData.dateOfBirth || ""}
+                  onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+                  disabled={isViewMode}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Social Media Collapsible */}
+          <Collapsible open={socialsOpen} onOpenChange={setSocialsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="flex items-center justify-between w-full p-2 hover:bg-gray-50 rounded-lg"
+                disabled={isViewMode}
+              >
+                <div className="flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-gray-700">Social Media & Contacts</span>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${socialsOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-2">
+              <div className="grid grid-cols-1 gap-3">
+                {socialPlatforms.map((platform) => {
+                  const Icon = platform.icon;
+                  return (
+                    <div key={platform.key} className="flex items-center gap-3">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full ${platform.color}`}>
+                        <Icon className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <Input
+                          placeholder={`${platform.label} username or link`}
+                          value={studentData.socials?.[platform.key] || ""}
+                          onChange={(e) => handleSocialChange(platform.key, e.target.value)}
+                          disabled={isViewMode}
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
           
           {isNewStudent && (
             <>
