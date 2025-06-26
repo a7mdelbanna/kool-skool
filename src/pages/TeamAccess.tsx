@@ -154,23 +154,39 @@ const TeamAccess = () => {
     try {
       setFormLoading(true);
       
-      // Call the Supabase RPC function to add a team member
-      const { data, error } = await supabase.rpc('add_team_member', {
-        member_first_name: formData.firstName,
-        member_last_name: formData.lastName,
-        member_email: formData.email,
-        member_role: formData.role,
-        member_password: formData.password
-      });
-      
-      if (error) {
-        throw error;
+      const userData = getUserData();
+      if (!userData || !userData.schoolId) {
+        throw new Error('No school ID available');
       }
       
-      const response = (data as unknown) as TeamMemberResponse;
+      // Use the create_user Edge function instead of the RPC function
+      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/create_user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
+          'x-user-id': userData.id,
+          'x-school-id': userData.schoolId,
+          'x-user-role': userData.role,
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          role: formData.role,
+          school_id: userData.schoolId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
       
-      if (!response.success) {
-        throw new Error(response.message || "Failed to add team member");
+      if (!result.success) {
+        throw new Error(result.message || "Failed to add team member");
       }
       
       setFormData({
