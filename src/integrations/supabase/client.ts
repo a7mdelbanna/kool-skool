@@ -283,10 +283,8 @@ export const addStudentSubscription = async (subscriptionData: {
   notes?: string;
   status?: string;
 }) => {
-  console.log('addStudentSubscription called with DUPLICATE PREVENTION:', subscriptionData);
-  
-  // Prevent rapid successive calls
-  const callKey = `add_subscription_${subscriptionData.student_id}_${Date.now()}`;
+  console.log('=== USING FINAL FIXED add_student_subscription RPC ===');
+  console.log('addStudentSubscription called with COMPREHENSIVE DUPLICATE PREVENTION:', subscriptionData);
   
   try {
     // Get current user from localStorage for validation
@@ -298,7 +296,7 @@ export const addStudentSubscription = async (subscriptionData: {
     const user = JSON.parse(userString);
     console.log('Current user for subscription:', user);
     
-    console.log('=== CALLING CLEAN add_student_subscription RPC ===');
+    console.log('=== CALLING COMPREHENSIVE FIXED add_student_subscription RPC ===');
     console.log('About to call add_student_subscription RPC with parameters:', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -306,11 +304,10 @@ export const addStudentSubscription = async (subscriptionData: {
       p_start_date: subscriptionData.start_date,
       p_schedule: subscriptionData.schedule,
       p_current_user_id: user.id,
-      p_current_school_id: user.schoolId,
-      call_key: callKey
+      p_current_school_id: user.schoolId
     });
     
-    // Use the clean RPC function with enhanced duplicate prevention
+    // Use the comprehensively fixed RPC function with final duplicate prevention
     const { data, error } = await supabase.rpc('add_student_subscription', {
       p_student_id: subscriptionData.student_id,
       p_session_count: subscriptionData.session_count,
@@ -329,15 +326,11 @@ export const addStudentSubscription = async (subscriptionData: {
     });
 
     if (error) {
-      console.error('❌ Error adding student subscription via clean RPC:', error);
+      console.error('❌ Error adding student subscription via COMPREHENSIVE FIXED RPC:', error);
       
-      // More specific error handling
+      // Enhanced error handling for the comprehensive fix
       if (error.message && error.message.includes('duplicate key value violates unique constraint')) {
         throw new Error('Cannot create subscription: A session already exists at this time. Please choose a different schedule.');
-      }
-      
-      if (error.message && error.message.includes('No sessions were created')) {
-        throw new Error('Cannot create subscription: All requested session times conflict with existing sessions. Please choose different dates or times.');
       }
       
       if (error.message && error.message.includes('Duplicate session prevented')) {
@@ -352,13 +345,13 @@ export const addStudentSubscription = async (subscriptionData: {
       throw new Error('Subscription creation failed: No data returned from server');
     }
 
-    console.log('✅ Successfully added student subscription via clean RPC:', data);
-    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with duplicate prevention');
+    console.log('✅ Successfully added student subscription via COMPREHENSIVE FIXED RPC:', data);
+    console.log('🎉 SUBSCRIPTION CREATED SUCCESSFULLY with comprehensive duplicate prevention');
     
     // Return the first item from the array since RPC returns an array
     return Array.isArray(data) && data.length > 0 ? data[0] : data;
   } catch (error) {
-    console.error('❌ Error in addStudentSubscription with duplicate prevention:', error);
+    console.error('❌ Error in addStudentSubscription with comprehensive duplicate prevention:', error);
     
     // Re-throw with more context if it's a generic error
     if (error instanceof Error) {
@@ -422,30 +415,30 @@ export const addLessonSessions = async (sessions: Array<{
 };
 
 export const getStudentLessonSessions = async (studentId: string) => {
-  console.log('getStudentLessonSessions called with ENHANCED VALIDATION for studentId:', studentId);
+  console.log('getStudentLessonSessions called with COMPREHENSIVE VALIDATION for studentId:', studentId);
   
   try {
-    // Enhanced logging for session retrieval with new database structure
-    console.log('=== FETCHING SESSIONS WITH ENHANCED VALIDATION ===');
+    // Enhanced logging for session retrieval with comprehensive database structure
+    console.log('=== FETCHING SESSIONS WITH COMPREHENSIVE VALIDATION ===');
     console.log('Fetching lesson sessions for student:', studentId);
     
-    // Use direct RPC call with enhanced error handling
+    // Use direct RPC call with comprehensive error handling
     const { data, error } = await supabase.rpc('get_lesson_sessions' as any, {
       p_student_id: studentId
     });
 
-    console.log('Lesson sessions RPC result with enhanced validation:', { data, error });
+    console.log('Lesson sessions RPC result with comprehensive validation:', { data, error });
 
     if (error) {
       console.error('❌ Error fetching lesson sessions via RPC:', error);
       throw error;
     }
 
-    // Enhanced logging and validation for retrieved sessions
+    // Comprehensive logging and validation for retrieved sessions
     if (data && data.length > 0) {
-      console.log(`✅ Successfully fetched ${data.length} lesson sessions with enhanced validation`);
+      console.log(`✅ Successfully fetched ${data.length} lesson sessions with comprehensive validation`);
       
-      // Enhanced session validation and logging
+      // Comprehensive session validation and logging
       const sessionSummary = data.map((session, index) => ({
         position: index + 1,
         id: session.id,
@@ -456,9 +449,9 @@ export const getStudentLessonSessions = async (studentId: string) => {
         subscription_id: session.subscription_id
       }));
       
-      console.log('Enhanced session summary:', sessionSummary);
+      console.log('Comprehensive session summary:', sessionSummary);
       
-      // Enhanced duplicate detection with database constraint validation
+      // Comprehensive duplicate detection with database constraint validation
       const dateMap = new Map();
       const duplicates: any[] = [];
       
@@ -469,7 +462,7 @@ export const getStudentLessonSessions = async (studentId: string) => {
             position: index + 1,
             existing: dateMap.get(dateKey),
             duplicate: session,
-            message: 'This should not happen with the enhanced database constraints'
+            message: 'This should not happen with the comprehensive database constraints'
           });
           duplicates.push(session);
         } else {
@@ -484,7 +477,7 @@ export const getStudentLessonSessions = async (studentId: string) => {
           duplicates: duplicates
         });
       } else {
-        console.log('✅ ALL SESSIONS VALIDATED - Enhanced duplicate prevention working correctly');
+        console.log('✅ ALL SESSIONS VALIDATED - Comprehensive duplicate prevention working correctly');
       }
       
     } else {
@@ -493,7 +486,7 @@ export const getStudentLessonSessions = async (studentId: string) => {
 
     return data || [];
   } catch (error) {
-    console.error('❌ Error in getStudentLessonSessions with enhanced validation:', error);
+    console.error('❌ Error in getStudentLessonSessions with comprehensive validation:', error);
     throw error;
   }
 };

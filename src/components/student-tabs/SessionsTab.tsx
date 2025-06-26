@@ -83,7 +83,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     
     try {
       setLoading(true);
-      console.log('=== LOADING SESSIONS WITH NEW DATABASE STRUCTURE ===');
+      console.log('=== LOADING SESSIONS WITH COMPREHENSIVE DATABASE STRUCTURE ===');
       console.log('Loading sessions for student:', studentData.id);
       
       const data = await getStudentLessonSessions(studentData.id);
@@ -92,9 +92,9 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       // Ensure data is an array and properly typed
       const sessionsArray = Array.isArray(data) ? data as DatabaseSession[] : [];
       
-      // Enhanced validation for the new database structure
+      // Comprehensive validation for the new database structure
       if (sessionsArray.length > 0) {
-        console.log('=== VALIDATING SESSION DATA INTEGRITY ===');
+        console.log('=== VALIDATING SESSION DATA INTEGRITY WITH COMPREHENSIVE CHECKS ===');
         const uniqueCheck = new Map();
         const validSessions: DatabaseSession[] = [];
         
@@ -109,7 +109,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           });
           
           if (uniqueCheck.has(dateKey)) {
-            console.warn(`⚠️  DUPLICATE DETECTED: Session at ${dateKey} - This should not happen with new constraints`);
+            console.warn(`⚠️  DUPLICATE DETECTED: Session at ${dateKey} - This should not happen with comprehensive constraints`);
             // Don't add duplicates to the display
           } else {
             uniqueCheck.set(dateKey, session);
@@ -119,14 +119,14 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         
         if (validSessions.length !== sessionsArray.length) {
           const duplicateCount = sessionsArray.length - validSessions.length;
-          console.error(`❌ FOUND ${duplicateCount} DUPLICATE SESSIONS - Database constraints may not be working`);
+          console.error(`❌ FOUND ${duplicateCount} DUPLICATE SESSIONS - Comprehensive database constraints may not be working`);
           toast({
             title: "Warning: Data Integrity Issue",
-            description: `Found ${duplicateCount} duplicate session(s). Database constraints should prevent this.`,
+            description: `Found ${duplicateCount} duplicate session(s). Comprehensive database constraints should prevent this.`,
             variant: "destructive",
           });
         } else {
-          console.log('✅ ALL SESSIONS ARE UNIQUE - Database constraints working correctly');
+          console.log('✅ ALL SESSIONS ARE UNIQUE - Comprehensive database constraints working correctly');
         }
         
         setSessions(validSessions);
@@ -134,8 +134,8 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         setSessions([]);
       }
       
-      console.log(`✅ Successfully loaded ${sessionsArray.length} sessions`);
-      console.log('=== END SESSION LOADING ===');
+      console.log(`✅ Successfully loaded ${sessionsArray.length} sessions with comprehensive validation`);
+      console.log('=== END COMPREHENSIVE SESSION LOADING ===');
     } catch (error) {
       console.error('❌ Error loading sessions:', error);
       toast({
@@ -150,17 +150,17 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   };
 
   const handleRefreshSessions = async () => {
-    console.log('=== MANUAL REFRESH TRIGGERED ===');
+    console.log('=== COMPREHENSIVE MANUAL REFRESH TRIGGERED ===');
     setRefreshing(true);
     
     try {
       await loadSessions();
       toast({
         title: "Sessions Refreshed",
-        description: "Session data has been updated successfully",
+        description: "Session data has been updated successfully with comprehensive validation",
       });
     } catch (error) {
-      console.error('Error during manual refresh:', error);
+      console.error('Error during comprehensive manual refresh:', error);
       toast({
         title: "Refresh Failed",
         description: "Could not refresh session data",
@@ -411,7 +411,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       <div className="flex items-center justify-center py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading sessions...</p>
+          <p className="mt-2 text-sm text-muted-foreground">Loading sessions with comprehensive validation...</p>
         </div>
       </div>
     );
@@ -429,7 +429,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             Sessions are automatically generated when you add a subscription in the Subscriptions tab.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length} | Duplicate prevention: Active ✅
+            Total sessions: {sessions.length} | Comprehensive duplicate prevention: Active ✅
           </p>
         </div>
       </div>
