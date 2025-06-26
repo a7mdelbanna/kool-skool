@@ -519,6 +519,7 @@ export type Database = {
       }
       create_student_with_profile: {
         Args: {
+          current_user_id: string
           student_email: string
           student_password: string
           student_first_name: string
