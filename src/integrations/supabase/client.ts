@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -68,6 +67,13 @@ export interface StudentRecord {
   payment_status?: string;
 }
 
+// Updated interface to match the new function signature
+export interface CurrentUserInfo {
+  user_id: string;
+  user_school_id: string;
+  user_role: string;
+}
+
 export const user_login = async (email: string, password: string): Promise<UserLoginResponse> => {
   const { data, error } = await supabase.rpc('user_login', {
     user_email: email,
@@ -107,7 +113,7 @@ export const verify_license_and_create_school = async (
   return data as unknown as SchoolSetupResponse;
 };
 
-export const getCurrentUserInfo = async () => {
+export const getCurrentUserInfo = async (): Promise<CurrentUserInfo[]> => {
   const { data, error } = await supabase.rpc('get_current_user_info');
   
   if (error) {
@@ -115,7 +121,7 @@ export const getCurrentUserInfo = async () => {
     throw new Error(error.message);
   }
   
-  return data;
+  return data as CurrentUserInfo[];
 };
 
 export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
@@ -320,8 +326,8 @@ export const addStudentSubscription = async (subscriptionData: {
   }
   
   const userRecord = userInfo[0];
-  const currentUserId = userRecord?.user_id; // Now correctly getting user_id
-  const currentSchoolId = userRecord?.user_school_id;
+  const currentUserId = userRecord.user_id;
+  const currentSchoolId = userRecord.user_school_id;
   
   if (!currentUserId || !currentSchoolId) {
     console.error('❌ User information incomplete:', { currentUserId, currentSchoolId });
