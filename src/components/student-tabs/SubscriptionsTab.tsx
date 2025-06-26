@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays, startOfWeek } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -145,29 +145,71 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     });
   };
 
-  // Calculate how sessions will be distributed across days
-  const calculateSessionDistribution = () => {
-    if (formData.schedule.length === 0 || formData.sessionCount === 0) {
+  // Enhanced session distribution calculation
+  const calculateIntelligentSessionDistribution = () => {
+    if (formData.schedule.length === 0 || formData.sessionCount === 0 || !formData.startDate) {
       return [];
     }
 
     const validSchedules = formData.schedule.filter(s => s.day && s.time);
     if (validSchedules.length === 0) return [];
 
-    const sessionsPerDay = Math.floor(formData.sessionCount / validSchedules.length);
-    const extraSessions = formData.sessionCount % validSchedules.length;
-
-    return validSchedules.map((schedule, index) => {
-      const sessions = sessionsPerDay + (index < extraSessions ? 1 : 0);
-      return {
-        day: schedule.day,
-        time: schedule.time,
-        sessions
-      };
+    // Sort schedules by day of week
+    const sortedSchedules = [...validSchedules].sort((a, b) => {
+      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      return dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
     });
+
+    const startDate = new Date(formData.startDate);
+    const sessions: Array<{
+      sessionNumber: number;
+      day: string;
+      time: string;
+      date: string;
+    }> = [];
+
+    let currentDate = new Date(startDate);
+    let sessionsCreated = 0;
+
+    while (sessionsCreated < formData.sessionCount) {
+      // Try each scheduled day in order
+      for (const schedule of sortedSchedules) {
+        if (sessionsCreated >= formData.sessionCount) break;
+
+        // Find next occurrence of this day
+        const targetDayIndex = daysOfWeek.indexOf(schedule.day);
+        const currentDayIndex = currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1; // Convert Sunday=0 to Sunday=6
+        
+        let daysToAdd = targetDayIndex - currentDayIndex;
+        if (daysToAdd < 0) {
+          daysToAdd += 7; // Move to next week
+        }
+
+        const sessionDate = addDays(currentDate, daysToAdd);
+        
+        // Only add if on or after start date
+        if (sessionDate >= startDate) {
+          sessions.push({
+            sessionNumber: sessionsCreated + 1,
+            day: schedule.day,
+            time: schedule.time,
+            date: format(sessionDate, 'MMM dd, yyyy')
+          });
+          
+          sessionsCreated++;
+          // Move current date to the day after this session
+          currentDate = addDays(sessionDate, 1);
+        } else {
+          // If before start date, just move current date forward
+          currentDate = addDays(currentDate, 1);
+        }
+      }
+    }
+
+    return sessions;
   };
 
-  const sessionDistribution = calculateSessionDistribution();
+  const intelligentSessionDistribution = calculateIntelligentSessionDistribution();
 
   const handleSubmit = preventRapidCalls(async () => {
     if (!studentData.id) {
@@ -420,21 +462,34 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               )}
             </div>
 
-            {/* Session Distribution Preview */}
-            {sessionDistribution.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-800 mb-2">Session Distribution Preview</h4>
-                <p className="text-sm text-blue-600 mb-3">
-                  Total Sessions: <span className="font-bold">{formData.sessionCount}</span>
+            {/* Intelligent Session Distribution Preview */}
+            {intelligentSessionDistribution.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Smart Session Schedule Preview
+                </h4>
+                <p className="text-sm text-green-700 mb-3">
+                  Sessions will be distributed intelligently across your selected days, starting from the first available slot:
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {sessionDistribution.map((dist, index) => (
-                    <div key={index} className="bg-white rounded p-2 text-sm">
-                      <span className="font-medium">{dist.day}s at {dist.time}</span>
-                      <br />
-                      <span className="text-blue-600">{dist.sessions} session{dist.sessions !== 1 ? 's' : ''}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                  {intelligentSessionDistribution.map((session, index) => (
+                    <div key={index} className="bg-white rounded-lg p-3 text-sm border border-green-100">
+                      <div className="font-medium text-green-800">
+                        Session {session.sessionNumber}
+                      </div>
+                      <div className="text-green-600">
+                        {session.day}, {session.date}
+                      </div>
+                      <div className="text-green-500 text-xs">
+                        at {session.time}
+                      </div>
                     </div>
                   ))}
+                </div>
+                <div className="mt-3 p-2 bg-green-100 rounded text-xs text-green-700">
+                  <strong>Scheduling Logic:</strong> Sessions rotate through selected days in weekly cycles, 
+                  ensuring even distribution and natural progression from your start date.
                 </div>
               </div>
             )}
