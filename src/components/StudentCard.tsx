@@ -25,6 +25,10 @@ export interface Student {
   nextPaymentDate?: string;
   nextPaymentAmount?: number;
   subscriptionProgress?: string;
+  dateOfBirth?: string;
+  socials?: {
+    [key: string]: string;
+  };
 }
 
 interface StudentCardProps {
@@ -40,7 +44,6 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
   console.log('Rendering StudentCard with data:', student);
   console.log('Subscription progress value:', student.subscriptionProgress);
   
-  // ... keep existing code (getPaymentStatusColor function)
   const getPaymentStatusColor = (status: Student['paymentStatus']) => {
     switch (status) {
       case 'paid':
@@ -54,7 +57,6 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     }
   };
 
-  // ... keep existing code (getLevelColor function)
   const getLevelColor = (level: Student['level']) => {
     switch (level) {
       case 'beginner':
@@ -70,7 +72,6 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     }
   };
 
-  // ... keep existing code (formatNextPayment function)
   const formatNextPayment = (dateStr: string | null | undefined, amount: number | null | undefined): string => {
     if (!dateStr || !amount) return 'Not scheduled';
     
@@ -91,7 +92,6 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     return `${formattedAmount} - ${formattedDate}`;
   };
 
-  // ... keep existing code (isValidStudent check)
   const isValidStudent = student && 
     typeof student === 'object' && 
     'id' in student && 
