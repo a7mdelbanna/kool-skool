@@ -517,6 +517,22 @@ export type Database = {
         }
         Returns: Json
       }
+      create_student_with_profile: {
+        Args: {
+          student_email: string
+          student_password: string
+          student_first_name: string
+          student_last_name: string
+          teacher_id: string
+          course_id: string
+          age_group: string
+          level: string
+          phone?: string
+          date_of_birth?: string
+          socials?: Json
+        }
+        Returns: Json
+      }
       delete_course: {
         Args: { p_course_id: string }
         Returns: undefined

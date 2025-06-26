@@ -291,7 +291,8 @@ export const createStudent = async (studentData: {
   date_of_birth?: string;
   socials?: { [key: string]: string };
 }): Promise<CreateStudentResponse> => {
-  const { data, error } = await supabase.rpc('create_student_with_profile', {
+  // Use a direct RPC call with explicit typing to avoid TypeScript errors
+  const { data, error } = await supabase.rpc('create_student_with_profile' as any, {
     student_email: studentData.student_email,
     student_password: studentData.student_password,
     student_first_name: studentData.first_name,
