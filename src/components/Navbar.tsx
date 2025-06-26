@@ -10,7 +10,8 @@ import {
   Menu,
   X,
   School,
-  LogOut
+  LogOut,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -131,6 +132,13 @@ const MobileNavbar = () => {
             onClick={closeMenu}
           />
           <NavItem 
+            to="/courses" 
+            icon={<BookOpen size={20} />} 
+            label="Courses" 
+            isActive={location.pathname === "/courses"} 
+            onClick={closeMenu}
+          />
+          <NavItem 
             to="/calendar" 
             icon={<Calendar size={20} />} 
             label="Calendar" 
@@ -184,6 +192,12 @@ const MobileNavbar = () => {
           isActive={location.pathname === "/students"} 
         />
         <NavItem 
+          to="/courses" 
+          icon={<BookOpen size={20} />} 
+          label="Courses" 
+          isActive={location.pathname === "/courses"} 
+        />
+        <NavItem 
           to="/calendar" 
           icon={<Calendar size={20} />} 
           label="Calendar" 
@@ -194,12 +208,6 @@ const MobileNavbar = () => {
           icon={<DollarSign size={20} />} 
           label="Payments" 
           isActive={location.pathname === "/payments"} 
-        />
-        <NavItem 
-          to="/school-setup" 
-          icon={<School size={20} />} 
-          label="Setup" 
-          isActive={location.pathname === "/school-setup"} 
         />
         <NavItem 
           to="/settings" 

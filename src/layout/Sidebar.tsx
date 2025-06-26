@@ -12,7 +12,8 @@ import {
   GraduationCap,
   School,
   BarChart2,
-  UserPlus
+  UserPlus,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -105,6 +106,22 @@ export function Sidebar() {
                   >
                     <Users className="h-5 w-5" />
                     <span>Students</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/courses"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <BookOpen className="h-5 w-5" />
+                    <span>Courses</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

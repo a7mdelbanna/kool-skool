@@ -8,6 +8,7 @@ import { useState, useEffect, createContext } from 'react';
 import MainLayout from "./layout/MainLayout";
 import Index from "./pages/Index";
 import Students from "./pages/Students";
+import Courses from "./pages/Courses";
 import Calendar from "./pages/Calendar";
 import Payments from "./pages/Payments";
 import Settings from "./pages/Settings";
@@ -87,6 +88,7 @@ const App = () => {
                 <Route element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>
                   <Route path="/" element={<Index />} />
                   <Route path="/students" element={<Students />} />
+                  <Route path="/courses" element={<Courses />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/payments" element={<Payments />} />
                   <Route path="/settings" element={<Settings />} />
