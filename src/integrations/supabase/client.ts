@@ -354,9 +354,9 @@ export const createStudent = async (data: CreateStudentData): Promise<CreateStud
     
     console.log('Student creation result:', result);
     
-    // Type guard to ensure result has the expected structure
+    // Type guard to ensure result has the expected structure and cast to unknown first
     if (typeof result === 'object' && result !== null && 'success' in result) {
-      return result as CreateStudentResponse;
+      return result as unknown as CreateStudentResponse;
     } else {
       throw new Error('Invalid response format from database function');
     }

@@ -380,45 +380,63 @@ export type Database = {
           created_by: string | null
           date_of_birth: string | null
           email: string
+          facebook: string | null
           first_name: string | null
           id: string
+          instagram: string | null
           last_name: string | null
           password_hash: string | null
           phone: string | null
           role: string
           school_id: string | null
-          socials: Json | null
+          skype: string | null
+          telegram: string | null
           updated_at: string
+          viber: string | null
+          whatsapp: string | null
+          zoom: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
           email: string
+          facebook?: string | null
           first_name?: string | null
           id?: string
+          instagram?: string | null
           last_name?: string | null
           password_hash?: string | null
           phone?: string | null
           role: string
           school_id?: string | null
-          socials?: Json | null
+          skype?: string | null
+          telegram?: string | null
           updated_at?: string
+          viber?: string | null
+          whatsapp?: string | null
+          zoom?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
           email?: string
+          facebook?: string | null
           first_name?: string | null
           id?: string
+          instagram?: string | null
           last_name?: string | null
           password_hash?: string | null
           phone?: string | null
           role?: string
           school_id?: string | null
-          socials?: Json | null
+          skype?: string | null
+          telegram?: string | null
           updated_at?: string
+          viber?: string | null
+          whatsapp?: string | null
+          zoom?: string | null
         }
         Relationships: [
           {
