@@ -77,7 +77,8 @@ export interface CurrentUserInfo {
 // Helper function to get current user from localStorage
 const getCurrentUserFromStorage = () => {
   try {
-    const userData = localStorage.getItem('userData');
+    // First try 'user' key (which is what the login process uses)
+    let userData = localStorage.getItem('user');
     if (userData) {
       const user = JSON.parse(userData);
       return {
@@ -86,6 +87,18 @@ const getCurrentUserFromStorage = () => {
         user_role: user.role
       };
     }
+    
+    // Fallback to 'userData' key for backward compatibility
+    userData = localStorage.getItem('userData');
+    if (userData) {
+      const user = JSON.parse(userData);
+      return {
+        user_id: user.id,
+        user_school_id: user.schoolId,
+        user_role: user.role
+      };
+    }
+    
     return null;
   } catch (error) {
     console.error('Error parsing user data from localStorage:', error);
