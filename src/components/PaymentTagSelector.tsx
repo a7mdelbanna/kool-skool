@@ -250,7 +250,7 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
     );
   }
 
-  // Ensure we have arrays to work with
+  // Ensure we have arrays to work with - this is critical!
   const safeAvailableTags = Array.isArray(availableTags) ? availableTags : [];
   const safeCurrentTags = Array.isArray(currentTags) ? currentTags : [];
   
@@ -262,6 +262,36 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
   );
   
   console.log('🔍 Filtered available tags:', filteredAvailableTags);
+
+  // Don't render if we don't have proper data structure
+  if (!safeAvailableTags || !Array.isArray(safeAvailableTags)) {
+    console.log('⚠️ Available tags is not a proper array, not rendering popover content');
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Current tags */}
+        {safeCurrentTags.map((tag) => (
+          <Badge
+            key={tag.id}
+            variant="outline"
+            className="flex items-center gap-1 pr-1"
+            style={{ borderColor: tag.color, color: tag.color }}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+            {tag.name}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-4 w-4 ml-1 hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => handleRemoveTag(tag.id)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </Badge>
+        ))}
+        <div className="text-sm text-muted-foreground">Tags not available</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -286,7 +316,7 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
         </Badge>
       ))}
 
-      {/* Add tag button */}
+      {/* Add tag button - only render if we have valid data */}
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1">
@@ -295,22 +325,29 @@ const PaymentTagSelector: React.FC<PaymentTagSelectorProps> = ({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-0">
-          <Command>
-            <CommandInput placeholder="Search tags..." />
-            <CommandEmpty>No tags found.</CommandEmpty>
-            <CommandGroup>
-              {filteredAvailableTags.map((tag) => (
-                <CommandItem
-                  key={tag.id}
-                  onSelect={() => handleAddTag(tag.id)}
-                  className="flex items-center gap-2"
-                >
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                  {tag.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </Command>
+          {/* Only render Command if we have proper data */}
+          {Array.isArray(filteredAvailableTags) && filteredAvailableTags.length >= 0 ? (
+            <Command>
+              <CommandInput placeholder="Search tags..." />
+              <CommandEmpty>No tags found.</CommandEmpty>
+              <CommandGroup>
+                {filteredAvailableTags.map((tag) => (
+                  <CommandItem
+                    key={tag.id}
+                    onSelect={() => handleAddTag(tag.id)}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                    {tag.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </Command>
+          ) : (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No tags available
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     </div>
