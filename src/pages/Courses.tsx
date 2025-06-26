@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { UserContext } from '@/App';
-import { createCourse, Course } from '@/integrations/supabase/client';
+import { getSchoolCourses, createCourse, Course, supabase } from '@/integrations/supabase/client';
 
 const Courses = () => {
   const { user } = useContext(UserContext);
@@ -34,24 +34,7 @@ const Courses = () => {
       setLoading(true);
       console.log('Fetching courses for school:', user.schoolId);
       
-      // Call the edge function to get courses
-      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/get_courses`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
-          'x-user-id': user.id,
-          'x-school-id': user.schoolId,
-          'x-user-role': user.role,
-        },
-        body: JSON.stringify({ school_id: user.schoolId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await getSchoolCourses(user.schoolId);
       console.log('Fetched courses:', data);
       setCourses(data || []);
     } catch (error) {
@@ -115,25 +98,17 @@ const Courses = () => {
     }
 
     try {
-      // Call edge function to update course
-      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/update_course`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
-          'x-user-id': user.id,
-          'x-school-id': user.schoolId,
-          'x-user-role': user.role,
-        },
-        body: JSON.stringify({
-          course_id: courseId,
-          course_name: editCourseName.trim(),
-          lesson_type: editCourseType
-        }),
-      });
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          name: editCourseName.trim(),
+          lesson_type: editCourseType,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', courseId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw error;
       }
 
       toast({
@@ -159,21 +134,13 @@ const Courses = () => {
     }
 
     try {
-      // Call edge function to delete course
-      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/delete_course`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
-          'x-user-id': user.id,
-          'x-school-id': user.schoolId,
-          'x-user-role': user.role,
-        },
-        body: JSON.stringify({ course_id: courseId }),
-      });
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw error;
       }
 
       toast({
