@@ -463,6 +463,10 @@ export type Database = {
         Args: { p_course_id: string }
         Returns: undefined
       }
+      delete_student_subscription: {
+        Args: { p_subscription_id: string }
+        Returns: Json
+      }
       get_current_user_info: {
         Args: Record<PropertyKey, never>
         Returns: {

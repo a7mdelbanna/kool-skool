@@ -387,7 +387,7 @@ export const addStudentSubscription = async (subscriptionData: {
 };
 
 export const deleteStudentSubscription = async (subscriptionId: string) => {
-  console.log('🗑️ FIXED deleteStudentSubscription called with subscriptionId:', subscriptionId);
+  console.log('🗑️ DATABASE FUNCTION: deleteStudentSubscription called with subscriptionId:', subscriptionId);
   
   if (!subscriptionId) {
     console.error('❌ No subscription ID provided');
@@ -395,78 +395,30 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
   }
   
   try {
-    // First, let's check if the subscription exists before deletion
-    console.log('🔍 Checking if subscription exists before deletion...');
-    const { data: existingSubscription, error: checkError } = await supabase
-      .from('subscriptions')
-      .select('id, student_id')
-      .eq('id', subscriptionId)
-      .maybeSingle();
+    console.log('🔧 Using database function for secure deletion...');
+    
+    // Use the database function for secure deletion with all cascading operations
+    const { data, error } = await supabase.rpc('delete_student_subscription', {
+      p_subscription_id: subscriptionId
+    });
 
-    if (checkError) {
-      console.error('❌ Error checking subscription existence:', checkError);
-      throw new Error(`Failed to verify subscription: ${checkError.message}`);
+    console.log('Database function result:', { data, error });
+
+    if (error) {
+      console.error('❌ Database function error:', error);
+      throw new Error(`Database deletion failed: ${error.message}`);
     }
 
-    if (!existingSubscription) {
-      console.log('⚠️ Subscription not found - may have been already deleted');
-      return; // Already deleted, no error needed
+    if (!data || !data.success) {
+      const errorMessage = data?.message || 'Unknown deletion error';
+      console.error('❌ Deletion failed:', errorMessage);
+      throw new Error(errorMessage);
     }
 
-    console.log('✅ Found subscription to delete:', existingSubscription);
-
-    // Delete associated lesson sessions first
-    console.log('🗑️ Deleting associated lesson sessions...');
-    const { error: sessionsError } = await supabase
-      .from('lesson_sessions')
-      .delete()
-      .eq('subscription_id', subscriptionId);
-
-    if (sessionsError) {
-      console.error('❌ Error deleting lesson sessions:', sessionsError);
-      throw new Error(`Failed to delete lesson sessions: ${sessionsError.message}`);
-    } else {
-      console.log('✅ Successfully deleted associated lesson sessions');
-    }
-
-    // Now delete the subscription
-    console.log('🗑️ Deleting subscription from database...');
-    const { error: deleteError, data: deletedData } = await supabase
-      .from('subscriptions')
-      .delete()
-      .eq('id', subscriptionId)
-      .select();
-
-    if (deleteError) {
-      console.error('❌ Error deleting subscription:', deleteError);
-      throw new Error(`Failed to delete subscription: ${deleteError.message}`);
-    }
-
-    // Verify the deletion worked
-    if (!deletedData || deletedData.length === 0) {
-      console.error('❌ Subscription deletion failed - no records were deleted');
-      throw new Error('Subscription deletion failed - no records were affected');
-    }
-
-    console.log('✅ Successfully deleted subscription:', deletedData);
-
-    // Final verification - check that it's actually gone
-    console.log('🔍 Final verification - checking if subscription is gone...');
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('id', subscriptionId)
-      .maybeSingle();
-
-    if (verifyError) {
-      console.error('❌ Error during final verification:', verifyError);
-      // Don't throw here as the main deletion likely succeeded
-    } else if (!verifyData) {
-      console.log('✅ DELETION CONFIRMED - subscription no longer exists in database');
-    } else {
-      console.error('❌ CRITICAL: Subscription still exists after deletion!', verifyData);
-      throw new Error('Subscription deletion failed - record still exists in database');
-    }
+    console.log('✅ SUCCESS: Subscription deleted via database function');
+    console.log(`📊 Deletion summary: ${data.sessions_deleted} sessions deleted`);
+    
+    return data;
 
   } catch (error) {
     console.error('❌ Error in deleteStudentSubscription:', error);
