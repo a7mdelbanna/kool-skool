@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -462,6 +461,23 @@ export const getStudentLessonSessions = async (studentId: string) => {
   }
   
   console.log('✅ CLIENT: Lesson sessions retrieved:', data);
+  return data;
+};
+
+export const getSchoolLessonSessions = async (schoolId: string) => {
+  console.log('=== CLIENT: getSchoolLessonSessions called ===');
+  console.log('School ID:', schoolId);
+  
+  const { data, error } = await supabase.rpc('get_school_lesson_sessions', {
+    p_school_id: schoolId
+  });
+  
+  if (error) {
+    console.error('❌ CLIENT: Error getting school lesson sessions:', error);
+    throw new Error(error.message);
+  }
+  
+  console.log('✅ CLIENT: School lesson sessions retrieved:', data);
   return data;
 };
 
