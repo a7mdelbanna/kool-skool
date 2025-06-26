@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Calendar, CheckSquare, DollarSign, Edit, Trash2, CreditCard } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,6 +24,7 @@ export interface Student {
   nextLesson?: string;
   nextPaymentDate?: string;
   nextPaymentAmount?: number;
+  subscriptionProgress?: string;
 }
 
 interface StudentCardProps {
@@ -39,6 +39,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
   // Debug log to see what data is being passed to the component
   console.log('Rendering StudentCard with data:', student);
   
+  // ... keep existing code (getPaymentStatusColor function)
   const getPaymentStatusColor = (status: Student['paymentStatus']) => {
     switch (status) {
       case 'paid':
@@ -52,6 +53,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     }
   };
 
+  // ... keep existing code (getLevelColor function)
   const getLevelColor = (level: Student['level']) => {
     switch (level) {
       case 'beginner':
@@ -67,7 +69,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     }
   };
 
-  // Format next payment date and amount for display
+  // ... keep existing code (formatNextPayment function)
   const formatNextPayment = (dateStr: string | null | undefined, amount: number | null | undefined): string => {
     if (!dateStr || !amount) return 'Not scheduled';
     
@@ -88,13 +90,12 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     return `${formattedAmount} - ${formattedDate}`;
   };
 
-  // Make sure we have a valid student object with required properties
+  // ... keep existing code (isValidStudent check)
   const isValidStudent = student && 
     typeof student === 'object' && 
     'id' in student && 
     student.id;
 
-  // If we don't have a valid student, return nothing
   if (!isValidStudent) {
     console.error('Invalid student data provided to StudentCard:', student);
     return null;
@@ -170,7 +171,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
             <CheckSquare className="h-4 w-4 text-primary" />
             <div className="text-xs">
               <p className="text-muted-foreground">Progress</p>
-              <p className="font-medium">{(student as any).subscriptionProgress || '0/0'}</p>
+              <p className="font-medium">{student.subscriptionProgress || '0/0'}</p>
             </div>
           </div>
           
