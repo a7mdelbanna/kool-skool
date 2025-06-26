@@ -1,4 +1,5 @@
 
+
 -- Fix session generation to avoid duplicates and start date sessions
 CREATE OR REPLACE FUNCTION public.add_student_subscription(
   p_student_id uuid, 
@@ -198,3 +199,4 @@ BEGIN
   WHERE sub.id = new_subscription_id;
 END;
 $function$;
+
