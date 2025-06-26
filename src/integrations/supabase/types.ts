@@ -268,6 +268,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_school_courses: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          school_id: string
+          name: string
+          lesson_type: string
+          created_at: string
+          updated_at: string
+        }[]
+      }
       get_students_with_details: {
         Args: { p_school_id: string }
         Returns: {
