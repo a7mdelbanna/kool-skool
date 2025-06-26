@@ -529,7 +529,13 @@ export type Database = {
           level: string
           phone?: string
           date_of_birth?: string
-          socials?: Json
+          telegram?: string
+          whatsapp?: string
+          instagram?: string
+          viber?: string
+          facebook?: string
+          skype?: string
+          zoom?: string
         }
         Returns: Json
       }
