@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -520,37 +519,18 @@ export const updateStudentPayment = async (paymentId: string, updates: {
 export const deleteStudentPayment = async (paymentId: string) => {
   console.log('🗑️ CLIENT: deleteStudentPayment called with ID:', paymentId);
   
-  // Get current user info from localStorage
-  const userInfo = getCurrentUserFromStorage();
-  console.log('🔑 User info for payment deletion:', userInfo);
-  
-  if (!userInfo) {
-    console.error('❌ No user info found in localStorage for payment deletion');
-    throw new Error('User not authenticated - please log in again');
-  }
-  
-  const currentUserId = userInfo.user_id;
-  const currentSchoolId = userInfo.user_school_id;
-  
-  if (!currentUserId || !currentSchoolId) {
-    console.error('❌ User information incomplete for payment deletion:', { currentUserId, currentSchoolId });
-    throw new Error('User information incomplete');
-  }
-  
-  console.log('🔑 Using user info for payment deletion:', { currentUserId, currentSchoolId });
-  
-  // Use the supabase client to call the function directly
-  const { data, error } = await supabase.rpc('delete_student_payment' as any, {
-    p_payment_id: paymentId,
-    p_current_user_id: currentUserId,
-    p_current_school_id: currentSchoolId
-  });
+  const { data, error } = await supabase
+    .from('student_payments')
+    .delete()
+    .eq('id', paymentId)
+    .select()
+    .single();
   
   if (error) {
     console.error('❌ CLIENT: Error deleting payment:', error);
     throw new Error(error.message);
   }
   
-  console.log('✅ CLIENT: Payment deletion response:', data);
+  console.log('✅ CLIENT: Payment deleted successfully:', data);
   return data;
 };

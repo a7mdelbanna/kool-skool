@@ -86,7 +86,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   React.useEffect(() => {
     if (paymentsError) {
       console.error("Error loading payments:", paymentsError);
-      toast.error("Failed to load payment history. Please check your authentication.");
+      toast.error("Failed to load payment history. Please refresh the page and try again.");
     }
   }, [paymentsError]);
 
@@ -96,11 +96,18 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-payments', studentData.id] });
       toast.success("Payment added successfully");
-      form.reset();
+      form.reset({
+        amount: 0,
+        date: new Date(),
+        method: "",
+        notes: "",
+        currency: "USD",
+      });
+      setSelectedCurrency(currencies[0]);
     },
     onError: (error) => {
       console.error("Error adding payment:", error);
-      toast.error("Failed to add payment. Please make sure you are logged in and try again.");
+      toast.error("Failed to add payment. Please try again.");
     },
   });
 
@@ -113,7 +120,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     },
     onError: (error) => {
       console.error("Error deleting payment:", error);
-      toast.error("Failed to delete payment. Please make sure you are logged in and try again.");
+      toast.error("Failed to delete payment. Please try again.");
     },
   });
   
