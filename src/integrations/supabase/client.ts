@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -6,7 +7,67 @@ const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
-export const user_login = async (email: string, password: string) => {
+// Export types
+export interface Course {
+  id: string;
+  school_id: string;
+  name: string;
+  lesson_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStudentResponse {
+  success: boolean;
+  student_id?: string;
+  user_id?: string;
+  message?: string;
+}
+
+export interface UserLoginResponse {
+  success: boolean;
+  user_id?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  school_id?: string;
+  message?: string;
+}
+
+export interface SchoolSetupResponse {
+  success: boolean;
+  school_id?: string;
+  user_id?: string;
+  message?: string;
+}
+
+export interface TeamMemberResponse {
+  success: boolean;
+  user_id?: string;
+  message?: string;
+}
+
+export interface StudentRecord {
+  id: string;
+  school_id: string;
+  user_id: string;
+  teacher_id: string;
+  course_id: string;
+  age_group: string;
+  level: string;
+  phone: string;
+  created_at: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  course_name: string;
+  lesson_type: string;
+  teacher_first_name: string;
+  teacher_last_name: string;
+  teacher_email: string;
+}
+
+export const user_login = async (email: string, password: string): Promise<UserLoginResponse> => {
   const { data, error } = await supabase.rpc('user_login', {
     user_email: email,
     user_password: password
@@ -17,7 +78,7 @@ export const user_login = async (email: string, password: string) => {
     throw new Error(error.message);
   }
   
-  return data;
+  return data as UserLoginResponse;
 };
 
 export const verify_license_and_create_school = async (
@@ -27,7 +88,7 @@ export const verify_license_and_create_school = async (
   adminLastName: string,
   adminEmail: string,
   adminPassword: string
-) => {
+): Promise<SchoolSetupResponse> => {
   const { data, error } = await supabase.rpc('verify_license_and_create_school', {
     license_key: licenseKey,
     school_name: schoolName,
@@ -42,7 +103,7 @@ export const verify_license_and_create_school = async (
     throw new Error(error.message);
   }
   
-  return data;
+  return data as SchoolSetupResponse;
 };
 
 export const getCurrentUserInfo = async () => {
@@ -56,7 +117,7 @@ export const getCurrentUserInfo = async () => {
   return data;
 };
 
-export const getSchoolCourses = async (schoolId: string) => {
+export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
   const { data, error } = await supabase.rpc('get_school_courses', {
     p_school_id: schoolId
   });
@@ -66,10 +127,32 @@ export const getSchoolCourses = async (schoolId: string) => {
     throw new Error(error.message);
   }
   
-  return data;
+  return data as Course[];
 };
 
-export const createCourse = async (name: string, lessonType: string) => {
+export const getSchoolTeachers = async (schoolId: string) => {
+  const { data, error } = await supabase.rpc('get_team_members', {
+    p_school_id: schoolId
+  });
+  
+  if (error) {
+    console.error('Error getting school teachers:', error);
+    throw new Error(error.message);
+  }
+  
+  // Filter to only return teachers and format for display
+  const teachers = data?.filter(member => member.role === 'teacher').map(teacher => ({
+    id: teacher.id,
+    first_name: teacher.first_name,
+    last_name: teacher.last_name,
+    display_name: `${teacher.first_name} ${teacher.last_name}`,
+    email: teacher.email
+  }));
+  
+  return teachers || [];
+};
+
+export const createCourse = async (name: string, lessonType: string): Promise<Course> => {
   const { data, error } = await supabase
     .from('courses')
     .insert([
@@ -87,7 +170,7 @@ export const createCourse = async (name: string, lessonType: string) => {
     throw new Error(error.message);
   }
   
-  return data;
+  return data as Course;
 };
 
 export const updateCourse = async (courseId: string, name: string, lessonType: string) => {
@@ -133,7 +216,7 @@ export const addTeamMember = async (
   email: string,
   role: string,
   password: string
-) => {
+): Promise<TeamMemberResponse> => {
   const { data, error } = await supabase.rpc('add_team_member', {
     member_first_name: firstName,
     member_last_name: lastName,
@@ -147,30 +230,30 @@ export const addTeamMember = async (
     throw new Error(error.message);
   }
   
-  return data;
+  return data as TeamMemberResponse;
 };
 
-export const createStudent = async (
-  email: string,
-  password: string,
-  firstName: string,
-  lastName: string,
-  teacherId: string,
-  courseId: string,
-  ageGroup: string,
-  level: string,
-  phone?: string
-) => {
+export const createStudent = async (studentData: {
+  student_email: string;
+  student_password: string;
+  first_name: string;
+  last_name: string;
+  teacher_id: string;
+  course_id: string;
+  age_group: string;
+  level: string;
+  phone?: string;
+}): Promise<CreateStudentResponse> => {
   const { data, error } = await supabase.rpc('create_student', {
-    student_email: email,
-    student_password: password,
-    student_first_name: firstName,
-    student_last_name: lastName,
-    teacher_id: teacherId,
-    course_id: courseId,
-    age_group: ageGroup,
-    level: level,
-    phone: phone
+    student_email: studentData.student_email,
+    student_password: studentData.student_password,
+    student_first_name: studentData.first_name,
+    student_last_name: studentData.last_name,
+    teacher_id: studentData.teacher_id,
+    course_id: studentData.course_id,
+    age_group: studentData.age_group,
+    level: studentData.level,
+    phone: studentData.phone
   });
   
   if (error) {
@@ -178,10 +261,10 @@ export const createStudent = async (
     throw new Error(error.message);
   }
   
-  return data;
+  return data as CreateStudentResponse;
 };
 
-export const getStudentsWithDetails = async (schoolId: string) => {
+export const getStudentsWithDetails = async (schoolId: string): Promise<StudentRecord[]> => {
   const { data, error } = await supabase.rpc('get_students_with_details', {
     p_school_id: schoolId
   });
@@ -191,7 +274,7 @@ export const getStudentsWithDetails = async (schoolId: string) => {
     throw new Error(error.message);
   }
   
-  return data;
+  return data as StudentRecord[];
 };
 
 export const getStudentSubscriptions = async (studentId: string) => {
@@ -223,7 +306,6 @@ export const addStudentSubscription = async (subscriptionData: {
   initial_payment_amount?: number;
   payment_method?: string;
   payment_notes?: string;
-  lesson_duration_minutes?: number; // New parameter
 }) => {
   console.log('🚀 addStudentSubscription called with data:', subscriptionData);
   
@@ -242,7 +324,7 @@ export const addStudentSubscription = async (subscriptionData: {
   
   console.log('🔑 Current user info:', { currentUserId, currentSchoolId });
   
-  // Call the database function with enhanced parameters including lesson duration
+  // Call the database function with the enhanced parameters (without lesson duration for now)
   const { data, error } = await supabase.rpc('add_student_subscription', {
     p_student_id: subscriptionData.student_id,
     p_session_count: subscriptionData.session_count,
@@ -260,8 +342,7 @@ export const addStudentSubscription = async (subscriptionData: {
     p_current_school_id: currentSchoolId,
     p_initial_payment_amount: subscriptionData.initial_payment_amount || 0,
     p_payment_method: subscriptionData.payment_method || 'Cash',
-    p_payment_notes: subscriptionData.payment_notes || '',
-    p_lesson_duration_minutes: subscriptionData.lesson_duration_minutes || 60 // Default to 60 minutes
+    p_payment_notes: subscriptionData.payment_notes || ''
   });
   
   if (error) {
