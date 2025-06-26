@@ -24,6 +24,7 @@ export interface Student {
   lessonsCompleted?: number;
   nextLesson?: string;
   nextPaymentDate?: string;
+  nextPaymentAmount?: number;
 }
 
 interface StudentCardProps {
@@ -64,6 +65,27 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
       default:
         return '';
     }
+  };
+
+  // Format next payment date and amount for display
+  const formatNextPayment = (dateStr: string | null | undefined, amount: number | null | undefined): string => {
+    if (!dateStr || !amount) return 'Not scheduled';
+    
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const formattedAmount = `$${amount.toFixed(0)}`;
+    
+    if (diffDays === 0) return `${formattedAmount} - Today`;
+    if (diffDays === 1) return `${formattedAmount} - Tomorrow`;
+    if (diffDays > 0 && diffDays <= 7) return `${formattedAmount} - In ${diffDays} days`;
+    
+    const formattedDate = date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    return `${formattedAmount} - ${formattedDate}`;
   };
 
   // Make sure we have a valid student object with required properties
@@ -177,7 +199,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
             <CreditCard className="h-4 w-4 text-primary" />
             <div className="text-xs">
               <p className="text-muted-foreground">Next Payment</p>
-              <p className="font-medium">{student.nextPaymentDate || 'Not scheduled'}</p>
+              <p className="font-medium">{formatNextPayment(student.nextPaymentDate, student.nextPaymentAmount)}</p>
             </div>
           </div>
         </div>

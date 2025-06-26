@@ -127,7 +127,8 @@ const Students = () => {
       teacherId: record.teacher_id,
       lessonsCompleted: record.lessons_count || 0,
       nextLesson: formatNextSession(record.next_session_date),
-      nextPaymentDate: undefined
+      nextPaymentDate: record.next_payment_date,
+      nextPaymentAmount: record.next_payment_amount
     };
   };
   
@@ -803,7 +804,8 @@ function getMockStudents(): Student[] {
       paymentStatus: 'paid',
       lessonsCompleted: 12,
       nextLesson: '2025-04-01',
-      nextPaymentDate: '2025-04-15'
+      nextPaymentDate: '2025-04-15',
+      nextPaymentAmount: 100
     },
     {
       id: '2',
@@ -818,7 +820,8 @@ function getMockStudents(): Student[] {
       paymentStatus: 'pending',
       lessonsCompleted: 8,
       nextLesson: '2025-03-28',
-      nextPaymentDate: '2025-04-01'
+      nextPaymentDate: '2025-04-01',
+      nextPaymentAmount: 50
     },
     {
       id: '3',
@@ -833,7 +836,8 @@ function getMockStudents(): Student[] {
       paymentStatus: 'overdue',
       lessonsCompleted: 3,
       nextLesson: '2025-03-29',
-      nextPaymentDate: '2025-03-15'
+      nextPaymentDate: '2025-03-15',
+      nextPaymentAmount: 75
     }
   ];
 }

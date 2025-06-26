@@ -223,6 +223,8 @@ export type Database = {
           created_at: string
           id: string
           level: string | null
+          next_payment_amount: number | null
+          next_payment_date: string | null
           phone: string | null
           school_id: string
           teacher_id: string | null
@@ -235,6 +237,8 @@ export type Database = {
           created_at?: string
           id?: string
           level?: string | null
+          next_payment_amount?: number | null
+          next_payment_date?: string | null
           phone?: string | null
           school_id: string
           teacher_id?: string | null
@@ -247,6 +251,8 @@ export type Database = {
           created_at?: string
           id?: string
           level?: string | null
+          next_payment_amount?: number | null
+          next_payment_date?: string | null
           phone?: string | null
           school_id?: string
           teacher_id?: string | null
@@ -465,6 +471,10 @@ export type Database = {
         }
         Returns: Json
       }
+      calculate_next_payment_info: {
+        Args: { p_student_id: string }
+        Returns: undefined
+      }
       create_student: {
         Args: {
           student_email: string
@@ -596,6 +606,8 @@ export type Database = {
           payment_status: string
           lessons_count: number
           next_session_date: string
+          next_payment_date: string
+          next_payment_amount: number
         }[]
       }
       get_team_members: {
