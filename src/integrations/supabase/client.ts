@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -311,20 +312,25 @@ export const addStudentSubscription = async (subscriptionData: {
   
   // Get current user info
   const userInfo = await getCurrentUserInfo();
+  console.log('🔑 Raw user info response:', userInfo);
+  
   if (!userInfo || userInfo.length === 0) {
+    console.error('❌ No user info returned from getCurrentUserInfo');
     throw new Error('User not authenticated');
   }
   
-  const currentUserId = userInfo[0]?.user_school_id; // This should be user_id, not school_id
-  const currentSchoolId = userInfo[0]?.user_school_id;
+  const userRecord = userInfo[0];
+  const currentUserId = userRecord?.user_id; // Now correctly getting user_id
+  const currentSchoolId = userRecord?.user_school_id;
   
   if (!currentUserId || !currentSchoolId) {
+    console.error('❌ User information incomplete:', { currentUserId, currentSchoolId });
     throw new Error('User information incomplete');
   }
   
-  console.log('🔑 Current user info:', { currentUserId, currentSchoolId });
+  console.log('🔑 Using user info:', { currentUserId, currentSchoolId });
   
-  // Call the database function with the enhanced parameters (without lesson duration for now)
+  // Call the database function with the enhanced parameters
   const { data, error } = await supabase.rpc('add_student_subscription', {
     p_student_id: subscriptionData.student_id,
     p_session_count: subscriptionData.session_count,
