@@ -17,6 +17,8 @@ export interface Student {
   phone?: string;
   dateOfBirth?: string;
   subscriptionProgress?: string;
+  nextPaymentDate?: string;
+  nextPaymentAmount?: number;
   // Separate social media fields
   telegram?: string;
   whatsapp?: string;
