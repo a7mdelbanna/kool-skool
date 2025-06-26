@@ -305,6 +305,10 @@ export type Database = {
         Args: { password: string }
         Returns: string
       }
+      update_course: {
+        Args: { p_course_id: string; p_name: string; p_lesson_type: string }
+        Returns: undefined
+      }
       user_login: {
         Args: { user_email: string; user_password: string }
         Returns: Json

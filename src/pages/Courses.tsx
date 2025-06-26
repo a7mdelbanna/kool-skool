@@ -114,8 +114,8 @@ const Courses = () => {
     try {
       console.log('Updating course:', { id: courseId, name: editCourseName, type: editCourseType });
       
-      // Use RPC function to bypass RLS for updates
-      const { error } = await supabase.rpc('update_course', {
+      // Use RPC function to bypass RLS for updates - using type assertion to work around TypeScript
+      const { error } = await (supabase.rpc as any)('update_course', {
         p_course_id: courseId,
         p_name: editCourseName.trim(),
         p_lesson_type: editCourseType
