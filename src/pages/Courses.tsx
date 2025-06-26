@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useContext } from 'react';
-import { PlusCircle, Edit, Trash2, Search, Filter, Save, X } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Search, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { UserContext } from '@/App';
-import { supabase, setupSupabaseAuth, Course } from '@/integrations/supabase/client';
+import { createCourse, Course } from '@/integrations/supabase/client';
 
 const Courses = () => {
   const { user } = useContext(UserContext);
@@ -21,44 +21,37 @@ const Courses = () => {
   const [newCourseType, setNewCourseType] = useState<'individual' | 'group'>('individual');
   const [editCourseName, setEditCourseName] = useState('');
   const [editCourseType, setEditCourseType] = useState<'individual' | 'group'>('individual');
-  const [authSetup, setAuthSetup] = useState(false);
 
-  // Set up Supabase authentication when component mounts
+  // Fetch courses when user is ready
   useEffect(() => {
-    const initializeAuth = async () => {
-      if (user && !authSetup) {
-        console.log('Setting up Supabase auth with user:', user);
-        await setupSupabaseAuth(user);
-        setAuthSetup(true);
-      }
-    };
-    
-    initializeAuth();
-  }, [user, authSetup]);
-
-  // Fetch courses when user and auth are ready
-  useEffect(() => {
-    if (user?.schoolId && authSetup) {
+    if (user?.schoolId) {
       fetchCourses();
     }
-  }, [user?.schoolId, authSetup]);
+  }, [user?.schoolId]);
 
   const fetchCourses = async () => {
     try {
       setLoading(true);
       console.log('Fetching courses for school:', user.schoolId);
       
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('school_id', user.schoolId)
-        .order('name');
+      // Call the edge function to get courses
+      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/get_courses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
+          'x-user-id': user.id,
+          'x-school-id': user.schoolId,
+          'x-user-role': user.role,
+        },
+        body: JSON.stringify({ school_id: user.schoolId }),
+      });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      const data = await response.json();
       console.log('Fetched courses:', data);
       setCourses(data || []);
     } catch (error) {
@@ -86,23 +79,12 @@ const Courses = () => {
     try {
       console.log('Creating course:', { name: newCourseName, type: newCourseType });
       
-      const { data, error } = await supabase
-        .from('courses')
-        .insert({
-          school_id: user.schoolId,
-          name: newCourseName.trim(),
-          lesson_type: newCourseType
-        })
-        .select()
-        .single();
+      await createCourse({
+        school_id: user.schoolId,
+        course_name: newCourseName.trim(),
+        lesson_type: newCourseType
+      });
 
-      if (error) {
-        console.error('Error creating course:', error);
-        throw error;
-      }
-
-      console.log('Course created:', data);
-      
       toast({
         title: "Success",
         description: "Course created successfully"
@@ -133,17 +115,26 @@ const Courses = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('courses')
-        .update({
-          name: editCourseName.trim(),
-          lesson_type: editCourseType,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', courseId)
-        .eq('school_id', user.schoolId);
+      // Call edge function to update course
+      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/update_course`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
+          'x-user-id': user.id,
+          'x-school-id': user.schoolId,
+          'x-user-role': user.role,
+        },
+        body: JSON.stringify({
+          course_id: courseId,
+          course_name: editCourseName.trim(),
+          lesson_type: editCourseType
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       toast({
         title: "Success",
@@ -168,13 +159,22 @@ const Courses = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', courseId)
-        .eq('school_id', user.schoolId);
+      // Call edge function to delete course
+      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/delete_course`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
+          'x-user-id': user.id,
+          'x-school-id': user.schoolId,
+          'x-user-role': user.role,
+        },
+        body: JSON.stringify({ course_id: courseId }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       toast({
         title: "Success",
