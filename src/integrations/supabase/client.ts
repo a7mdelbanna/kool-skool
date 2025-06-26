@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -279,7 +278,7 @@ export const addTeamMember = async (
   return data as unknown as TeamMemberResponse;
 };
 
-export interface CreateStudentData {
+export const createStudent = async (studentData: {
   student_email: string;
   student_password: string;
   first_name: string;
@@ -289,82 +288,25 @@ export interface CreateStudentData {
   age_group: string;
   level: string;
   phone?: string;
-  date_of_birth?: string;
-  telegram?: string;
-  whatsapp?: string;
-  instagram?: string;
-  viber?: string;
-  facebook?: string;
-  skype?: string;
-  zoom?: string;
-}
-
-export const createStudent = async (data: CreateStudentData): Promise<CreateStudentResponse> => {
-  console.log('createStudent called with data:', data);
+}): Promise<CreateStudentResponse> => {
+  const { data, error } = await supabase.rpc('create_student', {
+    student_email: studentData.student_email,
+    student_password: studentData.student_password,
+    student_first_name: studentData.first_name,
+    student_last_name: studentData.last_name,
+    teacher_id: studentData.teacher_id,
+    course_id: studentData.course_id,
+    age_group: studentData.age_group,
+    level: studentData.level,
+    phone: studentData.phone
+  });
   
-  try {
-    // Get user data from localStorage for authentication
-    const userDataStr = localStorage.getItem('user');
-    if (!userDataStr) {
-      throw new Error('User not authenticated - no user data found');
-    }
-    
-    const userData = JSON.parse(userDataStr);
-    console.log('Current user data:', userData);
-    
-    if (!userData.id || !userData.schoolId || userData.role !== 'admin') {
-      throw new Error('Only school admins can create students');
-    }
-    
-    console.log('Calling create_student_with_profile RPC function with current_user_id:', userData.id);
-    
-    // Call the RPC function with current_user_id as the first parameter
-    const { data: result, error } = await supabase.rpc('create_student_with_profile', {
-      current_user_id: userData.id,
-      student_email: data.student_email,
-      student_password: data.student_password,
-      student_first_name: data.first_name,
-      student_last_name: data.last_name,
-      teacher_id: data.teacher_id,
-      course_id: data.course_id,
-      age_group: data.age_group,
-      level: data.level,
-      phone: data.phone || null,
-      date_of_birth: data.date_of_birth || null,
-      telegram: data.telegram || null,
-      whatsapp: data.whatsapp || null,
-      instagram: data.instagram || null,
-      viber: data.viber || null,
-      facebook: data.facebook || null,
-      skype: data.skype || null,
-      zoom: data.zoom || null
-    });
-    
-    console.log('RPC function response:', { result, error });
-    
-    if (error) {
-      console.error('Supabase RPC error:', error);
-      throw new Error(`Database error: ${error.message}`);
-    }
-    
-    if (!result) {
-      console.error('No result returned from RPC function');
-      throw new Error('No response from database function');
-    }
-    
-    console.log('Student creation result:', result);
-    
-    // Type guard to ensure result has the expected structure and cast to unknown first
-    if (typeof result === 'object' && result !== null && 'success' in result) {
-      return result as unknown as CreateStudentResponse;
-    } else {
-      throw new Error('Invalid response format from database function');
-    }
-    
-  } catch (error) {
-    console.error('Error in createStudent:', error);
-    throw error;
+  if (error) {
+    console.error('Error creating student:', error);
+    throw new Error(error.message);
   }
+  
+  return data as unknown as CreateStudentResponse;
 };
 
 export const getStudentsWithDetails = async (schoolId: string): Promise<StudentRecord[]> => {

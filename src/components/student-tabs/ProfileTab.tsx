@@ -1,242 +1,243 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
+import React from "react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Student } from "@/components/StudentCard";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Student } from "../StudentCard";
 import { Course } from "@/integrations/supabase/client";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Calendar, User, MessageCircle, Phone, Instagram, Send, Hash, Mail } from "lucide-react";
 
 interface Teacher {
   id: string;
   first_name: string;
   last_name: string;
   display_name: string;
-  email: string;
 }
 
 interface ProfileTabProps {
   studentData: Partial<Student>;
   setStudentData: (data: Partial<Student>) => void;
   isViewMode: boolean;
-  password: string;
-  setPassword: (password: string) => void;
-  createPassword: boolean;
-  setCreatePassword: (create: boolean) => void;
-  isNewStudent: boolean;
-  courses: Course[];
-  teachers: Teacher[];
-  isLoading: boolean;
+  password?: string;
+  setPassword?: (password: string) => void;
+  createPassword?: boolean;
+  setCreatePassword?: (create: boolean) => void;
+  isNewStudent?: boolean;
+  courses?: Course[];
+  teachers?: Teacher[];
+  isLoading?: boolean;
 }
 
 const ProfileTab: React.FC<ProfileTabProps> = ({
   studentData,
   setStudentData,
   isViewMode,
-  password,
+  password = "",
   setPassword,
   createPassword,
   setCreatePassword,
-  isNewStudent,
-  courses,
-  teachers,
-  isLoading
+  isNewStudent = false,
+  courses = [],
+  teachers = [],
+  isLoading = false
 }) => {
-  const [additionalInfoOpen, setAdditionalInfoOpen] = useState(false);
-  const [socialsOpen, setSocialsOpen] = useState(false);
-  const [emailError, setEmailError] = useState("");
-
   console.log('ProfileTab render - teachers data:', teachers);
   console.log('ProfileTab render - courses data:', courses);
   console.log('ProfileTab render - studentData:', studentData);
-
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email) {
-      setEmailError("Email is required");
-      return false;
-    }
-    if (!emailRegex.test(email)) {
-      setEmailError("Please enter a valid email address");
-      return false;
-    }
-    setEmailError("");
-    return true;
+  
+  const handleInputChange = (field: keyof Student, value: string) => {
+    setStudentData({ [field]: value });
   };
-
-  const handleEmailChange = (email: string) => {
-    setStudentData({ email });
-    validateEmail(email);
-  };
-
-  const handleSocialChange = (platform: string, value: string) => {
-    setStudentData({ [platform]: value.trim() === '' ? undefined : value });
-  };
-
-  const socialPlatforms = [
-    { key: 'telegram', label: 'Telegram', icon: Send, placeholder: 'Telegram username', color: 'text-blue-500' },
-    { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, placeholder: 'WhatsApp number or username', color: 'text-green-500' },
-    { key: 'instagram', label: 'Instagram', icon: Instagram, placeholder: 'Instagram username', color: 'text-pink-500' },
-    { key: 'viber', label: 'Viber', icon: Phone, placeholder: 'Viber username or number', color: 'text-purple-500' },
-    { key: 'facebook', label: 'Facebook', icon: User, placeholder: 'Facebook username or profile', color: 'text-blue-600' },
-    { key: 'skype', label: 'Skype', icon: User, placeholder: 'Skype username', color: 'text-blue-400' },
-    { key: 'zoom', label: 'Zoom', icon: User, placeholder: 'Zoom username or ID', color: 'text-blue-500' },
-  ];
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-          <div className="h-10 bg-gray-200 rounded"></div>
-        </div>
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-          <div className="h-10 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      {/* Personal Information Section */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Personal Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Personal Information */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Personal Information</h3>
+          
+          <div className="space-y-2">
             <Label htmlFor="firstName">First Name*</Label>
             <Input
               id="firstName"
               value={studentData.firstName || ""}
-              onChange={(e) => setStudentData({ firstName: e.target.value })}
+              onChange={(e) => handleInputChange("firstName", e.target.value)}
+              placeholder="First"
               disabled={isViewMode}
-              placeholder="Enter first name"
             />
           </div>
           
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="lastName">Last Name*</Label>
             <Input
               id="lastName"
               value={studentData.lastName || ""}
-              onChange={(e) => setStudentData({ lastName: e.target.value })}
+              onChange={(e) => handleInputChange("lastName", e.target.value)}
+              placeholder="Student"
               disabled={isViewMode}
-              placeholder="Enter last name"
             />
           </div>
           
-          <div className="md:col-span-2">
+          <div className="space-y-2">
             <Label htmlFor="email">Email*</Label>
             <Input
               id="email"
               type="email"
               value={studentData.email || ""}
-              onChange={(e) => handleEmailChange(e.target.value)}
+              onChange={(e) => handleInputChange("email", e.target.value)}
+              placeholder="email@example.com"
               disabled={isViewMode}
-              placeholder="Enter email address"
-              className={emailError ? "border-red-500" : ""}
             />
-            {emailError && (
-              <p className="text-sm text-red-500 mt-1">{emailError}</p>
-            )}
-            {!isViewMode && (
-              <p className="text-sm text-gray-500 mt-1">
-                This email must be unique and will be used for the student's login account.
-              </p>
-            )}
           </div>
           
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
               value={studentData.phone || ""}
-              onChange={(e) => setStudentData({ phone: e.target.value })}
+              onChange={(e) => handleInputChange("phone", e.target.value)}
+              placeholder="Phone number"
               disabled={isViewMode}
-              placeholder="Enter phone number"
             />
           </div>
+          
+          {isNewStudent && (
+            <>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="createPassword"
+                  checked={createPassword}
+                  onCheckedChange={(checked) => setCreatePassword?.(checked as boolean)}
+                  disabled={isViewMode}
+                />
+                <Label htmlFor="createPassword" className="text-sm">
+                  Create account with password
+                </Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Student will be able to log in to their account
+              </p>
+              
+              {createPassword && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password*</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword?.(e.target.value)}
+                    placeholder="••••••••••••••••"
+                    disabled={isViewMode}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
-      </div>
-
-      {/* Course Information Section */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Course Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+        
+        {/* Course Information */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Course Information</h3>
+          
+          <div className="space-y-2">
             <Label htmlFor="course">Course*</Label>
-            <Select 
-              value={studentData.courseName || ""} 
-              onValueChange={(value) => setStudentData({ courseName: value })}
-              disabled={isViewMode}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a course" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses && courses.length > 0 ? (
-                  courses.map((course) => (
+            {isLoading ? (
+              <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                Loading courses...
+              </div>
+            ) : courses.length > 0 ? (
+              <Select
+                value={studentData.courseName || ""}
+                onValueChange={(value) => handleInputChange("courseName", value)}
+                disabled={isViewMode}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a course" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((course) => (
                     <SelectItem key={course.id} value={course.name}>
                       {course.name}
                     </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="" disabled>No courses available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                No courses available
+              </div>
+            )}
           </div>
-
-          <div>
+          
+          <div className="space-y-2">
             <Label>Lesson Type*</Label>
-            <RadioGroup
-              value={studentData.lessonType || "individual"}
-              onValueChange={(value) => setStudentData({ lessonType: value as 'individual' | 'group' })}
-              className="flex flex-row space-x-4 mt-2"
-              disabled={isViewMode}
-            >
+            <div className="flex space-x-4">
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="individual" id="individual" />
+                <input
+                  type="radio"
+                  id="individual"
+                  name="lessonType"
+                  value="individual"
+                  checked={studentData.lessonType === "individual"}
+                  onChange={(e) => handleInputChange("lessonType", e.target.value)}
+                  disabled={isViewMode}
+                />
                 <Label htmlFor="individual">Individual</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="group" id="group" />
+                <input
+                  type="radio"
+                  id="group"
+                  name="lessonType"
+                  value="group"
+                  checked={studentData.lessonType === "group"}
+                  onChange={(e) => handleInputChange("lessonType", e.target.value)}
+                  disabled={isViewMode}
+                />
                 <Label htmlFor="group">Group</Label>
               </div>
-            </RadioGroup>
+            </div>
           </div>
-
-          <div>
+          
+          <div className="space-y-2">
             <Label>Age Group*</Label>
-            <RadioGroup
-              value={studentData.ageGroup || "adult"}
-              onValueChange={(value) => setStudentData({ ageGroup: value as 'adult' | 'kid' })}
-              className="flex flex-row space-x-4 mt-2"
-              disabled={isViewMode}
-            >
+            <div className="flex space-x-4">
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="adult" id="adult" />
+                <input
+                  type="radio"
+                  id="adult"
+                  name="ageGroup"
+                  value="adult"
+                  checked={studentData.ageGroup === "adult"}
+                  onChange={(e) => handleInputChange("ageGroup", e.target.value)}
+                  disabled={isViewMode}
+                />
                 <Label htmlFor="adult">Adult</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="kid" id="kid" />
+                <input
+                  type="radio"
+                  id="kid"
+                  name="ageGroup"
+                  value="kid"
+                  checked={studentData.ageGroup === "kid"}
+                  onChange={(e) => handleInputChange("ageGroup", e.target.value)}
+                  disabled={isViewMode}
+                />
                 <Label htmlFor="kid">Kid</Label>
               </div>
-            </RadioGroup>
+            </div>
           </div>
-
-          <div>
+          
+          <div className="space-y-2">
             <Label htmlFor="level">Level*</Label>
-            <Select 
-              value={studentData.level || "beginner"} 
-              onValueChange={(value) => setStudentData({ level: value as 'beginner' | 'intermediate' | 'advanced' | 'fluent' })}
+            <Select
+              value={studentData.level || ""}
+              onValueChange={(value) => handleInputChange("level", value)}
               disabled={isViewMode}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select level" />
+                <SelectValue placeholder="Beginner" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="beginner">Beginner</SelectItem>
@@ -246,134 +247,44 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               </SelectContent>
             </Select>
           </div>
-
-          <div>
+          
+          <div className="space-y-2">
             <Label htmlFor="teacher">Teacher</Label>
-            <Select 
-              value={studentData.teacherId || ""} 
-              onValueChange={(value) => setStudentData({ teacherId: value })}
-              disabled={isViewMode}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a teacher" />
-              </SelectTrigger>
-              <SelectContent>
-                {teachers && teachers.length > 0 ? (
-                  teachers.map((teacher) => (
+            {isLoading ? (
+              <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                Loading teachers...
+              </div>
+            ) : teachers.length > 0 ? (
+              <Select
+                value={studentData.teacherId || ""}
+                onValueChange={(value) => handleInputChange("teacherId", value)}
+                disabled={isViewMode}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a teacher" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teachers.map((teacher) => (
                     <SelectItem key={teacher.id} value={teacher.id}>
                       {teacher.display_name}
                     </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="" disabled>
-                    {teachers === undefined ? "Loading teachers..." : "No teachers available"}
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            {teachers && teachers.length > 0 && (
-              <p className="text-sm text-gray-500 mt-1">
-                {teachers.length} teacher{teachers.length !== 1 ? 's' : ''} available
-              </p>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                No teachers available
+              </div>
             )}
+            <p className="text-sm text-muted-foreground">
+              {teachers.length > 0 ? 
+                `${teachers.length} teacher${teachers.length > 1 ? 's' : ''} available` : 
+                'Please add teachers to your school first'
+              }
+            </p>
           </div>
         </div>
       </div>
-
-      {/* Additional Information Collapsible */}
-      <Collapsible open={additionalInfoOpen} onOpenChange={setAdditionalInfoOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            <span className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Additional Information
-            </span>
-            {additionalInfoOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4 mt-4">
-          <div>
-            <Label htmlFor="dateOfBirth">Date of Birth</Label>
-            <Input
-              id="dateOfBirth"
-              type="date"
-              value={studentData.dateOfBirth || ""}
-              onChange={(e) => setStudentData({ dateOfBirth: e.target.value })}
-              disabled={isViewMode}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Social Media & Contacts Collapsible */}
-      <Collapsible open={socialsOpen} onOpenChange={setSocialsOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            <span className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4" />
-              Social Media & Contacts
-            </span>
-            {socialsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4 mt-4">
-          {socialPlatforms.map((platform) => {
-            const Icon = platform.icon;
-            return (
-              <div key={platform.key} className="space-y-2">
-                <Label htmlFor={platform.key} className="flex items-center gap-2">
-                  <Icon className={`h-4 w-4 ${platform.color}`} />
-                  {platform.label}
-                </Label>
-                <Input
-                  id={platform.key}
-                  value={studentData[platform.key as keyof Student] as string || ""}
-                  onChange={(e) => handleSocialChange(platform.key, e.target.value)}
-                  disabled={isViewMode}
-                  placeholder={platform.placeholder}
-                />
-              </div>
-            );
-          })}
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Password Section for New Students */}
-      {isNewStudent && !isViewMode && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="createPassword"
-                checked={createPassword}
-                onChange={(e) => setCreatePassword(e.target.checked)}
-                className="rounded"
-              />
-              <Label htmlFor="createPassword" className="text-sm">
-                Create account with password
-              </Label>
-            </div>
-            
-            {createPassword && (
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password for student account"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Student will be able to log in to their account
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

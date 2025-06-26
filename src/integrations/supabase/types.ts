@@ -378,65 +378,41 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          date_of_birth: string | null
           email: string
-          facebook: string | null
           first_name: string | null
           id: string
-          instagram: string | null
           last_name: string | null
           password_hash: string | null
           phone: string | null
           role: string
           school_id: string | null
-          skype: string | null
-          telegram: string | null
           updated_at: string
-          viber: string | null
-          whatsapp: string | null
-          zoom: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
-          date_of_birth?: string | null
           email: string
-          facebook?: string | null
           first_name?: string | null
           id?: string
-          instagram?: string | null
           last_name?: string | null
           password_hash?: string | null
           phone?: string | null
           role: string
           school_id?: string | null
-          skype?: string | null
-          telegram?: string | null
           updated_at?: string
-          viber?: string | null
-          whatsapp?: string | null
-          zoom?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
-          date_of_birth?: string | null
           email?: string
-          facebook?: string | null
           first_name?: string | null
           id?: string
-          instagram?: string | null
           last_name?: string | null
           password_hash?: string | null
           phone?: string | null
           role?: string
           school_id?: string | null
-          skype?: string | null
-          telegram?: string | null
           updated_at?: string
-          viber?: string | null
-          whatsapp?: string | null
-          zoom?: string | null
         }
         Relationships: [
           {
@@ -532,29 +508,6 @@ export type Database = {
           age_group: string
           level: string
           phone?: string
-        }
-        Returns: Json
-      }
-      create_student_with_profile: {
-        Args: {
-          current_user_id: string
-          student_email: string
-          student_password: string
-          student_first_name: string
-          student_last_name: string
-          teacher_id: string
-          course_id: string
-          age_group: string
-          level: string
-          phone?: string
-          date_of_birth?: string
-          telegram?: string
-          whatsapp?: string
-          instagram?: string
-          viber?: string
-          facebook?: string
-          skype?: string
-          zoom?: string
         }
         Returns: Json
       }

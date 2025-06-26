@@ -27,15 +27,7 @@ export const useStudentForm = (
     courseName: "",
     level: "beginner",
     paymentStatus: "pending",
-    teacherId: "",
-    dateOfBirth: "",
-    telegram: "",
-    whatsapp: "",
-    instagram: "",
-    viber: "",
-    facebook: "",
-    skype: "",
-    zoom: ""
+    teacherId: ""
   });
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState("defaultPassword123");
@@ -171,15 +163,7 @@ export const useStudentForm = (
         courseName: "",
         level: "beginner",
         paymentStatus: "pending",
-        teacherId: "",
-        dateOfBirth: "",
-        telegram: "",
-        whatsapp: "",
-        instagram: "",
-        viber: "",
-        facebook: "",
-        skype: "",
-        zoom: ""
+        teacherId: ""
       });
       setPassword("defaultPassword123");
       setCreatePassword(true);
@@ -246,7 +230,6 @@ export const useStudentForm = (
         
         console.log("Using course:", course);
         console.log("Using teacher:", selectedTeacher);
-        console.log("Student data being saved:", studentData);
         
         toast.loading("Creating student...");
 
@@ -262,30 +245,14 @@ export const useStudentForm = (
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
           level: studentData.level === 'beginner' ? 'Beginner' : 
             studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
-          phone: studentData.phone,
-          date_of_birth: studentData.dateOfBirth,
-          telegram: studentData.telegram,
-          whatsapp: studentData.whatsapp,
-          instagram: studentData.instagram,
-          viber: studentData.viber,
-          facebook: studentData.facebook,
-          skype: studentData.skype,
-          zoom: studentData.zoom
+          phone: studentData.phone
         });
         
         toast.dismiss();
         
         if (!response || !response.success) {
           console.error("Error creating student:", response?.message);
-          
-          // Handle specific error cases with user-friendly messages
-          if (response?.message?.includes('duplicate key value violates unique constraint "users_email_key"')) {
-            toast.error(`A student with email "${studentData.email}" already exists. Please use a different email address.`);
-          } else if (response?.message?.includes('duplicate') || response?.message?.includes('already exists')) {
-            toast.error("This student already exists. Please check the email address and try again.");
-          } else {
-            toast.error(response?.message || "Failed to create student");
-          }
+          toast.error(response?.message || "Failed to create student");
           setSaving(false);
           return;
         }
@@ -306,15 +273,7 @@ export const useStudentForm = (
             paymentStatus: "pending",
             teacherId: selectedTeacherId,
             lessonsCompleted: 0,
-            nextLesson: 'Not scheduled',
-            dateOfBirth: studentData.dateOfBirth,
-            telegram: studentData.telegram,
-            whatsapp: studentData.whatsapp,
-            instagram: studentData.instagram,
-            viber: studentData.viber,
-            facebook: studentData.facebook,
-            skype: studentData.skype,
-            zoom: studentData.zoom
+            nextLesson: 'Not scheduled'
           };
           onStudentAdded(newStudent);
         }
@@ -325,19 +284,7 @@ export const useStudentForm = (
       }
     } catch (error) {
       console.error("Error saving student:", error);
-      
-      // Handle specific database constraint errors
-      if (error instanceof Error) {
-        if (error.message.includes('duplicate key value violates unique constraint "users_email_key"')) {
-          toast.error(`A student with email "${studentData.email}" already exists. Please use a different email address.`);
-        } else if (error.message.includes('duplicate') || error.message.includes('already exists')) {
-          toast.error("This student already exists. Please check the information and try again.");
-        } else {
-          toast.error("An error occurred while saving the student: " + error.message);
-        }
-      } else {
-        toast.error("An unexpected error occurred while saving the student");
-      }
+      toast.error("An error occurred while saving the student");
     } finally {
       setSaving(false);
     }
