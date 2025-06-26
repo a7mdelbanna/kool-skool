@@ -468,17 +468,21 @@ export const getSchoolLessonSessions = async (schoolId: string) => {
   console.log('=== CLIENT: getSchoolLessonSessions called ===');
   console.log('School ID:', schoolId);
   
-  const { data, error } = await supabase.rpc('get_school_lesson_sessions', {
-    p_school_id: schoolId
-  });
+  // Since the function doesn't exist yet, let's use the existing get_lesson_sessions for each student
+  const students = await getStudentsWithDetails(schoolId);
+  const allSessions = [];
   
-  if (error) {
-    console.error('❌ CLIENT: Error getting school lesson sessions:', error);
-    throw new Error(error.message);
+  for (const student of students) {
+    try {
+      const sessions = await getStudentLessonSessions(student.id);
+      allSessions.push(...sessions);
+    } catch (error) {
+      console.error(`Error fetching sessions for student ${student.id}:`, error);
+    }
   }
   
-  console.log('✅ CLIENT: School lesson sessions retrieved:', data);
-  return data;
+  console.log('✅ CLIENT: School lesson sessions retrieved:', allSessions);
+  return allSessions;
 };
 
 export const handleSessionAction = async (sessionId: string, action: string, newDatetime?: string) => {

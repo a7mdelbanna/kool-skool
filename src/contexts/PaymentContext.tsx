@@ -19,10 +19,60 @@ export interface Session {
   paymentStatus: string;
 }
 
+// Add back missing interfaces for compatibility
+export interface Payment {
+  id: string;
+  amount: number;
+  date: Date;
+  method: string;
+  notes: string;
+  status: "completed" | "pending" | "failed";
+  accountId?: string;
+  studentName?: string;
+}
+
+export interface Expense {
+  id: string;
+  amount: number;
+  date: Date;
+  category: string;
+  name: string;
+  notes: string;
+  recurring: boolean;
+  frequency?: string;
+  accountId?: string;
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  currency: string;
+}
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  expenseNames: string[];
+}
+
 interface PaymentContextType {
   sessions: Session[];
   loading: boolean;
   refreshSessions: () => Promise<void>;
+  // Add back missing properties for compatibility
+  payments: Payment[];
+  expenses: Expense[];
+  accounts: Account[];
+  expenseCategories: ExpenseCategory[];
+  addPayment: (payment: Omit<Payment, 'id'>) => void;
+  updatePayment: (id: string, payment: Partial<Payment>) => void;
+  removePayment: (id: string) => void;
+  addExpense: (expense: Omit<Expense, 'id'>) => void;
+  updateExpense: (id: string, expense: Partial<Expense>) => void;
+  removeExpense: (id: string) => void;
+  updateSessionStatus: (id: string, status: Session['status']) => void;
+  rescheduleSession: (id: string) => void;
+  addSessions: (sessions: Session[]) => void;
 }
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
@@ -30,6 +80,34 @@ const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 export const PaymentProvider = ({ children }: { children: React.ReactNode }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Add back missing state for compatibility
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  
+  // Mock data for compatibility
+  const accounts: Account[] = [
+    { id: '1', name: 'Main Account', currency: 'USD' },
+    { id: '2', name: 'Savings Account', currency: 'USD' }
+  ];
+  
+  const expenseCategories: ExpenseCategory[] = [
+    {
+      id: '1',
+      name: 'Office Supplies',
+      expenseNames: ['Stationery', 'Printer Paper', 'Pens', 'Notebooks']
+    },
+    {
+      id: '2',
+      name: 'Utilities',
+      expenseNames: ['Electricity', 'Internet', 'Phone', 'Water']
+    },
+    {
+      id: '3',
+      name: 'Marketing',
+      expenseNames: ['Social Media Ads', 'Print Materials', 'Website']
+    }
+  ];
 
   const fetchAllSessions = async () => {
     try {
@@ -109,12 +187,75 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
     await fetchAllSessions();
   };
 
+  // Add back missing functions for compatibility
+  const addPayment = (payment: Omit<Payment, 'id'>) => {
+    const newPayment = { ...payment, id: Date.now().toString() };
+    setPayments(prev => [...prev, newPayment]);
+  };
+
+  const updatePayment = (id: string, updates: Partial<Payment>) => {
+    setPayments(prev => prev.map(payment => 
+      payment.id === id ? { ...payment, ...updates } : payment
+    ));
+  };
+
+  const removePayment = (id: string) => {
+    setPayments(prev => prev.filter(payment => payment.id !== id));
+  };
+
+  const addExpense = (expense: Omit<Expense, 'id'>) => {
+    const newExpense = { ...expense, id: Date.now().toString() };
+    setExpenses(prev => [...prev, newExpense]);
+  };
+
+  const updateExpense = (id: string, updates: Partial<Expense>) => {
+    setExpenses(prev => prev.map(expense => 
+      expense.id === id ? { ...expense, ...updates } : expense
+    ));
+  };
+
+  const removeExpense = (id: string) => {
+    setExpenses(prev => prev.filter(expense => expense.id !== id));
+  };
+
+  const updateSessionStatus = (id: string, status: Session['status']) => {
+    setSessions(prev => prev.map(session => 
+      session.id === id ? { ...session, status } : session
+    ));
+  };
+
+  const rescheduleSession = (id: string) => {
+    // This would typically open a reschedule dialog or similar
+    console.log('Rescheduling session:', id);
+  };
+
+  const addSessions = (newSessions: Session[]) => {
+    setSessions(prev => [...prev, ...newSessions]);
+  };
+
   useEffect(() => {
     fetchAllSessions();
   }, []);
 
   return (
-    <PaymentContext.Provider value={{ sessions, loading, refreshSessions }}>
+    <PaymentContext.Provider value={{ 
+      sessions, 
+      loading, 
+      refreshSessions,
+      payments,
+      expenses,
+      accounts,
+      expenseCategories,
+      addPayment,
+      updatePayment,
+      removePayment,
+      addExpense,
+      updateExpense,
+      removeExpense,
+      updateSessionStatus,
+      rescheduleSession,
+      addSessions
+    }}>
       {children}
     </PaymentContext.Provider>
   );
