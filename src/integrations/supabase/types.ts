@@ -305,6 +305,17 @@ export type Database = {
           teacher_email: string
         }[]
       }
+      get_team_members: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          first_name: string
+          last_name: string
+          email: string
+          role: string
+          created_at: string
+        }[]
+      }
       hash_password: {
         Args: { password: string }
         Returns: string
