@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   DollarSign, 
@@ -47,6 +46,7 @@ import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supab
 import { toast } from 'sonner';
 import PaymentDialog from '@/components/PaymentDialog';
 import ExpenseDialog from '@/components/ExpenseDialog';
+import { Expense } from '@/contexts/PaymentContext';
 
 interface StudentPayment {
   id: string;
@@ -59,17 +59,6 @@ interface StudentPayment {
   notes: string;
   created_at: string;
   student_name?: string;
-}
-
-interface Expense {
-  id: string;
-  name: string;
-  category: string;
-  amount: number;
-  date: Date;
-  notes?: string;
-  recurring: boolean;
-  frequency?: string;
 }
 
 const Payments = () => {
