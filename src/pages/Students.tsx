@@ -94,6 +94,7 @@ const Students = () => {
   
   const mapStudentRecordToStudent = (record: StudentRecord): Student => {
     console.log('Mapping student record to UI model:', record);
+    console.log('Raw subscription_progress from database:', record.subscription_progress);
     
     // Format next session date for display
     const formatNextSession = (dateStr: string | null): string => {
@@ -113,7 +114,7 @@ const Students = () => {
       });
     };
     
-    return {
+    const mappedStudent = {
       id: record.id,
       firstName: record.first_name || '',
       lastName: record.last_name || '',
@@ -128,8 +129,12 @@ const Students = () => {
       lessonsCompleted: record.lessons_count || 0,
       nextLesson: formatNextSession(record.next_session_date),
       nextPaymentDate: record.next_payment_date,
-      nextPaymentAmount: record.next_payment_amount
+      nextPaymentAmount: record.next_payment_amount,
+      subscriptionProgress: record.subscription_progress || '0/0'
     };
+    
+    console.log('Mapped student with subscription progress:', mappedStudent.subscriptionProgress);
+    return mappedStudent;
   };
   
   useEffect(() => {
