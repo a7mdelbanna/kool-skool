@@ -133,23 +133,42 @@ export const getSchoolTeamMembers = async (schoolId: string) => {
 };
 
 export const getSchoolTeachers = async (schoolId: string) => {
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, first_name, last_name, email')
-    .eq('school_id', schoolId)
-    .eq('role', 'teacher')
-    .order('first_name');
+  console.log('getSchoolTeachers called with schoolId:', schoolId);
+  
+  try {
+    // Use the RPC function to bypass RLS consistently
+    const { data, error } = await supabase.rpc('get_team_members', {
+      p_school_id: schoolId
+    });
 
-  if (error) {
-    console.error('Error fetching teachers:', error);
+    console.log('Teachers RPC result:', { data, error });
+
+    if (error) {
+      console.error('Error fetching teachers via RPC:', error);
+      throw error;
+    }
+
+    console.log('Successfully fetched teachers:', data);
+    
+    // Filter only teachers and format for compatibility
+    const teachers = (data || [])
+      .filter(member => member.role === 'teacher')
+      .map(teacher => ({
+        id: teacher.id,
+        first_name: teacher.first_name || '',
+        last_name: teacher.last_name || '',
+        email: teacher.email || '',
+        display_name: teacher.first_name && teacher.last_name 
+          ? `${teacher.first_name} ${teacher.last_name}`
+          : teacher.email || `ID: ${teacher.id.substring(0, 8)}`
+      }));
+
+    console.log('Formatted teachers:', teachers);
+    return teachers;
+  } catch (error) {
+    console.error('Error in getSchoolTeachers:', error);
     throw error;
   }
-
-  // Transform data to include display_name for compatibility
-  return data?.map(teacher => ({
-    ...teacher,
-    display_name: `${teacher.first_name} ${teacher.last_name}`
-  })) || [];
 };
 
 export const createStudent = async (studentData: {

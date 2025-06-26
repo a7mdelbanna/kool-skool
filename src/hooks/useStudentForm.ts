@@ -1,11 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
 import { 
   createStudent, 
   getSchoolCourses, 
-  getSchoolTeachers, 
   Course,
   CreateStudentResponse,
   supabase
