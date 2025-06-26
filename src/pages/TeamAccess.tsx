@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Users, UserPlus, Mail, Key, User, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, TeamMemberResponse, getSchoolTeamMembers } from "@/integrations/supabase/client";
+import { supabase, TeamMemberResponse, getTeamMembers } from "@/integrations/supabase/client";
 
 interface TeamMember {
   id: string;
@@ -68,7 +68,7 @@ const TeamAccess = () => {
       }
 
       console.log('Fetching team members for school:', userData.schoolId);
-      const data = await getSchoolTeamMembers(userData.schoolId);
+      const data = await getTeamMembers(userData.schoolId);
       
       console.log('Team members fetched:', data);
       setTeamMembers(data);

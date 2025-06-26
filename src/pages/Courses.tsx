@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { UserContext } from '@/App';
-import { getSchoolCourses, createCourse, Course, supabase } from '@/integrations/supabase/client';
+import { getSchoolCourses, createCourse, Course, updateCourse, deleteCourse } from '@/integrations/supabase/client';
 
 const Courses = () => {
   const { user } = useContext(UserContext);
@@ -76,11 +76,7 @@ const Courses = () => {
     try {
       console.log('Creating course:', { name: newCourseName, type: newCourseType });
       
-      await createCourse({
-        school_id: user.schoolId,
-        course_name: newCourseName.trim(),
-        lesson_type: newCourseType
-      });
+      await createCourse(newCourseName.trim(), newCourseType);
 
       toast({
         title: "Success",
@@ -114,19 +110,7 @@ const Courses = () => {
     try {
       console.log('Updating course:', { id: courseId, name: editCourseName, type: editCourseType });
       
-      // Use RPC function to bypass RLS for updates - using type assertion to work around TypeScript
-      const { error } = await (supabase.rpc as any)('update_course', {
-        p_course_id: courseId,
-        p_name: editCourseName.trim(),
-        p_lesson_type: editCourseType
-      });
-
-      if (error) {
-        console.error('RPC update_course error:', error);
-        throw error;
-      }
-
-      console.log('Course updated successfully via RPC');
+      await updateCourse(courseId, editCourseName.trim(), editCourseType);
 
       toast({
         title: "Success",
@@ -159,17 +143,7 @@ const Courses = () => {
     try {
       console.log('Deleting course:', deleteDialog.course.id);
       
-      // Use RPC function to bypass RLS for deletions - using type assertion to work around TypeScript
-      const { error } = await (supabase.rpc as any)('delete_course', {
-        p_course_id: deleteDialog.course.id
-      });
-
-      if (error) {
-        console.error('RPC delete_course error:', error);
-        throw error;
-      }
-
-      console.log('Course deleted successfully via RPC');
+      await deleteCourse(deleteDialog.course.id);
 
       toast({
         title: "Success",
