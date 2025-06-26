@@ -21,13 +21,7 @@ import {
   XCircle,
   CalendarDays
 } from 'lucide-react';
-import { 
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle 
-} from '@/components/ui/card';
+import FunEmptyState from './FunEmptyState';
 
 interface UpcomingLessonsListProps {
   sessions: Session[];
@@ -243,16 +237,9 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
       {/* Render past sessions if any */}
       {renderSessionGroup("Past Lessons", pastSessions, viewMode !== 'day')}
       
-      {/* Empty state */}
+      {/* Fun empty state */}
       {upcomingSessions.length === 0 && pastSessions.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>No lessons found</CardTitle>
-            <CardDescription>
-              There are no lessons for the selected {viewMode} view.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <FunEmptyState />
       )}
     </div>
   );
