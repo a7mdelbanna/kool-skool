@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
@@ -353,8 +354,12 @@ export const createStudent = async (data: CreateStudentData): Promise<CreateStud
     
     console.log('Student creation result:', result);
     
-    // The result should be a JSON object with success, student_id, and user_id
-    return result as CreateStudentResponse;
+    // Type guard to ensure result has the expected structure
+    if (typeof result === 'object' && result !== null && 'success' in result) {
+      return result as CreateStudentResponse;
+    } else {
+      throw new Error('Invalid response format from database function');
+    }
     
   } catch (error) {
     console.error('Error in createStudent:', error);
