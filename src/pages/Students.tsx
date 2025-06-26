@@ -94,6 +94,25 @@ const Students = () => {
   
   const mapStudentRecordToStudent = (record: StudentRecord): Student => {
     console.log('Mapping student record to UI model:', record);
+    
+    // Format next session date for display
+    const formatNextSession = (dateStr: string | null): string => {
+      if (!dateStr) return 'Not scheduled';
+      
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Tomorrow';
+      if (diffDays > 0 && diffDays <= 7) return `In ${diffDays} days`;
+      
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    };
+    
     return {
       id: record.id,
       firstName: record.first_name || '',
@@ -104,11 +123,10 @@ const Students = () => {
       ageGroup: (record.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
       level: (record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
       phone: record.phone,
-      // Use the calculated payment status from the database, with fallback
       paymentStatus: (record.payment_status || 'pending') as 'paid' | 'pending' | 'overdue',
       teacherId: record.teacher_id,
-      lessonsCompleted: 0,
-      nextLesson: 'Not scheduled',
+      lessonsCompleted: record.lessons_count || 0,
+      nextLesson: formatNextSession(record.next_session_date),
       nextPaymentDate: undefined
     };
   };

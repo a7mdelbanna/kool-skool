@@ -65,6 +65,8 @@ export interface StudentRecord {
   teacher_last_name: string;
   teacher_email: string;
   payment_status: string;
+  lessons_count: number;
+  next_session_date: string | null;
 }
 
 // Updated interface to match the new function signature
