@@ -416,8 +416,8 @@ export const deleteStudentSubscription = async (subscriptionId: string) => {
       throw new Error(`Database error: ${error.message}`);
     }
 
-    // Type assertion for the response data
-    const response = data as DeleteSubscriptionResponse;
+    // Properly type the response data by casting to unknown first, then to our interface
+    const response = data as unknown as DeleteSubscriptionResponse;
 
     // The database function returns a JSON object with success/failure info
     if (!response || !response.success) {
