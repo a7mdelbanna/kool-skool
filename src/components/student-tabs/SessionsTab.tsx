@@ -486,11 +486,11 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
               {!isViewMode && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {session.status === "scheduled" && (
-                    <>
+                    <div className="flex gap-2 w-full">
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="border-green-500 text-green-500 hover:bg-green-50"
+                        className="border-green-500 text-green-500 hover:bg-green-50 flex-1"
                         onClick={() => {
                           setSelectedSession(session);
                           setCompleteDialogOpen(true);
@@ -503,7 +503,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="border-red-500 text-red-500 hover:bg-red-50"
+                        className="border-red-500 text-red-500 hover:bg-red-50 flex-1"
                         onClick={() => {
                           setSelectedSession(session);
                           setCancelDialogOpen(true);
@@ -516,7 +516,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                        className="border-orange-500 text-orange-500 hover:bg-orange-50 flex-1"
                         onClick={() => {
                           setSelectedSession(session);
                           setRescheduleDialogOpen(true);
@@ -529,14 +529,14 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                        className="border-blue-500 text-blue-500 hover:bg-blue-50 flex-1"
                         onClick={() => handleMoveSession(session.id)}
                         disabled={loading}
                       >
                         <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                        Move to End
+                        Move
                       </Button>
-                    </>
+                    </div>
                   )}
                   
                   {(session.status === "completed" || session.status === "cancelled" || session.status === "rescheduled") && (
