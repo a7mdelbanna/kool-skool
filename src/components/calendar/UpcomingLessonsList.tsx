@@ -121,36 +121,58 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ searchQuery =
             return (
               <div 
                 key={session.id} 
-                className="border rounded-md p-3 hover:bg-accent cursor-pointer transition-colors"
+                className="border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors"
                 onClick={() => handleLessonClick(session)}
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-medium">{studentName}</div>
-                    <div className="text-sm text-muted-foreground">{subject} Lesson</div>
+                <div className="flex items-center gap-4">
+                  {/* Time Section - Left Side */}
+                  <div className="flex-shrink-0 text-center min-w-[80px]">
+                    <div className="text-2xl font-bold text-primary">
+                      {session.time.split(':')[0]}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      :{session.time.split(':')[1]}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {session.duration}
+                    </div>
                   </div>
-                  <Badge 
-                    variant="outline" 
-                    className={
-                      session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
-                      session.status === "canceled" ? "bg-orange-50 text-orange-700 border-orange-300" :
-                      session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
-                      "bg-blue-50 text-blue-700 border-blue-300"
-                    }
-                  >
-                    <span className="mr-1">{renderStatusIcon(session.status)}</span>
-                    {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                  </Badge>
-                </div>
-                
-                <div className="flex mt-2 items-center text-sm text-muted-foreground gap-4">
-                  <div className="flex items-center">
-                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-                    {dateLabel}
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="mr-1 h-3.5 w-3.5" />
-                    {session.time} ({session.duration})
+                  
+                  {/* Divider */}
+                  <div className="w-px h-16 bg-border"></div>
+                  
+                  {/* Main Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-lg text-foreground truncate">
+                          {studentName}
+                        </div>
+                        <div className="text-sm text-muted-foreground mb-2">
+                          {subject} Lesson
+                        </div>
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                          {dateLabel}
+                        </div>
+                      </div>
+                      
+                      {/* Status Badge */}
+                      <div className="flex-shrink-0 ml-4">
+                        <Badge 
+                          variant="outline" 
+                          className={
+                            session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
+                            session.status === "canceled" ? "bg-orange-50 text-orange-700 border-orange-300" :
+                            session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
+                            "bg-blue-50 text-blue-700 border-blue-300"
+                          }
+                        >
+                          <span className="mr-1">{renderStatusIcon(session.status)}</span>
+                          {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
