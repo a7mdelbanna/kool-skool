@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,7 +56,7 @@ const Students = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
-  const [newCourseType, setNewCourseType] = useState<'Individual' | 'Group'>('Individual');
+  const [newCourseType, setNewCourseType] = useState<'individual' | 'group'>('individual');
   const [savingCourse, setSavingCourse] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -289,7 +288,7 @@ const Students = () => {
       const courseData = await createCourse({
         school_id: user.schoolId,
         course_name: newCourseName.trim(),
-        lesson_type: newCourseType
+        lesson_type: newCourseType // Now sending lowercase values
       });
       
       toast.dismiss();
@@ -714,9 +713,9 @@ const Students = () => {
                   <input 
                     type="radio" 
                     id="individual" 
-                    value="Individual"
-                    checked={newCourseType === 'Individual'}
-                    onChange={() => setNewCourseType('Individual')}
+                    value="individual"
+                    checked={newCourseType === 'individual'}
+                    onChange={() => setNewCourseType('individual')}
                     className="form-radio h-4 w-4"
                   />
                   <label htmlFor="individual" className="text-sm">Individual</label>
@@ -725,9 +724,9 @@ const Students = () => {
                   <input 
                     type="radio" 
                     id="group" 
-                    value="Group"
-                    checked={newCourseType === 'Group'}
-                    onChange={() => setNewCourseType('Group')}
+                    value="group"
+                    checked={newCourseType === 'group'}
+                    onChange={() => setNewCourseType('group')}
                     className="form-radio h-4 w-4"
                   />
                   <label htmlFor="group" className="text-sm">Group</label>
