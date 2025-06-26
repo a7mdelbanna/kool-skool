@@ -60,6 +60,12 @@ interface DatabaseSession {
   moved_from_session_id?: string | null;
 }
 
+interface SessionActionResponse {
+  success: boolean;
+  message: string;
+  new_session_id?: string;
+}
+
 const SessionsTab: React.FC<SessionsTabProps> = ({ 
   studentData, 
   setStudentData, 
@@ -203,7 +209,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           throw new Error(`Unsupported status: ${newStatus}`);
       }
       
-      const result = await handleSessionAction(sessionId, action);
+      const rawResult = await handleSessionAction(sessionId, action);
+      
+      // Type cast the JSON response to our expected interface
+      const result = rawResult as unknown as SessionActionResponse;
       
       if (result.success) {
         toast({
@@ -233,7 +242,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       setLoading(true);
       console.log(`🔄 Moving session ${sessionId} to next available slot`);
       
-      const result = await handleSessionAction(sessionId, 'moved');
+      const rawResult = await handleSessionAction(sessionId, 'moved');
+      
+      // Type cast the JSON response to our expected interface
+      const result = rawResult as unknown as SessionActionResponse;
       
       if (result.success) {
         toast({
