@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -58,9 +57,9 @@ export const useStudentForm = (
     error: coursesError,
     refetch: refetchCourses 
   } = useQuery({
-    queryKey: ['courses', schoolId, 'direct'],
+    queryKey: ['courses', schoolId, 'student-form'],
     queryFn: async () => {
-      console.log('Executing direct courses query with schoolId:', schoolId);
+      console.log('Executing courses query with schoolId:', schoolId);
       
       if (!schoolId) {
         console.warn('No school ID available for fetching courses');
@@ -68,35 +67,20 @@ export const useStudentForm = (
       }
       
       try {
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('school_id', schoolId);
+        console.log('Fetching courses using getSchoolCourses RPC function');
+        const coursesData = await getSchoolCourses(schoolId);
         
-        console.log('Direct courses query response - Data:', coursesData);
-        console.log('Direct courses query response - Error:', coursesError);
-        
-        if (coursesError) {
-          console.error('Error fetching courses directly:', coursesError);
-          throw new Error(`Failed to fetch courses: ${coursesError.message}`);
-        }
+        console.log('RPC getSchoolCourses response:', coursesData);
         
         if (!coursesData || coursesData.length === 0) {
           console.warn('No courses found for school:', schoolId);
           return { data: [] as Course[] };
         }
         
-        const formattedCourses = coursesData.map(course => ({
-          id: course.id,
-          school_id: course.school_id,
-          name: course.name,
-          lesson_type: course.lesson_type
-        })) as Course[];
+        console.log('Successfully fetched courses (count):', coursesData.length);
+        console.log('First course:', coursesData[0]);
         
-        console.log('Formatted courses (count):', formattedCourses.length);
-        console.log('Formatted courses data:', formattedCourses);
-        
-        return { data: formattedCourses };
+        return { data: coursesData };
       } catch (error) {
         console.error('Exception in courses query:', error);
         toast.error("Failed to load courses: " + (error as Error).message);
