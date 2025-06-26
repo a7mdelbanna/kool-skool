@@ -74,6 +74,25 @@ export interface CurrentUserInfo {
   user_role: string;
 }
 
+// Helper function to get current user from localStorage
+const getCurrentUserFromStorage = () => {
+  try {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      const user = JSON.parse(userData);
+      return {
+        user_id: user.id,
+        user_school_id: user.schoolId,
+        user_role: user.role
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error parsing user data from localStorage:', error);
+    return null;
+  }
+};
+
 export const user_login = async (email: string, password: string): Promise<UserLoginResponse> => {
   const { data, error } = await supabase.rpc('user_login', {
     user_email: email,
@@ -114,14 +133,15 @@ export const verify_license_and_create_school = async (
 };
 
 export const getCurrentUserInfo = async (): Promise<CurrentUserInfo[]> => {
-  const { data, error } = await supabase.rpc('get_current_user_info');
+  // Get user info from localStorage instead of database
+  const userInfo = getCurrentUserFromStorage();
   
-  if (error) {
-    console.error('Error getting current user info:', error);
-    throw new Error(error.message);
+  if (!userInfo) {
+    console.error('No user info found in localStorage');
+    return [];
   }
   
-  return data as CurrentUserInfo[];
+  return [userInfo as CurrentUserInfo];
 };
 
 export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
@@ -313,21 +333,21 @@ export const addStudentSubscription = async (subscriptionData: {
   initial_payment_amount?: number;
   payment_method?: string;
   payment_notes?: string;
+  lesson_duration_minutes?: number;
 }) => {
   console.log('🚀 addStudentSubscription called with data:', subscriptionData);
   
-  // Get current user info
-  const userInfo = await getCurrentUserInfo();
-  console.log('🔑 Raw user info response:', userInfo);
+  // Get current user info from localStorage instead of database
+  const userInfo = getCurrentUserFromStorage();
+  console.log('🔑 User info from localStorage:', userInfo);
   
-  if (!userInfo || userInfo.length === 0) {
-    console.error('❌ No user info returned from getCurrentUserInfo');
-    throw new Error('User not authenticated');
+  if (!userInfo) {
+    console.error('❌ No user info found in localStorage');
+    throw new Error('User not authenticated - please log in again');
   }
   
-  const userRecord = userInfo[0];
-  const currentUserId = userRecord.user_id;
-  const currentSchoolId = userRecord.user_school_id;
+  const currentUserId = userInfo.user_id;
+  const currentSchoolId = userInfo.user_school_id;
   
   if (!currentUserId || !currentSchoolId) {
     console.error('❌ User information incomplete:', { currentUserId, currentSchoolId });
