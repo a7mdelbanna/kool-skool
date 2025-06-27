@@ -1,115 +1,70 @@
-import React, { useState } from 'react';
-import { 
-  DollarSign, 
-  Search, 
-  Filter, 
-  Download,
-  ArrowUpDown,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  Calendar,
-  User,
-  PlusCircle,
-  Pencil,
-  Trash2,
-  ReceiptIcon,
-  Wallet,
-  Repeat,
-  Banknote,
-  CircleDollarSign
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, { useState, useEffect } from 'react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getCurrentUserInfo, getStudentsWithDetails, getStudentPayments, getSchoolTransactions } from '@/integrations/supabase/client';
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { CalendarIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { format } from 'date-fns';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getCurrentUserInfo, getSchoolTransactions, createTransaction } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import PaymentDialog from '@/components/PaymentDialog';
-import ExpenseDialog from '@/components/ExpenseDialog';
-import { Expense } from '@/contexts/PaymentContext';
-import PaymentTagSelector from '@/components/PaymentTagSelector';
-import TagManager from '@/components/TagManager';
-import AddTransactionDialog from '@/components/AddTransactionDialog';
 
-interface StudentPayment {
-  id: string;
-  student_id: string;
-  amount: number;
-  currency: string;
-  payment_date: string;
-  payment_method: string;
-  status: string;
-  notes: string;
-  created_at: string;
-  student_name?: string;
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  color: string;
-}
-
-interface Transaction {
-  id: string;
-  type: 'income' | 'expense' | 'transfer';
-  amount: number;
-  currency: string;
-  transaction_date: string;
-  description: string;
-  notes: string;
-  status: string;
-  contact_name: string;
-  contact_type: string;
-  category_name: string;
-  category_full_path: string;
-  from_account_name: string;
-  to_account_name: string;
-  payment_method: string;
-  receipt_number: string;
-  receipt_url: string;
-  tax_amount: number;
-  tax_rate: number;
-  is_recurring: boolean;
-  recurring_frequency: string;
-  created_at: string;
-  tags: Tag[] | null;
-}
-
-const Payments = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('transactions');
-  const [sortColumn, setSortColumn] = useState('transaction_date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  
-  // Dialog states
-  const [addTransactionDialogOpen, setAddTransactionDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<any>(undefined);
-  const [selectedExpense, setSelectedExpense] = useState<Expense | undefined>(undefined);
-  const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
-
+const PaymentsPage = () => {
+  const [date, setDate] = React.useState<Date | undefined>(new Date())
+  const [formData, setFormData] = useState({
+    type: 'income',
+    amount: '',
+    currency: 'USD',
+    transaction_date: new Date().toISOString().split('T')[0],
+    description: '',
+    notes: '',
+    contact_id: '',
+    category_id: '',
+    from_account_id: '',
+    to_account_id: '',
+    payment_method: '',
+    receipt_number: '',
+    receipt_url: '',
+    tax_amount: '',
+    tax_rate: '',
+    is_recurring: false,
+    recurring_frequency: '',
+    recurring_end_date: '',
+    tag_ids: [] as string[]
+  });
+  const [isCreating, setIsCreating] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch user info
@@ -118,627 +73,261 @@ const Payments = () => {
     queryFn: getCurrentUserInfo,
   });
 
-  // Fetch school transactions (new unified data)
-  const { data: rawTransactions = [], isLoading: transactionsLoading } = useQuery({
+  // Fetch transactions
+  const { data: rawTransactions = [], refetch } = useQuery({
     queryKey: ['school-transactions', userInfo?.[0]?.user_school_id],
     queryFn: () => getSchoolTransactions(userInfo?.[0]?.user_school_id as string),
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
-  // Transform transactions to ensure tags are properly typed
-  const transactions: Transaction[] = rawTransactions.map((transaction: any) => ({
-    ...transaction,
-    tags: Array.isArray(transaction.tags) 
-      ? transaction.tags as Tag[]
-      : typeof transaction.tags === 'string'
-        ? JSON.parse(transaction.tags) as Tag[]
-        : []
-  }));
+  // Transform the data to include the tag information
+  const transactions = rawTransactions ? rawTransactions.map(transaction => {
+    const tags = transaction.tags ? transaction.tags.map(tag => tag.name) : [];
+    return {
+      ...transaction,
+      tags: tags
+    };
+  }) : [];
 
-  // Fetch students to get student payments (keep for backward compatibility)
-  const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ['students-with-details', userInfo?.[0]?.user_school_id],
-    queryFn: () => getStudentsWithDetails(userInfo?.[0]?.user_school_id as string),
-    enabled: !!userInfo?.[0]?.user_school_id,
-  });
-
-  // Fetch all student payments using the proper Supabase client function (keep for backward compatibility)
-  const { data: allPayments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ['all-student-payments', students],
-    queryFn: async () => {
-      if (!students.length) return [];
-      
-      console.log('🔄 Fetching payments for', students.length, 'students');
-      const payments: StudentPayment[] = [];
-      
-      for (const student of students) {
-        try {
-          console.log('📝 Fetching payments for student:', student.id, student.first_name, student.last_name);
-          
-          const studentPayments = await getStudentPayments(student.id);
-          
-          console.log('💰 Found', studentPayments.length, 'payments for', student.first_name, student.last_name);
-          
-          const paymentsWithStudentName = studentPayments.map((payment: any) => ({
-            ...payment,
-            student_name: `${student.first_name} ${student.last_name}`
-          }));
-          
-          payments.push(...paymentsWithStudentName);
-        } catch (error) {
-          console.error(`❌ Error fetching payments for student ${student.id}:`, error);
-        }
-      }
-      
-      console.log('✅ Total payments fetched:', payments.length);
-      return payments;
-    },
-    enabled: students.length > 0,
-  });
-
-  // Mock expenses data (you can replace this with real data later)
-  const expenses: Expense[] = [];
-  
-  const isLoading = studentsLoading || paymentsLoading || transactionsLoading;
-  
-  console.log('📊 Payments data:', { 
-    transactions: transactions.length,
-    allPayments: allPayments.length, 
-    isLoading, 
-    studentsCount: students.length 
-  });
-  
-  // Calculate totals for payments (combine old payments and new transactions)
-  const incomeTransactions = transactions.filter(t => t.type === 'income');
-  const expenseTransactions = transactions.filter(t => t.type === 'expense');
-  const allIncomePayments = [...allPayments.filter(p => p.status === 'completed'), ...incomeTransactions];
-  const allExpensePayments = [...expenses, ...expenseTransactions];
-  
-  const totalPaid = allIncomePayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const totalPending = allPayments
-    .filter(payment => payment.status === 'pending')
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const totalOverdue = allPayments
-    .filter(payment => payment.status === 'failed')
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const totalPayments = totalPaid;
-  
-  // Calculate total for expenses (combine old expenses and new expense transactions)
-  const totalExpenses = allExpensePayments.reduce((sum, expense) => sum + Number(expense.amount), 0);
-  
-  // Calculate net income (revenue - expenses)
-  const netIncome = totalPayments - totalExpenses;
-  
-  const handleSort = (column: string) => {
-    if (column === sortColumn) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
-  
-  // Open payment dialog for adding
-  const handleAddPayment = () => {
-    setSelectedPayment(undefined);
-    setDialogMode('add');
-    setPaymentDialogOpen(true);
-  };
-  
-  // Open payment dialog for editing
-  const handleEditPayment = (payment: StudentPayment) => {
-    setSelectedPayment(payment);
-    setDialogMode('edit');
-    setPaymentDialogOpen(true);
-  };
-  
-  // Delete payment with confirmation
-  const handleDeletePayment = (payment: StudentPayment) => {
-    toast.success(`Payment of $${payment.amount} would be deleted`);
-  };
-  
-  // Open expense dialog for adding
-  const handleAddExpense = () => {
-    setSelectedExpense(undefined);
-    setDialogMode('add');
-    setExpenseDialogOpen(true);
-  };
-  
-  // Open expense dialog for editing
-  const handleEditExpense = (expense: Expense) => {
-    setSelectedExpense(expense);
-    setDialogMode('edit');
-    setExpenseDialogOpen(true);
-  };
-  
-  // Delete expense with confirmation
-  const handleDeleteExpense = (expense: Expense) => {
-    toast.success(`Expense of $${expense.amount} would be deleted`);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle adding new transaction - simplified to just refresh data
-  const handleAddTransactionSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
-    toast.success('Transaction created successfully');
+  const handleDateChange = (date: Date | undefined) => {
+    setDate(date);
+    setFormData(prev => ({ ...prev, transaction_date: date ? format(date, 'yyyy-MM-dd') : '' }));
   };
 
-  // Handle adding new transaction
-  const handleAddTransaction = async (transactionData: any) => {
+  const handleCreateTransaction = async (formData: any) => {
     try {
+      // Validate required fields
+      if (!formData.amount || !formData.description) {
+        toast.error('Amount and description are required');
+        return;
+      }
+
+      // Get current user data from localStorage
+      const userData = localStorage.getItem('user');
+      const user = userData ? JSON.parse(userData) : null;
+
+      if (!user || !user.schoolId) {
+        toast.error('User not authenticated or school not found');
+        return;
+      }
+
+      // Call the imported createTransaction function from the Supabase client
       await createTransaction({
-        school_id: userInfo?.[0]?.user_school_id as string,
-        ...transactionData,
+        school_id: user.schoolId,
+        type: formData.type || 'income',
+        amount: parseFloat(formData.amount),
+        currency: formData.currency || 'USD',
+        transaction_date: formData.transaction_date || new Date().toISOString().split('T')[0],
+        description: formData.description,
+        notes: formData.notes,
+        contact_id: formData.contact_id,
+        category_id: formData.category_id,
+        from_account_id: formData.from_account_id,
+        to_account_id: formData.to_account_id,
+        payment_method: formData.payment_method,
+        receipt_number: formData.receipt_number,
+        receipt_url: formData.receipt_url,
+        tax_amount: formData.tax_amount ? parseFloat(formData.tax_amount) : 0,
+        tax_rate: formData.tax_rate ? parseFloat(formData.tax_rate) : 0,
+        is_recurring: formData.is_recurring || false,
+        recurring_frequency: formData.recurring_frequency,
+        recurring_end_date: formData.recurring_end_date,
+        tag_ids: formData.tag_ids
       });
-      handleAddTransactionSuccess();
+
+      toast.success('Transaction created successfully');
+      refetch();
     } catch (error: any) {
+      console.error('Error creating transaction:', error);
       toast.error('Failed to create transaction: ' + error.message);
     }
   };
-  
-  // Get status badge for payments
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 gap-1">
-            <CheckCircle className="h-3 w-3" />
-            <span>Completed</span>
-          </Badge>
-        );
-      case 'pending':
-        return (
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 gap-1">
-            <Clock className="h-3 w-3" />
-            <span>Pending</span>
-          </Badge>
-        );
-      case 'cancelled':
-        return (
-          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 gap-1">
-            <AlertCircle className="h-3 w-3" />
-            <span>Cancelled</span>
-          </Badge>
-        );
-      default:
-        return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreating(true);
+    try {
+      await handleCreateTransaction(formData);
+      setFormData({
+        type: 'income',
+        amount: '',
+        currency: 'USD',
+        transaction_date: new Date().toISOString().split('T')[0],
+        description: '',
+        notes: '',
+        contact_id: '',
+        category_id: '',
+        from_account_id: '',
+        to_account_id: '',
+        payment_method: '',
+        receipt_number: '',
+        receipt_url: '',
+        tax_amount: '',
+        tax_rate: '',
+        is_recurring: false,
+        recurring_frequency: '',
+        recurring_end_date: '',
+        tag_ids: []
+      });
+    } finally {
+      setIsCreating(false);
     }
   };
 
-  const getTransactionTypeColor = (type: string) => {
-    switch (type) {
-      case 'income': return 'text-green-600';
-      case 'expense': return 'text-red-600';
-      case 'transfer': return 'text-blue-600';
-      default: return 'text-gray-600';
-    }
-  };
-  
-  // Filter and sort transactions
-  const filteredTransactions = transactions
-    .filter(transaction => 
-      transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortColumn === 'transaction_date') {
-        return sortDirection === 'asc' 
-          ? new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime()
-          : new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime();
-      } else if (sortColumn === 'amount') {
-        return sortDirection === 'asc' 
-          ? Number(a.amount) - Number(b.amount)
-          : Number(b.amount) - Number(a.amount);
-      } else if (sortColumn === 'type') {
-        return sortDirection === 'asc'
-          ? a.type.localeCompare(b.type)
-          : b.type.localeCompare(a.type);
-      }
-      return 0;
-    });
-
-  // Filter and sort payments (keep for backward compatibility)
-  const filteredPayments = allPayments
-    .filter(payment => 
-      payment.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.payment_method?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.student_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortColumn === 'payment_date') {
-        return sortDirection === 'asc' 
-          ? new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
-          : new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime();
-      } else if (sortColumn === 'amount') {
-        return sortDirection === 'asc' 
-          ? Number(a.amount) - Number(b.amount)
-          : Number(b.amount) - Number(a.amount);
-      } else if (sortColumn === 'student_name') {
-        const nameA = a.student_name || '';
-        const nameB = b.student_name || '';
-        return sortDirection === 'asc'
-          ? nameA.localeCompare(nameB)
-          : nameB.localeCompare(nameA);
-      }
-      return 0;
-    });
-  
-  // Filter and sort expenses (empty for now)
-  const filteredExpenses = expenses
-    .filter(expense => 
-      expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-  // Handle tag changes to refresh the payments list
-  const handleTagsChange = () => {
-    queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
-    queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-muted-foreground">Loading transactions...</div>
-        </div>
-      </div>
-    );
-  }
-  
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Payments & Transactions</h1>
-          <p className="text-muted-foreground mt-1">Track and manage your financial transactions</p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
-          <Button 
-            onClick={() => setAddTransactionDialogOpen(true)}
-            className="gap-2 bg-primary hover:bg-primary/90"
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Add Transaction</span>
-          </Button>
-        </div>
-      </div>
-      
-      {/* Add Tag Manager */}
-      <TagManager />
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-          <TabsList>
-            <TabsTrigger value="transactions" className="gap-2">
-              <Repeat className="h-4 w-4" />
-              All Transactions ({transactions.length})
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2">
-              <DollarSign className="h-4 w-4" />
-              Student Payments ({allPayments.length})
-            </TabsTrigger>
-            <TabsTrigger value="expenses" className="gap-2">
-              <ReceiptIcon className="h-4 w-4" />
-              Expenses ({expenses.length})
-            </TabsTrigger>
-          </TabsList>
-          
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="relative flex-1">
-              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input 
-                placeholder={activeTab === "transactions" ? "Search transactions..." : activeTab === "payments" ? "Search payments..." : "Search expenses..."}
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+    <div className="container py-8">
+      <h1 className="text-2xl font-bold mb-4">Payments</h1>
+
+      {/* Transaction Form */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Add Transaction</CardTitle>
+          <CardDescription>Record a new income or expense.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="grid gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="amount">Amount</Label>
+                <Input
+                  type="number"
+                  id="amount"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={handleInputChange}
+                  placeholder="Enter amount"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="currency">Currency</Label>
+                <Select
+                  value={formData.currency}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Input
+                type="text"
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Enter description"
+                required
               />
             </div>
-            
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              <span>Filter</span>
+
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                placeholder="Enter notes"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="transaction_date">Transaction Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full pl-3 text-left font-normal",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    {date ? (
+                      format(date, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={handleDateChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <Button type="submit" disabled={isCreating}>
+              {isCreating ? "Creating..." : "Create Transaction"}
             </Button>
-          </div>
-        </div>
-        
-        <TabsContent value="transactions" className="mt-0">
-          <div className="rounded-lg border glass glass-hover overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('type')}
-                      className="gap-1 font-medium"
-                    >
-                      Type
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('amount')}
-                      className="gap-1 font-medium"
-                    >
-                      Amount
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('transaction_date')}
-                      className="gap-1 font-medium"
-                    >
-                      Date
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTransactions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
-                      {transactions.length === 0 ? 'No transactions found.' : 'No transactions match your search.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredTransactions.map((transaction) => (
-                    <TableRow key={transaction.id} className="cursor-pointer hover:bg-accent/30">
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={cn(
-                            "capitalize",
-                            transaction.type === 'income' && "bg-green-100 text-green-800 border-green-200",
-                            transaction.type === 'expense' && "bg-red-100 text-red-800 border-red-200",
-                            transaction.type === 'transfer' && "bg-blue-100 text-blue-800 border-blue-200"
-                          )}
-                        >
-                          {transaction.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{transaction.description}</div>
-                        {transaction.notes && (
-                          <div className="text-sm text-muted-foreground truncate max-w-[200px]">
-                            {transaction.notes}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className={cn("font-medium", getTransactionTypeColor(transaction.type))}>
-                        {transaction.currency === 'EUR' ? '€' : transaction.currency === 'RUB' ? '₽' : '$'}{Number(transaction.amount).toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(transaction.transaction_date), 'MMM d, yyyy')}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {transaction.contact_name && (
-                          <div>
-                            <div className="font-medium">{transaction.contact_name}</div>
-                            <div className="text-sm text-muted-foreground capitalize">{transaction.contact_type}</div>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.category_full_path && (
-                          <div className="text-sm">{transaction.category_full_path}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {transaction.tags && transaction.tags.map((tag: Tag) => (
-                            <Badge 
-                              key={tag.id} 
-                              variant="outline" 
-                              className="text-xs"
-                              style={{ 
-                                backgroundColor: tag.color + '20',
-                                borderColor: tag.color,
-                                color: tag.color 
-                              }}
-                            >
-                              {tag.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon">
-                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button variant="ghost" size="icon">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="payments" className="mt-0">
-          <div className="rounded-lg border glass glass-hover overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[250px]">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('student_name')}
-                      className="gap-1 font-medium"
-                    >
-                      Student
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('amount')}
-                      className="gap-1 font-medium"
-                    >
-                      Amount
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('payment_date')}
-                      className="gap-1 font-medium"
-                    >
-                      Date
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPayments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      {allPayments.length === 0 ? 'No payments found.' : 'No payments match your search.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredPayments.map((payment) => (
-                    <TableRow key={payment.id} className="cursor-pointer hover:bg-accent/30">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src="" alt={payment.student_name || ''} />
-                            <AvatarFallback className="bg-primary/10 text-primary">
-                              {payment.student_name ? payment.student_name.split(' ').map(n => n[0]).join('') : '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{payment.student_name || 'Unknown Student'}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(payment.status)}</TableCell>
-                      <TableCell className="font-medium">
-                        {payment.currency === 'EUR' ? '€' : payment.currency === 'RUB' ? '₽' : '$'}{Number(payment.amount).toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(payment.payment_date), 'MMM d, yyyy')}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{payment.payment_method}</TableCell>
-                      <TableCell>
-                        <PaymentTagSelector
-                          paymentId={payment.id}
-                          onTagsChange={handleTagsChange}
-                        />
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate">{payment.notes}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditPayment(payment)}
-                          >
-                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeletePayment(payment)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="expenses" className="mt-0">
-          <div className="rounded-lg border glass glass-hover overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Recurring</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    No expenses found.
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Transaction Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Transactions</CardTitle>
+          <CardDescription>A history of all your transactions.</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[100px]">Date</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Tags</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell className="font-medium">{transaction.transaction_date}</TableCell>
+                  <TableCell>{transaction.description}</TableCell>
+                  <TableCell>{transaction.amount} {transaction.currency}</TableCell>
+                  <TableCell>
+                    <Badge variant={transaction.type === 'income' ? 'outline' : 'destructive'}>
+                      {transaction.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {transaction.tags && transaction.tags.length > 0 ? (
+                      transaction.tags.map((tag, index) => (
+                        <Badge key={index} className="mr-1">{tag}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-muted-foreground">No tags</span>
+                    )}
                   </TableCell>
                 </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Dialogs */}
-      <AddTransactionDialog
-        open={addTransactionDialogOpen}
-        onOpenChange={setAddTransactionDialogOpen}
-        onSuccess={handleAddTransactionSuccess}
-      />
-
-      <PaymentDialog 
-        open={paymentDialogOpen} 
-        onOpenChange={setPaymentDialogOpen}
-        payment={selectedPayment}
-        mode={dialogMode}
-      />
-
-      <ExpenseDialog
-        open={expenseDialogOpen}
-        onOpenChange={setExpenseDialogOpen}
-        expense={selectedExpense}
-        mode={dialogMode}
-      />
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
-export default Payments;
+export default PaymentsPage;

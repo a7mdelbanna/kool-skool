@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -241,9 +242,10 @@ export const useStudentForm = (
           last_name: studentData.lastName as string,
           teacher_id: selectedTeacherId,
           course_id: course.id,
-          age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
-          level: studentData.level === 'beginner' ? 'Beginner' : 
-            studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
+          age_group: studentData.ageGroup === 'adult' ? 'adult' : 'kid',
+          level: studentData.level === 'beginner' ? 'beginner' : 
+            studentData.level === 'intermediate' ? 'intermediate' : 
+            studentData.level === 'advanced' ? 'advanced' : 'beginner',
           phone: studentData.phone
         });
         
