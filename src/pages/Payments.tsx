@@ -29,7 +29,7 @@ import PaymentTagSelector from '@/components/PaymentTagSelector';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
 import TagManager from '@/components/TagManager';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, getCurrentUserInfo } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -54,17 +54,24 @@ const PaymentsPage = () => {
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch current user info
-  const { data: userInfo } = useQuery({
-    queryKey: ['current-user-info'],
-    queryFn: getCurrentUserInfo,
-  });
+  // Get school ID from localStorage
+  const getSchoolId = () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    const user = JSON.parse(userData);
+    return user.schoolId;
+  };
+
+  const schoolId = getSchoolId();
 
   // Fetch all student payments
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ['all-student-payments', userInfo?.[0]?.user_school_id],
+    queryKey: ['all-student-payments', schoolId],
     queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
+      if (!schoolId) {
+        console.log('No school ID available for payments');
+        return [];
+      }
       
       // First get all students in the school
       const { data: students, error: studentsError } = await supabase
@@ -74,7 +81,7 @@ const PaymentsPage = () => {
           user_id,
           users!inner(first_name, last_name)
         `)
-        .eq('school_id', userInfo[0].user_school_id);
+        .eq('school_id', schoolId);
 
       if (studentsError) throw studentsError;
 
@@ -101,22 +108,25 @@ const PaymentsPage = () => {
         };
       }) || [];
     },
-    enabled: !!userInfo?.[0]?.user_school_id,
+    enabled: !!schoolId,
   });
 
   // Fetch all transactions from the new transactions table
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
-    queryKey: ['school-transactions', userInfo?.[0]?.user_school_id],
+    queryKey: ['school-transactions', schoolId],
     queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
+      if (!schoolId) {
+        console.log('No school ID available for transactions');
+        return [];
+      }
       
       const { data, error } = await supabase
-        .rpc('get_school_transactions', { p_school_id: userInfo[0].user_school_id });
+        .rpc('get_school_transactions', { p_school_id: schoolId });
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!userInfo?.[0]?.user_school_id,
+    enabled: !!schoolId,
   });
 
   // Calculate statistics from actual payment data
@@ -254,6 +264,23 @@ const PaymentsPage = () => {
     queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
   };
+
+  if (!schoolId) {
+    return (
+      <div className="container py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Payments</h1>
+            <p className="text-muted-foreground">Track and manage your payment history</p>
+          </div>
+        </div>
+        <div className="text-center py-8">
+          <p className="text-amber-600 text-lg">No school ID found</p>
+          <p className="text-muted-foreground">Please refresh the page and try again.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (paymentsLoading || transactionsLoading) {
     return (

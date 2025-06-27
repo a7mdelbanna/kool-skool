@@ -1,9 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from './types'
 
-const supabaseUrl = 'https://clacmtyxfdtfgjkozmqf.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 // Define types for data consistency
 export interface StudentRecord {
@@ -563,22 +564,29 @@ export const deletePayment = async (id: string) => {
 
 // Function to get current user info
 export const getCurrentUserInfo = async () => {
+  // Get user data from localStorage instead of auth.uid()
   const userData = localStorage.getItem('user');
-  const user = userData ? JSON.parse(userData) : null;
-
-  if (!user) {
-    console.warn('No user signed in.');
-    return null;
+  if (!userData) {
+    console.log('No user data found in localStorage');
+    return [];
   }
 
-  const { data, error } = await supabase.rpc('get_current_user_info');
+  const user = JSON.parse(userData);
+  const schoolId = user.schoolId;
+  const role = user.role;
 
-  if (error) {
-    console.error('Error fetching user profile:', error);
-    return null;
+  if (!schoolId) {
+    console.log('No school ID found in user data');
+    return [];
   }
 
-  return data || null;
+  console.log('getCurrentUserInfo - returning:', { user_school_id: schoolId, user_role: role });
+  
+  // Return in the format expected by the components
+  return [{
+    user_school_id: schoolId,
+    user_role: role
+  }];
 };
 
 // Function to get school tags
