@@ -264,8 +264,16 @@ const PaymentsPage = () => {
   };
 
   const handleTransactionSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
+    // Invalidate both queries to refresh the data
+    queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
+    queryClient.invalidateQueries({ queryKey: ['all-student-payments', schoolId] });
+    toast.success('Transaction created successfully');
+  };
+
+  const handlePaymentSuccess = () => {
+    // Invalidate both queries to refresh the data
+    queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
+    queryClient.invalidateQueries({ queryKey: ['all-student-payments', schoolId] });
   };
 
   if (!schoolId) {
@@ -518,6 +526,7 @@ const PaymentsPage = () => {
         onOpenChange={setPaymentDialogOpen}
         payment={selectedPayment}
         mode={dialogMode}
+        onSuccess={handlePaymentSuccess}
       />
 
       {/* Add Transaction Dialog */}
