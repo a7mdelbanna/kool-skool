@@ -305,7 +305,7 @@ export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
   return data || [];
 };
 
-// Function to get school teachers
+// Function to get school teachers using the same approach as team members
 export const getSchoolTeachers = async (schoolId: string) => {
   console.log('=== getSchoolTeachers FUNCTION START ===');
   console.log('Input schoolId:', schoolId);
@@ -317,135 +317,61 @@ export const getSchoolTeachers = async (schoolId: string) => {
   }
 
   try {
-    // CRITICAL DEBUG: Let's check what school_id values exist in the database
-    console.log('=== CRITICAL DEBUG: Checking all school_id values in database ===');
-    const { data: allUsers, error: allUsersError } = await supabase
-      .from('users')
-      .select('id, email, role, school_id, first_name, last_name');
+    // Use the same approach as get_team_members but filter for teachers only
+    console.log('=== USING TEAM MEMBERS APPROACH ===');
+    console.log('Calling get_team_members RPC and filtering for teachers');
     
-    console.log('All users in database:', allUsers);
-    console.log('All users error:', allUsersError);
-    
-    if (allUsers) {
-      console.log('=== SCHOOL_ID ANALYSIS ===');
-      const uniqueSchoolIds = [...new Set(allUsers.map(u => u.school_id))];
-      console.log('Unique school_ids in database:', uniqueSchoolIds);
-      console.log('Looking for school_id:', schoolId);
-      console.log('schoolId exists in database?:', uniqueSchoolIds.includes(schoolId));
-      
-      // Check if there's a type mismatch
-      console.log('schoolId type:', typeof schoolId);
-      uniqueSchoolIds.forEach(id => {
-        console.log(`Database school_id "${id}" (type: ${typeof id}) === input "${schoolId}" (type: ${typeof schoolId})?`, id === schoolId);
-      });
-      
-      // Let's also check for teachers specifically
-      const teachersInDb = allUsers.filter(u => u.role === 'teacher');
-      console.log('All teachers in database (any school):', teachersInDb);
-      
-      const teachersForThisSchool = teachersInDb.filter(u => u.school_id === schoolId);
-      console.log('Teachers for this school_id:', teachersForThisSchool);
-    }
-    
-    // First, let's check what users exist for this school regardless of role
-    console.log('=== DEBUGGING: Checking all users for this school ===');
-    const { data: allSchoolUsers, error: allUsersError2 } = await supabase
-      .from('users')
-      .select('*')
-      .eq('school_id', schoolId);
-    
-    console.log('All users for school_id', schoolId, ':', allSchoolUsers);
-    console.log('All users error:', allUsersError2);
-    console.log('All users count:', allSchoolUsers?.length || 0);
-    
-    if (allSchoolUsers && allSchoolUsers.length > 0) {
-      console.log('Users found with roles:', allSchoolUsers.map(u => ({ 
-        id: u.id, 
-        email: u.email, 
-        role: u.role, 
-        first_name: u.first_name, 
-        last_name: u.last_name,
-        school_id: u.school_id 
-      })));
-    }
-    
-    // Now let's check for teachers specifically
-    console.log('=== DEBUGGING: Checking teachers specifically ===');
-    console.log('Querying users table for teachers with school_id:', schoolId);
-    console.log('Query: SELECT * FROM users WHERE school_id =', schoolId, 'AND role = teacher');
-    
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('school_id', schoolId)
-      .eq('role', 'teacher');
+    const { data, error } = await supabase.rpc('get_team_members', {
+      p_school_id: schoolId
+    });
 
-    console.log('=== SUPABASE QUERY RESULT ===');
+    console.log('=== TEAM MEMBERS RPC RESULT ===');
     console.log('Error:', error);
     console.log('Data:', data);
     console.log('Data type:', typeof data);
     console.log('Is array?:', Array.isArray(data));
 
     if (error) {
-      console.error('Supabase error in getSchoolTeachers:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('Supabase error in getSchoolTeachers (team members approach):', error);
       throw error;
     }
 
-    console.log('Raw Supabase response:', data);
-    console.log('Number of teachers found:', data?.length || 0);
+    console.log('Raw team members response:', data);
+    console.log('Number of team members found:', data?.length || 0);
     
     if (data && data.length > 0) {
-      console.log('Teachers found:', data);
-      data.forEach((teacher, index) => {
-        console.log(`Teacher ${index + 1}:`, {
-          id: teacher.id,
-          first_name: teacher.first_name,
-          last_name: teacher.last_name,
-          email: teacher.email,
-          role: teacher.role,
-          school_id: teacher.school_id,
-          display_name: `${teacher.first_name} ${teacher.last_name}`
+      // Filter for teachers only
+      const teachers = data.filter(member => member.role === 'teacher');
+      console.log('Teachers found after filtering:', teachers);
+      console.log('Number of teachers found:', teachers.length);
+      
+      if (teachers.length > 0) {
+        teachers.forEach((teacher, index) => {
+          console.log(`Teacher ${index + 1}:`, {
+            id: teacher.id,
+            first_name: teacher.first_name,
+            last_name: teacher.last_name,
+            email: teacher.email,
+            role: teacher.role
+          });
         });
-      });
-      
-      // Add display_name field for easier rendering
-      const teachersWithDisplayName = data.map(teacher => ({
-        ...teacher,
-        display_name: `${teacher.first_name} ${teacher.last_name}`
-      }));
-      
-      console.log('Teachers with display_name:', teachersWithDisplayName);
-      console.log('Returning teachers count:', teachersWithDisplayName.length);
-      return teachersWithDisplayName;
-    } else {
-      console.warn('No teachers found for school:', schoolId);
-      
-      // Let's also check if there are any users with role 'teacher' in the entire database
-      console.log('=== DEBUGGING: Checking if ANY teachers exist in database ===');
-      const { data: allTeachers, error: allTeachersError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('role', 'teacher');
-      
-      console.log('All teachers in database:', allTeachers);
-      console.log('All teachers error:', allTeachersError);
-      console.log('Total teachers in database:', allTeachers?.length || 0);
-      
-      if (allTeachers && allTeachers.length > 0) {
-        console.log('Teachers exist in database but not for this school:', allTeachers.map(t => ({ 
-          id: t.id, 
-          email: t.email, 
-          school_id: t.school_id,
-          role: t.role 
-        })));
+        
+        // Add display_name field for easier rendering
+        const teachersWithDisplayName = teachers.map(teacher => ({
+          ...teacher,
+          display_name: `${teacher.first_name} ${teacher.last_name}`
+        }));
+        
+        console.log('Teachers with display_name:', teachersWithDisplayName);
+        console.log('Returning teachers count:', teachersWithDisplayName.length);
+        return teachersWithDisplayName;
+      } else {
+        console.warn('No teachers found in team members for school:', schoolId);
+        console.log('All team members roles:', data.map(m => ({ id: m.id, role: m.role, name: `${m.first_name} ${m.last_name}` })));
+        return [];
       }
-      
+    } else {
+      console.warn('No team members found for school:', schoolId);
       return [];
     }
   } catch (error) {
