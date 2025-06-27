@@ -58,13 +58,19 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
       if (formData.initialPayment.accountId && formData.initialPayment.amount > 0) {
         const { data: accountData, error: accountError } = await supabase
           .from('accounts')
-          .select('currency_code, currencies(code)')
+          .select(`
+            *,
+            currencies (
+              code,
+              symbol
+            )
+          `)
           .eq('id', formData.initialPayment.accountId)
           .single();
 
         if (accountError) throw accountError;
 
-        const accountCurrency = accountData.currencies?.code || accountData.currency_code;
+        const accountCurrency = accountData.currencies?.code;
         if (accountCurrency !== formData.currency) {
           throw new Error(`Account currency (${accountCurrency}) must match subscription currency (${formData.currency})`);
         }
@@ -172,9 +178,22 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
     }
   };
 
+  // Prevent rapid calls function
+  const preventRapidCalls = (fn: () => Promise<void>) => {
+    return async () => {
+      if (isSubmitting || createSubscriptionMutation.isPending) {
+        console.log('⚠️ Preventing rapid submission');
+        return;
+      }
+      await fn();
+    };
+  };
+
   return {
     createSubscription,
     isSubmitting: isSubmitting || createSubscriptionMutation.isPending,
+    isCreating: createSubscriptionMutation.isPending,
     error: createSubscriptionMutation.error,
+    preventRapidCalls,
   };
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt } from "lucide-react";
-import { format, addDays, startOfWeek } from "date-fns";
+import { format, addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -199,7 +199,12 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { isCreating, preventRapidCalls } = useSubscriptionCreation();
+  const { createSubscription, isSubmitting, isCreating, preventRapidCalls } = useSubscriptionCreation(
+    studentData.id || '',
+    () => {
+      loadSubscriptions();
+    }
+  );
   
   // Enhanced form state with Date object for better date handling
   const [formData, setFormData] = useState({
@@ -436,7 +441,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         schedule: formData.schedule,
         price_mode: formData.priceMode,
         price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
-        fixed_price: formData.priceMode === 'fixed' ? formData.fixedPrice : null,
+        fixed_price: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : null,
         total_price: totalPrice,
         currency: formData.currency,
         notes: formData.notes,
@@ -666,7 +671,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   <div className="flex-1">
                     <Label className="text-xs text-gray-600">Day</Label>
                     <Select 
-                      value={schedule.day}
+                      value={schedule.day || ""}
                       onValueChange={(value) => updateScheduleItem(index, 'day', value)}
                     >
                       <SelectTrigger>
@@ -748,7 +753,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="perSession">Per Session</SelectItem>
-                    <SelectItem value="fixed">Fixed Price</SelectItem>
+                    <SelectItem value="fixedPrice">Fixed Price</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -773,7 +778,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                 </div>
               )}
 
-              {formData.priceMode === 'fixed' && (
+              {formData.priceMode === 'fixedPrice' && (
                 <div>
                   <Label htmlFor="fixedPrice" className="text-sm font-semibold text-gray-700">
                     Fixed Price ({getCurrencySymbol(formData.currency)})
