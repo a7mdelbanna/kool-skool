@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Plus, Search, Filter, MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,59 +26,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { UserContext } from '@/App';
+import ContactDialog from '@/components/ContactDialog';
 
-// Mock data for contacts - replace with actual database fetch
-const mockContacts = [
-  {
-    id: '1',
-    name: 'ABC Marketing Agency',
-    type: 'Vendor',
-    email: 'contact@abcmarketing.com',
-    phone: '+1 (555) 123-4567',
-    notes: 'Marketing and advertising services for school promotion',
-    createdAt: '2024-01-15',
-  },
-  {
-    id: '2',
-    name: 'John Smith Construction',
-    type: 'Service Provider',
-    email: 'john@smithconstruction.com',
-    phone: '+1 (555) 234-5678',
-    notes: 'Facility maintenance and repairs',
-    createdAt: '2024-02-20',
-  },
-  {
-    id: '3',
-    name: 'Tech Solutions Inc',
-    type: 'Vendor',
-    email: 'support@techsolutions.com',
-    phone: '+1 (555) 345-6789',
-    notes: 'IT equipment and software provider',
-    createdAt: '2024-03-10',
-  },
-  {
-    id: '4',
-    name: 'Sarah Johnson',
-    type: 'Client',
-    email: 'sarah.johnson@email.com',
-    phone: '+1 (555) 456-7890',
-    notes: 'Parent interested in advanced math programs',
-    createdAt: '2024-03-25',
-  },
-  {
-    id: '5',
-    name: 'Office Supplies Plus',
-    type: 'Vendor',
-    email: 'orders@officesupplies.com',
-    phone: '+1 (555) 567-8901',
-    notes: 'Regular supplier for classroom materials',
-    createdAt: '2024-04-05',
-  },
-];
+interface Contact {
+  id: string;
+  name: string;
+  type: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  created_at: string;
+}
 
-const contactTypes = ['All Types', 'Client', 'Vendor', 'Service Provider', 'Partner'];
+const contactTypes = ['All Types', 'Client', 'Vendor', 'Service Provider', 'Partner', 'Supplier', 'Contractor'];
 
 const getTypeColor = (type: string) => {
   switch (type) {
@@ -90,56 +64,127 @@ const getTypeColor = (type: string) => {
       return 'bg-orange-100 text-orange-800 hover:bg-orange-200';
     case 'Partner':
       return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
+    case 'Supplier':
+      return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
+    case 'Contractor':
+      return 'bg-red-100 text-red-800 hover:bg-red-200';
     default:
       return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
   }
 };
 
 const Contacts = () => {
+  const { user } = useContext(UserContext);
   const { toast } = useToast();
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All Types');
+  const [contactDialog, setContactDialog] = useState<{
+    open: boolean;
+    mode: 'add' | 'edit';
+    contact?: Contact;
+  }>({ open: false, mode: 'add' });
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    contact?: Contact;
+  }>({ open: false });
+
+  const fetchContacts = async () => {
+    if (!user?.schoolId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('school_id', user.schoolId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setContacts(data || []);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load contacts",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchContacts();
+  }, [user?.schoolId]);
 
   // Filter contacts based on search term and type
-  const filteredContacts = mockContacts.filter(contact => {
+  const filteredContacts = contacts.filter(contact => {
     const matchesSearch = contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         contact.phone.includes(searchTerm) ||
-                         contact.notes.toLowerCase().includes(searchTerm.toLowerCase());
+                         (contact.email && contact.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         (contact.phone && contact.phone.includes(searchTerm)) ||
+                         (contact.notes && contact.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesType = selectedType === 'All Types' || contact.type === selectedType;
     
     return matchesSearch && matchesType;
   });
 
-  const handleViewDetails = (contact: any) => {
+  const handleAddContact = () => {
+    setContactDialog({ open: true, mode: 'add' });
+  };
+
+  const handleEditContact = (contact: Contact) => {
+    setContactDialog({ open: true, mode: 'edit', contact });
+  };
+
+  const handleDeleteContact = (contact: Contact) => {
+    setDeleteDialog({ open: true, contact });
+  };
+
+  const confirmDeleteContact = async () => {
+    if (!deleteDialog.contact) return;
+
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', deleteDialog.contact.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Contact deleted successfully",
+      });
+
+      fetchContacts();
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete contact",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialog({ open: false });
+    }
+  };
+
+  const handleViewDetails = (contact: Contact) => {
     toast({
       title: "Contact Details",
       description: `Viewing details for ${contact.name}`,
     });
   };
 
-  const handleEditContact = (contact: any) => {
-    toast({
-      title: "Edit Contact",
-      description: `Edit functionality for ${contact.name} will be implemented`,
-    });
-  };
-
-  const handleDeleteContact = (contact: any) => {
-    toast({
-      title: "Delete Contact",
-      description: `Delete confirmation for ${contact.name} will be implemented`,
-      variant: "destructive",
-    });
-  };
-
-  const handleAddContact = () => {
-    toast({
-      title: "Add New Contact",
-      description: "Add contact form will be implemented",
-    });
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -166,7 +211,7 @@ const Contacts = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockContacts.length}</div>
+            <div className="text-2xl font-bold">{contacts.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -177,7 +222,7 @@ const Contacts = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockContacts.filter(c => c.type === 'Vendor').length}
+              {contacts.filter(c => c.type === 'Vendor').length}
             </div>
           </CardContent>
         </Card>
@@ -189,7 +234,7 @@ const Contacts = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockContacts.filter(c => c.type === 'Client').length}
+              {contacts.filter(c => c.type === 'Client').length}
             </div>
           </CardContent>
         </Card>
@@ -201,7 +246,7 @@ const Contacts = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockContacts.filter(c => c.type === 'Service Provider').length}
+              {contacts.filter(c => c.type === 'Service Provider').length}
             </div>
           </CardContent>
         </Card>
@@ -273,7 +318,7 @@ const Contacts = () => {
                       <div className="text-muted-foreground">
                         {searchTerm || selectedType !== 'All Types' 
                           ? 'No contacts found matching your criteria'
-                          : 'No contacts available'
+                          : 'No contacts available. Click "Add Contact" to get started.'
                         }
                       </div>
                     </TableCell>
@@ -307,7 +352,7 @@ const Contacts = () => {
                       <TableCell>
                         <div className="max-w-xs">
                           <p className="text-sm text-muted-foreground truncate">
-                            {contact.notes}
+                            {contact.notes || 'No notes'}
                           </p>
                         </div>
                       </TableCell>
@@ -350,6 +395,33 @@ const Contacts = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Contact Dialog */}
+      <ContactDialog
+        open={contactDialog.open}
+        onOpenChange={(open) => setContactDialog(prev => ({ ...prev, open }))}
+        contact={contactDialog.contact}
+        mode={contactDialog.mode}
+        onSuccess={fetchContacts}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteDialog.contact?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteContact} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Contact
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
