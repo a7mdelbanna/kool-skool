@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -442,16 +441,22 @@ const PaymentsOptimized = () => {
   };
 
   const handleTransactionSuccess = () => {
+    // Invalidate all related queries to refresh the data
     queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['student-payments', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
+    queryClient.invalidateQueries({ queryKey: ['school-currencies', schoolId] });
+    console.log('🔄 All queries invalidated after transaction success');
     toast.success('Transaction created successfully');
   };
 
   const handlePaymentSuccess = () => {
+    // Invalidate all related queries to refresh the data
     queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['student-payments', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
+    queryClient.invalidateQueries({ queryKey: ['school-currencies', schoolId] });
+    console.log('🔄 All queries invalidated after payment success');
   };
 
   // Loading skeleton component

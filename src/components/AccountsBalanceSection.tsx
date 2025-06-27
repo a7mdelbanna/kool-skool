@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -42,6 +43,35 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
 
       console.log('💰 Raw transactions data:', transactionsData);
 
+      // Helper function to safely convert transaction amount to number
+      const safeParseAmount = (amount: any): number => {
+        if (amount === null || amount === undefined || amount === '') {
+          console.warn('⚠️ Empty or null amount detected:', amount);
+          return 0;
+        }
+
+        let numericAmount: number;
+        
+        if (typeof amount === 'string') {
+          // Remove any non-numeric characters except decimal point and minus sign
+          const cleanAmount = amount.replace(/[^\d.-]/g, '');
+          numericAmount = parseFloat(cleanAmount);
+        } else if (typeof amount === 'number') {
+          numericAmount = amount;
+        } else {
+          console.warn('⚠️ Invalid amount type:', typeof amount, amount);
+          return 0;
+        }
+
+        // Final validation
+        if (isNaN(numericAmount) || !isFinite(numericAmount)) {
+          console.warn('⚠️ Invalid amount after parsing:', amount, 'resulted in:', numericAmount);
+          return 0;
+        }
+
+        return numericAmount;
+      };
+
       // Calculate balance for each account in its native currency
       const accountBalances = (accountsData || []).map((account: any) => {
         let balance = 0;
@@ -49,46 +79,31 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
 
         console.log(`🏦 Calculating balance for account: ${account.name} (${accountCurrency})`);
 
-        // Calculate balance from transactions that match this account's currency
-        (transactionsData || []).forEach((transaction: any) => {
-          // Enhanced debugging for transaction amount
+        // Filter and process transactions that match this account's currency
+        const relevantTransactions = (transactionsData || []).filter((transaction: any) => {
+          // Only process transactions that match the account's currency
+          return transaction.currency === accountCurrency;
+        });
+
+        console.log(`📋 Found ${relevantTransactions.length} transactions for ${account.name} in ${accountCurrency}`);
+
+        relevantTransactions.forEach((transaction: any) => {
+          const transactionAmount = safeParseAmount(transaction.amount);
+          
+          if (transactionAmount === 0) {
+            console.log(`⚠️ Skipping transaction ${transaction.id} due to invalid amount`);
+            return;
+          }
+
           console.log(`🔍 Processing transaction:`, {
             id: transaction.id,
             amount: transaction.amount,
-            type: typeof transaction.amount,
+            parsedAmount: transactionAmount,
             currency: transaction.currency,
-            transactionType: transaction.type,
+            type: transaction.type,
             fromAccount: transaction.from_account_name,
             toAccount: transaction.to_account_name
           });
-
-          // More robust amount validation
-          let transactionAmount = 0;
-          if (transaction.amount === null || transaction.amount === undefined) {
-            console.warn('❌ Transaction amount is null/undefined:', transaction.id);
-            return;
-          }
-
-          // Handle different data types
-          if (typeof transaction.amount === 'string') {
-            transactionAmount = parseFloat(transaction.amount);
-          } else if (typeof transaction.amount === 'number') {
-            transactionAmount = transaction.amount;
-          } else {
-            console.warn('❌ Invalid transaction amount type:', typeof transaction.amount, transaction.amount);
-            return;
-          }
-
-          if (isNaN(transactionAmount) || !isFinite(transactionAmount)) {
-            console.warn('❌ Invalid transaction amount after conversion:', transaction.amount, 'converted to:', transactionAmount);
-            return;
-          }
-
-          // Only process transactions that match the account's currency
-          if (transaction.currency !== accountCurrency) {
-            console.log(`⚠️ Skipping transaction ${transaction.id}: currency mismatch (${transaction.currency} vs ${accountCurrency})`);
-            return;
-          }
 
           // For income transactions (money coming into an account)
           if (transaction.type === 'income' && transaction.to_account_name === account.name) {
@@ -97,13 +112,13 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
           }
           
           // For expense transactions (money going out of an account)  
-          if (transaction.type === 'expense' && transaction.from_account_name === account.name) {
+          else if (transaction.type === 'expense' && transaction.from_account_name === account.name) {
             balance -= transactionAmount;
             console.log(`➖ Expense: -${transactionAmount} ${accountCurrency} from ${account.name} | New balance: ${balance}`);
           }
           
           // For transfer transactions
-          if (transaction.type === 'transfer') {
+          else if (transaction.type === 'transfer') {
             if (transaction.from_account_name === account.name) {
               balance -= transactionAmount;
               console.log(`🔄 Transfer out: -${transactionAmount} ${accountCurrency} from ${account.name} | New balance: ${balance}`);
@@ -117,8 +132,8 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
 
         // Final validation to ensure balance is a valid number
         if (isNaN(balance) || !isFinite(balance)) {
-          console.error(`❌ Invalid balance calculated for ${account.name}: ${balance}`);
-          balance = 0; // Fallback to 0 if calculation fails
+          console.error(`❌ Invalid balance calculated for ${account.name}: ${balance}. Resetting to 0.`);
+          balance = 0;
         }
 
         console.log(`💼 Final balance for ${account.name}: ${balance} ${accountCurrency}`);
@@ -137,8 +152,10 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
       return accountBalances;
     },
     enabled: !!schoolId,
-    staleTime: 5000, // Reduce stale time to 5 seconds for more frequent updates
-    gcTime: 60000, // Reduce garbage collection time to 1 minute
+    staleTime: 1000, // Very short stale time to ensure fresh data
+    gcTime: 10000, // Short garbage collection time
+    refetchOnWindowFocus: false, // Prevent unnecessary refetches
+    refetchOnMount: true, // Always refetch on mount
   });
 
   if (accountsLoading) {
