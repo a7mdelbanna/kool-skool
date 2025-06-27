@@ -28,27 +28,109 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Payment, usePayments } from '@/contexts/PaymentContext';
-import { useToast } from '@/hooks/use-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase, getCurrentUserInfo } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  payment?: Payment;
+  payment?: any;
   mode: 'add' | 'edit';
 }
 
 const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps) => {
-  const { addPayment, updatePayment, accounts } = usePayments();
-  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [amount, setAmount] = useState<number>(0);
   const [date, setDate] = useState<Date>(new Date());
   const [method, setMethod] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [status, setStatus] = useState<"completed" | "pending" | "failed">('completed');
-  const [accountId, setAccountId] = useState<string>('');
-  const [studentName, setStudentName] = useState<string>('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+
+  // Fetch current user info
+  const { data: userInfo } = useQuery({
+    queryKey: ['current-user-info'],
+    queryFn: getCurrentUserInfo,
+  });
+
+  // Fetch students for the dropdown
+  const { data: students = [] } = useQuery({
+    queryKey: ['students', userInfo?.[0]?.user_school_id],
+    queryFn: async () => {
+      if (!userInfo?.[0]?.user_school_id) return [];
+      
+      const { data, error } = await supabase
+        .from('students')
+        .select(`
+          id,
+          users!inner(first_name, last_name)
+        `)
+        .eq('school_id', userInfo[0].user_school_id);
+
+      if (error) throw error;
+      
+      return data?.map((student: any) => ({
+        id: student.id,
+        name: `${student.users.first_name} ${student.users.last_name}`
+      })) || [];
+    },
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
+
+  // Create payment mutation
+  const createPaymentMutation = useMutation({
+    mutationFn: async (paymentData: any) => {
+      const { error } = await supabase
+        .from('student_payments')
+        .insert([{
+          student_id: paymentData.student_id,
+          amount: paymentData.amount,
+          currency: 'USD',
+          payment_date: paymentData.payment_date,
+          payment_method: paymentData.payment_method,
+          status: paymentData.status,
+          notes: paymentData.notes
+        }]);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
+      toast.success('Payment created successfully');
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast.error('Failed to create payment: ' + error.message);
+    },
+  });
+
+  // Update payment mutation
+  const updatePaymentMutation = useMutation({
+    mutationFn: async (paymentData: any) => {
+      const { error } = await supabase
+        .from('student_payments')
+        .update({
+          amount: paymentData.amount,
+          payment_date: paymentData.payment_date,
+          payment_method: paymentData.payment_method,
+          status: paymentData.status,
+          notes: paymentData.notes
+        })
+        .eq('id', payment.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
+      toast.success('Payment updated successfully');
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast.error('Failed to update payment: ' + error.message);
+    },
+  });
 
   // Initialize form when payment changes or dialog opens
   useEffect(() => {
@@ -58,8 +140,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
       setMethod(payment.method);
       setNotes(payment.notes);
       setStatus(payment.status);
-      setAccountId(payment.accountId || '');
-      setStudentName(payment.studentName || '');
+      setSelectedStudentId(payment.student_id || '');
     } else {
       // Default values for add mode
       setAmount(0);
@@ -67,46 +148,35 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
       setMethod('');
       setNotes('');
       setStatus('completed');
-      setAccountId('');
-      setStudentName('');
+      setSelectedStudentId('');
     }
   }, [payment, mode, open]);
 
   const handleSubmit = () => {
-    if (!amount) {
-      toast({
-        title: "Error",
-        description: "Amount is required",
-        variant: "destructive",
-      });
+    if (!amount || amount <= 0) {
+      toast.error('Amount is required and must be greater than 0');
+      return;
+    }
+
+    if (mode === 'add' && !selectedStudentId) {
+      toast.error('Please select a student');
       return;
     }
 
     const paymentData = {
+      student_id: selectedStudentId,
       amount,
-      date,
-      method: method || 'Cash',
-      notes,
+      payment_date: format(date, 'yyyy-MM-dd'),
+      payment_method: method || 'Cash',
       status,
-      accountId,
-      studentName,
+      notes,
     };
 
     if (mode === 'add') {
-      addPayment(paymentData as Required<typeof paymentData>);
-      toast({
-        title: "Payment added",
-        description: `Payment of $${amount} has been added.`,
-      });
-    } else if (payment) {
-      updatePayment(payment.id, paymentData);
-      toast({
-        title: "Payment updated",
-        description: `Payment of $${amount} has been updated.`,
-      });
+      createPaymentMutation.mutate(paymentData);
+    } else {
+      updatePaymentMutation.mutate(paymentData);
     }
-
-    onOpenChange(false);
   };
 
   return (
@@ -122,6 +192,28 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
+          {mode === 'add' && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="student" className="text-right">
+                Student
+              </Label>
+              <div className="col-span-3">
+                <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select student" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map(student => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="amount" className="text-right">
               Amount
@@ -134,7 +226,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
                 id="amount"
                 type="number"
                 value={amount}
-                onChange={(e) => setAmount(parseFloat(e.target.value))}
+                onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                 className="pl-7"
                 placeholder="0.00"
                 required
@@ -203,56 +295,27 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="completed" className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Completed</span>
+                  <SelectItem value="completed">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span>Completed</span>
+                    </div>
                   </SelectItem>
-                  <SelectItem value="pending" className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-amber-500" />
-                    <span>Pending</span>
+                  <SelectItem value="pending">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-amber-500" />
+                      <span>Pending</span>
+                    </div>
                   </SelectItem>
-                  <SelectItem value="failed" className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    <span>Failed</span>
+                  <SelectItem value="failed">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                      <span>Failed</span>
+                    </div>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          
-          {accounts.length > 0 && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="account" className="text-right">
-                Account
-              </Label>
-              <div className="col-span-3">
-                <Select value={accountId} onValueChange={setAccountId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map(account => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({account.currency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-          
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="student" className="text-right">
-              Student
-            </Label>
-            <Input
-              id="student"
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-              placeholder="Student name"
-              className="col-span-3"
-            />
           </div>
           
           <div className="grid grid-cols-4 items-start gap-4">
@@ -273,8 +336,15 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSubmit}>
-            {mode === 'add' ? 'Add Payment' : 'Save Changes'}
+          <Button 
+            type="submit" 
+            onClick={handleSubmit}
+            disabled={createPaymentMutation.isPending || updatePaymentMutation.isPending}
+          >
+            {createPaymentMutation.isPending || updatePaymentMutation.isPending 
+              ? 'Saving...' 
+              : mode === 'add' ? 'Add Payment' : 'Save Changes'
+            }
           </Button>
         </DialogFooter>
       </DialogContent>
