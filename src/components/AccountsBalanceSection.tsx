@@ -52,8 +52,9 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
 
         // Calculate balance from transactions that match this account's currency
         (transactionsData || []).forEach((transaction: any) => {
+          // Add robust amount validation
           const transactionAmount = Number(transaction.amount);
-          if (isNaN(transactionAmount)) {
+          if (isNaN(transactionAmount) || !isFinite(transactionAmount)) {
             console.warn('❌ Invalid transaction amount:', transaction.amount, 'for transaction:', transaction.id);
             return;
           }
@@ -89,6 +90,12 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
           }
         });
 
+        // Final validation to ensure balance is a valid number
+        if (isNaN(balance) || !isFinite(balance)) {
+          console.error(`❌ Invalid balance calculated for ${account.name}: ${balance}`);
+          balance = 0; // Fallback to 0 if calculation fails
+        }
+
         console.log(`💼 Final balance for ${account.name}: ${balance} ${accountCurrency}`);
 
         return {
@@ -104,8 +111,8 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
       return accountBalances;
     },
     enabled: !!schoolId,
-    staleTime: 30000, // 30 seconds
-    gcTime: 300000, // 5 minutes
+    staleTime: 5000, // Reduce stale time to 5 seconds for more frequent updates
+    gcTime: 60000, // Reduce garbage collection time to 1 minute
   });
 
   if (accountsLoading) {
