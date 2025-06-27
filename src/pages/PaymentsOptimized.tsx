@@ -136,12 +136,20 @@ const PaymentsOptimized = () => {
       return amount;
     }
 
-    // Convert to default currency using exchange rates
-    // Formula: amount * (1 / exchange_rate_from) * exchange_rate_to
-    // Since default currency typically has rate 1, we can simplify:
-    const convertedAmount = amount / fromCurrencyData.exchange_rate * defaultCurrency.exchange_rate;
+    // Convert to USD (or default currency) using exchange rates
+    // The exchange rate should represent how many units of the currency equal 1 USD
+    // For example: 1 USD = 100 RUB, so RUB exchange_rate should be 100
+    // To convert RUB to USD: amount_in_rub / exchange_rate_rub = amount_in_usd
     
-    console.log(`💱 Converting ${amount} ${fromCurrency} to ${convertedAmount.toFixed(2)} ${defaultCurrency.code}`);
+    let convertedAmount = amount;
+    
+    // If converting from non-default to default currency
+    if (fromCurrencyData.exchange_rate && fromCurrencyData.exchange_rate > 0) {
+      // Assuming exchange_rate represents how many units of fromCurrency = 1 unit of default currency
+      convertedAmount = amount / fromCurrencyData.exchange_rate;
+    }
+    
+    console.log(`💱 Converting ${amount} ${fromCurrency} to ${convertedAmount.toFixed(2)} ${defaultCurrency.code} (exchange rate: ${fromCurrencyData.exchange_rate})`);
     return convertedAmount;
   };
 
@@ -159,7 +167,7 @@ const PaymentsOptimized = () => {
         .select(`
           id,
           user_id,
-          users!inner(first_name, last_name)
+          users!students_user_id_fkey(first_name, last_name)
         `)
         .eq('school_id', schoolId);
 
@@ -233,6 +241,7 @@ const PaymentsOptimized = () => {
     // Convert all amounts to default currency for unified calculations
     const totalRevenue = paidPayments.reduce((sum, payment) => {
       const convertedAmount = convertToDefaultCurrency(Number(payment.amount), payment.currency);
+      console.log(`📊 Payment revenue: ${payment.amount} ${payment.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency?.code}`);
       return sum + convertedAmount;
     }, 0);
     
@@ -246,15 +255,23 @@ const PaymentsOptimized = () => {
     
     const totalTransactionIncome = incomeTransactions.reduce((sum, t) => {
       const convertedAmount = convertToDefaultCurrency(Number(t.amount), t.currency);
+      console.log(`📊 Transaction income: ${t.amount} ${t.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency?.code}`);
       return sum + convertedAmount;
     }, 0);
     
     const totalExpenses = expenseTransactions.reduce((sum, t) => {
       const convertedAmount = convertToDefaultCurrency(Number(t.amount), t.currency);
+      console.log(`📊 Transaction expense: ${t.amount} ${t.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency?.code}`);
       return sum + convertedAmount;
     }, 0);
     
     const netIncome = (totalRevenue + totalTransactionIncome) - totalExpenses;
+
+    console.log(`📊 Final calculations:
+      - Total Revenue: ${totalRevenue.toFixed(2)} ${defaultCurrency?.code}
+      - Total Transaction Income: ${totalTransactionIncome.toFixed(2)} ${defaultCurrency?.code}
+      - Total Expenses: ${totalExpenses.toFixed(2)} ${defaultCurrency?.code}
+      - Net Income: ${netIncome.toFixed(2)} ${defaultCurrency?.code}`);
 
     console.timeEnd('calculate-statistics');
     
