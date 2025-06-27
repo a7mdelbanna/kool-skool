@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   Form,
@@ -157,7 +156,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         p_amount: data.amount,
         p_currency: data.currency,
         p_transaction_date: format(data.date, 'yyyy-MM-dd'),
-        p_description: `Student payment from ${studentData.first_name || 'Unknown'} ${studentData.last_name || 'Student'}`,
+        p_description: `Student payment from ${studentData.firstName || 'Unknown'} ${studentData.lastName || 'Student'}`,
         p_notes: data.notes || '',
         p_to_account_id: data.account_id,
         p_payment_method: data.method,
