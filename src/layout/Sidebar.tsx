@@ -13,7 +13,8 @@ import {
   School,
   BarChart2,
   UserPlus,
-  BookOpen
+  BookOpen,
+  Contact
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -122,6 +123,22 @@ export function Sidebar() {
                   >
                     <BookOpen className="h-5 w-5" />
                     <span>Courses</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink 
+                    to="/contacts"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-3 px-3 py-2 rounded-md", 
+                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      )
+                    }
+                  >
+                    <Contact className="h-5 w-5" />
+                    <span>Contacts</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
