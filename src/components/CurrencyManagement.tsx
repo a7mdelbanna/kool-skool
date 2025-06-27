@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { Plus, Edit2, Trash2, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import CurrencyDialog from './CurrencyDialog';
+import CurrencyCalculator from './CurrencyCalculator';
 
 interface Currency {
   id: string;
@@ -152,7 +152,11 @@ const CurrencyManagement = () => {
   }
 
   return (
-    <>
+    <div className="space-y-6">
+      {/* Currency Calculator */}
+      <CurrencyCalculator />
+
+      {/* Currency Management */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -256,7 +260,7 @@ const CurrencyManagement = () => {
         schoolId={user?.schoolId || ''}
         onSuccess={fetchCurrencies}
       />
-    </>
+    </div>
   );
 };
 
