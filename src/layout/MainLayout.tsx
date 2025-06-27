@@ -8,6 +8,8 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  console.log('MainLayout rendering with children:', children);
+  
   return (
     <div className="min-h-screen flex w-full overflow-hidden">
       <Sidebar />

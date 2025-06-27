@@ -1,12 +1,11 @@
 
 import React from 'react';
-import { useUser } from '@/contexts/UserContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, UserPlus, GraduationCap } from 'lucide-react';
 
 const Students = () => {
-  const { user, setUser } = useUser();
-
+  console.log('Students page rendering');
+  
   return (
     <div className="space-y-6">
       <div>

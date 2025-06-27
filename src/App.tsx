@@ -23,6 +23,8 @@ const queryClient = new QueryClient();
 const Contacts = lazy(() => import('@/pages/Contacts'));
 
 function App() {
+  console.log('App component rendering');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider>
