@@ -80,6 +80,14 @@ interface CombinedTransaction {
   tags?: any;
 }
 
+interface Currency {
+  id: string;
+  code: string;
+  symbol: string;
+  exchange_rate: number;
+  is_default: boolean;
+}
+
 const PaymentsOptimized = () => {
   const queryClient = useQueryClient();
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -97,6 +105,45 @@ const PaymentsOptimized = () => {
   };
 
   const schoolId = getSchoolId();
+
+  // Fetch school currencies for conversion
+  const { data: currencies = [] } = useQuery({
+    queryKey: ['school-currencies', schoolId],
+    queryFn: async (): Promise<Currency[]> => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_currencies', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+    staleTime: 60000, // 1 minute
+  });
+
+  // Get default currency
+  const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
+
+  // Helper function to convert amount to default currency
+  const convertToDefaultCurrency = (amount: number, fromCurrency: string): number => {
+    if (!defaultCurrency || fromCurrency === defaultCurrency.code) {
+      return amount;
+    }
+    
+    const fromCurrencyData = currencies.find(c => c.code === fromCurrency);
+    if (!fromCurrencyData) {
+      console.warn(`Currency ${fromCurrency} not found, using amount as-is`);
+      return amount;
+    }
+
+    // Convert to default currency using exchange rates
+    // Formula: amount * (1 / exchange_rate_from) * exchange_rate_to
+    // Since default currency typically has rate 1, we can simplify:
+    const convertedAmount = amount / fromCurrencyData.exchange_rate * defaultCurrency.exchange_rate;
+    
+    console.log(`💱 Converting ${amount} ${fromCurrency} to ${convertedAmount.toFixed(2)} ${defaultCurrency.code}`);
+    return convertedAmount;
+  };
 
   // Optimized parallel queries with proper caching
   const { data: payments = [], isLoading: paymentsLoading, error: paymentsError } = useQuery({
@@ -176,21 +223,37 @@ const PaymentsOptimized = () => {
     gcTime: 300000, // 5 minutes
   });
 
-  // Memoized calculations to prevent recalculation on every render
+  // Memoized calculations with currency conversion to prevent recalculation on every render
   const statistics = useMemo(() => {
     console.time('calculate-statistics');
     
     const paidPayments = payments.filter(payment => payment.status === 'completed');
     const pendingPayments = payments.filter(payment => payment.status === 'pending');
     
-    const totalRevenue = paidPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    const pendingAmount = pendingPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+    // Convert all amounts to default currency for unified calculations
+    const totalRevenue = paidPayments.reduce((sum, payment) => {
+      const convertedAmount = convertToDefaultCurrency(Number(payment.amount), payment.currency);
+      return sum + convertedAmount;
+    }, 0);
+    
+    const pendingAmount = pendingPayments.reduce((sum, payment) => {
+      const convertedAmount = convertToDefaultCurrency(Number(payment.amount), payment.currency);
+      return sum + convertedAmount;
+    }, 0);
     
     const incomeTransactions = transactions.filter(t => t.type === 'income');
     const expenseTransactions = transactions.filter(t => t.type === 'expense');
     
-    const totalTransactionIncome = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalTransactionIncome = incomeTransactions.reduce((sum, t) => {
+      const convertedAmount = convertToDefaultCurrency(Number(t.amount), t.currency);
+      return sum + convertedAmount;
+    }, 0);
+    
+    const totalExpenses = expenseTransactions.reduce((sum, t) => {
+      const convertedAmount = convertToDefaultCurrency(Number(t.amount), t.currency);
+      return sum + convertedAmount;
+    }, 0);
+    
     const netIncome = (totalRevenue + totalTransactionIncome) - totalExpenses;
 
     console.timeEnd('calculate-statistics');
@@ -200,9 +263,10 @@ const PaymentsOptimized = () => {
       pendingAmount,
       totalTransactionIncome,
       totalExpenses,
-      netIncome
+      netIncome,
+      defaultCurrencySymbol: defaultCurrency?.symbol || '$'
     };
-  }, [payments, transactions]);
+  }, [payments, transactions, currencies, defaultCurrency]);
 
   // Memoized combined transactions with optimized filtering
   const { allTransactions, filteredTransactions } = useMemo(() => {
@@ -313,7 +377,7 @@ const PaymentsOptimized = () => {
   };
 
   const handleExport = () => {
-    const headers = ['Date', 'Type', 'Contact/Student', 'Amount', 'Method', 'Status', 'Category', 'Notes'];
+    const headers = ['Date', 'Type', 'Contact/Student', 'Amount', 'Currency', 'Method', 'Status', 'Category', 'Notes'];
     const csvContent = [
       headers.join(','),
       ...filteredTransactions.map(transaction => [
@@ -321,6 +385,7 @@ const PaymentsOptimized = () => {
         transaction.type,
         `"${transaction.student_name || ''}"`,
         transaction.amount,
+        transaction.currency,
         transaction.method || '',
         transaction.status,
         transaction.category_name || '',
@@ -448,7 +513,7 @@ const PaymentsOptimized = () => {
             <AccountsBalanceSection schoolId={schoolId!} />
           </div>
 
-          {/* Statistics Cards */}
+          {/* Statistics Cards - All amounts converted to default currency */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -456,8 +521,12 @@ const PaymentsOptimized = () => {
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">${statistics.netIncome.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">Revenue minus expenses</p>
+                <div className="text-2xl font-bold text-green-600">
+                  {statistics.defaultCurrencySymbol}{statistics.netIncome.toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Revenue minus expenses ({defaultCurrency?.code || 'USD'})
+                </p>
               </CardContent>
             </Card>
 
@@ -467,8 +536,12 @@ const PaymentsOptimized = () => {
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${(statistics.totalRevenue + statistics.totalTransactionIncome).toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">From all payments</p>
+                <div className="text-2xl font-bold">
+                  {statistics.defaultCurrencySymbol}{(statistics.totalRevenue + statistics.totalTransactionIncome).toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  From all payments ({defaultCurrency?.code || 'USD'})
+                </p>
               </CardContent>
             </Card>
 
@@ -478,8 +551,12 @@ const PaymentsOptimized = () => {
                 <div className="w-2 h-2 bg-red-500 rounded-full"></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">${statistics.totalExpenses.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">All business expenses</p>
+                <div className="text-2xl font-bold text-red-600">
+                  {statistics.defaultCurrencySymbol}{statistics.totalExpenses.toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  All business expenses ({defaultCurrency?.code || 'USD'})
+                </p>
               </CardContent>
             </Card>
 
@@ -489,8 +566,12 @@ const PaymentsOptimized = () => {
                 <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-600">${statistics.pendingAmount.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">Payments not yet received</p>
+                <div className="text-2xl font-bold text-amber-600">
+                  {statistics.defaultCurrencySymbol}{statistics.pendingAmount.toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Payments not yet received ({defaultCurrency?.code || 'USD'})
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -534,6 +615,7 @@ const PaymentsOptimized = () => {
                     <TableHead>Contact/Student</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Currency</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Method</TableHead>
                     <TableHead>Category</TableHead>
@@ -575,7 +657,10 @@ const PaymentsOptimized = () => {
                           {transaction.status === 'completed' ? 'Completed' : transaction.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>${Number(transaction.amount).toFixed(2)}</TableCell>
+                      <TableCell>{Number(transaction.amount).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{transaction.currency}</span>
+                      </TableCell>
                       <TableCell>{format(new Date(transaction.date), 'MMM dd, yyyy')}</TableCell>
                       <TableCell>{transaction.method || '-'}</TableCell>
                       <TableCell>{transaction.category_name || '-'}</TableCell>
@@ -625,7 +710,7 @@ const PaymentsOptimized = () => {
                   ))}
                   {filteredTransactions.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         No transactions found
                       </TableCell>
                     </TableRow>

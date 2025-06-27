@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, X } from 'lucide-react';
+import { CalendarIcon, Plus, X, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -61,6 +61,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   });
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lockedCurrency, setLockedCurrency] = useState<string | null>(null);
 
   // Fetch user info
   const { data: userInfo } = useQuery({
@@ -74,20 +75,6 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   const { data: availableTags = [] } = useQuery({
     queryKey: ['school-tags', schoolId],
     queryFn: () => getSchoolTags(schoolId as string),
-    enabled: !!schoolId,
-  });
-
-  // Fetch currencies
-  const { data: currencies = [] } = useQuery({
-    queryKey: ['school-currencies', schoolId],
-    queryFn: async () => {
-      if (!schoolId) return [];
-      const { data, error } = await supabase.rpc('get_school_currencies', {
-        p_school_id: schoolId
-      });
-      if (error) throw error;
-      return data || [];
-    },
     enabled: !!schoolId,
   });
 
@@ -158,21 +145,34 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
       });
       setSelectedTags([]);
       setActiveTab('income');
+      setLockedCurrency(null);
     }
   }, [open]);
-
-  // Set default currency when currencies are loaded
-  useEffect(() => {
-    if (currencies.length > 0 && !formData.currency) {
-      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
-      setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
-    }
-  }, [currencies, formData.currency]);
 
   // Update form type when tab changes
   useEffect(() => {
     setFormData(prev => ({ ...prev, type: activeTab }));
+    setLockedCurrency(null); // Reset currency lock when changing tabs
   }, [activeTab]);
+
+  // Handle account selection and currency locking
+  const handleAccountSelection = (accountId: string, accountType: 'from' | 'to') => {
+    const selectedAccount = accounts.find(acc => acc.id === accountId);
+    if (!selectedAccount) return;
+
+    if (accountType === 'from') {
+      setFormData(prev => ({ ...prev, fromAccountId: accountId }));
+    } else {
+      setFormData(prev => ({ ...prev, toAccountId: accountId }));
+    }
+
+    // Lock currency based on the selected account
+    const newCurrency = selectedAccount.currency_code;
+    setFormData(prev => ({ ...prev, currency: newCurrency }));
+    setLockedCurrency(newCurrency);
+
+    console.log(`🔒 Currency locked to ${newCurrency} based on account ${selectedAccount.name}`);
+  };
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -189,6 +189,22 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   const handleSubmit = async () => {
     if (!formData.amount || !formData.description) {
       toast.error('Amount and description are required');
+      return;
+    }
+
+    // Validate account selection based on transaction type
+    if (formData.type === 'income' && !formData.toAccountId) {
+      toast.error('Please select an account to receive the income');
+      return;
+    }
+
+    if (formData.type === 'expense' && !formData.fromAccountId) {
+      toast.error('Please select an account for the expense');
+      return;
+    }
+
+    if (formData.type === 'transfer' && (!formData.fromAccountId || !formData.toAccountId)) {
+      toast.error('Please select both source and destination accounts for transfer');
       return;
     }
 
@@ -272,21 +288,25 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
               <div className="space-y-2">
                 <Label htmlFor="amount">Amount *</Label>
                 <div className="flex gap-2">
-                  <Select 
-                    value={formData.currency} 
-                    onValueChange={(value) => handleInputChange('currency', value)}
-                  >
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map(currency => (
-                        <SelectItem key={currency.id} value={currency.code}>
-                          {currency.symbol} {currency.code}
+                  <div className="relative">
+                    <Select 
+                      value={formData.currency} 
+                      onValueChange={(value) => handleInputChange('currency', value)}
+                      disabled={!!lockedCurrency}
+                    >
+                      <SelectTrigger className={cn("w-24", lockedCurrency && "opacity-75")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={formData.currency}>
+                          {formData.currency}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      </SelectContent>
+                    </Select>
+                    {lockedCurrency && (
+                      <Lock className="absolute right-8 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    )}
+                  </div>
                   <Input
                     id="amount"
                     type="number"
@@ -298,6 +318,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                     className="flex-1"
                   />
                 </div>
+                {lockedCurrency && (
+                  <p className="text-xs text-muted-foreground">
+                    Currency is locked to the selected account's currency
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -359,10 +384,10 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                 </div>
 
                 <div className="space-y-2">
-                  <Label>To Account</Label>
+                  <Label>To Account *</Label>
                   <Select 
                     value={formData.toAccountId} 
-                    onValueChange={(value) => handleInputChange('toAccountId', value)}
+                    onValueChange={(value) => handleAccountSelection(value, 'to')}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select account" />
@@ -407,10 +432,10 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                 </div>
 
                 <div className="space-y-2">
-                  <Label>From Account</Label>
+                  <Label>From Account *</Label>
                   <Select 
                     value={formData.fromAccountId} 
-                    onValueChange={(value) => handleInputChange('fromAccountId', value)}
+                    onValueChange={(value) => handleAccountSelection(value, 'from')}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select account" />
@@ -463,10 +488,10 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
             <TabsContent value="transfer" className="space-y-4 mt-0">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>From Account</Label>
+                  <Label>From Account *</Label>
                   <Select 
                     value={formData.fromAccountId} 
-                    onValueChange={(value) => handleInputChange('fromAccountId', value)}
+                    onValueChange={(value) => handleAccountSelection(value, 'from')}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select source account" />
@@ -488,10 +513,10 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                 </div>
 
                 <div className="space-y-2">
-                  <Label>To Account</Label>
+                  <Label>To Account *</Label>
                   <Select 
                     value={formData.toAccountId} 
-                    onValueChange={(value) => handleInputChange('toAccountId', value)}
+                    onValueChange={(value) => handleAccountSelection(value, 'to')}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select destination account" />
