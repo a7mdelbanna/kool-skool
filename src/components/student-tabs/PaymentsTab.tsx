@@ -74,11 +74,10 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       notes: "",
       currency: "USD",
       account_id: "",
-      subscription_id: "",
+      subscription_id: "none",
     },
   });
 
-  // Get school ID from localStorage
   const getSchoolId = () => {
     const userData = localStorage.getItem('user');
     if (!userData) return null;
@@ -88,7 +87,6 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
 
   const schoolId = getSchoolId();
 
-  // Fetch school accounts
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: ['school-accounts', schoolId],
     queryFn: async () => {
@@ -102,7 +100,6 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     enabled: !!schoolId,
   });
 
-  // Fetch student subscriptions for linking payments
   const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery({
     queryKey: ['student-subscriptions', studentData.id],
     queryFn: async () => {
@@ -116,14 +113,12 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     enabled: !!studentData.id,
   });
 
-  // Fetch student payments from database
   const { data: payments = [], isLoading: paymentsLoading, error: paymentsError } = useQuery({
     queryKey: ['student-payments', studentData.id],
     queryFn: () => getStudentPayments(studentData.id as string),
     enabled: !!studentData.id,
   });
 
-  // Show error if there's an issue loading payments
   React.useEffect(() => {
     if (paymentsError) {
       console.error("Error loading payments:", paymentsError);
@@ -131,25 +126,21 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     }
   }, [paymentsError]);
 
-  // Mutation to add new payment via transactions table
   const addPaymentMutation = useMutation({
     mutationFn: async (data: PaymentFormValues) => {
       if (!studentData.id || !schoolId) {
         throw new Error("Student ID or School ID missing");
       }
 
-      // Get selected account details
       const selectedAccount = accounts.find(acc => acc.id === data.account_id);
       if (!selectedAccount) {
         throw new Error("Selected account not found");
       }
 
-      // Validate currency match
       if (selectedAccount.currency_code !== data.currency) {
         throw new Error(`Account currency (${selectedAccount.currency_code}) must match payment currency (${data.currency})`);
       }
 
-      // Create transaction record
       const { data: transactionData, error } = await supabase.rpc('create_transaction', {
         p_school_id: schoolId,
         p_type: 'income',
@@ -165,8 +156,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
 
       if (error) throw error;
 
-      // If a subscription is selected, update the transaction with subscription_id
-      if (data.subscription_id) {
+      if (data.subscription_id && data.subscription_id !== "none") {
         const { error: updateError } = await supabase
           .from('transactions')
           .update({ subscription_id: data.subscription_id })
@@ -189,7 +179,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         notes: "",
         currency: "USD",
         account_id: "",
-        subscription_id: "",
+        subscription_id: "none",
       });
       setSelectedCurrency(currencies[0]);
     },
@@ -199,7 +189,6 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     },
   });
 
-  // Mutation to delete payment
   const deletePaymentMutation = useMutation({
     mutationFn: deleteStudentPayment,
     onSuccess: () => {
@@ -234,11 +223,9 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     setSelectedCurrency(currency);
     form.setValue("currency", currencyCode);
     
-    // Reset account selection when currency changes
     form.setValue("account_id", "");
   };
 
-  // Filter accounts by selected currency
   const compatibleAccounts = accounts.filter(account => 
     account.currency_code === form.watch("currency")
   );
@@ -318,7 +305,6 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
           <h3 className="text-lg font-medium mb-4">Add New Payment</h3>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleAddPayment)} className="space-y-5">
-              {/* Layout with currency selector, amount and date in one row */}
               <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
@@ -414,7 +400,6 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                 />
               </div>
 
-              {/* Account and Subscription Selection */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -466,7 +451,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">No subscription</SelectItem>
+                          <SelectItem value="none">No subscription</SelectItem>
                           {subscriptions.map((subscription) => (
                             <SelectItem key={subscription.id} value={subscription.id}>
                               <div className="flex items-center gap-2">
