@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -235,8 +236,8 @@ export const useStudentForm = (
         console.log("Using password for student:", studentPassword);
         
         const response = await createStudent({
-          student_email: studentData.email as string,
-          student_password: studentPassword,
+          email: studentData.email as string,
+          password: studentPassword,
           first_name: studentData.firstName as string,
           last_name: studentData.lastName as string,
           teacher_id: selectedTeacherId,
@@ -244,7 +245,8 @@ export const useStudentForm = (
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
           level: studentData.level === 'beginner' ? 'Beginner' : 
             studentData.level === 'intermediate' ? 'Intermediate' : 'Advanced',
-          phone: studentData.phone
+          phone: studentData.phone,
+          current_user_id: userData.id
         });
         
         toast.dismiss();

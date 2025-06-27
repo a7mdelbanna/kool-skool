@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -315,7 +316,11 @@ const Students = () => {
       
       toast.loading("Creating course...");
       
-      const courseData = await createCourse(newCourseName.trim(), newCourseType);
+      const courseData = await createCourse({
+        school_id: user.schoolId,
+        name: newCourseName.trim(),
+        lesson_type: newCourseType
+      });
       
       toast.dismiss();
       

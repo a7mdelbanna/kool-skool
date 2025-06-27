@@ -113,9 +113,9 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         teachersData.data.slice(0, 3).forEach((teacher, index) => {
           console.log(`  Teacher ${index + 1}:`, {
             id: teacher.id,
-            displayName: teacher.display_name,
             firstName: teacher.first_name,
-            lastName: teacher.last_name
+            lastName: teacher.last_name,
+            email: teacher.email
           });
         });
       }
@@ -125,6 +125,12 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     
     console.log('===== END TEACHERS DEBUG =====');
   }, [teachersData]);
+
+  // Transform teachers data to include display_name
+  const transformedTeachers = teachersData?.data?.map(teacher => ({
+    ...teacher,
+    display_name: `${teacher.first_name} ${teacher.last_name}`
+  })) || [];
 
   return (
     <>
@@ -159,7 +165,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
             setCreatePassword={setCreatePassword}
             isNewStudent={!isEditMode}
             courses={coursesData?.data || []}
-            teachers={teachersData?.data || []}
+            teachers={transformedTeachers}
             isLoading={isLoading}
           />
         </TabsContent>
