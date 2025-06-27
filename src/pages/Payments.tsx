@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -97,7 +96,7 @@ const PaymentsPage = () => {
         return {
           ...payment,
           student_name: student?.users ? 
-            `${student.users.first_name} ${student.users.last_name}` : 
+            `${(student.users as any).first_name} ${(student.users as any).last_name}` : 
             'Unknown Student'
         };
       }) || [];
