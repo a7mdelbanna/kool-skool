@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentUserInfo, getSchoolTags, createTransaction } from '@/integrations/supabase/client';
+import { getCurrentUserInfo, getSchoolTags, createTransaction, supabase } from '@/integrations/supabase/client';
 
 interface AddTransactionDialogProps {
   open: boolean;
@@ -68,11 +68,69 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     queryFn: getCurrentUserInfo,
   });
 
+  const schoolId = userInfo?.[0]?.user_school_id;
+
   // Fetch available tags
   const { data: availableTags = [] } = useQuery({
-    queryKey: ['school-tags', userInfo?.[0]?.user_school_id],
-    queryFn: () => getSchoolTags(userInfo?.[0]?.user_school_id as string),
-    enabled: !!userInfo?.[0]?.user_school_id,
+    queryKey: ['school-tags', schoolId],
+    queryFn: () => getSchoolTags(schoolId as string),
+    enabled: !!schoolId,
+  });
+
+  // Fetch currencies
+  const { data: currencies = [] } = useQuery({
+    queryKey: ['school-currencies', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_currencies', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch accounts
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['school-accounts', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_accounts', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['school-categories', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_categories', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch contacts
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['school-contacts', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_contacts', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
   });
 
   // Reset form when dialog opens/closes
@@ -103,6 +161,14 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     }
   }, [open]);
 
+  // Set default currency when currencies are loaded
+  useEffect(() => {
+    if (currencies.length > 0 && !formData.currency) {
+      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
+      setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
+    }
+  }, [currencies, formData.currency]);
+
   // Update form type when tab changes
   useEffect(() => {
     setFormData(prev => ({ ...prev, type: activeTab }));
@@ -126,7 +192,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
       return;
     }
 
-    if (!userInfo?.[0]?.user_school_id) {
+    if (!schoolId) {
       toast.error('No school ID found');
       return;
     }
@@ -135,7 +201,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
 
     try {
       const transactionData = {
-        school_id: userInfo[0].user_school_id,
+        school_id: schoolId,
         type: formData.type,
         amount: parseFloat(formData.amount),
         currency: formData.currency,
@@ -171,13 +237,17 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   };
 
   const paymentMethods = ['Cash', 'Credit Card', 'Bank Transfer', 'Check', 'PayPal', 'Other'];
-  const currencies = ['USD', 'EUR', 'RUB'];
   const recurringFrequencies = [
     { value: 'daily', label: 'Daily' },
     { value: 'weekly', label: 'Weekly' },
     { value: 'monthly', label: 'Monthly' },
     { value: 'yearly', label: 'Yearly' },
   ];
+
+  // Filter categories by transaction type
+  const filteredCategories = categories.filter(cat => 
+    cat.type === formData.type || cat.type === 'all'
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,8 +281,8 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                     </SelectTrigger>
                     <SelectContent>
                       {currencies.map(currency => (
-                        <SelectItem key={currency} value={currency}>
-                          {currency}
+                        <SelectItem key={currency.id} value={currency.code}>
+                          {currency.symbol} {currency.code}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -289,7 +359,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Account</Label>
+                  <Label>To Account</Label>
                   <Select 
                     value={formData.toAccountId} 
                     onValueChange={(value) => handleInputChange('toAccountId', value)}
@@ -298,8 +368,17 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: account.color }}
+                            />
+                            {account.name} ({account.currency_symbol} {account.currency_code})
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -337,8 +416,17 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: account.color }}
+                            />
+                            {account.name} ({account.currency_symbol} {account.currency_code})
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -384,8 +472,17 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select source account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: account.color }}
+                            />
+                            {account.name} ({account.currency_symbol} {account.currency_code})
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -400,8 +497,17 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select destination account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: account.color }}
+                            />
+                            {account.name} ({account.currency_symbol} {account.currency_code})
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -420,8 +526,14 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                     <SelectValue placeholder="Select contact" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="contact1">John Doe</SelectItem>
-                    <SelectItem value="contact2">Jane Smith</SelectItem>
+                    {contacts.map(contact => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{contact.name}</span>
+                          <span className="text-xs text-muted-foreground">{contact.type}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -436,8 +548,17 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="category1">Tuition & Fees</SelectItem>
-                    <SelectItem value="category2">Office Supplies</SelectItem>
+                    {filteredCategories.map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          {category.full_path || category.name}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
