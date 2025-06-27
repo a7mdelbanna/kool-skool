@@ -813,6 +813,166 @@ export type Database = {
         }
         Relationships: []
       }
+      transaction_tags_junction: {
+        Row: {
+          created_at: string
+          id: string
+          tag_id: string
+          transaction_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          tag_id: string
+          transaction_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          tag_id?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_tags_junction_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_tags_junction_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          amount: number
+          category_id: string | null
+          contact_id: string | null
+          created_at: string
+          currency: string
+          description: string
+          from_account_id: string | null
+          id: string
+          is_recurring: boolean | null
+          notes: string | null
+          parent_transaction_id: string | null
+          payment_method: string | null
+          receipt_number: string | null
+          receipt_url: string | null
+          recurring_end_date: string | null
+          recurring_frequency: string | null
+          school_id: string
+          status: string
+          tax_amount: number | null
+          tax_rate: number | null
+          to_account_id: string | null
+          transaction_date: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          description: string
+          from_account_id?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          notes?: string | null
+          parent_transaction_id?: string | null
+          payment_method?: string | null
+          receipt_number?: string | null
+          receipt_url?: string | null
+          recurring_end_date?: string | null
+          recurring_frequency?: string | null
+          school_id: string
+          status?: string
+          tax_amount?: number | null
+          tax_rate?: number | null
+          to_account_id?: string | null
+          transaction_date?: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string
+          from_account_id?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          notes?: string | null
+          parent_transaction_id?: string | null
+          payment_method?: string | null
+          receipt_number?: string | null
+          receipt_url?: string | null
+          recurring_end_date?: string | null
+          recurring_frequency?: string | null
+          school_id?: string
+          status?: string
+          tax_amount?: number | null
+          tax_rate?: number | null
+          to_account_id?: string | null
+          transaction_date?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_parent_transaction_id_fkey"
+            columns: ["parent_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transfers: {
         Row: {
           amount: number
@@ -1057,6 +1217,31 @@ export type Database = {
             }
         Returns: Json
       }
+      create_transaction: {
+        Args: {
+          p_school_id: string
+          p_type: string
+          p_amount: number
+          p_currency: string
+          p_transaction_date: string
+          p_description: string
+          p_notes?: string
+          p_contact_id?: string
+          p_category_id?: string
+          p_from_account_id?: string
+          p_to_account_id?: string
+          p_payment_method?: string
+          p_receipt_number?: string
+          p_receipt_url?: string
+          p_tax_amount?: number
+          p_tax_rate?: number
+          p_is_recurring?: boolean
+          p_recurring_frequency?: string
+          p_recurring_end_date?: string
+          p_tag_ids?: string[]
+        }
+        Returns: string
+      }
       delete_course: {
         Args: { p_course_id: string }
         Returns: undefined
@@ -1228,6 +1413,34 @@ export type Database = {
           color: string
           created_at: string
           usage_count: number
+        }[]
+      }
+      get_school_transactions: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          type: string
+          amount: number
+          currency: string
+          transaction_date: string
+          description: string
+          notes: string
+          status: string
+          contact_name: string
+          contact_type: string
+          category_name: string
+          category_full_path: string
+          from_account_name: string
+          to_account_name: string
+          payment_method: string
+          receipt_number: string
+          receipt_url: string
+          tax_amount: number
+          tax_rate: number
+          is_recurring: boolean
+          recurring_frequency: string
+          created_at: string
+          tags: Json
         }[]
       }
       get_student_payments: {

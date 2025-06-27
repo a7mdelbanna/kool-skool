@@ -745,3 +745,132 @@ export const deleteContactType = async (contactTypeId: string) => {
     throw error;
   }
 };
+
+export const createTransaction = async (transactionData: {
+  school_id: string;
+  type: 'income' | 'expense' | 'transfer';
+  amount: number;
+  currency: string;
+  transaction_date: string;
+  description: string;
+  notes?: string;
+  contact_id?: string;
+  category_id?: string;
+  from_account_id?: string;
+  to_account_id?: string;
+  payment_method?: string;
+  receipt_number?: string;
+  receipt_url?: string;
+  tax_amount?: number;
+  tax_rate?: number;
+  is_recurring?: boolean;
+  recurring_frequency?: string;
+  recurring_end_date?: string;
+  tag_ids?: string[];
+}) => {
+  console.log('Creating transaction:', transactionData);
+  
+  const { data, error } = await supabase.rpc('create_transaction', {
+    p_school_id: transactionData.school_id,
+    p_type: transactionData.type,
+    p_amount: transactionData.amount,
+    p_currency: transactionData.currency,
+    p_transaction_date: transactionData.transaction_date,
+    p_description: transactionData.description,
+    p_notes: transactionData.notes,
+    p_contact_id: transactionData.contact_id,
+    p_category_id: transactionData.category_id,
+    p_from_account_id: transactionData.from_account_id,
+    p_to_account_id: transactionData.to_account_id,
+    p_payment_method: transactionData.payment_method,
+    p_receipt_number: transactionData.receipt_number,
+    p_receipt_url: transactionData.receipt_url,
+    p_tax_amount: transactionData.tax_amount || 0,
+    p_tax_rate: transactionData.tax_rate || 0,
+    p_is_recurring: transactionData.is_recurring || false,
+    p_recurring_frequency: transactionData.recurring_frequency,
+    p_recurring_end_date: transactionData.recurring_end_date,
+    p_tag_ids: transactionData.tag_ids || [],
+  });
+  
+  if (error) {
+    console.error('Error creating transaction:', error);
+    throw new Error(error.message);
+  }
+  
+  console.log('Transaction created successfully:', data);
+  return data;
+};
+
+export const getSchoolTransactions = async (schoolId: string) => {
+  console.log('Fetching school transactions for:', schoolId);
+  
+  const { data, error } = await supabase.rpc('get_school_transactions', {
+    p_school_id: schoolId
+  });
+  
+  if (error) {
+    console.error('Error fetching school transactions:', error);
+    throw new Error(error.message);
+  }
+  
+  console.log('School transactions fetched:', data);
+  return data;
+};
+
+export const updateTransaction = async (transactionId: string, updates: {
+  amount?: number;
+  currency?: string;
+  transaction_date?: string;
+  description?: string;
+  notes?: string;
+  contact_id?: string;
+  category_id?: string;
+  from_account_id?: string;
+  to_account_id?: string;
+  payment_method?: string;
+  receipt_number?: string;
+  receipt_url?: string;
+  tax_amount?: number;
+  tax_rate?: number;
+  is_recurring?: boolean;
+  recurring_frequency?: string;
+  recurring_end_date?: string;
+  status?: string;
+}) => {
+  console.log('Updating transaction:', transactionId, updates);
+  
+  const { data, error } = await supabase
+    .from('transactions')
+    .update(updates)
+    .eq('id', transactionId)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating transaction:', error);
+    throw new Error(error.message);
+  }
+  
+  console.log('Transaction updated successfully:', data);
+  return data;
+};
+
+export const deleteTransaction = async (transactionId: string) => {
+  console.log('Deleting transaction:', transactionId);
+  
+  const { data, error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', transactionId)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error deleting transaction:', error);
+    throw new Error(error.message);
+  }
+  
+  console.log('Transaction deleted successfully:', data);
+  return data;
+};

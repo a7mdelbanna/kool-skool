@@ -42,13 +42,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getCurrentUserInfo, getStudentsWithDetails, getStudentPayments } from '@/integrations/supabase/client';
+import { getCurrentUserInfo, getStudentsWithDetails, getStudentPayments, getSchoolTransactions } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import PaymentDialog from '@/components/PaymentDialog';
 import ExpenseDialog from '@/components/ExpenseDialog';
 import { Expense } from '@/contexts/PaymentContext';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import TagManager from '@/components/TagManager';
+import AddTransactionDialog from '@/components/AddTransactionDialog';
+import { createTransaction } from '@/integrations/supabase/client';
 
 interface StudentPayment {
   id: string;
@@ -63,13 +65,40 @@ interface StudentPayment {
   student_name?: string;
 }
 
+interface Transaction {
+  id: string;
+  type: 'income' | 'expense' | 'transfer';
+  amount: number;
+  currency: string;
+  transaction_date: string;
+  description: string;
+  notes: string;
+  status: string;
+  contact_name: string;
+  contact_type: string;
+  category_name: string;
+  category_full_path: string;
+  from_account_name: string;
+  to_account_name: string;
+  payment_method: string;
+  receipt_number: string;
+  receipt_url: string;
+  tax_amount: number;
+  tax_rate: number;
+  is_recurring: boolean;
+  recurring_frequency: string;
+  created_at: string;
+  tags: any[];
+}
+
 const Payments = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('payments');
-  const [sortColumn, setSortColumn] = useState('payment_date');
+  const [activeTab, setActiveTab] = useState('transactions');
+  const [sortColumn, setSortColumn] = useState('transaction_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
   // Dialog states
+  const [addTransactionDialogOpen, setAddTransactionDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(undefined);
@@ -84,14 +113,21 @@ const Payments = () => {
     queryFn: getCurrentUserInfo,
   });
 
-  // Fetch students to get student payments
+  // Fetch school transactions (new unified data)
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
+    queryKey: ['school-transactions', userInfo?.[0]?.user_school_id],
+    queryFn: () => getSchoolTransactions(userInfo?.[0]?.user_school_id as string),
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
+
+  // Fetch students to get student payments (keep for backward compatibility)
   const { data: students = [], isLoading: studentsLoading } = useQuery({
     queryKey: ['students-with-details', userInfo?.[0]?.user_school_id],
     queryFn: () => getStudentsWithDetails(userInfo?.[0]?.user_school_id as string),
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
-  // Fetch all student payments using the proper Supabase client function
+  // Fetch all student payments using the proper Supabase client function (keep for backward compatibility)
   const { data: allPayments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ['all-student-payments', students],
     queryFn: async () => {
@@ -104,7 +140,6 @@ const Payments = () => {
         try {
           console.log('📝 Fetching payments for student:', student.id, student.first_name, student.last_name);
           
-          // Use the existing getStudentPayments function from the client
           const studentPayments = await getStudentPayments(student.id);
           
           console.log('💰 Found', studentPayments.length, 'payments for', student.first_name, student.last_name);
@@ -129,31 +164,32 @@ const Payments = () => {
   // Mock expenses data (you can replace this with real data later)
   const expenses: Expense[] = [];
   
-  const isLoading = studentsLoading || paymentsLoading;
+  const isLoading = studentsLoading || paymentsLoading || transactionsLoading;
   
   console.log('📊 Payments data:', { 
+    transactions: transactions.length,
     allPayments: allPayments.length, 
     isLoading, 
     studentsCount: students.length 
   });
   
-  // Calculate totals for payments
-  const totalPaid = allPayments
-    .filter(payment => payment.status === 'completed')
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
-    
+  // Calculate totals for payments (combine old payments and new transactions)
+  const incomeTransactions = transactions.filter(t => t.type === 'income');
+  const expenseTransactions = transactions.filter(t => t.type === 'expense');
+  const allIncomePayments = [...allPayments.filter(p => p.status === 'completed'), ...incomeTransactions];
+  const allExpensePayments = [...expenses, ...expenseTransactions];
+  
+  const totalPaid = allIncomePayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const totalPending = allPayments
     .filter(payment => payment.status === 'pending')
     .reduce((sum, payment) => sum + Number(payment.amount), 0);
-    
   const totalOverdue = allPayments
     .filter(payment => payment.status === 'failed')
     .reduce((sum, payment) => sum + Number(payment.amount), 0);
-    
-  const totalPayments = allPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const totalPayments = totalPaid;
   
-  // Calculate total for expenses
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  // Calculate total for expenses (combine old expenses and new expense transactions)
+  const totalExpenses = allExpensePayments.reduce((sum, expense) => sum + Number(expense.amount), 0);
   
   // Calculate net income (revenue - expenses)
   const netIncome = totalPayments - totalExpenses;
@@ -183,7 +219,6 @@ const Payments = () => {
   
   // Delete payment with confirmation
   const handleDeletePayment = (payment: StudentPayment) => {
-    // This would need to be implemented with actual delete functionality
     toast.success(`Payment of $${payment.amount} would be deleted`);
   };
   
@@ -205,6 +240,20 @@ const Payments = () => {
   const handleDeleteExpense = (expense: Expense) => {
     toast.success(`Expense of $${expense.amount} would be deleted`);
   };
+
+  // Handle adding new transaction
+  const handleAddTransaction = async (transactionData: any) => {
+    try {
+      await createTransaction({
+        school_id: userInfo?.[0]?.user_school_id as string,
+        ...transactionData,
+      });
+      queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
+      toast.success('Transaction created successfully');
+    } catch (error: any) {
+      toast.error('Failed to create transaction: ' + error.message);
+    }
+  };
   
   // Get status badge for payments
   const getStatusBadge = (status: string) => {
@@ -213,7 +262,7 @@ const Payments = () => {
         return (
           <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 gap-1">
             <CheckCircle className="h-3 w-3" />
-            <span>Paid</span>
+            <span>Completed</span>
           </Badge>
         );
       case 'pending':
@@ -223,19 +272,53 @@ const Payments = () => {
             <span>Pending</span>
           </Badge>
         );
-      case 'failed':
+      case 'cancelled':
         return (
           <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 gap-1">
             <AlertCircle className="h-3 w-3" />
-            <span>Overdue</span>
+            <span>Cancelled</span>
           </Badge>
         );
       default:
         return null;
     }
   };
+
+  const getTransactionTypeColor = (type: string) => {
+    switch (type) {
+      case 'income': return 'text-green-600';
+      case 'expense': return 'text-red-600';
+      case 'transfer': return 'text-blue-600';
+      default: return 'text-gray-600';
+    }
+  };
   
-  // Filter and sort payments
+  // Filter and sort transactions
+  const filteredTransactions = transactions
+    .filter(transaction => 
+      transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortColumn === 'transaction_date') {
+        return sortDirection === 'asc' 
+          ? new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime()
+          : new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime();
+      } else if (sortColumn === 'amount') {
+        return sortDirection === 'asc' 
+          ? Number(a.amount) - Number(b.amount)
+          : Number(b.amount) - Number(a.amount);
+      } else if (sortColumn === 'type') {
+        return sortDirection === 'asc'
+          ? a.type.localeCompare(b.type)
+          : b.type.localeCompare(a.type);
+      }
+      return 0;
+    });
+
+  // Filter and sort payments (keep for backward compatibility)
   const filteredPayments = allPayments
     .filter(payment => 
       payment.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -272,13 +355,14 @@ const Payments = () => {
   // Handle tag changes to refresh the payments list
   const handleTagsChange = () => {
     queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
+    queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
   };
 
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex justify-center items-center h-64">
-          <div className="text-muted-foreground">Loading payments...</div>
+          <div className="text-muted-foreground">Loading transactions...</div>
         </div>
       </div>
     );
@@ -288,8 +372,8 @@ const Payments = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Payments</h1>
-          <p className="text-muted-foreground mt-1">Track and manage your payment history</p>
+          <h1 className="text-3xl font-bold">Payments & Transactions</h1>
+          <p className="text-muted-foreground mt-1">Track and manage your financial transactions</p>
         </div>
         
         <div className="flex gap-2">
@@ -297,84 +381,14 @@ const Payments = () => {
             <Download className="h-4 w-4" />
             <span>Export</span>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="gap-2">
-                <PlusCircle className="h-4 w-4" />
-                <span>Record New</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleAddPayment}>
-                <DollarSign className="h-4 w-4 mr-2" />
-                <span>Add Payment</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleAddExpense}>
-                <ReceiptIcon className="h-4 w-4 mr-2" />
-                <span>Add Expense</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button 
+            onClick={() => setAddTransactionDialogOpen(true)}
+            className="gap-2 bg-primary hover:bg-primary/90"
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>Add Transaction</span>
+          </Button>
         </div>
-      </div>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 element-transition">
-        <Card className="glass glass-hover">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <CircleDollarSign className="h-4 w-4 text-primary" />
-              Net Income
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={cn(
-              "text-2xl font-bold",
-              netIncome >= 0 ? "text-green-600" : "text-red-600"
-            )}>
-              ${netIncome.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Revenue minus expenses</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="glass glass-hover">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-primary" />
-              Total Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalPayments.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground mt-1">From all payments</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="glass glass-hover">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-primary" />
-              Total Expenses
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">${totalExpenses.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground mt-1">All business expenses</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="glass glass-hover">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-primary" />
-              Pending/Overdue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">${(totalPending + totalOverdue).toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Payments not yet received</p>
-          </CardContent>
-        </Card>
       </div>
       
       {/* Add Tag Manager */}
@@ -383,9 +397,13 @@ const Payments = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <TabsList>
+            <TabsTrigger value="transactions" className="gap-2">
+              <Repeat className="h-4 w-4" />
+              All Transactions ({transactions.length})
+            </TabsTrigger>
             <TabsTrigger value="payments" className="gap-2">
               <DollarSign className="h-4 w-4" />
-              Payments ({allPayments.length})
+              Student Payments ({allPayments.length})
             </TabsTrigger>
             <TabsTrigger value="expenses" className="gap-2">
               <ReceiptIcon className="h-4 w-4" />
@@ -397,7 +415,7 @@ const Payments = () => {
             <div className="relative flex-1">
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input 
-                placeholder={activeTab === "payments" ? "Search payments..." : "Search expenses..."}
+                placeholder={activeTab === "transactions" ? "Search transactions..." : activeTab === "payments" ? "Search payments..." : "Search expenses..."}
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -410,6 +428,139 @@ const Payments = () => {
             </Button>
           </div>
         </div>
+        
+        <TabsContent value="transactions" className="mt-0">
+          <div className="rounded-lg border glass glass-hover overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleSort('type')}
+                      className="gap-1 font-medium"
+                    >
+                      Type
+                      <ArrowUpDown className="h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleSort('amount')}
+                      className="gap-1 font-medium"
+                    >
+                      Amount
+                      <ArrowUpDown className="h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleSort('transaction_date')}
+                      className="gap-1 font-medium"
+                    >
+                      Date
+                      <ArrowUpDown className="h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="h-24 text-center">
+                      {transactions.length === 0 ? 'No transactions found.' : 'No transactions match your search.'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTransactions.map((transaction) => (
+                    <TableRow key={transaction.id} className="cursor-pointer hover:bg-accent/30">
+                      <TableCell>
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            "capitalize",
+                            transaction.type === 'income' && "bg-green-100 text-green-800 border-green-200",
+                            transaction.type === 'expense' && "bg-red-100 text-red-800 border-red-200",
+                            transaction.type === 'transfer' && "bg-blue-100 text-blue-800 border-blue-200"
+                          )}
+                        >
+                          {transaction.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{transaction.description}</div>
+                        {transaction.notes && (
+                          <div className="text-sm text-muted-foreground truncate max-w-[200px]">
+                            {transaction.notes}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className={cn("font-medium", getTransactionTypeColor(transaction.type))}>
+                        {transaction.currency === 'EUR' ? '€' : transaction.currency === 'RUB' ? '₽' : '$'}{Number(transaction.amount).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>{format(new Date(transaction.transaction_date), 'MMM d, yyyy')}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {transaction.contact_name && (
+                          <div>
+                            <div className="font-medium">{transaction.contact_name}</div>
+                            <div className="text-sm text-muted-foreground capitalize">{transaction.contact_type}</div>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.category_full_path && (
+                          <div className="text-sm">{transaction.category_full_path}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {transaction.tags?.map((tag: any) => (
+                            <Badge 
+                              key={tag.id} 
+                              variant="outline" 
+                              className="text-xs"
+                              style={{ 
+                                backgroundColor: tag.color + '20',
+                                borderColor: tag.color,
+                                color: tag.color 
+                              }}
+                            >
+                              {tag.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon">
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
         
         <TabsContent value="payments" className="mt-0">
           <div className="rounded-lg border glass glass-hover overflow-hidden">
@@ -547,6 +698,15 @@ const Payments = () => {
       </Tabs>
 
       {/* Dialogs */}
+      <AddTransactionDialog
+        open={addTransactionDialogOpen}
+        onOpenChange={setAddTransactionDialogOpen}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
+          setAddTransactionDialogOpen(false);
+        }}
+      />
+
       <PaymentDialog 
         open={paymentDialogOpen} 
         onOpenChange={setPaymentDialogOpen}
