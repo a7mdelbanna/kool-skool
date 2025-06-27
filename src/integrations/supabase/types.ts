@@ -102,6 +102,44 @@ export type Database = {
           },
         ]
       }
+      contact_types: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_types_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           created_at: string
@@ -1023,6 +1061,16 @@ export type Database = {
           currency_name: string
           currency_symbol: string
           currency_code: string
+        }[]
+      }
+      get_school_contact_types: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          name: string
+          color: string
+          is_active: boolean
+          created_at: string
         }[]
       }
       get_school_contacts: {

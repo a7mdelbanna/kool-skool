@@ -681,3 +681,67 @@ export const deleteTransactionTag = async (tagId: string) => {
     throw error;
   }
 };
+
+export const getSchoolContactTypes = async (schoolId: string) => {
+  const { data, error } = await supabase.rpc('get_school_contact_types', {
+    p_school_id: schoolId
+  });
+
+  if (error) {
+    console.error('Error fetching school contact types:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const createContactType = async (schoolId: string, name: string, color: string) => {
+  const { data, error } = await supabase
+    .from('contact_types')
+    .insert({
+      school_id: schoolId,
+      name,
+      color
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating contact type:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const updateContactType = async (contactTypeId: string, name: string, color: string) => {
+  const { data, error } = await supabase
+    .from('contact_types')
+    .update({
+      name,
+      color,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', contactTypeId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating contact type:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const deleteContactType = async (contactTypeId: string) => {
+  const { error } = await supabase
+    .from('contact_types')
+    .update({ is_active: false })
+    .eq('id', contactTypeId);
+
+  if (error) {
+    console.error('Error deactivating contact type:', error);
+    throw error;
+  }
+};

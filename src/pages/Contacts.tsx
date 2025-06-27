@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getSchoolContactTypes } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import ContactDialog from '@/components/ContactDialog';
 
@@ -52,31 +52,19 @@ interface Contact {
   created_at: string;
 }
 
-const contactTypes = ['All Types', 'Client', 'Vendor', 'Service Provider', 'Partner', 'Supplier', 'Contractor'];
-
-const getTypeColor = (type: string) => {
-  switch (type) {
-    case 'Client':
-      return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
-    case 'Vendor':
-      return 'bg-green-100 text-green-800 hover:bg-green-200';
-    case 'Service Provider':
-      return 'bg-orange-100 text-orange-800 hover:bg-orange-200';
-    case 'Partner':
-      return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
-    case 'Supplier':
-      return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
-    case 'Contractor':
-      return 'bg-red-100 text-red-800 hover:bg-red-200';
-    default:
-      return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
-  }
-};
+interface ContactType {
+  id: string;
+  name: string;
+  color: string;
+  is_active: boolean;
+  created_at: string;
+}
 
 const Contacts = () => {
   const { user } = useContext(UserContext);
   const { toast } = useToast();
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactTypes, setContactTypes] = useState<ContactType[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All Types');
@@ -89,6 +77,22 @@ const Contacts = () => {
     open: boolean;
     contact?: Contact;
   }>({ open: false });
+
+  const fetchContactTypes = async () => {
+    if (!user?.schoolId) return;
+
+    try {
+      const types = await getSchoolContactTypes(user.schoolId);
+      setContactTypes(types || []);
+    } catch (error) {
+      console.error('Error fetching contact types:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load contact types",
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchContacts = async () => {
     if (!user?.schoolId) return;
@@ -120,8 +124,18 @@ const Contacts = () => {
   };
 
   useEffect(() => {
+    fetchContactTypes();
     fetchContacts();
   }, [user?.schoolId]);
+
+  // Get contact type color
+  const getTypeColor = (typeName: string) => {
+    const contactType = contactTypes.find(ct => ct.name === typeName);
+    return contactType?.color || '#6B7280';
+  };
+
+  // Create dynamic contact type filter options
+  const contactTypeOptions = ['All Types', ...contactTypes.map(ct => ct.name)];
 
   // Filter contacts based on search term and type
   const filteredContacts = contacts.filter(contact => {
@@ -183,6 +197,11 @@ const Contacts = () => {
     });
   };
 
+  const handleRefresh = () => {
+    fetchContacts();
+    fetchContactTypes();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -207,8 +226,8 @@ const Contacts = () => {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Dynamic Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -219,42 +238,20 @@ const Contacts = () => {
             <div className="text-2xl font-bold">{contacts.length}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Vendors
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {contacts.filter(c => c.type === 'Vendor').length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Clients
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {contacts.filter(c => c.type === 'Client').length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Service Providers
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {contacts.filter(c => c.type === 'Service Provider').length}
-            </div>
-          </CardContent>
-        </Card>
+        {contactTypes.slice(0, 3).map((type) => (
+          <Card key={type.id}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {type.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {contacts.filter(c => c.type === type.name).length}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Filters and Search */}
@@ -282,7 +279,7 @@ const Contacts = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {contactTypes.map((type) => (
+                {contactTypeOptions.map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>
@@ -337,7 +334,11 @@ const Contacts = () => {
                       <TableCell>
                         <Badge 
                           variant="secondary" 
-                          className={getTypeColor(contact.type)}
+                          style={{
+                            backgroundColor: `${getTypeColor(contact.type)}20`,
+                            color: getTypeColor(contact.type),
+                            borderColor: getTypeColor(contact.type)
+                          }}
                         >
                           {contact.type}
                         </Badge>
@@ -407,7 +408,7 @@ const Contacts = () => {
         onOpenChange={(open) => setContactDialog(prev => ({ ...prev, open }))}
         contact={contactDialog.contact}
         mode={contactDialog.mode}
-        onSuccess={fetchContacts}
+        onSuccess={handleRefresh}
       />
 
       {/* Delete Confirmation Dialog */}
