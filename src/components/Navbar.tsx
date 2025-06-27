@@ -1,5 +1,4 @@
-
-import React, { useContext } from 'react';
+import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
@@ -17,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
-import { UserContext } from '@/App';
+import { useUser } from '@/contexts/UserContext';
 
 interface NavItemProps {
   to: string;
@@ -49,7 +48,7 @@ const MobileNavbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, setUser } = useContext(UserContext);
+  const { user, setUser } = useUser();
   const [isOpen, setIsOpen] = React.useState(false);
 
   const toggleMenu = () => setIsOpen(!isOpen);

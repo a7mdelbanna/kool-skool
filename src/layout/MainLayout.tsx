@@ -1,11 +1,14 @@
 
 import React from 'react';
-import { Outlet } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import MobileNavbar from '@/components/Navbar';
-import { Sidebar } from './Sidebar';
+import Sidebar from './Sidebar';
 
-const MainLayout = () => {
+interface MainLayoutProps {
+  children: React.ReactNode;
+}
+
+const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full overflow-hidden">
@@ -14,7 +17,7 @@ const MainLayout = () => {
           <MobileNavbar />
           <main className="flex-1 p-4 pt-24 pb-20 lg:pt-24 lg:pb-6 overflow-auto">
             <div className="max-w-7xl mx-auto transition-all duration-300 page-transition">
-              <Outlet />
+              {children}
             </div>
           </main>
         </div>
