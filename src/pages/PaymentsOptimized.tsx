@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -107,7 +108,7 @@ const PaymentsOptimized = () => {
   const schoolId = getSchoolId();
 
   // Fetch school currencies for conversion
-  const { data: currencies = [] } = useQuery({
+  const { data: currencies = [], isLoading: currenciesLoading } = useQuery({
     queryKey: ['school-currencies', schoolId],
     queryFn: async (): Promise<Currency[]> => {
       if (!schoolId) return [];
@@ -115,17 +116,27 @@ const PaymentsOptimized = () => {
         p_school_id: schoolId
       });
       if (error) throw error;
+      console.log('💰 Currencies fetched:', data);
       return data || [];
     },
     enabled: !!schoolId,
     staleTime: 60000, // 1 minute
   });
 
-  // Get default currency
-  const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
+  // Get default currency with better fallback handling
+  const defaultCurrency = useMemo(() => {
+    console.log('🔍 Looking for default currency in:', currencies);
+    const foundDefault = currencies.find(c => c.is_default);
+    const fallback = currencies.length > 0 ? currencies[0] : { code: 'USD', symbol: '$' };
+    const result = foundDefault || fallback;
+    console.log('💱 Default currency selected:', result);
+    return result;
+  }, [currencies]);
 
   // Helper function to convert amount to default currency
   const convertToDefaultCurrency = (amount: number, fromCurrency: string): number => {
+    console.log(`🔄 Converting ${amount} ${fromCurrency} to ${defaultCurrency?.code || 'USD'}`);
+    
     if (!defaultCurrency || fromCurrency === defaultCurrency.code) {
       return amount;
     }
@@ -137,10 +148,6 @@ const PaymentsOptimized = () => {
     }
 
     // Convert to USD (or default currency) using exchange rates
-    // The exchange rate should represent how many units of the currency equal 1 USD
-    // For example: 1 USD = 100 RUB, so RUB exchange_rate should be 100
-    // To convert RUB to USD: amount_in_rub / exchange_rate_rub = amount_in_usd
-    
     let convertedAmount = amount;
     
     // If converting from non-default to default currency
@@ -234,6 +241,20 @@ const PaymentsOptimized = () => {
   // Memoized calculations with currency conversion to prevent recalculation on every render
   const statistics = useMemo(() => {
     console.time('calculate-statistics');
+    console.log('📊 Starting statistics calculation with default currency:', defaultCurrency);
+    
+    // Ensure we have a valid default currency
+    if (!defaultCurrency) {
+      console.warn('⚠️ No default currency available, using USD fallback');
+      return {
+        totalRevenue: 0,
+        pendingAmount: 0,
+        totalTransactionIncome: 0,
+        totalExpenses: 0,
+        netIncome: 0,
+        defaultCurrencySymbol: '$'
+      };
+    }
     
     const paidPayments = payments.filter(payment => payment.status === 'completed');
     const pendingPayments = payments.filter(payment => payment.status === 'pending');
@@ -241,7 +262,7 @@ const PaymentsOptimized = () => {
     // Convert all amounts to default currency for unified calculations
     const totalRevenue = paidPayments.reduce((sum, payment) => {
       const convertedAmount = convertToDefaultCurrency(Number(payment.amount), payment.currency);
-      console.log(`📊 Payment revenue: ${payment.amount} ${payment.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency?.code}`);
+      console.log(`📊 Payment revenue: ${payment.amount} ${payment.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency.code}`);
       return sum + convertedAmount;
     }, 0);
     
@@ -255,23 +276,23 @@ const PaymentsOptimized = () => {
     
     const totalTransactionIncome = incomeTransactions.reduce((sum, t) => {
       const convertedAmount = convertToDefaultCurrency(Number(t.amount), t.currency);
-      console.log(`📊 Transaction income: ${t.amount} ${t.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency?.code}`);
+      console.log(`📊 Transaction income: ${t.amount} ${t.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency.code}`);
       return sum + convertedAmount;
     }, 0);
     
     const totalExpenses = expenseTransactions.reduce((sum, t) => {
       const convertedAmount = convertToDefaultCurrency(Number(t.amount), t.currency);
-      console.log(`📊 Transaction expense: ${t.amount} ${t.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency?.code}`);
+      console.log(`📊 Transaction expense: ${t.amount} ${t.currency} → ${convertedAmount.toFixed(2)} ${defaultCurrency.code}`);
       return sum + convertedAmount;
     }, 0);
     
     const netIncome = (totalRevenue + totalTransactionIncome) - totalExpenses;
 
     console.log(`📊 Final calculations:
-      - Total Revenue: ${totalRevenue.toFixed(2)} ${defaultCurrency?.code}
-      - Total Transaction Income: ${totalTransactionIncome.toFixed(2)} ${defaultCurrency?.code}
-      - Total Expenses: ${totalExpenses.toFixed(2)} ${defaultCurrency?.code}
-      - Net Income: ${netIncome.toFixed(2)} ${defaultCurrency?.code}`);
+      - Total Revenue: ${totalRevenue.toFixed(2)} ${defaultCurrency.code}
+      - Total Transaction Income: ${totalTransactionIncome.toFixed(2)} ${defaultCurrency.code}
+      - Total Expenses: ${totalExpenses.toFixed(2)} ${defaultCurrency.code}
+      - Net Income: ${netIncome.toFixed(2)} ${defaultCurrency.code}`);
 
     console.timeEnd('calculate-statistics');
     
@@ -281,7 +302,7 @@ const PaymentsOptimized = () => {
       totalTransactionIncome,
       totalExpenses,
       netIncome,
-      defaultCurrencySymbol: defaultCurrency?.symbol || '$'
+      defaultCurrencySymbol: defaultCurrency.symbol || '$'
     };
   }, [payments, transactions, currencies, defaultCurrency]);
 
@@ -499,7 +520,7 @@ const PaymentsOptimized = () => {
     );
   }
 
-  const isLoading = paymentsLoading || transactionsLoading;
+  const isLoading = paymentsLoading || transactionsLoading || currenciesLoading;
 
   return (
     <div className="container py-8">
