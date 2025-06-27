@@ -28,17 +28,17 @@ import {
 } from "@/components/ui/hover-card";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-const subjectColorMap: Record<string, { bg: string, border: string, text: string }> = {
-  'Mathematics': { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
-  'Science': { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-700' },
-  'English': { bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-700' },
-  'Physics': { bg: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-700' },
-  'Chemistry': { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-700' },
-  'Biology': { bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-700' },
-  'Geography': { bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-700' },
-  'Literature': { bg: 'bg-indigo-100', border: 'border-indigo-300', text: 'text-indigo-700' },
-  'Computer Science': { bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-700' },
-  'default': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' }
+const subjectColorMap: Record<string, { bg: string, border: string, text: string, solid: string }> = {
+  'Mathematics': { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700', solid: 'bg-blue-600' },
+  'Science': { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-700', solid: 'bg-green-600' },
+  'English': { bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-700', solid: 'bg-purple-600' },
+  'Physics': { bg: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-700', solid: 'bg-amber-600' },
+  'Chemistry': { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-700', solid: 'bg-red-600' },
+  'Biology': { bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-700', solid: 'bg-emerald-600' },
+  'Geography': { bg: 'bg-cyan-100', border: 'border-cyan-300', text: 'text-cyan-700', solid: 'bg-cyan-600' },
+  'Literature': { bg: 'bg-indigo-100', border: 'border-indigo-300', text: 'text-indigo-700', solid: 'bg-indigo-600' },
+  'Computer Science': { bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-700', solid: 'bg-slate-600' },
+  'default': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700', solid: 'bg-gray-600' }
 };
 
 interface SessionWithSubject extends Session {
@@ -174,7 +174,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                           <div
                             className={cn(
                               "text-xs p-1 rounded text-white font-medium cursor-pointer hover:opacity-80 truncate",
-                              colors.bg.replace('bg-', 'bg-').replace('-100', '-500'),
+                              colors.solid,
                               session.status === "canceled" && "opacity-60 line-through"
                             )}
                             onClick={(e) => {
