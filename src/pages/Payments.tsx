@@ -1,324 +1,268 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+
+import React, { useState } from 'react';
+import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Calendar } from "@/components/ui/calendar"
+} from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import PaymentDialog from '@/components/PaymentDialog';
+import { usePayments } from '@/contexts/PaymentContext';
 import { format } from 'date-fns';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCurrentUserInfo, getSchoolTransactions, createTransaction } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 const PaymentsPage = () => {
-  const [date, setDate] = React.useState<Date | undefined>(new Date())
-  const [formData, setFormData] = useState({
-    type: 'income',
-    amount: '',
-    currency: 'USD',
-    transaction_date: new Date().toISOString().split('T')[0],
-    description: '',
-    notes: '',
-    contact_id: '',
-    category_id: '',
-    from_account_id: '',
-    to_account_id: '',
-    payment_method: '',
-    receipt_number: '',
-    receipt_url: '',
-    tax_amount: '',
-    tax_rate: '',
-    is_recurring: false,
-    recurring_frequency: '',
-    recurring_end_date: '',
-    tag_ids: [] as string[]
-  });
-  const [isCreating, setIsCreating] = useState(false);
-  const queryClient = useQueryClient();
+  const { sessions, loading } = usePayments();
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(undefined);
+  const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch user info
-  const { data: userInfo } = useQuery({
-    queryKey: ['current-user-info'],
-    queryFn: getCurrentUserInfo,
-  });
+  // Calculate payment statistics from sessions
+  const paidSessions = sessions.filter(session => session.paymentStatus === 'paid');
+  const pendingSessions = sessions.filter(session => session.paymentStatus === 'pending');
+  
+  const totalRevenue = paidSessions.reduce((sum, session) => sum + session.cost, 0);
+  const netIncome = totalRevenue; // Assuming no expenses for now
+  const totalExpenses = 0; // No expenses data available
+  const pendingAmount = pendingSessions.reduce((sum, session) => sum + session.cost, 0);
 
-  // Fetch transactions
-  const { data: rawTransactions = [], refetch } = useQuery({
-    queryKey: ['school-transactions', userInfo?.[0]?.user_school_id],
-    queryFn: () => getSchoolTransactions(userInfo?.[0]?.user_school_id as string),
-    enabled: !!userInfo?.[0]?.user_school_id,
-  });
+  // Filter sessions based on search term
+  const filteredSessions = sessions.filter(session =>
+    session.studentName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  // Transform the data to include the tag information
-  const transactions = rawTransactions ? rawTransactions.map(transaction => {
-    const tags = transaction.tags ? transaction.tags.map(tag => tag.name) : [];
-    return {
-      ...transaction,
-      tags: tags
-    };
-  }) : [];
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const handleAddPayment = () => {
+    setSelectedPayment(undefined);
+    setDialogMode('add');
+    setPaymentDialogOpen(true);
   };
 
-  const handleDateChange = (date: Date | undefined) => {
-    setDate(date);
-    setFormData(prev => ({ ...prev, transaction_date: date ? format(date, 'yyyy-MM-dd') : '' }));
+  const handleEditPayment = (session: any) => {
+    setSelectedPayment({
+      id: session.id,
+      amount: session.cost,
+      date: session.date,
+      method: 'Cash',
+      notes: session.notes || '',
+      status: session.paymentStatus === 'paid' ? 'completed' : 'pending',
+      studentName: session.studentName
+    });
+    setDialogMode('edit');
+    setPaymentDialogOpen(true);
   };
 
-  const handleCreateTransaction = async (formData: any) => {
-    try {
-      // Validate required fields
-      if (!formData.amount || !formData.description) {
-        toast.error('Amount and description are required');
-        return;
-      }
-
-      // Get current user data from localStorage
-      const userData = localStorage.getItem('user');
-      const user = userData ? JSON.parse(userData) : null;
-
-      if (!user || !user.schoolId) {
-        toast.error('User not authenticated or school not found');
-        return;
-      }
-
-      // Call the imported createTransaction function from the Supabase client
-      await createTransaction({
-        school_id: user.schoolId,
-        type: formData.type || 'income',
-        amount: parseFloat(formData.amount),
-        currency: formData.currency || 'USD',
-        transaction_date: formData.transaction_date || new Date().toISOString().split('T')[0],
-        description: formData.description,
-        notes: formData.notes,
-        contact_id: formData.contact_id,
-        category_id: formData.category_id,
-        from_account_id: formData.from_account_id,
-        to_account_id: formData.to_account_id,
-        payment_method: formData.payment_method,
-        receipt_number: formData.receipt_number,
-        receipt_url: formData.receipt_url,
-        tax_amount: formData.tax_amount ? parseFloat(formData.tax_amount) : 0,
-        tax_rate: formData.tax_rate ? parseFloat(formData.tax_rate) : 0,
-        is_recurring: formData.is_recurring || false,
-        recurring_frequency: formData.recurring_frequency,
-        recurring_end_date: formData.recurring_end_date,
-        tag_ids: formData.tag_ids
-      });
-
-      toast.success('Transaction created successfully');
-      refetch();
-    } catch (error: any) {
-      console.error('Error creating transaction:', error);
-      toast.error('Failed to create transaction: ' + error.message);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
-    try {
-      await handleCreateTransaction(formData);
-      setFormData({
-        type: 'income',
-        amount: '',
-        currency: 'USD',
-        transaction_date: new Date().toISOString().split('T')[0],
-        description: '',
-        notes: '',
-        contact_id: '',
-        category_id: '',
-        from_account_id: '',
-        to_account_id: '',
-        payment_method: '',
-        receipt_number: '',
-        receipt_url: '',
-        tax_amount: '',
-        tax_rate: '',
-        is_recurring: false,
-        recurring_frequency: '',
-        recurring_end_date: '',
-        tag_ids: []
-      });
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="container py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Payments</h1>
+            <p className="text-muted-foreground">Track and manage your payment history</p>
+          </div>
+        </div>
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading payments...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-8">
-      <h1 className="text-2xl font-bold mb-4">Payments</h1>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Payments</h1>
+          <p className="text-muted-foreground">Track and manage your payment history</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button onClick={handleAddPayment}>
+            <Plus className="h-4 w-4 mr-2" />
+            Record New
+          </Button>
+        </div>
+      </div>
 
-      {/* Transaction Form */}
-      <Card className="mb-8">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-600">Net Income</CardTitle>
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">${netIncome.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">Revenue minus expenses</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">From all payments</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-600">Total Expenses</CardTitle>
+            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">${totalExpenses.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">All business expenses</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-amber-600">Pending/Overdue</CardTitle>
+            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">${pendingAmount.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">Payments not yet received</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tags Section */}
+      <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Add Transaction</CardTitle>
-          <CardDescription>Record a new income or expense.</CardDescription>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Tags</CardTitle>
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Tag
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="amount">Amount</Label>
-                <Input
-                  type="number"
-                  id="amount"
-                  name="amount"
-                  value={formData.amount}
-                  onChange={handleInputChange}
-                  placeholder="Enter amount"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="currency">Currency</Label>
-                <Select
-                  value={formData.currency}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select currency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Input
-                type="text"
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="Enter description"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                value={formData.notes}
-                onChange={handleInputChange}
-                placeholder="Enter notes"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="transaction_date">Transaction Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full pl-3 text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    {date ? (
-                      format(date, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <Button type="submit" disabled={isCreating}>
-              {isCreating ? "Creating..." : "Create Transaction"}
-            </Button>
-          </form>
+          <div className="flex gap-2">
+            <Badge variant="secondary" className="bg-pink-100 text-pink-800 border-pink-200">
+              <div className="w-2 h-2 bg-pink-500 rounded-full mr-2"></div>
+              tag1 ×
+            </Badge>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Transaction Table */}
+      {/* Payments Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Transactions</CardTitle>
-          <CardDescription>A history of all your transactions.</CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex gap-4">
+              <Button variant="outline" size="sm" className="text-blue-600 border-blue-200">
+                Payments (6)
+              </Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                Expenses (0)
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search payments..."
+                  className="pl-10 w-64"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filter
+              </Button>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="overflow-auto">
+        <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Date</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>Student</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Method</TableHead>
                 <TableHead>Tags</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="font-medium">{transaction.transaction_date}</TableCell>
-                  <TableCell>{transaction.description}</TableCell>
-                  <TableCell>{transaction.amount} {transaction.currency}</TableCell>
+              {filteredSessions.map((session) => (
+                <TableRow key={session.id}>
                   <TableCell>
-                    <Badge variant={transaction.type === 'income' ? 'outline' : 'destructive'}>
-                      {transaction.type}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-600">
+                        {session.studentName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </div>
+                      <span>{session.studentName}</span>
+                    </div>
                   </TableCell>
                   <TableCell>
-                    {transaction.tags && transaction.tags.length > 0 ? (
-                      transaction.tags.map((tag, index) => (
-                        <Badge key={index} className="mr-1">{tag}</Badge>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground">No tags</span>
-                    )}
+                    <Badge 
+                      variant={session.paymentStatus === 'paid' ? 'default' : 'secondary'}
+                      className={session.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : ''}
+                    >
+                      {session.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>₽{session.cost.toFixed(2)}</TableCell>
+                  <TableCell>{format(session.date, 'MMM dd, yyyy')}</TableCell>
+                  <TableCell>Cash</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" className="text-muted-foreground">
+                      + Add Tag
+                    </Button>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">-</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleEditPayment(session)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
@@ -326,6 +270,14 @@ const PaymentsPage = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        payment={selectedPayment}
+        mode={dialogMode}
+      />
     </div>
   );
 };
