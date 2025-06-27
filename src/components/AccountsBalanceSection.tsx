@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -52,10 +51,36 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
 
         // Calculate balance from transactions that match this account's currency
         (transactionsData || []).forEach((transaction: any) => {
-          // Add robust amount validation
-          const transactionAmount = Number(transaction.amount);
+          // Enhanced debugging for transaction amount
+          console.log(`🔍 Processing transaction:`, {
+            id: transaction.id,
+            amount: transaction.amount,
+            type: typeof transaction.amount,
+            currency: transaction.currency,
+            transactionType: transaction.type,
+            fromAccount: transaction.from_account_name,
+            toAccount: transaction.to_account_name
+          });
+
+          // More robust amount validation
+          let transactionAmount = 0;
+          if (transaction.amount === null || transaction.amount === undefined) {
+            console.warn('❌ Transaction amount is null/undefined:', transaction.id);
+            return;
+          }
+
+          // Handle different data types
+          if (typeof transaction.amount === 'string') {
+            transactionAmount = parseFloat(transaction.amount);
+          } else if (typeof transaction.amount === 'number') {
+            transactionAmount = transaction.amount;
+          } else {
+            console.warn('❌ Invalid transaction amount type:', typeof transaction.amount, transaction.amount);
+            return;
+          }
+
           if (isNaN(transactionAmount) || !isFinite(transactionAmount)) {
-            console.warn('❌ Invalid transaction amount:', transaction.amount, 'for transaction:', transaction.id);
+            console.warn('❌ Invalid transaction amount after conversion:', transaction.amount, 'converted to:', transactionAmount);
             return;
           }
 
@@ -68,24 +93,24 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
           // For income transactions (money coming into an account)
           if (transaction.type === 'income' && transaction.to_account_name === account.name) {
             balance += transactionAmount;
-            console.log(`➕ Income: +${transactionAmount} ${accountCurrency} to ${account.name}`);
+            console.log(`➕ Income: +${transactionAmount} ${accountCurrency} to ${account.name} | New balance: ${balance}`);
           }
           
-          // For expense transactions (money going out of an account)
+          // For expense transactions (money going out of an account)  
           if (transaction.type === 'expense' && transaction.from_account_name === account.name) {
             balance -= transactionAmount;
-            console.log(`➖ Expense: -${transactionAmount} ${accountCurrency} from ${account.name}`);
+            console.log(`➖ Expense: -${transactionAmount} ${accountCurrency} from ${account.name} | New balance: ${balance}`);
           }
           
           // For transfer transactions
           if (transaction.type === 'transfer') {
             if (transaction.from_account_name === account.name) {
               balance -= transactionAmount;
-              console.log(`🔄 Transfer out: -${transactionAmount} ${accountCurrency} from ${account.name}`);
+              console.log(`🔄 Transfer out: -${transactionAmount} ${accountCurrency} from ${account.name} | New balance: ${balance}`);
             }
             if (transaction.to_account_name === account.name) {
               balance += transactionAmount;
-              console.log(`🔄 Transfer in: +${transactionAmount} ${accountCurrency} to ${account.name}`);
+              console.log(`🔄 Transfer in: +${transactionAmount} ${accountCurrency} to ${account.name} | New balance: ${balance}`);
             }
           }
         });
@@ -108,6 +133,7 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
         };
       });
 
+      console.log('✅ All account balances calculated:', accountBalances);
       return accountBalances;
     },
     enabled: !!schoolId,
