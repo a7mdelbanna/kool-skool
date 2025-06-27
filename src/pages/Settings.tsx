@@ -11,7 +11,8 @@ import {
   Shield, 
   HelpCircle, 
   Save,
-  Wallet
+  Wallet,
+  Tags
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { cn } from '@/lib/utils';
 import CurrencyManagement from '@/components/CurrencyManagement';
 import AccountsManagement from '@/components/AccountsManagement';
+import TransactionCategoriesManagement from '@/components/TransactionCategoriesManagement';
 
 const Settings = () => {
   return (
@@ -35,7 +37,7 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-6 mb-6">
+        <TabsList className="grid grid-cols-7 mb-6">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
@@ -51,6 +53,10 @@ const Settings = () => {
           <TabsTrigger value="currencies" className="gap-2">
             <DollarSign className="h-4 w-4" />
             <span className="hidden sm:inline">Currencies</span>
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="gap-2">
+            <Tags className="h-4 w-4" />
+            <span className="hidden sm:inline">Categories</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
@@ -209,6 +215,10 @@ const Settings = () => {
 
         <TabsContent value="currencies" className="mt-0 space-y-6">
           <CurrencyManagement />
+        </TabsContent>
+
+        <TabsContent value="categories" className="mt-0 space-y-6">
+          <TransactionCategoriesManagement />
         </TabsContent>
         
         <TabsContent value="notifications" className="mt-0 space-y-6">

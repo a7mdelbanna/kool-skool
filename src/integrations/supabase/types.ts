@@ -268,6 +268,7 @@ export type Database = {
           account_id: string | null
           amount: number
           category: string
+          category_id: string | null
           contact_id: string | null
           created_at: string
           currency: string
@@ -284,6 +285,7 @@ export type Database = {
           account_id?: string | null
           amount: number
           category: string
+          category_id?: string | null
           contact_id?: string | null
           created_at?: string
           currency?: string
@@ -300,6 +302,7 @@ export type Database = {
           account_id?: string | null
           amount?: number
           category?: string
+          category_id?: string | null
           contact_id?: string | null
           created_at?: string
           currency?: string
@@ -318,6 +321,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_categories"
             referencedColumns: ["id"]
           },
           {
@@ -510,6 +520,7 @@ export type Database = {
         Row: {
           account_id: string | null
           amount: number
+          category_id: string | null
           contact_id: string | null
           created_at: string
           currency: string
@@ -524,6 +535,7 @@ export type Database = {
         Insert: {
           account_id?: string | null
           amount: number
+          category_id?: string | null
           contact_id?: string | null
           created_at?: string
           currency?: string
@@ -538,6 +550,7 @@ export type Database = {
         Update: {
           account_id?: string | null
           amount?: number
+          category_id?: string | null
           contact_id?: string | null
           created_at?: string
           currency?: string
@@ -555,6 +568,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payments_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_categories"
             referencedColumns: ["id"]
           },
           {
@@ -715,6 +735,57 @@ export type Database = {
           },
         ]
       }
+      transaction_categories: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          parent_id: string | null
+          school_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          parent_id?: string | null
+          school_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          parent_id?: string | null
+          school_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_categories_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_tags: {
         Row: {
           color: string
@@ -745,6 +816,7 @@ export type Database = {
       transfers: {
         Row: {
           amount: number
+          category_id: string | null
           contact_id: string | null
           created_at: string
           currency: string
@@ -762,6 +834,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          category_id?: string | null
           contact_id?: string | null
           created_at?: string
           currency?: string
@@ -779,6 +852,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          category_id?: string | null
           contact_id?: string | null
           created_at?: string
           currency?: string
@@ -795,6 +869,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "transfers_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transfers_contact_id_fkey"
             columns: ["contact_id"]
@@ -945,6 +1026,10 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: undefined
       }
+      create_default_categories: {
+        Args: { p_school_id: string }
+        Returns: undefined
+      }
       create_student: {
         Args:
           | {
@@ -987,6 +1072,10 @@ export type Database = {
       delete_student_subscription: {
         Args: { p_subscription_id: string }
         Returns: Json
+      }
+      get_category_path: {
+        Args: { category_id: string }
+        Returns: string
       }
       get_contact_with_tags: {
         Args: { p_contact_id: string }
@@ -1069,6 +1158,20 @@ export type Database = {
           currency_name: string
           currency_symbol: string
           currency_code: string
+        }[]
+      }
+      get_school_categories: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          name: string
+          type: string
+          color: string
+          parent_id: string
+          is_active: boolean
+          created_at: string
+          full_path: string
+          level: number
         }[]
       }
       get_school_contact_types: {
