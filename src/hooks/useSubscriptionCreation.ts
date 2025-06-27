@@ -28,31 +28,33 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
-  // Get school ID from localStorage
-  const getSchoolId = () => {
-    const userData = localStorage.getItem('user');
-    if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.schoolId;
-  };
-
-  const getCurrentUserId = () => {
-    const userData = localStorage.getItem('user');
-    if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.user_id;
+  // Get user info using RPC function instead of localStorage
+  const getCurrentUserInfo = async () => {
+    const { data, error } = await supabase.rpc('get_current_user_info');
+    if (error) {
+      console.error('❌ Error getting current user info:', error);
+      throw new Error('Failed to get current user information');
+    }
+    if (!data || data.length === 0) {
+      throw new Error('No user information found');
+    }
+    return data[0];
   };
 
   const createSubscriptionMutation = useMutation({
     mutationFn: async (formData: SubscriptionFormData) => {
-      const schoolId = getSchoolId();
-      const currentUserId = getCurrentUserId();
+      console.log('🎯 Creating subscription with data:', formData);
+
+      // Get current user info using RPC
+      const userInfo = await getCurrentUserInfo();
+      const schoolId = userInfo.user_school_id;
+      const currentUserId = userInfo.user_id;
       
       if (!schoolId || !currentUserId) {
         throw new Error('School ID or User ID not found');
       }
 
-      console.log('🎯 Creating subscription with data:', formData);
+      console.log('✅ Got user info:', { schoolId, currentUserId });
 
       // Validate that account currency matches subscription currency
       if (formData.initialPayment.accountId && formData.initialPayment.amount > 0) {
