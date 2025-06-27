@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -227,6 +228,7 @@ export const useStudentForm = (
         toast.loading("Creating student...");
 
         console.log("Using password for student:", studentPassword);
+        console.log("Age group value being sent:", studentData.ageGroup);
         
         const response = await createStudent({
           student_email: studentData.email as string,
@@ -235,10 +237,12 @@ export const useStudentForm = (
           last_name: studentData.lastName as string,
           teacher_id: selectedTeacherId,
           course_id: course.id,
-          age_group: studentData.ageGroup === 'adult' ? 'adult' : 'kid',
-          level: studentData.level === 'beginner' ? 'beginner' : 
-            studentData.level === 'intermediate' ? 'intermediate' : 
-            studentData.level === 'advanced' ? 'advanced' : 'beginner',
+          // Fix: Send capitalized age group values to match database constraint
+          age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
+          // Fix: Send capitalized level values to match database constraint
+          level: studentData.level === 'beginner' ? 'Beginner' : 
+            studentData.level === 'intermediate' ? 'Intermediate' : 
+            studentData.level === 'advanced' ? 'Advanced' : 'Beginner',
           phone: studentData.phone
         });
         
