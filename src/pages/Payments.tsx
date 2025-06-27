@@ -65,6 +65,12 @@ interface StudentPayment {
   student_name?: string;
 }
 
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface Transaction {
   id: string;
   type: 'income' | 'expense' | 'transfer';
@@ -88,7 +94,7 @@ interface Transaction {
   is_recurring: boolean;
   recurring_frequency: string;
   created_at: string;
-  tags: any[];
+  tags: Tag[] | null;
 }
 
 const Payments = () => {
@@ -114,11 +120,21 @@ const Payments = () => {
   });
 
   // Fetch school transactions (new unified data)
-  const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
+  const { data: rawTransactions = [], isLoading: transactionsLoading } = useQuery({
     queryKey: ['school-transactions', userInfo?.[0]?.user_school_id],
     queryFn: () => getSchoolTransactions(userInfo?.[0]?.user_school_id as string),
     enabled: !!userInfo?.[0]?.user_school_id,
   });
+
+  // Transform transactions to ensure tags are properly typed
+  const transactions: Transaction[] = rawTransactions.map((transaction: any) => ({
+    ...transaction,
+    tags: Array.isArray(transaction.tags) 
+      ? transaction.tags as Tag[]
+      : typeof transaction.tags === 'string'
+        ? JSON.parse(transaction.tags) as Tag[]
+        : []
+  }));
 
   // Fetch students to get student payments (keep for backward compatibility)
   const { data: students = [], isLoading: studentsLoading } = useQuery({
@@ -528,7 +544,7 @@ const Payments = () => {
                       <TableCell>{getStatusBadge(transaction.status)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {transaction.tags?.map((tag: any) => (
+                          {transaction.tags && transaction.tags.map((tag: Tag) => (
                             <Badge 
                               key={tag.id} 
                               variant="outline" 
