@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt } from "lucide-react";
 import { format, addDays, startOfWeek } from "date-fns";
@@ -28,7 +27,8 @@ import { Student } from "@/components/StudentCard";
 import { 
   getStudentSubscriptions, 
   addStudentSubscription, 
-  deleteStudentSubscription 
+  deleteStudentSubscription,
+  Subscription
 } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -36,23 +36,6 @@ interface SubscriptionsTabProps {
   studentData: Partial<Student>;
   setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
   isViewMode?: boolean;
-}
-
-interface DatabaseSubscription {
-  id: string;
-  student_id: string;
-  session_count: number;
-  duration_months: number;
-  start_date: string;
-  schedule: any;
-  price_mode: string;
-  price_per_session: number | null;
-  fixed_price: number | null;
-  total_price: number;
-  currency: string;
-  notes: string | null;
-  status: string;
-  created_at: string;
 }
 
 interface ScheduleItem {
@@ -213,7 +196,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   setStudentData, 
   isViewMode = false 
 }) => {
-  const [subscriptions, setSubscriptions] = useState<DatabaseSubscription[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { isCreating, preventRapidCalls } = useSubscriptionCreation();
