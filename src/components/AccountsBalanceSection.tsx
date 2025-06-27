@@ -20,28 +20,31 @@ interface AccountsBalanceSectionProps {
 }
 
 const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolId }) => {
-  // Get all school accounts with currency info
+  // Get all school accounts with currency info and calculate balances from transactions
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
-    queryKey: ['school-accounts', schoolId],
+    queryKey: ['school-accounts-with-balances', schoolId],
     queryFn: async (): Promise<AccountBalance[]> => {
       if (!schoolId) return [];
       
+      console.log('📊 Fetching accounts and calculating balances from transactions...');
+
+      // Get all school accounts with currency info
       const { data: accountsData, error: accountsError } = await supabase.rpc('get_school_accounts', {
         p_school_id: schoolId
       });
 
       if (accountsError) throw accountsError;
 
-      console.log('📊 Raw accounts data:', accountsData);
+      console.log('🏦 Raw accounts data:', accountsData);
 
-      // Get all transactions to calculate balances
+      // Get all transactions for this school
       const { data: transactionsData, error: transactionsError } = await supabase.rpc('get_school_transactions', {
         p_school_id: schoolId
       });
 
       if (transactionsError) throw transactionsError;
 
-      console.log('💰 Raw transactions data:', transactionsData);
+      console.log('💰 Raw transactions data:', transactionsData?.length || 0, 'transactions');
 
       // Helper function to safely convert transaction amount to number
       const safeParseAmount = (amount: any): number => {
@@ -72,17 +75,19 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
         return numericAmount;
       };
 
-      // Calculate balance for each account in its native currency
+      // Calculate balance for each account based on transactions
       const accountBalances = (accountsData || []).map((account: any) => {
         let balance = 0;
         const accountCurrency = account.currency_code;
 
         console.log(`🏦 Calculating balance for account: ${account.name} (${accountCurrency})`);
 
-        // Filter and process transactions that match this account's currency
+        // Filter transactions that affect this account and match its currency
         const relevantTransactions = (transactionsData || []).filter((transaction: any) => {
-          // Only process transactions that match the account's currency
-          return transaction.currency === accountCurrency;
+          const isIncomingToAccount = transaction.to_account_name === account.name && transaction.currency === accountCurrency;
+          const isOutgoingFromAccount = transaction.from_account_name === account.name && transaction.currency === accountCurrency;
+          
+          return isIncomingToAccount || isOutgoingFromAccount;
         });
 
         console.log(`📋 Found ${relevantTransactions.length} transactions for ${account.name} in ${accountCurrency}`);
@@ -102,31 +107,26 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
             currency: transaction.currency,
             type: transaction.type,
             fromAccount: transaction.from_account_name,
-            toAccount: transaction.to_account_name
+            toAccount: transaction.to_account_name,
+            status: transaction.status
           });
 
-          // For income transactions (money coming into an account)
-          if (transaction.type === 'income' && transaction.to_account_name === account.name) {
+          // Only process completed transactions
+          if (transaction.status !== 'completed') {
+            console.log(`⏸️ Skipping non-completed transaction: ${transaction.status}`);
+            return;
+          }
+
+          // Money coming into this account
+          if (transaction.to_account_name === account.name) {
             balance += transactionAmount;
-            console.log(`➕ Income: +${transactionAmount} ${accountCurrency} to ${account.name} | New balance: ${balance}`);
+            console.log(`➕ Money in: +${transactionAmount} ${accountCurrency} to ${account.name} | New balance: ${balance}`);
           }
           
-          // For expense transactions (money going out of an account)  
-          else if (transaction.type === 'expense' && transaction.from_account_name === account.name) {
+          // Money going out of this account
+          if (transaction.from_account_name === account.name) {
             balance -= transactionAmount;
-            console.log(`➖ Expense: -${transactionAmount} ${accountCurrency} from ${account.name} | New balance: ${balance}`);
-          }
-          
-          // For transfer transactions
-          else if (transaction.type === 'transfer') {
-            if (transaction.from_account_name === account.name) {
-              balance -= transactionAmount;
-              console.log(`🔄 Transfer out: -${transactionAmount} ${accountCurrency} from ${account.name} | New balance: ${balance}`);
-            }
-            if (transaction.to_account_name === account.name) {
-              balance += transactionAmount;
-              console.log(`🔄 Transfer in: +${transactionAmount} ${accountCurrency} to ${account.name} | New balance: ${balance}`);
-            }
+            console.log(`➖ Money out: -${transactionAmount} ${accountCurrency} from ${account.name} | New balance: ${balance}`);
           }
         });
 

@@ -869,6 +869,7 @@ export type Database = {
           recurring_frequency: string | null
           school_id: string
           status: string
+          subscription_id: string | null
           tax_amount: number | null
           tax_rate: number | null
           to_account_id: string | null
@@ -895,6 +896,7 @@ export type Database = {
           recurring_frequency?: string | null
           school_id: string
           status?: string
+          subscription_id?: string | null
           tax_amount?: number | null
           tax_rate?: number | null
           to_account_id?: string | null
@@ -921,6 +923,7 @@ export type Database = {
           recurring_frequency?: string | null
           school_id?: string
           status?: string
+          subscription_id?: string | null
           tax_amount?: number | null
           tax_rate?: number | null
           to_account_id?: string | null
@@ -962,6 +965,13 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
           {
@@ -1502,6 +1512,14 @@ export type Database = {
           next_payment_date: string
           next_payment_amount: number
           subscription_progress: string
+        }[]
+      }
+      get_subscription_payment_status: {
+        Args: { p_subscription_id: string }
+        Returns: {
+          total_paid: number
+          total_due: number
+          payment_status: string
         }[]
       }
       get_team_members: {

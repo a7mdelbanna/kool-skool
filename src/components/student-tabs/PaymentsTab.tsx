@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, CreditCard, DollarSign, Euro, Plus, Receipt, Trash } from "lucide-react";
+import { CalendarIcon, CreditCard, DollarSign, Euro, Plus, Receipt, Trash, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getStudentPayments, addStudentPayment, deleteStudentPayment } from "@/integrations/supabase/client";
+import { getStudentPayments, deleteStudentPayment, supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface PaymentsTabProps {
@@ -43,6 +43,8 @@ const paymentSchema = z.object({
   method: z.string().min(1, { message: "Payment method is required" }),
   notes: z.string().optional(),
   currency: z.string().default("USD"),
+  account_id: z.string().min(1, { message: "Account is required" }),
+  subscription_id: z.string().optional(),
 });
 
 type PaymentFormValues = z.infer<typeof paymentSchema>;
@@ -72,7 +74,47 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       method: "",
       notes: "",
       currency: "USD",
+      account_id: "",
+      subscription_id: "",
     },
+  });
+
+  // Get school ID from localStorage
+  const getSchoolId = () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    const user = JSON.parse(userData);
+    return user.schoolId;
+  };
+
+  const schoolId = getSchoolId();
+
+  // Fetch school accounts
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
+    queryKey: ['school-accounts', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_accounts', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch student subscriptions for linking payments
+  const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery({
+    queryKey: ['student-subscriptions', studentData.id],
+    queryFn: async () => {
+      if (!studentData.id) return [];
+      const { data, error } = await supabase.rpc('get_student_subscriptions', {
+        p_student_id: studentData.id
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!studentData.id,
   });
 
   // Fetch student payments from database
@@ -90,11 +132,56 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     }
   }, [paymentsError]);
 
-  // Mutation to add new payment
+  // Mutation to add new payment via transactions table
   const addPaymentMutation = useMutation({
-    mutationFn: addStudentPayment,
+    mutationFn: async (data: PaymentFormValues) => {
+      if (!studentData.id || !schoolId) {
+        throw new Error("Student ID or School ID missing");
+      }
+
+      // Get selected account details
+      const selectedAccount = accounts.find(acc => acc.id === data.account_id);
+      if (!selectedAccount) {
+        throw new Error("Selected account not found");
+      }
+
+      // Validate currency match
+      if (selectedAccount.currency_code !== data.currency) {
+        throw new Error(`Account currency (${selectedAccount.currency_code}) must match payment currency (${data.currency})`);
+      }
+
+      // Create transaction record
+      const { data: transactionData, error } = await supabase.rpc('create_transaction', {
+        p_school_id: schoolId,
+        p_type: 'income',
+        p_amount: data.amount,
+        p_currency: data.currency,
+        p_transaction_date: format(data.date, 'yyyy-MM-dd'),
+        p_description: `Student payment from ${studentData.first_name || 'Unknown'} ${studentData.last_name || 'Student'}`,
+        p_notes: data.notes || '',
+        p_to_account_id: data.account_id,
+        p_payment_method: data.method,
+        p_tag_ids: null
+      });
+
+      if (error) throw error;
+
+      // If a subscription is selected, update the transaction with subscription_id
+      if (data.subscription_id) {
+        const { error: updateError } = await supabase
+          .from('transactions')
+          .update({ subscription_id: data.subscription_id })
+          .eq('id', transactionData);
+
+        if (updateError) throw updateError;
+      }
+
+      return transactionData;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-payments', studentData.id] });
+      queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
       toast.success("Payment added successfully");
       form.reset({
         amount: 0,
@@ -102,12 +189,14 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         method: "",
         notes: "",
         currency: "USD",
+        account_id: "",
+        subscription_id: "",
       });
       setSelectedCurrency(currencies[0]);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Error adding payment:", error);
-      toast.error("Failed to add payment. Please try again.");
+      toast.error(error.message || "Failed to add payment. Please try again.");
     },
   });
 
@@ -116,6 +205,8 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     mutationFn: deleteStudentPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-payments', studentData.id] });
+      queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
       toast.success("Payment deleted successfully");
     },
     onError: (error) => {
@@ -131,15 +222,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     }
 
     console.log("Adding payment with data:", data);
-    addPaymentMutation.mutate({
-      student_id: studentData.id,
-      amount: data.amount,
-      currency: data.currency,
-      payment_date: format(data.date, 'yyyy-MM-dd'),
-      payment_method: data.method,
-      status: 'completed',
-      notes: data.notes || '',
-    });
+    addPaymentMutation.mutate(data);
   };
 
   const handleDeletePayment = (paymentId: string) => {
@@ -151,9 +234,17 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     const currency = currencies.find(c => c.code === currencyCode) || currencies[0];
     setSelectedCurrency(currency);
     form.setValue("currency", currencyCode);
+    
+    // Reset account selection when currency changes
+    form.setValue("account_id", "");
   };
 
-  if (paymentsLoading) {
+  // Filter accounts by selected currency
+  const compatibleAccounts = accounts.filter(account => 
+    account.currency_code === form.watch("currency")
+  );
+
+  if (paymentsLoading || accountsLoading || subscriptionsLoading) {
     return (
       <div className="space-y-6">
         <div className="text-center py-8">
@@ -323,6 +414,77 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                   )}
                 />
               </div>
+
+              {/* Account and Subscription Selection */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="account_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account <span className="text-red-500">*</span></FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select account" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {compatibleAccounts.length === 0 ? (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No accounts available for {form.watch("currency")}
+                            </div>
+                          ) : (
+                            compatibleAccounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id}>
+                                <div className="flex items-center gap-2">
+                                  <Wallet className="h-4 w-4" />
+                                  <span>{account.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    ({account.currency_code})
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="subscription_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Link to Subscription (Optional)</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select subscription" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">No subscription</SelectItem>
+                          {subscriptions.map((subscription) => (
+                            <SelectItem key={subscription.id} value={subscription.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{subscription.session_count} sessions</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({subscription.currency} {subscription.total_price})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}
@@ -376,11 +538,17 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={addPaymentMutation.isPending}
+                disabled={addPaymentMutation.isPending || compatibleAccounts.length === 0}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {addPaymentMutation.isPending ? "Adding Payment..." : "Add Payment"}
               </Button>
+              
+              {compatibleAccounts.length === 0 && form.watch("currency") && (
+                <p className="text-sm text-amber-600 text-center">
+                  No accounts available for {form.watch("currency")}. Please create an account with this currency first.
+                </p>
+              )}
             </form>
           </Form>
         </div>
