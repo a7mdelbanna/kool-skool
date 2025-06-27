@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { useUser } from '@/contexts/UserContext';
+import React, { useContext } from 'react';
+import { UserContext } from '@/App';
 import { User, LogOut } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const UserProfile = () => {
-  const { user } = useUser();
+  const { user } = useContext(UserContext);
 
   const handleLogout = () => {
     localStorage.removeItem('user');

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUserInfo, getStudentsWithDetails, supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -28,7 +29,6 @@ export interface Payment {
   status: "completed" | "pending" | "failed";
   accountId?: string;
   studentName?: string;
-  contactId?: string;
 }
 
 export interface Expense {
@@ -41,7 +41,6 @@ export interface Expense {
   recurring: boolean;
   frequency?: string;
   accountId?: string;
-  contactId?: string;
 }
 
 export interface Account {
