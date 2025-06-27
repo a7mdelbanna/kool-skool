@@ -9,6 +9,78 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      contact_tags: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          tag_id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          tag_id: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_tags_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          school_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          school_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          school_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       courses: {
         Row: {
           created_at: string
@@ -40,6 +112,62 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          contact_id: string | null
+          created_at: string
+          currency: string
+          description: string
+          expense_date: string
+          id: string
+          notes: string | null
+          payment_method: string
+          school_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          description: string
+          expense_date: string
+          id?: string
+          notes?: string | null
+          payment_method: string
+          school_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          school_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -224,6 +352,7 @@ export type Database = {
       student_payments: {
         Row: {
           amount: number
+          contact_id: string | null
           created_at: string
           currency: string
           id: string
@@ -236,6 +365,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          contact_id?: string | null
           created_at?: string
           currency?: string
           id?: string
@@ -248,6 +378,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          contact_id?: string | null
           created_at?: string
           currency?: string
           id?: string
@@ -259,6 +390,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "student_payments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "student_payments_student_id_fkey"
             columns: ["student_id"]
@@ -437,6 +575,62 @@ export type Database = {
         }
         Relationships: []
       }
+      transfers: {
+        Row: {
+          amount: number
+          contact_id: string | null
+          created_at: string
+          currency: string
+          description: string
+          from_account: string
+          id: string
+          notes: string | null
+          school_id: string
+          status: string
+          to_account: string
+          transfer_date: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          description: string
+          from_account: string
+          id?: string
+          notes?: string | null
+          school_id: string
+          status?: string
+          to_account: string
+          transfer_date: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string
+          from_account?: string
+          id?: string
+          notes?: string | null
+          school_id?: string
+          status?: string
+          to_account?: string
+          transfer_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfers_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -607,6 +801,19 @@ export type Database = {
         Args: { p_subscription_id: string }
         Returns: Json
       }
+      get_contact_with_tags: {
+        Args: { p_contact_id: string }
+        Returns: {
+          id: string
+          name: string
+          type: string
+          email: string
+          phone: string
+          notes: string
+          created_at: string
+          tags: Json
+        }[]
+      }
       get_current_user_info: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -659,6 +866,19 @@ export type Database = {
       get_role_constraint_values: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_school_contacts: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          name: string
+          type: string
+          email: string
+          phone: string
+          notes: string
+          created_at: string
+          tag_count: number
+        }[]
       }
       get_school_courses: {
         Args: { p_school_id: string }
@@ -750,6 +970,21 @@ export type Database = {
           last_name: string
           email: string
           role: string
+          created_at: string
+        }[]
+      }
+      get_transactions_with_contacts: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          type: string
+          amount: number
+          currency: string
+          transaction_date: string
+          description: string
+          contact_name: string
+          contact_type: string
+          status: string
           created_at: string
         }[]
       }

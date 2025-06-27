@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Repeat } from 'lucide-react';
@@ -31,6 +30,8 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { Expense, usePayments } from '@/contexts/PaymentContext';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { getCurrentUserInfo, getSchoolContacts } from '@/lib/api';
 
 interface ExpenseDialogProps {
   open: boolean;
@@ -51,6 +52,22 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
   const [recurring, setRecurring] = useState(false);
   const [frequency, setFrequency] = useState<string>('monthly');
   const [accountId, setAccountId] = useState<string>('');
+  const [contactId, setContactId] = useState<string>('');
+
+  // Fetch user info and contacts
+  const { data: userInfo } = useQuery({
+    queryKey: ['current-user-info'],
+    queryFn: getCurrentUserInfo,
+  });
+
+  const { data: contacts } = useQuery({
+    queryKey: ['school-contacts', userInfo?.[0]?.user_school_id],
+    queryFn: async () => {
+      if (!userInfo?.[0]?.user_school_id) return [];
+      return await getSchoolContacts(userInfo[0].user_school_id);
+    },
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
 
   // Initialize form when expense changes or dialog opens
   useEffect(() => {
@@ -63,6 +80,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
       setRecurring(expense.recurring);
       setFrequency(expense.frequency || 'monthly');
       setAccountId(expense.accountId || '');
+      setContactId(expense.contactId || '');
     } else {
       // Default values for add mode
       setAmount(0);
@@ -73,6 +91,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
       setRecurring(false);
       setFrequency('monthly');
       setAccountId('');
+      setContactId('');
     }
   }, [expense, mode, open]);
 
@@ -113,6 +132,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
       recurring,
       frequency: recurring ? frequency : undefined,
       accountId,
+      contactId,
     };
 
     if (mode === 'add') {
@@ -294,6 +314,29 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
                     {accounts.map(account => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.name} ({account.currency})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          {contacts && contacts.length > 0 && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="contact" className="text-right">
+                Contact
+              </Label>
+              <div className="col-span-3">
+                <Select value={contactId} onValueChange={setContactId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select contact (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No contact</SelectItem>
+                    {contacts.map(contact => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.name} ({contact.type})
                       </SelectItem>
                     ))}
                   </SelectContent>

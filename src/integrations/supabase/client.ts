@@ -681,3 +681,184 @@ export const deleteTransactionTag = async (tagId: string) => {
     throw error;
   }
 };
+
+// Add new functions for contact management
+export const getSchoolContacts = async (schoolId: string) => {
+  const { data, error } = await supabase.rpc('get_school_contacts', {
+    p_school_id: schoolId
+  });
+
+  if (error) {
+    console.error('Error fetching school contacts:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const getContactWithTags = async (contactId: string) => {
+  const { data, error } = await supabase.rpc('get_contact_with_tags', {
+    p_contact_id: contactId
+  });
+
+  if (error) {
+    console.error('Error fetching contact with tags:', error);
+    throw error;
+  }
+
+  return data?.[0] || null;
+};
+
+export const getTransactionsWithContacts = async (schoolId: string) => {
+  const { data, error } = await supabase.rpc('get_transactions_with_contacts', {
+    p_school_id: schoolId
+  });
+
+  if (error) {
+    console.error('Error fetching transactions with contacts:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const createContact = async (contactData: {
+  school_id: string;
+  name: string;
+  type: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('contacts')
+    .insert([contactData])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating contact:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const updateContact = async (contactId: string, updates: {
+  name?: string;
+  type?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('contacts')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', contactId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating contact:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const deleteContact = async (contactId: string) => {
+  const { error } = await supabase
+    .from('contacts')
+    .delete()
+    .eq('id', contactId);
+
+  if (error) {
+    console.error('Error deleting contact:', error);
+    throw error;
+  }
+};
+
+// Add contact tagging functions
+export const addContactTag = async (contactId: string, tagId: string) => {
+  const { data, error } = await supabase
+    .from('contact_tags')
+    .insert({
+      contact_id: contactId,
+      tag_id: tagId
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error adding contact tag:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const removeContactTag = async (contactId: string, tagId: string) => {
+  const { error } = await supabase
+    .from('contact_tags')
+    .delete()
+    .eq('contact_id', contactId)
+    .eq('tag_id', tagId);
+
+  if (error) {
+    console.error('Error removing contact tag:', error);
+    throw error;
+  }
+};
+
+// Add expense management functions
+export const createExpense = async (expenseData: {
+  school_id: string;
+  contact_id?: string;
+  amount: number;
+  currency: string;
+  expense_date: string;
+  category: string;
+  description: string;
+  payment_method: string;
+  status?: string;
+  notes?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert([expenseData])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating expense:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const createTransfer = async (transferData: {
+  school_id: string;
+  contact_id?: string;
+  amount: number;
+  currency: string;
+  transfer_date: string;
+  from_account: string;
+  to_account: string;
+  description: string;
+  status?: string;
+  notes?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('transfers')
+    .insert([transferData])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating transfer:', error);
+    throw error;
+  }
+
+  return data;
+};
