@@ -309,6 +309,7 @@ export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
 export const getSchoolTeachers = async (schoolId: string) => {
   console.log('=== getSchoolTeachers FUNCTION START ===');
   console.log('Input schoolId:', schoolId);
+  console.log('Type of schoolId:', typeof schoolId);
   
   if (!schoolId) {
     console.warn('No schoolId provided to getSchoolTeachers');
@@ -317,6 +318,7 @@ export const getSchoolTeachers = async (schoolId: string) => {
 
   try {
     console.log('Querying users table for teachers with school_id:', schoolId);
+    console.log('Query: SELECT * FROM users WHERE school_id =', schoolId, 'AND role = teacher');
     
     const { data, error } = await supabase
       .from('users')
@@ -324,8 +326,20 @@ export const getSchoolTeachers = async (schoolId: string) => {
       .eq('school_id', schoolId)
       .eq('role', 'teacher');
 
+    console.log('=== SUPABASE QUERY RESULT ===');
+    console.log('Error:', error);
+    console.log('Data:', data);
+    console.log('Data type:', typeof data);
+    console.log('Is array?:', Array.isArray(data));
+
     if (error) {
       console.error('Supabase error in getSchoolTeachers:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       throw error;
     }
 
@@ -353,9 +367,26 @@ export const getSchoolTeachers = async (schoolId: string) => {
       }));
       
       console.log('Teachers with display_name:', teachersWithDisplayName);
+      console.log('Returning teachers count:', teachersWithDisplayName.length);
       return teachersWithDisplayName;
     } else {
       console.warn('No teachers found for school:', schoolId);
+      console.log('Checking if there are ANY users for this school...');
+      
+      // Additional debugging: check if there are any users for this school
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('school_id', schoolId);
+      
+      console.log('All users for school:', allUsers);
+      console.log('All users error:', allUsersError);
+      console.log('All users count:', allUsers?.length || 0);
+      
+      if (allUsers && allUsers.length > 0) {
+        console.log('Users found but no teachers. User roles:', allUsers.map(u => ({ id: u.id, role: u.role, email: u.email })));
+      }
+      
       return [];
     }
   } catch (error) {

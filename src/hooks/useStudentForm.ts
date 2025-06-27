@@ -36,11 +36,17 @@ export const useStudentForm = (
   const getUserData = () => {
     try {
       const user = localStorage.getItem('user');
-      console.log("User data from localStorage:", user);
-      if (!user) return null;
+      console.log("=== getUserData DEBUG ===");
+      console.log("Raw localStorage user:", user);
+      if (!user) {
+        console.warn("No user found in localStorage");
+        return null;
+      }
       
       const userData = JSON.parse(user);
       console.log("Parsed user data:", userData);
+      console.log("User schoolId:", userData?.schoolId);
+      console.log("User schoolId type:", typeof userData?.schoolId);
       return userData;
     } catch (error) {
       console.error("Error parsing user data:", error);
@@ -50,10 +56,20 @@ export const useStudentForm = (
 
   const userData = getUserData();
   const schoolId = userData?.schoolId || null;
-  console.log("School ID for queries:", schoolId);
+  console.log("=== useStudentForm SCHOOL ID DEBUG ===");
+  console.log("Final schoolId for queries:", schoolId);
+  console.log("SchoolId type:", typeof schoolId);
+  console.log("SchoolId is truthy:", !!schoolId);
+  console.log("Open state:", open);
+  console.log("Teachers query enabled:", !!schoolId && open);
   
   // Use the dedicated teachers hook
   const { teachers, isLoading: teachersLoading, error: teachersError, refetch: refetchTeachers } = useTeachers(schoolId, open);
+  
+  console.log("=== useStudentForm TEACHERS RESULT ===");
+  console.log("Teachers from hook:", teachers);
+  console.log("Teachers loading:", teachersLoading);
+  console.log("Teachers error:", teachersError);
   
   const { 
     data: coursesData, 
@@ -110,6 +126,7 @@ export const useStudentForm = (
   useEffect(() => {
     if (open && schoolId) {
       console.log("Dialog opened - triggering data refetch");
+      console.log("Refetching for schoolId:", schoolId);
       refetchCourses();
       refetchTeachers();
     }
@@ -259,6 +276,8 @@ export const useStudentForm = (
   console.log('=== useStudentForm FINAL DEBUG ===');
   console.log('Returning coursesData:', coursesData);
   console.log('Returning teachers:', teachers);
+  console.log('Teachers final check - is array?:', Array.isArray(teachers));
+  console.log('Teachers final check - length:', teachers?.length);
   if (coursesData?.data) {
     console.log('Courses count to return:', coursesData.data.length);
   }

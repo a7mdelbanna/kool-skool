@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -41,12 +42,30 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   isLoading = false
 }) => {
   console.log('=== ProfileTab RENDER DEBUG ===');
-  console.log('ProfileTab render - teachers data:', teachers);
+  console.log('ProfileTab render - RAW teachers prop:', teachers);
+  console.log('ProfileTab render - teachers prop type:', typeof teachers);
+  console.log('ProfileTab render - teachers is array?:', Array.isArray(teachers));
   console.log('ProfileTab render - teachers length:', teachers?.length);
   console.log('ProfileTab render - courses data:', courses);
   console.log('ProfileTab render - courses length:', courses?.length);
   console.log('ProfileTab render - studentData:', studentData);
   console.log('ProfileTab render - isLoading:', isLoading);
+  
+  // Deep inspection of teachers data
+  if (teachers && Array.isArray(teachers)) {
+    console.log('ProfileTab - Teachers array details:');
+    teachers.forEach((teacher, index) => {
+      console.log(`  Teacher ${index}:`, {
+        id: teacher?.id,
+        first_name: teacher?.first_name,
+        last_name: teacher?.last_name,
+        display_name: teacher?.display_name,
+        fullObject: teacher
+      });
+    });
+  } else {
+    console.warn('ProfileTab - Teachers is not a proper array:', teachers);
+  }
   
   // Validate teachers data structure
   const validTeachers = Array.isArray(teachers) ? teachers : [];
@@ -258,6 +277,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           
           <div className="space-y-2">
             <Label htmlFor="teacher">Teacher</Label>
+            <div style={{ border: '2px solid red', padding: '10px', margin: '10px 0' }}>
+              <div style={{ color: 'red', fontWeight: 'bold' }}>DEBUGGING INFO:</div>
+              <div>isLoading: {String(isLoading)}</div>
+              <div>validTeachers.length: {validTeachers.length}</div>
+              <div>validTeachers: {JSON.stringify(validTeachers)}</div>
+              <div>teachers prop: {JSON.stringify(teachers)}</div>
+            </div>
             {isLoading ? (
               <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
                 Loading teachers...
