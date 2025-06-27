@@ -37,18 +37,53 @@ const TransactionCategoriesManagement = () => {
     queryFn: getCurrentUserInfo,
   });
 
-  // Fetch categories
-  const { data: categories = [], isLoading } = useQuery({
+  // Fetch categories with better error handling and logging
+  const { data: categories = [], isLoading, error } = useQuery({
     queryKey: ['school-categories', userInfo?.[0]?.user_school_id],
     queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
+      if (!userInfo?.[0]?.user_school_id) {
+        console.log('No school ID found for categories');
+        return [];
+      }
       
-      const { data, error } = await supabase.rpc('get_school_categories', {
-        p_school_id: userInfo[0].user_school_id
-      });
+      console.log('Fetching categories for school:', userInfo[0].user_school_id);
       
-      if (error) throw error;
-      return data as Category[];
+      try {
+        const { data, error } = await supabase.rpc('get_school_categories', {
+          p_school_id: userInfo[0].user_school_id
+        });
+        
+        if (error) {
+          console.error('Error fetching categories:', error);
+          throw error;
+        }
+        
+        console.log('Categories fetched:', data);
+        return data as Category[];
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
+        // Fallback: try to fetch directly from transaction_categories table
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('transaction_categories')
+          .select('*')
+          .eq('school_id', userInfo[0].user_school_id)
+          .eq('is_active', true)
+          .order('name');
+        
+        if (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          throw fallbackError;
+        }
+        
+        console.log('Fallback categories fetched:', fallbackData);
+        
+        // Transform fallback data to match expected format
+        return (fallbackData || []).map((cat: any) => ({
+          ...cat,
+          full_path: cat.name,
+          level: cat.parent_id ? 1 : 0
+        }));
+      }
     },
     enabled: !!userInfo?.[0]?.user_school_id,
   });
@@ -231,6 +266,10 @@ const TransactionCategoriesManagement = () => {
     );
   }
 
+  if (error) {
+    console.error('Categories query error:', error);
+  }
+
   return (
     <>
       <Card className="glass glass-hover">
@@ -255,9 +294,24 @@ const TransactionCategoriesManagement = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800 text-sm">
+                Error loading categories: {error.message}
+                <br />
+                <span className="text-xs">Check the console for more details.</span>
+              </p>
+            </div>
+          )}
+          
           {categories.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>No categories found. Create some categories to organize your transactions.</p>
+              {error && (
+                <p className="text-xs mt-2 text-red-600">
+                  There was an error loading categories. Please check your database connection.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
