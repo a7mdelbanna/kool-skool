@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
@@ -21,7 +22,7 @@ const Sidebar = () => {
     { icon: Calendar, label: 'Calendar', path: '/calendar' },
     { icon: BookOpen, label: 'Courses', path: '/courses' },
     { icon: CreditCard, label: 'Payments', path: '/payments' },
-    { icon: UserCheck, label: 'Contacts', path: '/contacts' }, // Add contacts menu item
+    { icon: UserCheck, label: 'Contacts', path: '/contacts' },
     { icon: Users, label: 'Team Access', path: '/team-access' },
     { icon: TrendingUp, label: 'Reports', path: '/states-reports' },
     { icon: Key, label: 'License', path: '/license-management' },
@@ -29,17 +30,17 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="w-64 bg-gray-50 border-r min-h-screen py-4">
+    <div className="w-64 bg-gray-50 border-r min-h-screen py-4 hidden md:block">
       <div className="px-6 py-2">
-        <h1 className="text-2xl font-bold text-gray-800">SchoolPanel</h1>
+        <h1 className="text-2xl font-bold text-gray-800">TutorPro</h1>
       </div>
       <nav className="mt-6">
         {menuItems.map((item) => (
           <Link
             to={item.path}
             key={item.label}
-            className={`flex items-center px-6 py-3 text-gray-700 hover:bg-gray-200 hover:text-gray-900 ${
-              location.pathname === item.path ? 'bg-gray-200 font-medium' : ''
+            className={`flex items-center px-6 py-3 text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors ${
+              location.pathname === item.path ? 'bg-gray-200 font-medium text-gray-900' : ''
             }`}
           >
             <item.icon className="h-5 w-5 mr-3" />
