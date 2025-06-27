@@ -1,531 +1,43 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from './types';
 
-const supabaseUrl = "https://clacmtyxfdtfgjkozmqf.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY";
+const supabaseUrl = 'https://clacmtyxfdtfgjkozmqf.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY';
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Export types
-export interface Course {
-  id: string;
-  school_id: string;
-  name: string;
-  lesson_type: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateStudentResponse {
-  success: boolean;
-  student_id?: string;
-  user_id?: string;
-  message?: string;
-}
-
-export interface UserLoginResponse {
-  success: boolean;
-  user_id?: string;
-  first_name?: string;
-  last_name?: string;
-  role?: string;
-  school_id?: string;
-  message?: string;
-}
-
-export interface SchoolSetupResponse {
-  success: boolean;
-  school_id?: string;
-  user_id?: string;
-  message?: string;
-}
-
-export interface TeamMemberResponse {
-  success: boolean;
-  user_id?: string;
-  message?: string;
-}
-
+// Define types for data consistency
 export interface StudentRecord {
   id: string;
-  school_id: string;
-  user_id: string;
-  teacher_id: string;
-  course_id: string;
-  age_group: string;
-  level: string;
-  phone: string;
-  created_at: string;
+  created_at?: string;
   first_name: string;
   last_name: string;
   email: string;
-  course_name: string;
-  lesson_type: string;
-  teacher_first_name: string;
-  teacher_last_name: string;
-  teacher_email: string;
-  payment_status: string;
-  lessons_count: number;
-  next_session_date: string | null;
-  next_payment_date: string | null;
-  next_payment_amount: number | null;
-  subscription_progress: string;
-}
-
-// Updated interface to match the new function signature
-export interface CurrentUserInfo {
-  user_id: string;
-  user_school_id: string;
-  user_role: string;
-}
-
-// Helper function to get current user from localStorage
-const getCurrentUserFromStorage = () => {
-  try {
-    // First try 'user' key (which is what the login process uses)
-    let userData = localStorage.getItem('user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      return {
-        user_id: user.id,
-        user_school_id: user.schoolId,
-        user_role: user.role
-      };
-    }
-    
-    // Fallback to 'userData' key for backward compatibility
-    userData = localStorage.getItem('userData');
-    if (userData) {
-      const user = JSON.parse(userData);
-      return {
-        user_id: user.id,
-        user_school_id: user.schoolId,
-        user_role: user.role
-      };
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Error parsing user data from localStorage:', error);
-    return null;
-  }
-};
-
-export const user_login = async (email: string, password: string): Promise<UserLoginResponse> => {
-  const { data, error } = await supabase.rpc('user_login', {
-    user_email: email,
-    user_password: password
-  });
-  
-  if (error) {
-    console.error('Login error:', error);
-    throw new Error(error.message);
-  }
-  
-  return data as unknown as UserLoginResponse;
-};
-
-export const verify_license_and_create_school = async (
-  licenseKey: string,
-  schoolName: string,
-  adminFirstName: string,
-  adminLastName: string,
-  adminEmail: string,
-  adminPassword: string
-): Promise<SchoolSetupResponse> => {
-  const { data, error } = await supabase.rpc('verify_license_and_create_school', {
-    license_key: licenseKey,
-    school_name: schoolName,
-    admin_first_name: adminFirstName,
-    admin_last_name: adminLastName,
-    admin_email: adminEmail,
-    admin_password: adminPassword
-  });
-  
-  if (error) {
-    console.error('License verification error:', error);
-    throw new Error(error.message);
-  }
-  
-  return data as unknown as SchoolSetupResponse;
-};
-
-export const getCurrentUserInfo = async (): Promise<CurrentUserInfo[]> => {
-  // Get user info from localStorage instead of database
-  const userInfo = getCurrentUserFromStorage();
-  
-  if (!userInfo) {
-    console.error('No user info found in localStorage');
-    return [];
-  }
-  
-  return [userInfo as CurrentUserInfo];
-};
-
-export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
-  const { data, error } = await supabase.rpc('get_school_courses', {
-    p_school_id: schoolId
-  });
-  
-  if (error) {
-    console.error('Error getting school courses:', error);
-    throw new Error(error.message);
-  }
-  
-  return data as Course[];
-};
-
-export const getSchoolTeachers = async (schoolId: string) => {
-  const { data, error } = await supabase.rpc('get_team_members', {
-    p_school_id: schoolId
-  });
-  
-  if (error) {
-    console.error('Error getting school teachers:', error);
-    throw new Error(error.message);
-  }
-  
-  // Filter to only return teachers and format for display
-  const teachers = data?.filter(member => member.role === 'teacher').map(teacher => ({
-    id: teacher.id,
-    first_name: teacher.first_name,
-    last_name: teacher.last_name,
-    display_name: `${teacher.first_name} ${teacher.last_name}`,
-    email: teacher.email
-  }));
-  
-  return teachers || [];
-};
-
-export const createCourse = async (name: string, lessonType: string): Promise<Course> => {
-  const { data, error } = await supabase
-    .from('courses')
-    .insert([
-      {
-        name,
-        lesson_type: lessonType,
-        school_id: (await getCurrentUserInfo())[0]?.user_school_id
-      }
-    ])
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error creating course:', error);
-    throw new Error(error.message);
-  }
-  
-  return data as Course;
-};
-
-export const updateCourse = async (courseId: string, name: string, lessonType: string) => {
-  const { error } = await supabase.rpc('update_course', {
-    p_course_id: courseId,
-    p_name: name,
-    p_lesson_type: lessonType
-  });
-  
-  if (error) {
-    console.error('Error updating course:', error);
-    throw new Error(error.message);
-  }
-};
-
-export const deleteCourse = async (courseId: string) => {
-  const { error } = await supabase.rpc('delete_course', {
-    p_course_id: courseId
-  });
-  
-  if (error) {
-    console.error('Error deleting course:', error);
-    throw new Error(error.message);
-  }
-};
-
-export const getTeamMembers = async (schoolId: string) => {
-  const { data, error } = await supabase.rpc('get_team_members', {
-    p_school_id: schoolId
-  });
-  
-  if (error) {
-    console.error('Error getting team members:', error);
-    throw new Error(error.message);
-  }
-  
-  return data;
-};
-
-export const addTeamMember = async (
-  firstName: string,
-  lastName: string,
-  email: string,
-  role: string,
-  password: string
-): Promise<TeamMemberResponse> => {
-  const { data, error } = await supabase.rpc('add_team_member', {
-    member_first_name: firstName,
-    member_last_name: lastName,
-    member_email: email,
-    member_role: role,
-    member_password: password
-  });
-  
-  if (error) {
-    console.error('Error adding team member:', error);
-    throw new Error(error.message);
-  }
-  
-  return data as unknown as TeamMemberResponse;
-};
-
-export const createStudent = async (studentData: {
-  student_email: string;
-  student_password: string;
-  first_name: string;
-  last_name: string;
-  teacher_id: string;
-  course_id: string;
-  age_group: string;
-  level: string;
   phone?: string;
-}): Promise<CreateStudentResponse> => {
-  // Get current user info from localStorage
-  const userInfo = getCurrentUserFromStorage();
-  
-  if (!userInfo) {
-    console.error('No user info found in localStorage');
-    throw new Error('User not authenticated - please log in again');
-  }
-  
-  console.log('Creating student with user info:', userInfo);
-  console.log('Student data:', studentData);
-  
-  // Call the RPC function with the updated parameter
-  const { data, error } = await supabase.rpc('create_student', {
-    student_email: studentData.student_email,
-    student_password: studentData.student_password,
-    student_first_name: studentData.first_name,
-    student_last_name: studentData.last_name,
-    teacher_id: studentData.teacher_id,
-    course_id: studentData.course_id,
-    age_group: studentData.age_group,
-    level: studentData.level,
-    phone: studentData.phone || null,
-    current_user_id: userInfo.user_id
-  });
-  
-  if (error) {
-    console.error('Error creating student:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('Student creation response:', data);
-  return data as unknown as CreateStudentResponse;
-};
+  course_name: string;
+  lesson_type: 'individual' | 'group';
+  age_group: 'adult' | 'kid';
+  level: 'beginner' | 'intermediate' | 'advanced' | 'fluent';
+  teacher_id?: string;
+  school_id?: string;
+  payment_status?: 'paid' | 'pending' | 'overdue';
+  next_payment_date?: string;
+  next_payment_amount?: number;
+  lessons_count?: number;
+  next_session_date?: string;
+  subscription_progress?: string;
+}
 
-export const getStudentsWithDetails = async (schoolId: string): Promise<StudentRecord[]> => {
-  const { data, error } = await supabase.rpc('get_students_with_details', {
-    p_school_id: schoolId
-  });
-  
-  if (error) {
-    console.error('Error getting students with details:', error);
-    throw new Error(error.message);
-  }
-  
-  return data as StudentRecord[];
-};
+export interface CourseRecord {
+  id: string;
+  created_at?: string;
+  name: string;
+  type: 'individual' | 'group';
+  school_id?: string;
+}
 
-export const getStudentSubscriptions = async (studentId: string) => {
-  const { data, error } = await supabase.rpc('get_student_subscriptions', {
-    p_student_id: studentId
-  });
-  
-  if (error) {
-    console.error('Error getting student subscriptions:', error);
-    throw new Error(error.message);
-  }
-  
-  return data;
-};
-
-export const addStudentSubscription = async (subscriptionData: {
-  student_id: string;
-  session_count: number;
-  duration_months: number;
-  start_date: string;
-  schedule: any;
-  price_mode: string;
-  price_per_session: number | null;
-  fixed_price: number | null;
-  total_price: number;
-  currency: string;
-  notes: string;
-  status: string;
-  initial_payment_amount?: number;
-  payment_method?: string;
-  payment_notes?: string;
-  lesson_duration_minutes?: number;
-}) => {
-  console.log('🚀 addStudentSubscription called with data:', subscriptionData);
-  
-  // Get current user info from localStorage instead of database
-  const userInfo = getCurrentUserFromStorage();
-  console.log('🔑 User info from localStorage:', userInfo);
-  
-  if (!userInfo) {
-    console.error('❌ No user info found in localStorage');
-    throw new Error('User not authenticated - please log in again');
-  }
-  
-  const currentUserId = userInfo.user_id;
-  const currentSchoolId = userInfo.user_school_id;
-  
-  if (!currentUserId || !currentSchoolId) {
-    console.error('❌ User information incomplete:', { currentUserId, currentSchoolId });
-    throw new Error('User information incomplete');
-  }
-  
-  console.log('🔑 Using user info:', { currentUserId, currentSchoolId });
-  
-  // Call the database function with the enhanced parameters
-  const { data, error } = await supabase.rpc('add_student_subscription', {
-    p_student_id: subscriptionData.student_id,
-    p_session_count: subscriptionData.session_count,
-    p_duration_months: subscriptionData.duration_months,
-    p_start_date: subscriptionData.start_date,
-    p_schedule: subscriptionData.schedule,
-    p_price_mode: subscriptionData.price_mode,
-    p_price_per_session: subscriptionData.price_per_session,
-    p_fixed_price: subscriptionData.fixed_price,
-    p_total_price: subscriptionData.total_price,
-    p_currency: subscriptionData.currency,
-    p_notes: subscriptionData.notes,
-    p_status: subscriptionData.status,
-    p_current_user_id: currentUserId,
-    p_current_school_id: currentSchoolId,
-    p_initial_payment_amount: subscriptionData.initial_payment_amount || 0,
-    p_payment_method: subscriptionData.payment_method || 'Cash',
-    p_payment_notes: subscriptionData.payment_notes || ''
-  });
-  
-  if (error) {
-    console.error('❌ Error adding student subscription:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('✅ Subscription added successfully:', data);
-  return data;
-};
-
-export const deleteStudentSubscription = async (subscriptionId: string) => {
-  console.log('🗑️ CLIENT: deleteStudentSubscription called with ID:', subscriptionId);
-  
-  const { data, error } = await supabase.rpc('delete_student_subscription', {
-    p_subscription_id: subscriptionId
-  });
-  
-  if (error) {
-    console.error('❌ CLIENT: Error deleting subscription:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('✅ CLIENT: Subscription deletion response:', data);
-  return data;
-};
-
-export const getStudentPayments = async (studentId: string) => {
-  const { data, error } = await supabase.rpc('get_student_payments', {
-    p_student_id: studentId
-  });
-  
-  if (error) {
-    console.error('Error getting student payments:', error);
-    throw new Error(error.message);
-  }
-  
-  return data;
-};
-
-export const getStudentLessonSessions = async (studentId: string) => {
-  console.log('=== CLIENT: getStudentLessonSessions called ===');
-  console.log('Student ID:', studentId);
-  
-  const { data, error } = await supabase.rpc('get_lesson_sessions', {
-    p_student_id: studentId
-  });
-  
-  if (error) {
-    console.error('❌ CLIENT: Error getting lesson sessions:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('✅ CLIENT: Lesson sessions retrieved:', data);
-  return data;
-};
-
-export const getSchoolLessonSessions = async (schoolId: string) => {
-  console.log('=== CLIENT: getSchoolLessonSessions called ===');
-  console.log('School ID:', schoolId);
-  
-  // Since the function doesn't exist yet, let's use the existing get_lesson_sessions for each student
-  const students = await getStudentsWithDetails(schoolId);
-  const allSessions = [];
-  
-  for (const student of students) {
-    try {
-      const sessions = await getStudentLessonSessions(student.id);
-      allSessions.push(...sessions);
-    } catch (error) {
-      console.error(`Error fetching sessions for student ${student.id}:`, error);
-    }
-  }
-  
-  console.log('✅ CLIENT: School lesson sessions retrieved:', allSessions);
-  return allSessions;
-};
-
-export const handleSessionAction = async (sessionId: string, action: string, newDatetime?: string) => {
-  console.log(`🎯 CLIENT: handleSessionAction called - Session: ${sessionId}, Action: ${action}, New DateTime: ${newDatetime}`);
-  
-  const { data, error } = await supabase.rpc('handle_session_action', {
-    p_session_id: sessionId,
-    p_action: action,
-    p_new_datetime: newDatetime || null
-  });
-  
-  if (error) {
-    console.error('❌ CLIENT: Error handling session action:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('✅ CLIENT: Session action completed:', data);
-  return data;
-};
-
-export const updateLessonSessionStatus = async (sessionId: string, newStatus: string) => {
-  console.log(`📝 CLIENT: Updating lesson session ${sessionId} status to: ${newStatus}`);
-  
-  // Map status to appropriate action
-  let action: string;
-  switch (newStatus) {
-    case 'completed':
-      action = 'attended';
-      break;
-    case 'cancelled':
-      action = 'cancelled';
-      break;
-    case 'scheduled':
-      action = 'rescheduled';
-      break;
-    default:
-      throw new Error(`Unsupported status: ${newStatus}`);
-  }
-  
-  return await handleSessionAction(sessionId, action);
-};
-
-export const addStudentPayment = async (paymentData: {
+export interface PaymentRecord {
+  id: string;
+  created_at?: string;
   student_id: string;
   amount: number;
   currency: string;
@@ -533,222 +45,350 @@ export const addStudentPayment = async (paymentData: {
   payment_method: string;
   status: string;
   notes?: string;
-}) => {
-  console.log('Adding student payment:', paymentData);
-  
+}
+
+export interface SchoolTag {
+  id: string;
+  created_at?: string;
+  school_id: string;
+  name: string;
+  color: string;
+}
+
+export interface TransactionRecord {
+  id: string;
+  created_at?: string;
+  school_id: string;
+  type: 'income' | 'expense' | 'transfer';
+  amount: number;
+  currency: string;
+  transaction_date: string;
+  description: string;
+  notes?: string;
+  contact_id?: string;
+  category_id?: string;
+  from_account_id?: string;
+  to_account_id?: string;
+  payment_method: string;
+  receipt_number?: string;
+  receipt_url?: string;
+  tax_amount?: number;
+  tax_rate?: number;
+  is_recurring?: boolean;
+  recurring_frequency?: string;
+  recurring_end_date?: string;
+}
+
+// Function to get students with details
+export const getStudentsWithDetails = async (schoolId: string | undefined) => {
+  if (!schoolId) {
+    console.warn('No school ID provided to getStudentsWithDetails');
+    return [];
+  }
+
   const { data, error } = await supabase
-    .from('student_payments')
+    .from('students')
+    .select('*')
+    .eq('school_id', schoolId);
+
+  if (error) {
+    console.error('Error fetching students:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+// Function to create a new student
+export const createStudent = async (studentData: Omit<StudentRecord, 'id' | 'created_at'>) => {
+  const { data, error } = await supabase
+    .from('students')
+    .insert([studentData])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating student:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to update an existing student
+export const updateStudent = async (id: string, updates: Partial<StudentRecord>) => {
+  const { data, error } = await supabase
+    .from('students')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating student:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to delete a student
+export const deleteStudent = async (id: string) => {
+  const { data, error } = await supabase
+    .from('students')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting student:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to get courses for a specific school
+export const getCourses = async (schoolId: string | undefined) => {
+  if (!schoolId) {
+    console.warn('No school ID provided to getCourses');
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('school_id', schoolId);
+
+  if (error) {
+    console.error('Error fetching courses:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+// Function to create a new course
+export const createCourse = async (name: string, type: 'individual' | 'group') => {
+  const user = supabase.auth.user();
+
+  if (!user) {
+    console.error('User not authenticated.');
+    throw new Error('Authentication required to create a course.');
+  }
+
+  const schoolId = user.user_metadata.schoolId;
+
+  if (!schoolId) {
+    console.error('School ID not found in user metadata.');
+    throw new Error('School ID is required to create a course.');
+  }
+
+  const { data, error } = await supabase
+    .from('courses')
+    .insert([{ name, type, school_id: schoolId }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating course:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to get payments for a specific student
+export const getStudentPayments = async (studentId: string) => {
+    const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('student_id', studentId);
+
+    if (error) {
+        console.error('Error fetching payments:', error);
+        throw error;
+    }
+
+    return data || [];
+};
+
+// Function to create a new payment
+export const createPayment = async (paymentData: Omit<PaymentRecord, 'id' | 'created_at'>) => {
+  const { data, error } = await supabase
+    .from('payments')
     .insert([paymentData])
     .select()
     .single();
-  
+
   if (error) {
-    console.error('Error adding student payment:', error);
-    throw new Error(error.message);
+    console.error('Error creating payment:', error);
+    throw error;
   }
-  
-  console.log('Student payment added:', data);
+
   return data;
 };
 
-export const updateStudentPayment = async (paymentId: string, updates: {
-  amount?: number;
-  currency?: string;
-  payment_date?: string;
-  payment_method?: string;
-  status?: string;
-  notes?: string;
-}) => {
-  console.log('Updating student payment:', paymentId, updates);
-  
+// Function to update an existing payment
+export const updatePayment = async (id: string, updates: Partial<PaymentRecord>) => {
   const { data, error } = await supabase
-    .from('student_payments')
+    .from('payments')
     .update(updates)
-    .eq('id', paymentId)
+    .eq('id', id)
     .select()
     .single();
-  
+
   if (error) {
-    console.error('Error updating student payment:', error);
-    throw new Error(error.message);
+    console.error('Error updating payment:', error);
+    throw error;
   }
-  
-  console.log('Student payment updated:', data);
+
   return data;
 };
 
-export const deleteStudentPayment = async (paymentId: string) => {
-  console.log('🗑️ CLIENT: deleteStudentPayment called with ID:', paymentId);
-  
+// Function to delete a payment
+export const deletePayment = async (id: string) => {
   const { data, error } = await supabase
-    .from('student_payments')
+    .from('payments')
     .delete()
-    .eq('id', paymentId)
-    .select()
-    .single();
-  
+    .eq('id', id);
+
   if (error) {
-    console.error('❌ CLIENT: Error deleting payment:', error);
-    throw new Error(error.message);
+    console.error('Error deleting payment:', error);
+    throw error;
   }
-  
-  console.log('✅ CLIENT: Payment deleted successfully:', data);
+
   return data;
 };
 
-// Add new functions for tag management
-export const getSchoolTags = async (schoolId: string) => {
-  const { data, error } = await supabase.rpc('get_school_tags', {
-    p_school_id: schoolId
-  });
+// Function to get current user info
+export const getCurrentUserInfo = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    console.warn('No user signed in.');
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id);
+
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+
+  return data || null;
+};
+
+// Function to get school tags
+export const getSchoolTags = async (schoolId: string | undefined) => {
+  if (!schoolId) {
+    console.warn('No school ID provided to getSchoolTags');
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('school_tags')
+    .select('*')
+    .eq('school_id', schoolId);
 
   if (error) {
     console.error('Error fetching school tags:', error);
     throw error;
   }
 
-  return data;
+  return data || [];
 };
 
-export const getPaymentWithTags = async (paymentId: string) => {
-  const { data, error } = await supabase.rpc('get_payment_with_tags', {
-    p_payment_id: paymentId
-  });
-
-  if (error) {
-    console.error('Error fetching payment with tags:', error);
-    throw error;
-  }
-
-  return data?.[0] || null;
-};
-
-export const addPaymentTag = async (paymentId: string, tagId: string) => {
-  const { data, error } = await supabase.rpc('add_payment_tag', {
-    p_payment_id: paymentId,
-    p_tag_id: tagId
-  });
-
-  if (error) {
-    console.error('Error adding payment tag:', error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const removePaymentTag = async (paymentId: string, tagId: string) => {
-  const { data, error } = await supabase.rpc('remove_payment_tag', {
-    p_payment_id: paymentId,
-    p_tag_id: tagId
-  });
-
-  if (error) {
-    console.error('Error removing payment tag:', error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const createTransactionTag = async (name: string, color: string, schoolId: string) => {
+// Function to create a new school tag
+export const createSchoolTag = async (tagData: Omit<SchoolTag, 'id' | 'created_at'>) => {
   const { data, error } = await supabase
-    .from('transaction_tags')
-    .insert({
-      name,
-      color,
-      school_id: schoolId
-    })
+    .from('school_tags')
+    .insert([tagData])
     .select()
     .single();
 
   if (error) {
-    console.error('Error creating transaction tag:', error);
+    console.error('Error creating school tag:', error);
     throw error;
   }
 
   return data;
 };
 
-export const deleteTransactionTag = async (tagId: string) => {
-  const { error } = await supabase
-    .from('transaction_tags')
+// Function to update an existing school tag
+export const updateSchoolTag = async (id: string, updates: Partial<SchoolTag>) => {
+  const { data, error } = await supabase
+    .from('school_tags')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating school tag:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to delete a school tag
+export const deleteSchoolTag = async (id: string) => {
+  const { data, error } = await supabase
+    .from('school_tags')
     .delete()
-    .eq('id', tagId);
+    .eq('id', id);
 
   if (error) {
-    console.error('Error deleting transaction tag:', error);
-    throw error;
-  }
-};
-
-export const getSchoolContactTypes = async (schoolId: string) => {
-  const { data, error } = await supabase.rpc('get_school_contact_types', {
-    p_school_id: schoolId
-  });
-
-  if (error) {
-    console.error('Error fetching school contact types:', error);
+    console.error('Error deleting school tag:', error);
     throw error;
   }
 
   return data;
 };
 
-export const createContactType = async (schoolId: string, name: string, color: string) => {
+// Function to get school transactions
+export const getSchoolTransactions = async (schoolId: string | undefined) => {
+  if (!schoolId) {
+    console.warn('No school ID provided to getSchoolTransactions');
+    return [];
+  }
+
   const { data, error } = await supabase
-    .from('contact_types')
-    .insert({
-      school_id: schoolId,
-      name,
-      color
-    })
-    .select()
-    .single();
+    .from('transactions')
+    .select(`
+      *,
+      tags:transaction_tags (
+        tag_id,
+        school_tag (*)
+      )
+    `)
+    .eq('school_id', schoolId);
 
   if (error) {
-    console.error('Error creating contact type:', error);
+    console.error('Error fetching school transactions:', error);
     throw error;
   }
 
-  return data;
+  // Transform the data to include the tag information
+  const transactions = data ? data.map(transaction => {
+    const tags = transaction.tags ? transaction.tags.map(tag => tag.school_tag) : [];
+    return {
+      ...transaction,
+      tags: tags
+    };
+  }) : [];
+
+  return transactions;
 };
 
-export const updateContactType = async (contactTypeId: string, name: string, color: string) => {
-  const { data, error } = await supabase
-    .from('contact_types')
-    .update({
-      name,
-      color,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', contactTypeId)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating contact type:', error);
-    throw error;
-  }
-
-  return data;
-};
-
-export const deleteContactType = async (contactTypeId: string) => {
-  const { error } = await supabase
-    .from('contact_types')
-    .update({ is_active: false })
-    .eq('id', contactTypeId);
-
-  if (error) {
-    console.error('Error deactivating contact type:', error);
-    throw error;
-  }
-};
-
+// Add the missing createTransaction function
 export const createTransaction = async (transactionData: {
   school_id: string;
-  type: 'income' | 'expense' | 'transfer';
+  type: string;
   amount: number;
   currency: string;
   transaction_date: string;
@@ -768,109 +408,38 @@ export const createTransaction = async (transactionData: {
   recurring_end_date?: string;
   tag_ids?: string[];
 }) => {
-  console.log('Creating transaction:', transactionData);
-  
-  const { data, error } = await supabase.rpc('create_transaction', {
-    p_school_id: transactionData.school_id,
-    p_type: transactionData.type,
-    p_amount: transactionData.amount,
-    p_currency: transactionData.currency,
-    p_transaction_date: transactionData.transaction_date,
-    p_description: transactionData.description,
-    p_notes: transactionData.notes,
-    p_contact_id: transactionData.contact_id,
-    p_category_id: transactionData.category_id,
-    p_from_account_id: transactionData.from_account_id,
-    p_to_account_id: transactionData.to_account_id,
-    p_payment_method: transactionData.payment_method,
-    p_receipt_number: transactionData.receipt_number,
-    p_receipt_url: transactionData.receipt_url,
-    p_tax_amount: transactionData.tax_amount || 0,
-    p_tax_rate: transactionData.tax_rate || 0,
-    p_is_recurring: transactionData.is_recurring || false,
-    p_recurring_frequency: transactionData.recurring_frequency,
-    p_recurring_end_date: transactionData.recurring_end_date,
-    p_tag_ids: transactionData.tag_ids || [],
-  });
-  
-  if (error) {
-    console.error('Error creating transaction:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('Transaction created successfully:', data);
-  return data;
-};
+  try {
+    const { data, error } = await supabase.rpc('create_transaction', {
+      p_school_id: transactionData.school_id,
+      p_type: transactionData.type,
+      p_amount: transactionData.amount,
+      p_currency: transactionData.currency,
+      p_transaction_date: transactionData.transaction_date,
+      p_description: transactionData.description,
+      p_notes: transactionData.notes || null,
+      p_contact_id: transactionData.contact_id || null,
+      p_category_id: transactionData.category_id || null,
+      p_from_account_id: transactionData.from_account_id || null,
+      p_to_account_id: transactionData.to_account_id || null,
+      p_payment_method: transactionData.payment_method || null,
+      p_receipt_number: transactionData.receipt_number || null,
+      p_receipt_url: transactionData.receipt_url || null,
+      p_tax_amount: transactionData.tax_amount || 0,
+      p_tax_rate: transactionData.tax_rate || 0,
+      p_is_recurring: transactionData.is_recurring || false,
+      p_recurring_frequency: transactionData.recurring_frequency || null,
+      p_recurring_end_date: transactionData.recurring_end_date || null,
+      p_tag_ids: transactionData.tag_ids || null
+    });
 
-export const getSchoolTransactions = async (schoolId: string) => {
-  console.log('Fetching school transactions for:', schoolId);
-  
-  const { data, error } = await supabase.rpc('get_school_transactions', {
-    p_school_id: schoolId
-  });
-  
-  if (error) {
-    console.error('Error fetching school transactions:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('School transactions fetched:', data);
-  return data;
-};
+    if (error) {
+      console.error('Error creating transaction:', error);
+      throw error;
+    }
 
-export const updateTransaction = async (transactionId: string, updates: {
-  amount?: number;
-  currency?: string;
-  transaction_date?: string;
-  description?: string;
-  notes?: string;
-  contact_id?: string;
-  category_id?: string;
-  from_account_id?: string;
-  to_account_id?: string;
-  payment_method?: string;
-  receipt_number?: string;
-  receipt_url?: string;
-  tax_amount?: number;
-  tax_rate?: number;
-  is_recurring?: boolean;
-  recurring_frequency?: string;
-  recurring_end_date?: string;
-  status?: string;
-}) => {
-  console.log('Updating transaction:', transactionId, updates);
-  
-  const { data, error } = await supabase
-    .from('transactions')
-    .update(updates)
-    .eq('id', transactionId)
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error updating transaction:', error);
-    throw new Error(error.message);
+    return data;
+  } catch (error) {
+    console.error('Error in createTransaction:', error);
+    throw error;
   }
-  
-  console.log('Transaction updated successfully:', data);
-  return data;
-};
-
-export const deleteTransaction = async (transactionId: string) => {
-  console.log('Deleting transaction:', transactionId);
-  
-  const { data, error } = await supabase
-    .from('transactions')
-    .delete()
-    .eq('id', transactionId)
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error deleting transaction:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('Transaction deleted successfully:', data);
-  return data;
 };

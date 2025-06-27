@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentUserInfo, getSchoolTags } from '@/integrations/supabase/client';
+import { getCurrentUserInfo, getSchoolTags, createTransaction } from '@/integrations/supabase/client';
 
 interface AddTransactionDialogProps {
   open: boolean;
@@ -134,18 +134,36 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     setIsSubmitting(true);
 
     try {
-      // This would call a new client function to create the transaction
-      // For now, we'll show a success message
-      console.log('Creating transaction:', {
-        ...formData,
-        tags: selectedTags,
-        schoolId: userInfo[0].user_school_id,
-      });
+      const transactionData = {
+        school_id: userInfo[0].user_school_id,
+        type: formData.type,
+        amount: parseFloat(formData.amount),
+        currency: formData.currency,
+        transaction_date: format(formData.transactionDate, 'yyyy-MM-dd'),
+        description: formData.description,
+        notes: formData.notes || undefined,
+        contact_id: formData.contactId || undefined,
+        category_id: formData.categoryId || undefined,
+        from_account_id: formData.fromAccountId || undefined,
+        to_account_id: formData.toAccountId || undefined,
+        payment_method: formData.paymentMethod || undefined,
+        receipt_number: formData.receiptNumber || undefined,
+        receipt_url: formData.receiptUrl || undefined,
+        tax_amount: formData.taxAmount ? parseFloat(formData.taxAmount) : 0,
+        tax_rate: formData.taxRate ? parseFloat(formData.taxRate) : 0,
+        is_recurring: formData.isRecurring,
+        recurring_frequency: formData.recurringFrequency || undefined,
+        recurring_end_date: formData.recurringEndDate ? format(formData.recurringEndDate, 'yyyy-MM-dd') : undefined,
+        tag_ids: selectedTags.length > 0 ? selectedTags : undefined,
+      };
+
+      await createTransaction(transactionData);
       
       toast.success('Transaction created successfully');
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
+      console.error('Error creating transaction:', error);
       toast.error('Failed to create transaction: ' + error.message);
     } finally {
       setIsSubmitting(false);

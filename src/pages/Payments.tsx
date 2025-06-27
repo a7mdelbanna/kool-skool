@@ -50,7 +50,6 @@ import { Expense } from '@/contexts/PaymentContext';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import TagManager from '@/components/TagManager';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
-import { createTransaction } from '@/integrations/supabase/client';
 
 interface StudentPayment {
   id: string;
@@ -257,6 +256,12 @@ const Payments = () => {
     toast.success(`Expense of $${expense.amount} would be deleted`);
   };
 
+  // Handle adding new transaction - simplified to just refresh data
+  const handleAddTransactionSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
+    toast.success('Transaction created successfully');
+  };
+
   // Handle adding new transaction
   const handleAddTransaction = async (transactionData: any) => {
     try {
@@ -264,8 +269,7 @@ const Payments = () => {
         school_id: userInfo?.[0]?.user_school_id as string,
         ...transactionData,
       });
-      queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
-      toast.success('Transaction created successfully');
+      handleAddTransactionSuccess();
     } catch (error: any) {
       toast.error('Failed to create transaction: ' + error.message);
     }
@@ -717,10 +721,7 @@ const Payments = () => {
       <AddTransactionDialog
         open={addTransactionDialogOpen}
         onOpenChange={setAddTransactionDialogOpen}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
-          setAddTransactionDialogOpen(false);
-        }}
+        onSuccess={handleAddTransactionSuccess}
       />
 
       <PaymentDialog 

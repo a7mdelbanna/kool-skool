@@ -12,7 +12,7 @@ import StudentCard, { Student } from '@/components/StudentCard';
 import UpcomingLessons, { Lesson } from '@/components/UpcomingLessons';
 import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
 import AddStudentDialog from '@/components/AddStudentDialog';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 
 // Sample data for demonstration
@@ -263,10 +263,7 @@ const Index = () => {
           onOpenChange={setIsAddStudentOpen}
           onStudentAdded={(student) => {
             setIsAddStudentOpen(false);
-            toast({
-              title: "Success",
-              description: `Student ${student.firstName} ${student.lastName} added successfully`,
-            });
+            toast.success(`Student ${student.firstName} ${student.lastName} added successfully`);
           }}
         />
       </PaymentProvider>
