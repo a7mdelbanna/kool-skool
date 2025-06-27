@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://clacmtyxfdtfgjkozmqf.supabase.co';
@@ -164,23 +163,25 @@ export interface TransactionRecord {
   recurring_end_date?: string;
 }
 
-// Function to get students with details
+// Function to get students with details using the proper SQL function
 export const getStudentsWithDetails = async (schoolId: string | undefined) => {
   if (!schoolId) {
     console.warn('No school ID provided to getStudentsWithDetails');
     return [];
   }
 
-  const { data, error } = await supabase
-    .from('students')
-    .select('*')
-    .eq('school_id', schoolId);
+  console.log('Fetching students with details for school:', schoolId);
+
+  const { data, error } = await supabase.rpc('get_students_with_details', {
+    p_school_id: schoolId
+  });
 
   if (error) {
-    console.error('Error fetching students:', error);
+    console.error('Error fetching students with details:', error);
     throw error;
   }
 
+  console.log('Students data received from RPC:', data);
   return data || [];
 };
 
