@@ -1451,6 +1451,7 @@ export type Database = {
           recurring_frequency: string
           created_at: string
           tags: Json
+          subscription_id: string
         }[]
       }
       get_student_payments: {
@@ -1484,6 +1485,7 @@ export type Database = {
           notes: string
           status: string
           created_at: string
+          end_date: string
         }[]
       }
       get_students_with_details: {
