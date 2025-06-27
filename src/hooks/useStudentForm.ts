@@ -1,15 +1,14 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
 import { 
   createStudent, 
   getSchoolCourses, 
-  getSchoolTeachers,
   Course,
   CreateStudentResponse
 } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useTeachers } from "./useTeachers";
 
 export const useStudentForm = (
   student: Student | null | undefined,
@@ -52,6 +51,9 @@ export const useStudentForm = (
   const schoolId = userData?.schoolId || null;
   console.log("School ID for queries:", schoolId);
   
+  // Use the dedicated teachers hook
+  const { teachers, isLoading: teachersLoading, error: teachersError, refetch: refetchTeachers } = useTeachers(schoolId, open);
+  
   const { 
     data: coursesData, 
     isLoading: coursesLoading,
@@ -91,66 +93,6 @@ export const useStudentForm = (
     staleTime: 0,
     enabled: !!schoolId && open,
     retry: 1,
-  });
-
-  const { 
-    data: teachersData, 
-    isLoading: teachersLoading,
-    error: teachersError,
-    refetch: refetchTeachers
-  } = useQuery({
-    queryKey: ['teachers', schoolId, 'student-form'],
-    queryFn: async () => {
-      console.log('=== TEACHERS QUERY START ===');
-      console.log('Executing teacher query function with schoolId:', schoolId);
-      
-      if (!schoolId) {
-        console.warn('No school ID available for fetching teachers');
-        return { data: [] };
-      }
-      
-      try {
-        console.log('Calling getSchoolTeachers function with schoolId:', schoolId);
-        const teachersResult = await getSchoolTeachers(schoolId);
-        
-        console.log('Raw teachers response:', teachersResult);
-        console.log('Teachers response type:', typeof teachersResult);
-        console.log('Teachers array length:', teachersResult?.length);
-        
-        if (teachersResult && Array.isArray(teachersResult) && teachersResult.length > 0) {
-          console.log('Teachers found:', teachersResult.length);
-          teachersResult.forEach((teacher, index) => {
-            console.log(`Teacher ${index + 1}:`, {
-              id: teacher.id,
-              first_name: teacher.first_name,
-              last_name: teacher.last_name,
-              email: teacher.email,
-              role: teacher.role,
-              school_id: teacher.school_id
-            });
-          });
-          
-          return { data: teachersResult };
-        } else {
-          console.warn('No teachers found or invalid response:', teachersResult);
-          return { data: [] };
-        }
-      } catch (error) {
-        console.error('Exception in teachers query:', error);
-        console.error('Error details:', {
-          message: (error as Error).message,
-          stack: (error as Error).stack
-        });
-        toast.error("Failed to load teachers: " + (error as Error).message);
-        return { data: [] };
-      } finally {
-        console.log('=== TEACHERS QUERY END ===');
-      }
-    },
-    staleTime: 0,
-    enabled: !!schoolId && open,
-    retry: 2,
-    retryDelay: 1000,
   });
   
   useEffect(() => {
@@ -315,13 +257,13 @@ export const useStudentForm = (
 
   console.log('=== useStudentForm FINAL DEBUG ===');
   console.log('Returning coursesData:', coursesData);
-  console.log('Returning teachersData:', teachersData);
+  console.log('Returning teachers:', teachers);
   if (coursesData?.data) {
     console.log('Courses count to return:', coursesData.data.length);
   }
-  if (teachersData?.data) {
-    console.log('Teachers count to return:', teachersData.data.length);
-    console.log('Teachers to return:', teachersData.data);
+  if (teachers) {
+    console.log('Teachers count to return:', teachers.length);
+    console.log('Teachers to return:', teachers);
   }
 
   return {
@@ -334,7 +276,7 @@ export const useStudentForm = (
     setCreatePassword,
     handleSave,
     coursesData,
-    teachersData,
+    teachersData: { data: teachers }, // Wrap in data property for compatibility
     isLoading: coursesLoading || teachersLoading
   };
 };

@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -48,6 +47,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   console.log('ProfileTab render - courses length:', courses?.length);
   console.log('ProfileTab render - studentData:', studentData);
   console.log('ProfileTab render - isLoading:', isLoading);
+  
+  // Validate teachers data structure
+  const validTeachers = Array.isArray(teachers) ? teachers : [];
+  console.log('ProfileTab - Valid teachers array:', validTeachers);
+  console.log('ProfileTab - Valid teachers count:', validTeachers.length);
   
   const handleInputChange = (field: keyof Student, value: string) => {
     setStudentData({ [field]: value });
@@ -258,7 +262,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
                 Loading teachers...
               </div>
-            ) : teachers && Array.isArray(teachers) && teachers.length > 0 ? (
+            ) : validTeachers.length > 0 ? (
               <Select
                 value={studentData.teacherId || ""}
                 onValueChange={(value) => handleInputChange("teacherId", value)}
@@ -268,9 +272,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                   <SelectValue placeholder="Select a teacher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teachers.map((teacher) => (
+                  {validTeachers.map((teacher) => (
                     <SelectItem key={teacher.id} value={teacher.id}>
-                      {teacher.display_name || `${teacher.first_name} ${teacher.last_name}`}
+                      {teacher.display_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -281,8 +285,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               </div>
             )}
             <p className="text-sm text-muted-foreground">
-              {teachers && Array.isArray(teachers) && teachers.length > 0 ? 
-                `${teachers.length} teacher${teachers.length > 1 ? 's' : ''} available` : 
+              {validTeachers.length > 0 ? 
+                `${validTeachers.length} teacher${validTeachers.length > 1 ? 's' : ''} available` : 
                 'Please add teachers to your school first'
               }
             </p>
