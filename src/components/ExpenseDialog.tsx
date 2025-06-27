@@ -61,12 +61,12 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
   });
 
   const { data: contacts } = useQuery({
-    queryKey: ['school-contacts', userInfo?.[0]?.user_school_id],
+    queryKey: ['school-contacts', userInfo?.[0]?.school_id],
     queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
-      return await getSchoolContacts(userInfo[0].user_school_id);
+      if (!userInfo?.[0]?.school_id) return [];
+      return await getSchoolContacts(userInfo[0].school_id);
     },
-    enabled: !!userInfo?.[0]?.user_school_id,
+    enabled: !!userInfo?.[0]?.school_id,
   });
 
   // Initialize form when expense changes or dialog opens

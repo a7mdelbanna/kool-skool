@@ -59,12 +59,12 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
   });
 
   const { data: contacts } = useQuery({
-    queryKey: ['school-contacts', userInfo?.[0]?.user_school_id],
+    queryKey: ['school-contacts', userInfo?.[0]?.school_id],
     queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
-      return await getSchoolContacts(userInfo[0].user_school_id);
+      if (!userInfo?.[0]?.school_id) return [];
+      return await getSchoolContacts(userInfo[0].school_id);
     },
-    enabled: !!userInfo?.[0]?.user_school_id,
+    enabled: !!userInfo?.[0]?.school_id,
   });
 
   // Initialize form when payment changes or dialog opens
