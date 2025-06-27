@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -47,6 +46,13 @@ export const useStudentForm = (
       console.log("Parsed user data:", userData);
       console.log("User schoolId:", userData?.schoolId);
       console.log("User schoolId type:", typeof userData?.schoolId);
+      
+      // Additional debug: let's check all properties
+      console.log("All user properties:", Object.keys(userData));
+      for (const [key, value] of Object.entries(userData)) {
+        console.log(`  ${key}:`, value, `(${typeof value})`);
+      }
+      
       return userData;
     } catch (error) {
       console.error("Error parsing user data:", error);
@@ -62,6 +68,11 @@ export const useStudentForm = (
   console.log("SchoolId is truthy:", !!schoolId);
   console.log("Open state:", open);
   console.log("Teachers query enabled:", !!schoolId && open);
+  console.log("userData object:", userData);
+  
+  // Let's also check what happens if we manually check the database user records
+  console.log("=== MANUAL DATABASE CHECK DEBUG ===");
+  console.log("About to call useTeachers with schoolId:", schoolId);
   
   // Use the dedicated teachers hook
   const { teachers, isLoading: teachersLoading, error: teachersError, refetch: refetchTeachers } = useTeachers(schoolId, open);

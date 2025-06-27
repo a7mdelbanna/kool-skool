@@ -16,6 +16,20 @@ export const useTeachers = (schoolId: string | null, enabled: boolean = true) =>
   console.log('useTeachers - enabled:', enabled);
   console.log('useTeachers - query will be enabled:', !!schoolId && enabled);
   
+  // Let's also check what's in localStorage
+  const userData = localStorage.getItem('user');
+  console.log('useTeachers - localStorage user data:', userData);
+  if (userData) {
+    try {
+      const parsedUser = JSON.parse(userData);
+      console.log('useTeachers - parsed user:', parsedUser);
+      console.log('useTeachers - user.schoolId from localStorage:', parsedUser.schoolId);
+      console.log('useTeachers - comparison schoolId === parsedUser.schoolId:', schoolId === parsedUser.schoolId);
+    } catch (e) {
+      console.error('useTeachers - error parsing user data:', e);
+    }
+  }
+  
   const { data: teachers, isLoading, error, refetch } = useQuery({
     queryKey: ['teachers', schoolId],
     queryFn: async (): Promise<Teacher[]> => {

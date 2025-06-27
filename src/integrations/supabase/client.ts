@@ -317,15 +317,45 @@ export const getSchoolTeachers = async (schoolId: string) => {
   }
 
   try {
+    // CRITICAL DEBUG: Let's check what school_id values exist in the database
+    console.log('=== CRITICAL DEBUG: Checking all school_id values in database ===');
+    const { data: allUsers, error: allUsersError } = await supabase
+      .from('users')
+      .select('id, email, role, school_id, first_name, last_name');
+    
+    console.log('All users in database:', allUsers);
+    console.log('All users error:', allUsersError);
+    
+    if (allUsers) {
+      console.log('=== SCHOOL_ID ANALYSIS ===');
+      const uniqueSchoolIds = [...new Set(allUsers.map(u => u.school_id))];
+      console.log('Unique school_ids in database:', uniqueSchoolIds);
+      console.log('Looking for school_id:', schoolId);
+      console.log('schoolId exists in database?:', uniqueSchoolIds.includes(schoolId));
+      
+      // Check if there's a type mismatch
+      console.log('schoolId type:', typeof schoolId);
+      uniqueSchoolIds.forEach(id => {
+        console.log(`Database school_id "${id}" (type: ${typeof id}) === input "${schoolId}" (type: ${typeof schoolId})?`, id === schoolId);
+      });
+      
+      // Let's also check for teachers specifically
+      const teachersInDb = allUsers.filter(u => u.role === 'teacher');
+      console.log('All teachers in database (any school):', teachersInDb);
+      
+      const teachersForThisSchool = teachersInDb.filter(u => u.school_id === schoolId);
+      console.log('Teachers for this school_id:', teachersForThisSchool);
+    }
+    
     // First, let's check what users exist for this school regardless of role
     console.log('=== DEBUGGING: Checking all users for this school ===');
-    const { data: allSchoolUsers, error: allUsersError } = await supabase
+    const { data: allSchoolUsers, error: allUsersError2 } = await supabase
       .from('users')
       .select('*')
       .eq('school_id', schoolId);
     
     console.log('All users for school_id', schoolId, ':', allSchoolUsers);
-    console.log('All users error:', allUsersError);
+    console.log('All users error:', allUsersError2);
     console.log('All users count:', allSchoolUsers?.length || 0);
     
     if (allSchoolUsers && allSchoolUsers.length > 0) {
