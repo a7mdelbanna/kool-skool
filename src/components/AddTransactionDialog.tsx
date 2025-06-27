@@ -24,12 +24,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, X } from 'lucide-react';
+import { CalendarIcon, Plus, X, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentUserInfo, getSchoolTags } from '@/integrations/supabase/client';
+import { getCurrentUserInfo, getSchoolTags, getSchoolCategories, getSchoolContacts, getSchoolAccounts, createTransaction } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AddTransactionDialogProps {
   open: boolean;
@@ -61,6 +62,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   });
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   // Fetch user info
   const { data: userInfo } = useQuery({
@@ -72,6 +74,27 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   const { data: availableTags = [] } = useQuery({
     queryKey: ['school-tags', userInfo?.[0]?.user_school_id],
     queryFn: () => getSchoolTags(userInfo?.[0]?.user_school_id as string),
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
+
+  // Fetch categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['school-categories', userInfo?.[0]?.user_school_id],
+    queryFn: () => getSchoolCategories(userInfo?.[0]?.user_school_id as string),
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
+
+  // Fetch contacts
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['school-contacts', userInfo?.[0]?.user_school_id],
+    queryFn: () => getSchoolContacts(userInfo?.[0]?.user_school_id as string),
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
+
+  // Fetch accounts
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['school-accounts', userInfo?.[0]?.user_school_id],
+    queryFn: () => getSchoolAccounts(userInfo?.[0]?.user_school_id as string),
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
@@ -100,6 +123,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
       });
       setSelectedTags([]);
       setActiveTab('income');
+      setReceiptFile(null);
     }
   }, [open]);
 
@@ -120,6 +144,39 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     );
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setReceiptFile(file);
+    }
+  };
+
+  const uploadReceipt = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${userInfo?.[0]?.user_school_id}/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('transaction-receipts')
+        .upload(filePath, file);
+
+      if (error) {
+        console.error('Upload error:', error);
+        throw error;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('transaction-receipts')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading receipt:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formData.amount || !formData.description) {
       toast.error('Amount and description are required');
@@ -134,18 +191,51 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     setIsSubmitting(true);
 
     try {
-      // This would call a new client function to create the transaction
-      // For now, we'll show a success message
-      console.log('Creating transaction:', {
-        ...formData,
-        tags: selectedTags,
-        schoolId: userInfo[0].user_school_id,
+      let receiptUrl = formData.receiptUrl;
+
+      // Upload receipt file if provided
+      if (receiptFile) {
+        const uploadedUrl = await uploadReceipt(receiptFile);
+        if (uploadedUrl) {
+          receiptUrl = uploadedUrl;
+        } else {
+          toast.error('Failed to upload receipt file');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Create the transaction
+      const transactionId = await createTransaction({
+        school_id: userInfo[0].user_school_id,
+        type: formData.type as 'income' | 'expense' | 'transfer',
+        amount: parseFloat(formData.amount),
+        currency: formData.currency,
+        transaction_date: format(formData.transactionDate, 'yyyy-MM-dd'),
+        description: formData.description,
+        notes: formData.notes || null,
+        contact_id: formData.contactId || null,
+        category_id: formData.categoryId || null,
+        from_account_id: formData.fromAccountId || null,
+        to_account_id: formData.toAccountId || null,
+        payment_method: formData.paymentMethod || null,
+        receipt_number: formData.receiptNumber || null,
+        receipt_url: receiptUrl || null,
+        tax_amount: formData.taxAmount ? parseFloat(formData.taxAmount) : 0,
+        tax_rate: formData.taxRate ? parseFloat(formData.taxRate) : 0,
+        is_recurring: formData.isRecurring,
+        recurring_frequency: formData.recurringFrequency || null,
+        recurring_end_date: formData.recurringEndDate ? format(formData.recurringEndDate, 'yyyy-MM-dd') : null,
+        tag_ids: selectedTags.length > 0 ? selectedTags : null,
       });
+
+      console.log('Transaction created with ID:', transactionId);
       
       toast.success('Transaction created successfully');
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
+      console.error('Transaction creation error:', error);
       toast.error('Failed to create transaction: ' + error.message);
     } finally {
       setIsSubmitting(false);
@@ -160,6 +250,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     { value: 'monthly', label: 'Monthly' },
     { value: 'yearly', label: 'Yearly' },
   ];
+
+  // Filter categories by type
+  const getFilteredCategories = () => {
+    return categories.filter(cat => cat.type === formData.type || cat.type === 'general');
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -271,7 +366,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Account</Label>
+                  <Label>To Account</Label>
                   <Select 
                     value={formData.toAccountId} 
                     onValueChange={(value) => handleInputChange('toAccountId', value)}
@@ -280,8 +375,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -319,8 +417,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -366,8 +467,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select source account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -382,8 +486,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                       <SelectValue placeholder="Select destination account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
+                      {accounts.map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -402,8 +509,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                     <SelectValue placeholder="Select contact" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="contact1">John Doe</SelectItem>
-                    <SelectItem value="contact2">Jane Smith</SelectItem>
+                    {contacts.map(contact => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.name} ({contact.type})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -418,8 +528,11 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="category1">Tuition & Fees</SelectItem>
-                    <SelectItem value="category2">Office Supplies</SelectItem>
+                    {getFilteredCategories().map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.full_path}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -469,6 +582,27 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                   placeholder="https://example.com/receipt.pdf"
                 />
               </div>
+            </div>
+
+            {/* Receipt File Upload */}
+            <div className="space-y-2">
+              <Label>Upload Receipt</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleFileChange}
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" size="icon">
+                  <Upload className="h-4 w-4" />
+                </Button>
+              </div>
+              {receiptFile && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {receiptFile.name}
+                </p>
+              )}
             </div>
 
             {/* Recurring Transaction */}
