@@ -29,7 +29,8 @@ import {
   addStudentSubscription, 
   deleteStudentSubscription,
   Subscription,
-  supabase
+  supabase,
+  getSchoolTransactions
 } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -278,6 +279,13 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     enabled: !!schoolId,
   });
 
+  // Fetch school transactions to calculate payment status
+  const { data: allTransactions = [] } = useQuery({
+    queryKey: ['school-transactions', schoolId],
+    queryFn: () => getSchoolTransactions(schoolId),
+    enabled: !!schoolId,
+  });
+
   const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
 
   const daysOfWeek = [
@@ -310,6 +318,48 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calculate payment status for a subscription
+  const calculateSubscriptionPaymentStatus = (subscription: Subscription) => {
+    if (!studentData.firstName || !studentData.lastName || !allTransactions.length) {
+      return {
+        totalPaid: 0,
+        remaining: subscription.total_price,
+        status: 'Not Paid' as const,
+        payments: []
+      };
+    }
+
+    const studentName = `${studentData.firstName} ${studentData.lastName}`;
+    
+    // Find all payments for this subscription
+    const subscriptionPayments = allTransactions.filter(transaction => 
+      transaction.type === 'income' && 
+      transaction.contact_name === studentName &&
+      transaction.contact_type === 'student' &&
+      transaction.subscription_id === subscription.id &&
+      transaction.status === 'completed'
+    );
+
+    const totalPaid = subscriptionPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const remaining = Math.max(0, subscription.total_price - totalPaid);
+    
+    let status: 'Fully Paid' | 'Partially Paid' | 'Not Paid';
+    if (totalPaid >= subscription.total_price) {
+      status = 'Fully Paid';
+    } else if (totalPaid > 0) {
+      status = 'Partially Paid';
+    } else {
+      status = 'Not Paid';
+    }
+
+    return {
+      totalPaid,
+      remaining,
+      status,
+      payments: subscriptionPayments
+    };
   };
 
   const addScheduleItem = () => {
@@ -590,6 +640,19 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     } catch (error) {
       console.error("Error formatting date:", error);
       return "Invalid Date";
+    }
+  };
+
+  const getPaymentStatusColor = (status: 'Fully Paid' | 'Partially Paid' | 'Not Paid') => {
+    switch (status) {
+      case 'Fully Paid':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'Partially Paid':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Not Paid':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -1026,7 +1089,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         </Card>
       )}
 
-      {/* Current Subscriptions */}
+      {/* Current Subscriptions - Updated with Payment Status */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1047,56 +1110,92 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {subscriptions.map((subscription) => (
-                <div key={subscription.id} className="py-6 first:pt-0 last:pb-0">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold">
-                        {subscription.session_count} Sessions - {subscription.duration_months} Month(s)
-                      </h3>
-                      <p className="text-muted-foreground">
-                        Start Date: {formatDate(subscription.start_date)}
-                      </p>
-                      <div className="flex gap-2">
-                        <Badge variant="secondary">
-                          Total: {getCurrencySymbol(subscription.currency)} {subscription.total_price}
-                        </Badge>
-                        <Badge variant="outline" className="capitalize">
-                          {subscription.status}
-                        </Badge>
+              {subscriptions.map((subscription) => {
+                const paymentStatus = calculateSubscriptionPaymentStatus(subscription);
+                return (
+                  <div key={subscription.id} className="py-6 first:pt-0 last:pb-0">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-3 flex-1">
+                        <div>
+                          <h3 className="text-lg font-semibold">
+                            {subscription.session_count} Sessions - {subscription.duration_months} Month(s)
+                          </h3>
+                          <p className="text-muted-foreground">
+                            Start Date: {formatDate(subscription.start_date)}
+                          </p>
+                        </div>
+                        
+                        {/* Payment Status Section */}
+                        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                          <h4 className="font-medium text-sm">Payment Information</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Subscription</p>
+                              <p className="font-medium">
+                                {getCurrencySymbol(subscription.currency)} {subscription.total_price.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Paid</p>
+                              <p className="font-medium text-green-600">
+                                {getCurrencySymbol(subscription.currency)} {paymentStatus.totalPaid.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Remaining</p>
+                              <p className={cn(
+                                "font-medium",
+                                paymentStatus.remaining > 0 ? "text-red-600" : "text-green-600"
+                              )}>
+                                {getCurrencySymbol(subscription.currency)} {paymentStatus.remaining.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="pt-2">
+                            <Badge className={cn("text-xs", getPaymentStatusColor(paymentStatus.status))}>
+                              {paymentStatus.status}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Badge variant="outline" className="capitalize">
+                            {subscription.status}
+                          </Badge>
+                        </div>
                       </div>
+                      {!isViewMode && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleOpenDeleteDialog(subscription.id)}
+                          disabled={deletingSubscriptionId === subscription.id}
+                        >
+                          {deletingSubscriptionId === subscription.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
-                    {!isViewMode && (
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => handleOpenDeleteDialog(subscription.id)}
-                        disabled={deletingSubscriptionId === subscription.id}
-                      >
-                        {deletingSubscriptionId === subscription.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </>
-                        )}
-                      </Button>
+                    {subscription.notes && (
+                      <>
+                        <Separator className="my-3" />
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Notes:</strong> {subscription.notes}
+                        </p>
+                      </>
                     )}
                   </div>
-                  {subscription.notes && (
-                    <>
-                      <Separator className="my-3" />
-                      <p className="text-sm text-muted-foreground">
-                        <strong>Notes:</strong> {subscription.notes}
-                      </p>
-                    </>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from "react";
 import {
   Form,
@@ -142,6 +143,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       status: transaction.status,
       notes: transaction.notes || '',
       created_at: transaction.created_at,
+      subscription_id: transaction.subscription_id,
     }));
   }, [allTransactions, studentData.firstName, studentData.lastName]);
 
@@ -261,6 +263,26 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     account.currency_code === form.watch("currency")
   );
 
+  // Helper function to get subscription info for a payment
+  const getSubscriptionInfo = (subscriptionId: string | null) => {
+    if (!subscriptionId) return null;
+    
+    const subscription = subscriptions.find(sub => sub.id === subscriptionId);
+    if (!subscription) return null;
+
+    const startDate = format(new Date(subscription.start_date), "MMM do");
+    const endDate = subscription.end_date 
+      ? format(new Date(subscription.end_date), "MMM do") 
+      : format(new Date(subscription.start_date + subscription.duration_months * 30 * 24 * 60 * 60 * 1000), "MMM do");
+    
+    return {
+      title: `${subscription.session_count} Sessions`,
+      duration: `${startDate} to ${endDate}`,
+      totalPrice: subscription.total_price,
+      currency: subscription.currency
+    };
+  };
+
   if (paymentsLoading || accountsLoading || subscriptionsLoading) {
     return (
       <div className="space-y-6">
@@ -284,49 +306,66 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {payments.map((payment) => (
-              <div
-                key={payment.id}
-                className="border rounded-md p-4 flex justify-between items-start"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium">
-                      {payment.currency ? 
-                        currencies.find(c => c.code === payment.currency)?.symbol || '$' 
-                        : '$'}{Number(payment.amount).toFixed(2)}
-                    </h4>
-                    <span className="text-sm text-muted-foreground">
-                      via {payment.payment_method}
-                    </span>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-xs",
-                      payment.status === 'completed' ? "bg-green-100 text-green-800" :
-                      payment.status === 'pending' ? "bg-yellow-100 text-yellow-800" :
-                      "bg-red-100 text-red-800"
-                    )}>
-                      {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                    </span>
+            {payments.map((payment) => {
+              const subscriptionInfo = getSubscriptionInfo(payment.subscription_id);
+              
+              return (
+                <div
+                  key={payment.id}
+                  className="border rounded-md p-4 flex justify-between items-start"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium">
+                        {payment.currency ? 
+                          currencies.find(c => c.code === payment.currency)?.symbol || '$' 
+                          : '$'}{Number(payment.amount).toFixed(2)}
+                      </h4>
+                      <span className="text-sm text-muted-foreground">
+                        via {payment.payment_method}
+                      </span>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-xs",
+                        payment.status === 'completed' ? "bg-green-100 text-green-800" :
+                        payment.status === 'pending' ? "bg-yellow-100 text-yellow-800" :
+                        "bg-red-100 text-red-800"
+                      )}>
+                        {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                      </span>
+                    </div>
+                    <p className="text-sm my-1">
+                      Paid on {format(new Date(payment.payment_date), "PPP")}
+                    </p>
+                    
+                    {/* Linked Subscription Information */}
+                    {subscriptionInfo && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm font-medium text-blue-800">
+                          Linked Subscription: {subscriptionInfo.title}
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          {subscriptionInfo.duration}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {payment.notes && (
+                      <p className="text-sm text-muted-foreground mt-1">{payment.notes}</p>
+                    )}
                   </div>
-                  <p className="text-sm my-1">
-                    Paid on {format(new Date(payment.payment_date), "PPP")}
-                  </p>
-                  {payment.notes && (
-                    <p className="text-sm text-muted-foreground mt-1">{payment.notes}</p>
+                  {!isViewMode && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeletePayment(payment.id)}
+                      disabled={deletePaymentMutation.isPending}
+                    >
+                      <Trash className="h-4 w-4 text-destructive" />
+                    </Button>
                   )}
                 </div>
-                {!isViewMode && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeletePayment(payment.id)}
-                    disabled={deletePaymentMutation.isPending}
-                  >
-                    <Trash className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
