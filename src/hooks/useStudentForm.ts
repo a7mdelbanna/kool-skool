@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -173,8 +174,8 @@ export const useStudentForm = (
         // Use the selected teacher ID or fall back to the first available teacher
         let selectedTeacherId = studentData.teacherId;
         
-        if (!selectedTeacherId && teachersData?.data && teachersData.data.length > 0) {
-          selectedTeacherId = teachersData.data[0].id;
+        if (!selectedTeacherId && teachers && teachers.length > 0) {
+          selectedTeacherId = teachers[0].id;
           console.log("No teacher selected, using first available teacher:", selectedTeacherId);
         }
         
@@ -184,7 +185,7 @@ export const useStudentForm = (
           return;
         }
         
-        const selectedTeacher = teachersData?.data?.find(t => t.id === selectedTeacherId);
+        const selectedTeacher = teachers?.find(t => t.id === selectedTeacherId);
         
         console.log("Creating student with admin credentials:", { 
           userId: userData.id,
