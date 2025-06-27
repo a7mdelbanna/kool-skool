@@ -28,6 +28,7 @@ import {
 import PaymentDialog from '@/components/PaymentDialog';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
+import TagManager from '@/components/TagManager';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, getCurrentUserInfo } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -342,26 +343,10 @@ const PaymentsPage = () => {
         </Card>
       </div>
 
-      {/* Tags Section */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Tags</CardTitle>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Tag
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Badge variant="secondary" className="bg-pink-100 text-pink-800 border-pink-200">
-              <div className="w-2 h-2 bg-pink-500 rounded-full mr-2"></div>
-              tag1 ×
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Tags Section - Using TagManager component */}
+      <div className="mb-6">
+        <TagManager showUsageCount={true} />
+      </div>
 
       {/* Transactions Table */}
       <Card>
