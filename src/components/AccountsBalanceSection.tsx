@@ -45,23 +45,30 @@ const AccountsBalanceSection: React.FC<AccountsBalanceSectionProps> = ({ schoolI
 
         // Calculate balance from transactions
         (transactionsData || []).forEach((transaction: any) => {
+          // Skip if transaction amount is not a valid number
+          const transactionAmount = Number(transaction.amount);
+          if (isNaN(transactionAmount)) {
+            console.warn('Invalid transaction amount:', transaction.amount, 'for transaction:', transaction.id);
+            return;
+          }
+
           // For income transactions (money coming into an account)
           if (transaction.type === 'income' && transaction.to_account_name === account.name) {
-            balance += Number(transaction.amount);
+            balance += transactionAmount;
           }
           
           // For expense transactions (money going out of an account)
           if (transaction.type === 'expense' && transaction.from_account_name === account.name) {
-            balance -= Number(transaction.amount);
+            balance -= transactionAmount;
           }
           
           // For transfer transactions
           if (transaction.type === 'transfer') {
             if (transaction.from_account_name === account.name) {
-              balance -= Number(transaction.amount);
+              balance -= transactionAmount;
             }
             if (transaction.to_account_name === account.name) {
-              balance += Number(transaction.amount);
+              balance += transactionAmount;
             }
           }
         });
