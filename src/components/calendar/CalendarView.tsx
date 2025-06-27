@@ -7,7 +7,9 @@ import {
   isSameMonth,
   isSameDay,
   getDay,
-  addDays
+  addDays,
+  startOfWeek,
+  endOfWeek
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
@@ -115,7 +117,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const renderMonthView = () => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
-    const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+    
+    console.log("Month view - calendar start:", format(calendarStart, 'yyyy-MM-dd'));
+    console.log("Month view - calendar end:", format(calendarEnd, 'yyyy-MM-dd'));
+    console.log("Month view - total calendar days:", calendarDays.length);
+    console.log("Month view - processed sessions:", processedSessions.length);
     
     return (
       <div className="grid grid-cols-7 gap-1 p-4">
@@ -127,102 +136,92 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         ))}
         
         {/* Calendar grid */}
-        {Array.from({ length: Math.ceil((monthDays.length + getDay(monthStart)) / 7) }, (_, weekIndex) => {
-          const weekStart = weekIndex * 7;
-          const weekDays = Array.from({ length: 7 }, (_, dayIndex) => {
-            const dayOffset = weekStart + dayIndex - getDay(monthStart);
-            return dayOffset >= 0 && dayOffset < monthDays.length ? monthDays[dayOffset] : null;
-          });
+        {calendarDays.map((day, index) => {
+          const dateSessions = getDateSessions(day);
+          const isToday = isSameDay(day, new Date());
+          const isCurrentMonth = isSameMonth(day, currentDate);
           
-          return weekDays.map((day, dayIndex) => {
-            if (!day) {
-              return <div key={`empty-${weekIndex}-${dayIndex}`} className="h-24 p-1"></div>;
-            }
-            
-            const dateSessions = getDateSessions(day);
-            const isToday = isSameDay(day, new Date());
-            const isCurrentMonth = isSameMonth(day, currentDate);
-            
-            return (
-              <div
-                key={day.toISOString()}
-                className={cn(
-                  "h-24 p-1 border border-border relative cursor-pointer hover:bg-accent/50 transition-colors",
-                  isToday && "bg-primary/5 border-primary/20",
-                  !isCurrentMonth && "text-muted-foreground bg-muted/20"
-                )}
-                onClick={() => {
-                  if (dateSessions.length === 1) {
-                    handleSessionClick(dateSessions[0]);
-                  }
-                }}
-              >
-                <div className="flex flex-col h-full">
-                  <div className={cn(
-                    "text-sm font-medium mb-1",
-                    isToday && "text-primary font-bold"
-                  )}>
-                    {format(day, 'd')}
-                  </div>
-                  
-                  <div className="flex-1 space-y-0.5 overflow-hidden">
-                    {dateSessions.slice(0, 3).map((session) => {
-                      const colors = getSubjectColors(session.subject);
-                      return (
-                        <HoverCard key={session.id} openDelay={300} closeDelay={100}>
-                          <HoverCardTrigger asChild>
-                            <div
-                              className={cn(
-                                "text-xs p-1 rounded text-white font-medium cursor-pointer hover:opacity-80 truncate",
-                                colors.bg.replace('bg-', 'bg-').replace('-100', '-500'),
-                                session.status === "canceled" && "opacity-60 line-through"
+          console.log(`Day ${format(day, 'yyyy-MM-dd')}: ${dateSessions.length} sessions`);
+          
+          return (
+            <div
+              key={day.toISOString()}
+              className={cn(
+                "h-24 p-1 border border-border relative cursor-pointer hover:bg-accent/50 transition-colors",
+                isToday && "bg-primary/5 border-primary/20",
+                !isCurrentMonth && "text-muted-foreground bg-muted/20"
+              )}
+              onClick={() => {
+                if (dateSessions.length === 1) {
+                  handleSessionClick(dateSessions[0]);
+                }
+              }}
+            >
+              <div className="flex flex-col h-full">
+                <div className={cn(
+                  "text-sm font-medium mb-1",
+                  isToday && "text-primary font-bold"
+                )}>
+                  {format(day, 'd')}
+                </div>
+                
+                <div className="flex-1 space-y-0.5 overflow-hidden">
+                  {dateSessions.slice(0, 3).map((session) => {
+                    const colors = getSubjectColors(session.subject);
+                    return (
+                      <HoverCard key={session.id} openDelay={300} closeDelay={100}>
+                        <HoverCardTrigger asChild>
+                          <div
+                            className={cn(
+                              "text-xs p-1 rounded text-white font-medium cursor-pointer hover:opacity-80 truncate",
+                              colors.bg.replace('bg-', 'bg-').replace('-100', '-500'),
+                              session.status === "canceled" && "opacity-60 line-through"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSessionClick(session);
+                            }}
+                          >
+                            {session.time} {session.studentName}
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80 p-3" side="top">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className={cn("h-8 w-8", colors.border)}>
+                                <AvatarFallback className={cn(colors.bg, colors.text)}>
+                                  {session.subject.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="font-medium">{session.studentName}</div>
+                                <div className="text-sm text-muted-foreground">{session.subject}</div>
+                              </div>
+                              {renderStatusIcon(session.status)}
+                            </div>
+                            <div className="text-sm space-y-1">
+                              <div>Time: {session.time}</div>
+                              <div>Duration: {session.duration}</div>
+                              {session.sessionNumber && session.totalSessions && (
+                                <div>Session: {session.sessionNumber}/{session.totalSessions}</div>
                               )}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSessionClick(session);
-                              }}
-                            >
-                              {session.time} {session.studentName}
                             </div>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80 p-3" side="top">
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Avatar className={cn("h-8 w-8", colors.border)}>
-                                  <AvatarFallback className={cn(colors.bg, colors.text)}>
-                                    {session.subject.substring(0, 2).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="font-medium">{session.studentName}</div>
-                                  <div className="text-sm text-muted-foreground">{session.subject}</div>
-                                </div>
-                                {renderStatusIcon(session.status)}
-                              </div>
-                              <div className="text-sm space-y-1">
-                                <div>Time: {session.time}</div>
-                                <div>Duration: {session.duration}</div>
-                                {session.sessionNumber && session.totalSessions && (
-                                  <div>Session: {session.sessionNumber}/{session.totalSessions}</div>
-                                )}
-                              </div>
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      );
-                    })}
-                    
-                    {dateSessions.length > 3 && (
-                      <div className="text-xs text-muted-foreground font-medium">
-                        +{dateSessions.length - 3} more
-                      </div>
-                    )}
-                  </div>
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    );
+                  })}
+                  
+                  {dateSessions.length > 3 && (
+                    <div className="text-xs text-muted-foreground font-medium">
+                      +{dateSessions.length - 3} more
+                    </div>
+                  )}
                 </div>
               </div>
-            );
-          });
-        }).flat()}
+            </div>
+          );
+        })}
       </div>
     );
   };
