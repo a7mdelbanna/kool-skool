@@ -11,7 +11,7 @@ import Students from "./pages/Students";
 import Courses from "./pages/Courses";
 import Contacts from "./pages/Contacts";
 import Calendar from "./pages/Calendar";
-import Payments from "./pages/Payments";
+import PaymentsOptimized from "./pages/PaymentsOptimized";
 import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
@@ -32,7 +32,17 @@ export const UserContext = createContext<{
   setUser: () => {},
 });
 
-const queryClient = new QueryClient();
+// Optimized QueryClient configuration for better performance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30000, // 30 seconds
+      gcTime: 300000, // 5 minutes
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => {
   const [user, setUser] = useState<any>(null);
@@ -92,7 +102,7 @@ const App = () => {
                   <Route path="/courses" element={<Courses />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/calendar" element={<Calendar />} />
-                  <Route path="/payments" element={<Payments />} />
+                  <Route path="/payments" element={<PaymentsOptimized />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<StatesReports />} />
                   <Route path="/team-access" element={<TeamAccess />} />
