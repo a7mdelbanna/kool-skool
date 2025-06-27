@@ -28,19 +28,51 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
-  // Get school ID from localStorage
+  // Get school ID from localStorage with better error handling
   const getSchoolId = () => {
-    const userData = localStorage.getItem('user');
-    if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.schoolId;
+    try {
+      const userData = localStorage.getItem('user');
+      console.log('📋 Raw user data from localStorage:', userData);
+      
+      if (!userData) {
+        console.error('❌ No user data found in localStorage');
+        return null;
+      }
+      
+      const user = JSON.parse(userData);
+      console.log('📋 Parsed user data:', user);
+      
+      // Try different possible property names for school ID
+      const schoolId = user.schoolId || user.school_id || user.schoolId;
+      console.log('🏫 Extracted school ID:', schoolId);
+      
+      return schoolId;
+    } catch (error) {
+      console.error('❌ Error parsing user data from localStorage:', error);
+      return null;
+    }
   };
 
   const getCurrentUserId = () => {
-    const userData = localStorage.getItem('user');
-    if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.user_id;
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        console.error('❌ No user data found in localStorage for user ID');
+        return null;
+      }
+      
+      const user = JSON.parse(userData);
+      console.log('📋 User data for user ID extraction:', user);
+      
+      // Try different possible property names for user ID
+      const userId = user.user_id || user.id || user.userId;
+      console.log('👤 Extracted user ID:', userId);
+      
+      return userId;
+    } catch (error) {
+      console.error('❌ Error parsing user data for user ID:', error);
+      return null;
+    }
   };
 
   const createSubscriptionMutation = useMutation({
@@ -48,8 +80,19 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
       const schoolId = getSchoolId();
       const currentUserId = getCurrentUserId();
       
-      if (!schoolId || !currentUserId) {
-        throw new Error('School ID or User ID not found');
+      console.log('🔍 Debug info:');
+      console.log('  - School ID:', schoolId);
+      console.log('  - User ID:', currentUserId);
+      console.log('  - Student ID:', studentId);
+      
+      if (!schoolId) {
+        console.error('❌ School ID not found in user data');
+        throw new Error('School ID not found. Please log in again.');
+      }
+      
+      if (!currentUserId) {
+        console.error('❌ User ID not found in user data');
+        throw new Error('User ID not found. Please log in again.');
       }
 
       console.log('🎯 Creating subscription with data:', formData);
