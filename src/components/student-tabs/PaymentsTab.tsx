@@ -1,5 +1,3 @@
-
-
 import React, { useState } from "react";
 import {
   Form,
@@ -263,6 +261,50 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     account.currency_code === form.watch("currency")
   );
 
+  // Helper function to safely format dates
+  const safeFormatDate = (dateValue: string | Date | null | undefined, formatStr: string = "MMM do"): string => {
+    if (!dateValue) return "Not set";
+    
+    try {
+      const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date value:", dateValue);
+        return "Invalid date";
+      }
+      
+      return format(date, formatStr);
+    } catch (error) {
+      console.error("Error formatting date:", error, "Value:", dateValue);
+      return "Invalid date";
+    }
+  };
+
+  // Helper function to calculate end date safely
+  const calculateEndDate = (startDate: string | Date | null | undefined, durationMonths: number): string => {
+    if (!startDate || !durationMonths) return "Not calculated";
+    
+    try {
+      const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+      
+      // Check if the start date is valid
+      if (isNaN(start.getTime())) {
+        console.warn("Invalid start date for calculation:", startDate);
+        return "Invalid start date";
+      }
+      
+      // Calculate end date by adding months
+      const endDate = new Date(start);
+      endDate.setMonth(endDate.getMonth() + durationMonths);
+      
+      return format(endDate, "MMM do");
+    } catch (error) {
+      console.error("Error calculating end date:", error);
+      return "Calculation error";
+    }
+  };
+
   // Helper function to get subscription info for a payment
   const getSubscriptionInfo = (subscriptionId: string | null) => {
     if (!subscriptionId) return null;
@@ -270,10 +312,10 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     const subscription = subscriptions.find(sub => sub.id === subscriptionId);
     if (!subscription) return null;
 
-    const startDate = format(new Date(subscription.start_date), "MMM do");
+    const startDate = safeFormatDate(subscription.start_date);
     const endDate = subscription.end_date 
-      ? format(new Date(subscription.end_date), "MMM do") 
-      : format(new Date(subscription.start_date + subscription.duration_months * 30 * 24 * 60 * 60 * 1000), "MMM do");
+      ? safeFormatDate(subscription.end_date)
+      : calculateEndDate(subscription.start_date, subscription.duration_months);
     
     return {
       title: `${subscription.session_count} Sessions`,
@@ -334,7 +376,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                       </span>
                     </div>
                     <p className="text-sm my-1">
-                      Paid on {format(new Date(payment.payment_date), "PPP")}
+                      Paid on {safeFormatDate(payment.payment_date, "PPP")}
                     </p>
                     
                     {/* Linked Subscription Information */}
