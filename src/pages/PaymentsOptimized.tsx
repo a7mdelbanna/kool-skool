@@ -165,7 +165,11 @@ const PaymentsOptimized = () => {
       }
       
       console.timeEnd('school-transactions-query');
-      return data || [];
+      // Type assertion to ensure compatibility
+      return (data || []).map((transaction: any) => ({
+        ...transaction,
+        type: transaction.type as 'income' | 'expense' | 'transfer'
+      }));
     },
     enabled: !!schoolId,
     staleTime: 30000, // 30 seconds
@@ -282,12 +286,6 @@ const PaymentsOptimized = () => {
       toast.error('Failed to delete payment: ' + error.message);
     },
   });
-
-  const handleAddPayment = () => {
-    setSelectedPayment(undefined);
-    setDialogMode('add');
-    setPaymentDialogOpen(true);
-  };
 
   const handleAddTransaction = () => {
     setAddTransactionDialogOpen(true);
@@ -432,13 +430,9 @@ const PaymentsOptimized = () => {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" onClick={handleAddTransaction} disabled={isLoading}>
+          <Button onClick={handleAddTransaction} disabled={isLoading}>
             <Plus className="h-4 w-4 mr-2" />
             Add Transaction
-          </Button>
-          <Button onClick={handleAddPayment} disabled={isLoading}>
-            <Plus className="h-4 w-4 mr-2" />
-            Record New
           </Button>
         </div>
       </div>
