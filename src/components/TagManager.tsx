@@ -36,42 +36,70 @@ const TagManager: React.FC<TagManagerProps> = ({
   const [newTagColor, setNewTagColor] = useState('#3B82F6');
   const queryClient = useQueryClient();
 
+  console.log('🏷️ TagManager rendered');
+
   // Fetch user info
-  const { data: userInfo } = useQuery({
+  const { data: userInfo, isLoading: userInfoLoading, error: userInfoError } = useQuery({
     queryKey: ['current-user-info'],
     queryFn: getCurrentUserInfo,
   });
 
+  console.log('👤 TagManager - User info:', userInfo, 'Loading:', userInfoLoading, 'Error:', userInfoError);
+
   // Fetch tags for the school
-  const { data: tags = [], isLoading } = useQuery({
+  const { data: tags = [], isLoading, error: tagsError } = useQuery({
     queryKey: ['school-tags', userInfo?.[0]?.user_school_id],
     queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
+      if (!userInfo?.[0]?.user_school_id) {
+        console.log('⚠️ TagManager - No school ID available');
+        return [];
+      }
+      
+      console.log('🔍 TagManager - Fetching school tags for school ID:', userInfo[0].user_school_id);
       
       const { data, error } = await supabase.rpc('get_school_tags', {
         p_school_id: userInfo[0].user_school_id
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ TagManager - Error fetching school tags:', error);
+        throw error;
+      }
+      
+      console.log('🏷️ TagManager - Fetched tags:', data);
       return data as TransactionTag[];
     },
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
+  console.log('🏷️ TagManager - Tags state:', tags, 'Loading:', isLoading, 'Error:', tagsError);
+
   // Create tag mutation
   const createTagMutation = useMutation({
     mutationFn: async (tagData: { name: string; color: string }) => {
+      console.log('➕ TagManager - Creating tag with data:', tagData);
+      console.log('🏫 TagManager - Using school ID:', userInfo?.[0]?.user_school_id);
+      
+      if (!userInfo?.[0]?.user_school_id) {
+        throw new Error('No school ID available');
+      }
+
       const { data, error } = await supabase
         .from('transaction_tags')
         .insert({
           name: tagData.name,
           color: tagData.color,
-          school_id: userInfo?.[0]?.user_school_id
+          school_id: userInfo[0].user_school_id
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ TagManager - Error creating tag:', error);
+        throw error;
+      }
+      
+      console.log('✅ TagManager - Tag created successfully:', data);
       return data;
     },
     onSuccess: () => {
@@ -82,6 +110,7 @@ const TagManager: React.FC<TagManagerProps> = ({
       setIsCreateDialogOpen(false);
     },
     onError: (error: any) => {
+      console.error('❌ TagManager - Failed to create tag:', error);
       toast.error('Failed to create tag: ' + error.message);
     },
   });
@@ -89,18 +118,26 @@ const TagManager: React.FC<TagManagerProps> = ({
   // Delete tag mutation
   const deleteTagMutation = useMutation({
     mutationFn: async (tagId: string) => {
+      console.log('🗑️ TagManager - Deleting tag:', tagId);
+      
       const { error } = await supabase
         .from('transaction_tags')
         .delete()
         .eq('id', tagId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ TagManager - Error deleting tag:', error);
+        throw error;
+      }
+      
+      console.log('✅ TagManager - Tag deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-tags'] });
       toast.success('Tag deleted successfully');
     },
     onError: (error: any) => {
+      console.error('❌ TagManager - Failed to delete tag:', error);
       toast.error('Failed to delete tag: ' + error.message);
     },
   });
@@ -111,6 +148,12 @@ const TagManager: React.FC<TagManagerProps> = ({
       return;
     }
 
+    if (!userInfo?.[0]?.user_school_id) {
+      toast.error('No school ID found. Please refresh the page and try again.');
+      return;
+    }
+
+    console.log('🎯 TagManager - Handle create tag called');
     createTagMutation.mutate({
       name: newTagName.trim(),
       color: newTagColor
@@ -123,8 +166,33 @@ const TagManager: React.FC<TagManagerProps> = ({
     }
   };
 
+  // Show loading state while user info is being fetched
+  if (userInfoLoading) {
+    console.log('⏳ TagManager - Loading user info...');
+    return <div className="text-center py-4">Loading user info...</div>;
+  }
+
+  // Show error state if user info failed to load
+  if (userInfoError) {
+    console.error('❌ TagManager - User info error:', userInfoError);
+    return <div className="text-center py-4 text-red-500">Error loading user information</div>;
+  }
+
+  // Show message if no school ID
+  if (!userInfo?.[0]?.user_school_id) {
+    console.warn('⚠️ TagManager - No school ID found');
+    return <div className="text-center py-4 text-amber-500">No school ID found</div>;
+  }
+
   if (isLoading) {
+    console.log('⏳ TagManager - Loading tags...');
     return <div className="text-center py-4">Loading tags...</div>;
+  }
+
+  // Show error state if tags failed to load
+  if (tagsError) {
+    console.error('❌ TagManager - Tags error:', tagsError);
+    return <div className="text-center py-4 text-red-500">Error loading tags</div>;
   }
 
   return (
