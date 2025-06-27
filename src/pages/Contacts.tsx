@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useContext } from 'react';
-import { Plus, Search, Filter, MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, Eye, Edit, Trash2, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase, getSchoolContactTypes } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import ContactDialog from '@/components/ContactDialog';
+import ContactTypeManager from '@/components/ContactTypeManager';
 
 interface Contact {
   id: string;
@@ -73,6 +74,7 @@ const Contacts = () => {
     mode: 'add' | 'edit';
     contact?: Contact;
   }>({ open: false, mode: 'add' });
+  const [contactTypeManager, setContactTypeManager] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     contact?: Contact;
@@ -220,10 +222,20 @@ const Contacts = () => {
             Manage your business contacts, vendors, and clients
           </p>
         </div>
-        <Button onClick={handleAddContact} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Contact
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setContactTypeManager(true)} 
+            className="gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Manage Types
+          </Button>
+          <Button onClick={handleAddContact} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Contact
+          </Button>
+        </div>
       </div>
 
       {/* Dynamic Stats Cards */}
@@ -408,6 +420,13 @@ const Contacts = () => {
         onOpenChange={(open) => setContactDialog(prev => ({ ...prev, open }))}
         contact={contactDialog.contact}
         mode={contactDialog.mode}
+        onSuccess={handleRefresh}
+      />
+
+      {/* Contact Type Manager */}
+      <ContactTypeManager
+        open={contactTypeManager}
+        onOpenChange={setContactTypeManager}
         onSuccess={handleRefresh}
       />
 
