@@ -76,11 +76,7 @@ const Courses = () => {
     try {
       console.log('Creating course:', { name: newCourseName, type: newCourseType });
       
-      await createCourse({
-        school_id: user.schoolId,
-        name: newCourseName.trim(),
-        lesson_type: newCourseType
-      });
+      await createCourse(newCourseName.trim(), newCourseType);
 
       toast({
         title: "Success",
@@ -114,10 +110,7 @@ const Courses = () => {
     try {
       console.log('Updating course:', { id: courseId, name: editCourseName, type: editCourseType });
       
-      await updateCourse(courseId, {
-        name: editCourseName.trim(),
-        lesson_type: editCourseType
-      });
+      await updateCourse(courseId, editCourseName.trim(), editCourseType);
 
       toast({
         title: "Success",
