@@ -7,8 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
-import { getCurrentUserInfo } from '@/integrations/supabase/client';
 
 interface Category {
   id: string;
@@ -32,12 +30,6 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
   const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense');
   const [color, setColor] = useState('#EF4444');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Fetch user info
-  const { data: userInfo } = useQuery({
-    queryKey: ['current-user-info'],
-    queryFn: getCurrentUserInfo,
-  });
 
   const colors = [
     '#EF4444', '#F97316', '#F59E0B', '#EAB308', 
@@ -71,8 +63,18 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
       return;
     }
 
-    if (!userInfo?.[0]?.user_school_id) {
-      toast.error('No school ID found');
+    // Get school ID from localStorage
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    const user = JSON.parse(userData);
+    const schoolId = user.schoolId;
+
+    if (!schoolId) {
+      toast.error('No school ID found. Please log in again.');
       return;
     }
 
@@ -81,7 +83,7 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
     try {
       if (mode === 'add') {
         console.log('Creating category:', {
-          school_id: userInfo[0].user_school_id,
+          school_id: schoolId,
           name: name.trim(),
           type,
           color,
@@ -89,7 +91,7 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
         });
 
         const { data, error } = await supabase.rpc('create_category', {
-          p_school_id: userInfo[0].user_school_id,
+          p_school_id: schoolId,
           p_name: name.trim(),
           p_type: type,
           p_color: color,

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { getCurrentUserInfo } from '@/integrations/supabase/client';
 import CategoryDialog from '@/components/CategoryDialog';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -31,70 +30,75 @@ const TransactionCategoriesManagement = () => {
 
   const queryClient = useQueryClient();
 
-  // Fetch user info
-  const { data: userInfo } = useQuery({
-    queryKey: ['current-user-info'],
-    queryFn: getCurrentUserInfo,
-  });
+  // Get school ID from localStorage
+  const getSchoolId = () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    const user = JSON.parse(userData);
+    return user.schoolId;
+  };
 
-  // Fetch categories with better error handling and logging
+  const schoolId = getSchoolId();
+
+  // Fetch categories directly from the database
   const { data: categories = [], isLoading, error } = useQuery({
-    queryKey: ['school-categories', userInfo?.[0]?.user_school_id],
+    queryKey: ['school-categories', schoolId],
     queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) {
+      if (!schoolId) {
         console.log('No school ID found for categories');
         return [];
       }
       
-      console.log('Fetching categories for school:', userInfo[0].user_school_id);
+      console.log('Fetching categories for school:', schoolId);
       
       try {
+        // Try using the RPC function first
         const { data, error } = await supabase.rpc('get_school_categories', {
-          p_school_id: userInfo[0].user_school_id
+          p_school_id: schoolId
         });
         
         if (error) {
-          console.error('Error fetching categories:', error);
-          throw error;
+          console.error('RPC error, trying direct query:', error);
+          // Fallback: direct query
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('transaction_categories')
+            .select('*')
+            .eq('school_id', schoolId)
+            .eq('is_active', true)
+            .order('name');
+          
+          if (fallbackError) {
+            console.error('Direct query also failed:', fallbackError);
+            throw fallbackError;
+          }
+          
+          console.log('Direct query categories:', fallbackData);
+          
+          // Transform fallback data to match expected format
+          return (fallbackData || []).map((cat: any) => ({
+            ...cat,
+            full_path: cat.name,
+            level: cat.parent_id ? 1 : 0
+          }));
         }
         
-        console.log('Categories fetched:', data);
+        console.log('RPC categories fetched:', data);
         return data as Category[];
       } catch (err) {
         console.error('Failed to fetch categories:', err);
-        // Fallback: try to fetch directly from transaction_categories table
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('transaction_categories')
-          .select('*')
-          .eq('school_id', userInfo[0].user_school_id)
-          .eq('is_active', true)
-          .order('name');
-        
-        if (fallbackError) {
-          console.error('Fallback query also failed:', fallbackError);
-          throw fallbackError;
-        }
-        
-        console.log('Fallback categories fetched:', fallbackData);
-        
-        // Transform fallback data to match expected format
-        return (fallbackData || []).map((cat: any) => ({
-          ...cat,
-          full_path: cat.name,
-          level: cat.parent_id ? 1 : 0
-        }));
+        throw err;
       }
     },
-    enabled: !!userInfo?.[0]?.user_school_id,
+    enabled: !!schoolId,
   });
 
   // Create default categories mutation
   const createDefaultCategories = useMutation({
     mutationFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) throw new Error('No school ID');
+      if (!schoolId) throw new Error('No school ID');
       
       const { error } = await supabase.rpc('create_default_categories', {
-        p_school_id: userInfo[0].user_school_id
+        p_school_id: schoolId
       });
       
       if (error) throw error;
@@ -255,6 +259,18 @@ const TransactionCategoriesManagement = () => {
       </div>
     );
   };
+
+  if (!schoolId) {
+    return (
+      <Card className="glass glass-hover">
+        <CardContent className="p-6">
+          <div className="text-center text-red-600">
+            <p>No school ID found. Please log in again.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (
