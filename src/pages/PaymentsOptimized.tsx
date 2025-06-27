@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,6 +29,7 @@ import PaymentDialog from '@/components/PaymentDialog';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
 import TagManager from '@/components/TagManager';
+import AccountsBalanceSection from '@/components/AccountsBalanceSection';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -341,12 +341,14 @@ const PaymentsOptimized = () => {
   const handleTransactionSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['student-payments', schoolId] });
+    queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
     toast.success('Transaction created successfully');
   };
 
   const handlePaymentSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['student-payments', schoolId] });
+    queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
   };
 
   // Loading skeleton component
@@ -441,6 +443,11 @@ const PaymentsOptimized = () => {
         <LoadingSkeleton />
       ) : (
         <>
+          {/* Account Balances Section */}
+          <div className="mb-6">
+            <AccountsBalanceSection schoolId={schoolId!} />
+          </div>
+
           {/* Statistics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
