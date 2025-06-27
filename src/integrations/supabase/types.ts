@@ -9,6 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          account_number: string | null
+          color: string
+          created_at: string
+          currency_id: string
+          exclude_from_stats: boolean
+          id: string
+          is_archived: boolean
+          name: string
+          school_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          account_number?: string | null
+          color?: string
+          created_at?: string
+          currency_id: string
+          exclude_from_stats?: boolean
+          id?: string
+          is_archived?: boolean
+          name: string
+          school_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          account_number?: string | null
+          color?: string
+          created_at?: string
+          currency_id?: string
+          exclude_from_stats?: boolean
+          id?: string
+          is_archived?: boolean
+          name?: string
+          school_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_currency_id_fkey"
+            columns: ["currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_tags: {
         Row: {
           contact_id: string
@@ -162,6 +219,7 @@ export type Database = {
       }
       expenses: {
         Row: {
+          account_id: string | null
           amount: number
           category: string
           contact_id: string | null
@@ -177,6 +235,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_id?: string | null
           amount: number
           category: string
           contact_id?: string | null
@@ -192,6 +251,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_id?: string | null
           amount?: number
           category?: string
           contact_id?: string | null
@@ -207,6 +267,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_contact_id_fkey"
             columns: ["contact_id"]
@@ -395,6 +462,7 @@ export type Database = {
       }
       student_payments: {
         Row: {
+          account_id: string | null
           amount: number
           contact_id: string | null
           created_at: string
@@ -408,6 +476,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_id?: string | null
           amount: number
           contact_id?: string | null
           created_at?: string
@@ -421,6 +490,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_id?: string | null
           amount?: number
           contact_id?: string | null
           created_at?: string
@@ -434,6 +504,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "student_payments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "student_payments_contact_id_fkey"
             columns: ["contact_id"]
@@ -627,11 +704,13 @@ export type Database = {
           currency: string
           description: string
           from_account: string
+          from_account_id: string | null
           id: string
           notes: string | null
           school_id: string
           status: string
           to_account: string
+          to_account_id: string | null
           transfer_date: string
           updated_at: string
         }
@@ -642,11 +721,13 @@ export type Database = {
           currency?: string
           description: string
           from_account: string
+          from_account_id?: string | null
           id?: string
           notes?: string | null
           school_id: string
           status?: string
           to_account: string
+          to_account_id?: string | null
           transfer_date: string
           updated_at?: string
         }
@@ -657,11 +738,13 @@ export type Database = {
           currency?: string
           description?: string
           from_account?: string
+          from_account_id?: string | null
           id?: string
           notes?: string | null
           school_id?: string
           status?: string
           to_account?: string
+          to_account_id?: string | null
           transfer_date?: string
           updated_at?: string
         }
@@ -671,6 +754,20 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfers_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfers_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -910,6 +1007,23 @@ export type Database = {
       get_role_constraint_values: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_school_accounts: {
+        Args: { p_school_id: string }
+        Returns: {
+          id: string
+          name: string
+          type: string
+          account_number: string
+          color: string
+          exclude_from_stats: boolean
+          is_archived: boolean
+          created_at: string
+          currency_id: string
+          currency_name: string
+          currency_symbol: string
+          currency_code: string
+        }[]
       }
       get_school_contacts: {
         Args: { p_school_id: string }

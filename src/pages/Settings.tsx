@@ -10,7 +10,8 @@ import {
   Bell, 
   Shield, 
   HelpCircle, 
-  Save 
+  Save,
+  Wallet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import CurrencyManagement from '@/components/CurrencyManagement';
+import AccountsManagement from '@/components/AccountsManagement';
 
 const Settings = () => {
   return (
@@ -33,7 +35,7 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-5 mb-6">
+        <TabsList className="grid grid-cols-6 mb-6">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
@@ -41,6 +43,10 @@ const Settings = () => {
           <TabsTrigger value="business" className="gap-2">
             <Briefcase className="h-4 w-4" />
             <span className="hidden sm:inline">Business</span>
+          </TabsTrigger>
+          <TabsTrigger value="accounts" className="gap-2">
+            <Wallet className="h-4 w-4" />
+            <span className="hidden sm:inline">Accounts</span>
           </TabsTrigger>
           <TabsTrigger value="currencies" className="gap-2">
             <DollarSign className="h-4 w-4" />
@@ -195,6 +201,10 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="accounts" className="mt-0 space-y-6">
+          <AccountsManagement />
         </TabsContent>
 
         <TabsContent value="currencies" className="mt-0 space-y-6">
