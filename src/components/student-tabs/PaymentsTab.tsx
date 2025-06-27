@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Form,
@@ -27,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getStudentPayments, deleteStudentPayment, supabase } from "@/integrations/supabase/client";
+import { getSchoolTransactions, supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface PaymentsTabProps {
@@ -113,11 +114,36 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     enabled: !!studentData.id,
   });
 
-  const { data: payments = [], isLoading: paymentsLoading, error: paymentsError } = useQuery({
-    queryKey: ['student-payments', studentData.id],
-    queryFn: () => getStudentPayments(studentData.id as string),
-    enabled: !!studentData.id,
+  // Updated to fetch from transactions instead of student_payments
+  const { data: allTransactions = [], isLoading: paymentsLoading, error: paymentsError } = useQuery({
+    queryKey: ['school-transactions', schoolId],
+    queryFn: () => getSchoolTransactions(schoolId),
+    enabled: !!schoolId,
   });
+
+  // Filter transactions to show only payments for this student
+  const payments = React.useMemo(() => {
+    if (!studentData.firstName || !studentData.lastName || !allTransactions.length) {
+      return [];
+    }
+    
+    const studentName = `${studentData.firstName} ${studentData.lastName}`;
+    
+    return allTransactions.filter(transaction => 
+      transaction.type === 'income' && 
+      transaction.contact_name === studentName &&
+      transaction.contact_type === 'student'
+    ).map(transaction => ({
+      id: transaction.id,
+      amount: transaction.amount,
+      currency: transaction.currency,
+      payment_date: transaction.transaction_date,
+      payment_method: transaction.payment_method || 'Unknown',
+      status: transaction.status,
+      notes: transaction.notes || '',
+      created_at: transaction.created_at,
+    }));
+  }, [allTransactions, studentData.firstName, studentData.lastName]);
 
   React.useEffect(() => {
     if (paymentsError) {
@@ -168,7 +194,6 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       return transactionData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-payments', studentData.id] });
       queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
       queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
       toast.success("Payment added successfully");
@@ -190,9 +215,15 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   });
 
   const deletePaymentMutation = useMutation({
-    mutationFn: deleteStudentPayment,
+    mutationFn: async (paymentId: string) => {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', paymentId);
+
+      if (error) throw error;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-payments', studentData.id] });
       queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
       queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
       toast.success("Payment deleted successfully");
