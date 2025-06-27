@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import CurrencyManagement from '@/components/CurrencyManagement';
 
 const Settings = () => {
   return (
@@ -32,7 +33,7 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-4 mb-6">
+        <TabsList className="grid grid-cols-5 mb-6">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
@@ -40,6 +41,10 @@ const Settings = () => {
           <TabsTrigger value="business" className="gap-2">
             <Briefcase className="h-4 w-4" />
             <span className="hidden sm:inline">Business</span>
+          </TabsTrigger>
+          <TabsTrigger value="currencies" className="gap-2">
+            <DollarSign className="h-4 w-4" />
+            <span className="hidden sm:inline">Currencies</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
@@ -190,6 +195,10 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="currencies" className="mt-0 space-y-6">
+          <CurrencyManagement />
         </TabsContent>
         
         <TabsContent value="notifications" className="mt-0 space-y-6">
