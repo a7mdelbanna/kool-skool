@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -99,7 +98,7 @@ const PaymentsPage = () => {
       if (paymentsError) throw paymentsError;
 
       // Combine payment data with student names
-      return paymentsData?.map(payment => {
+      const combinedPayments = paymentsData?.map(payment => {
         const student = students?.find(s => s.id === payment.student_id);
         return {
           ...payment,
@@ -108,6 +107,9 @@ const PaymentsPage = () => {
             'Unknown Student'
         };
       }) || [];
+
+      console.log('📊 Student payments fetched:', combinedPayments.length, combinedPayments);
+      return combinedPayments;
     },
     enabled: !!schoolId,
   });
@@ -124,7 +126,12 @@ const PaymentsPage = () => {
       const { data, error } = await supabase
         .rpc('get_school_transactions', { p_school_id: schoolId });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching transactions:', error);
+        throw error;
+      }
+      
+      console.log('📊 School transactions fetched:', data?.length || 0, data);
       return data || [];
     },
     enabled: !!schoolId,
@@ -177,6 +184,12 @@ const PaymentsPage = () => {
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+  // Add debug logging
+  console.log('🔍 Debug - Payments count:', payments.length);
+  console.log('🔍 Debug - Transactions count:', transactions.length);
+  console.log('🔍 Debug - All transactions combined:', allTransactions.length);
+  console.log('🔍 Debug - All transactions data:', allTransactions);
+
   // Filter transactions based on search term
   const filteredTransactions = allTransactions.filter(transaction =>
     transaction.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -184,6 +197,8 @@ const PaymentsPage = () => {
     transaction.method?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     transaction.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  console.log('🔍 Debug - Filtered transactions:', filteredTransactions.length);
 
   // Delete payment mutation
   const deletePaymentMutation = useMutation({
@@ -267,6 +282,7 @@ const PaymentsPage = () => {
     // Invalidate both queries to refresh the data
     queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['all-student-payments', schoolId] });
+    console.log('🔄 Invalidating queries after transaction success');
     toast.success('Transaction created successfully');
   };
 
@@ -274,6 +290,7 @@ const PaymentsPage = () => {
     // Invalidate both queries to refresh the data
     queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
     queryClient.invalidateQueries({ queryKey: ['all-student-payments', schoolId] });
+    console.log('🔄 Invalidating queries after payment success');
   };
 
   if (!schoolId) {
