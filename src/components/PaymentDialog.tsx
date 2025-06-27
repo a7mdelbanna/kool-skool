@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, CheckCircle, Clock, AlertCircle } from 'lucide-react';
@@ -29,8 +30,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Payment, usePayments } from '@/contexts/PaymentContext';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
-import { getCurrentUserInfo, getSchoolContacts } from '@/lib/api';
 
 interface PaymentDialogProps {
   open: boolean;
@@ -50,22 +49,6 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
   const [status, setStatus] = useState<"completed" | "pending" | "failed">('completed');
   const [accountId, setAccountId] = useState<string>('');
   const [studentName, setStudentName] = useState<string>('');
-  const [contactId, setContactId] = useState<string>('');
-
-  // Fetch user info and contacts
-  const { data: userInfo } = useQuery({
-    queryKey: ['current-user-info'],
-    queryFn: getCurrentUserInfo,
-  });
-
-  const { data: contacts } = useQuery({
-    queryKey: ['school-contacts', userInfo?.[0]?.user_school_id],
-    queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
-      return await getSchoolContacts(userInfo[0].user_school_id);
-    },
-    enabled: !!userInfo?.[0]?.user_school_id,
-  });
 
   // Initialize form when payment changes or dialog opens
   useEffect(() => {
@@ -77,7 +60,6 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
       setStatus(payment.status);
       setAccountId(payment.accountId || '');
       setStudentName(payment.studentName || '');
-      setContactId(payment.contactId || '');
     } else {
       // Default values for add mode
       setAmount(0);
@@ -87,7 +69,6 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
       setStatus('completed');
       setAccountId('');
       setStudentName('');
-      setContactId('');
     }
   }, [payment, mode, open]);
 
@@ -109,7 +90,6 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
       status,
       accountId,
       studentName,
-      contactId,
     };
 
     if (mode === 'add') {
@@ -254,29 +234,6 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
                     {accounts.map(account => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.name} ({account.currency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-          
-          {contacts && contacts.length > 0 && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contact" className="text-right">
-                Contact
-              </Label>
-              <div className="col-span-3">
-                <Select value={contactId} onValueChange={setContactId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select contact (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No contact</SelectItem>
-                    {contacts.map(contact => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.name} ({contact.type})
                       </SelectItem>
                     ))}
                   </SelectContent>
