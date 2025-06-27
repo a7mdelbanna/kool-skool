@@ -82,7 +82,7 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
 
     try {
       if (mode === 'add') {
-        console.log('Creating category:', {
+        console.log('Creating category with direct insert:', {
           school_id: schoolId,
           name: name.trim(),
           type,
@@ -90,13 +90,19 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
           parent_id: parentCategory?.id || null
         });
 
-        const { data, error } = await supabase.rpc('create_category', {
-          p_school_id: schoolId,
-          p_name: name.trim(),
-          p_type: type,
-          p_color: color,
-          p_parent_id: parentCategory?.id || null
-        });
+        // Use direct insert instead of RPC function
+        const { data, error } = await supabase
+          .from('transaction_categories')
+          .insert({
+            school_id: schoolId,
+            name: name.trim(),
+            type,
+            color,
+            parent_id: parentCategory?.id || null,
+            is_active: true
+          })
+          .select()
+          .single();
 
         if (error) {
           console.error('Error creating category:', error);
@@ -106,19 +112,23 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
         console.log('Category created successfully:', data);
         toast.success('Category created successfully');
       } else {
-        console.log('Updating category:', {
+        console.log('Updating category with direct update:', {
           id: category?.id,
           name: name.trim(),
           type,
           color
         });
 
-        const { error } = await supabase.rpc('update_category', {
-          p_category_id: category?.id,
-          p_name: name.trim(),
-          p_type: type,
-          p_color: color
-        });
+        // Use direct update instead of RPC function
+        const { error } = await supabase
+          .from('transaction_categories')
+          .update({
+            name: name.trim(),
+            type,
+            color,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', category?.id);
 
         if (error) {
           console.error('Error updating category:', error);
