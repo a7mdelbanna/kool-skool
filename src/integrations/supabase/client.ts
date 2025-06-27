@@ -317,6 +317,30 @@ export const getSchoolTeachers = async (schoolId: string) => {
   }
 
   try {
+    // First, let's check what users exist for this school regardless of role
+    console.log('=== DEBUGGING: Checking all users for this school ===');
+    const { data: allSchoolUsers, error: allUsersError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('school_id', schoolId);
+    
+    console.log('All users for school_id', schoolId, ':', allSchoolUsers);
+    console.log('All users error:', allUsersError);
+    console.log('All users count:', allSchoolUsers?.length || 0);
+    
+    if (allSchoolUsers && allSchoolUsers.length > 0) {
+      console.log('Users found with roles:', allSchoolUsers.map(u => ({ 
+        id: u.id, 
+        email: u.email, 
+        role: u.role, 
+        first_name: u.first_name, 
+        last_name: u.last_name,
+        school_id: u.school_id 
+      })));
+    }
+    
+    // Now let's check for teachers specifically
+    console.log('=== DEBUGGING: Checking teachers specifically ===');
     console.log('Querying users table for teachers with school_id:', schoolId);
     console.log('Query: SELECT * FROM users WHERE school_id =', schoolId, 'AND role = teacher');
     
@@ -371,20 +395,25 @@ export const getSchoolTeachers = async (schoolId: string) => {
       return teachersWithDisplayName;
     } else {
       console.warn('No teachers found for school:', schoolId);
-      console.log('Checking if there are ANY users for this school...');
       
-      // Additional debugging: check if there are any users for this school
-      const { data: allUsers, error: allUsersError } = await supabase
+      // Let's also check if there are any users with role 'teacher' in the entire database
+      console.log('=== DEBUGGING: Checking if ANY teachers exist in database ===');
+      const { data: allTeachers, error: allTeachersError } = await supabase
         .from('users')
         .select('*')
-        .eq('school_id', schoolId);
+        .eq('role', 'teacher');
       
-      console.log('All users for school:', allUsers);
-      console.log('All users error:', allUsersError);
-      console.log('All users count:', allUsers?.length || 0);
+      console.log('All teachers in database:', allTeachers);
+      console.log('All teachers error:', allTeachersError);
+      console.log('Total teachers in database:', allTeachers?.length || 0);
       
-      if (allUsers && allUsers.length > 0) {
-        console.log('Users found but no teachers. User roles:', allUsers.map(u => ({ id: u.id, role: u.role, email: u.email })));
+      if (allTeachers && allTeachers.length > 0) {
+        console.log('Teachers exist in database but not for this school:', allTeachers.map(t => ({ 
+          id: t.id, 
+          email: t.email, 
+          school_id: t.school_id,
+          role: t.role 
+        })));
       }
       
       return [];
