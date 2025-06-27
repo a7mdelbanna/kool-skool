@@ -37,9 +37,10 @@ interface PaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   payment?: any;
   mode: 'add' | 'edit';
+  onSuccess?: () => void;
 }
 
-const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps) => {
+const PaymentDialog = ({ open, onOpenChange, payment, mode, onSuccess }: PaymentDialogProps) => {
   const queryClient = useQueryClient();
 
   const [amount, setAmount] = useState<number>(0);
@@ -100,6 +101,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
       queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
       toast.success('Payment created successfully');
       onOpenChange(false);
+      onSuccess?.(); // Call the onSuccess callback if provided
     },
     onError: (error: any) => {
       toast.error('Failed to create payment: ' + error.message);
@@ -126,6 +128,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode }: PaymentDialogProps
       queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
       toast.success('Payment updated successfully');
       onOpenChange(false);
+      onSuccess?.(); // Call the onSuccess callback if provided
     },
     onError: (error: any) => {
       toast.error('Failed to update payment: ' + error.message);
