@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt } from "lucide-react";
+import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt, Wallet } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,9 +28,11 @@ import {
   getStudentSubscriptions, 
   addStudentSubscription, 
   deleteStudentSubscription,
-  Subscription
+  Subscription,
+  supabase
 } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -221,13 +223,38 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     // New payment fields
     initialPaymentAmount: 0,
     paymentMethod: 'Cash',
-    paymentNotes: ''
+    paymentNotes: '',
+    accountId: '' // Add account selection
   });
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [subscriptionToDelete, setSubscriptionToDelete] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingSubscriptionId, setDeletingSubscriptionId] = useState<string | null>(null);
+
+  // Get school ID from localStorage
+  const getSchoolId = () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    const user = JSON.parse(userData);
+    return user.schoolId;
+  };
+
+  const schoolId = getSchoolId();
+
+  // Fetch school accounts
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
+    queryKey: ['school-accounts', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_accounts', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
 
   // Enhanced currency options with proper symbols and codes
   const currencies = [
@@ -368,6 +395,16 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       : formData.fixedPrice;
   };
 
+  const getCurrencySymbol = (currencyCode: string) => {
+    const currency = currencies.find(c => c.value === currencyCode);
+    return currency?.symbol || currencyCode;
+  };
+
+  // Filter accounts by selected currency
+  const compatibleAccounts = accounts.filter(account => 
+    account.currency_code === formData.currency
+  );
+
   const handleSubmit = preventRapidCalls(async () => {
     if (!studentData.id) {
       toast({
@@ -419,6 +456,16 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       return;
     }
 
+    // Validate account selection if payment amount > 0
+    if (formData.initialPaymentAmount > 0 && !formData.accountId) {
+      toast({
+        title: "Error",
+        description: "Please select an account for the initial payment",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate lesson duration
     if (formData.lessonDurationMinutes <= 0) {
       toast({
@@ -430,40 +477,31 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     }
 
     try {
-      setSubmitting(true);
-      console.log('🚀 SUBMITTING ENHANCED SUBSCRIPTION WITH LESSON DURATION');
+      console.log('🚀 Creating subscription with initial payment');
       
-      const subscriptionData = {
-        student_id: studentData.id,
-        session_count: formData.sessionCount,
-        duration_months: formData.durationMonths,
-        start_date: format(formData.startDate, 'yyyy-MM-dd'),
+      const subscriptionFormData = {
+        sessionCount: formData.sessionCount,
+        durationMonths: formData.durationMonths,
+        startDate: formData.startDate,
         schedule: formData.schedule,
-        price_mode: formData.priceMode,
-        price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
-        fixed_price: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : null,
-        total_price: totalPrice,
+        priceMode: formData.priceMode as 'perSession' | 'fixedPrice',
+        pricePerSession: formData.priceMode === 'perSession' ? formData.pricePerSession : undefined,
+        fixedPrice: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : undefined,
+        totalPrice: totalPrice,
         currency: formData.currency,
         notes: formData.notes,
         status: 'active',
-        // Initial payment data
-        initial_payment_amount: formData.initialPaymentAmount,
-        payment_method: formData.paymentMethod,
-        payment_notes: formData.paymentNotes,
-        // Lesson duration
-        lesson_duration_minutes: formData.lessonDurationMinutes
+        initialPayment: {
+          amount: formData.initialPaymentAmount,
+          method: formData.paymentMethod,
+          notes: formData.paymentNotes,
+          accountId: formData.accountId
+        }
       };
 
-      console.log('📝 Enhanced subscription data with lesson duration:', subscriptionData);
+      await createSubscription(subscriptionFormData);
       
-      await addStudentSubscription(subscriptionData);
-      
-      toast({
-        title: "Success",
-        description: `Subscription created successfully with ${formData.lessonDurationMinutes}-minute lessons${formData.initialPaymentAmount > 0 ? ` and initial payment of ${getCurrencySymbol(formData.currency)}${formData.initialPaymentAmount}` : ''}`,
-      });
-      
-      // Reset form
+      // Reset form after successful creation
       setFormData({
         sessionCount: 4,
         durationMonths: 1,
@@ -477,21 +515,12 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         notes: '',
         initialPaymentAmount: 0,
         paymentMethod: 'Cash',
-        paymentNotes: ''
+        paymentNotes: '',
+        accountId: ''
       });
-      
-      // Reload subscriptions
-      await loadSubscriptions();
       
     } catch (error) {
-      console.error('❌ Error creating enhanced subscription:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create subscription",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
+      console.error('❌ Error creating subscription:', error);
     }
   });
 
@@ -551,11 +580,6 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     }
   };
 
-  const getCurrencySymbol = (currencyCode: string) => {
-    const currency = currencies.find(c => c.value === currencyCode);
-    return currency?.symbol || currencyCode;
-  };
-
   return (
     <div className="space-y-6">
       {!isViewMode && (
@@ -606,7 +630,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               </div>
               <div>
                 <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
-                <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value, accountId: '' })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
@@ -867,6 +891,49 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                 </div>
               </div>
 
+              {/* Account Selection */}
+              <div>
+                <Label className="text-sm font-semibold text-gray-700">
+                  Deposit Account {formData.initialPaymentAmount > 0 && <span className="text-red-500">*</span>}
+                </Label>
+                <Select 
+                  value={formData.accountId} 
+                  onValueChange={(value) => setFormData({ ...formData, accountId: value })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select account for payment" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accountsLoading ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Loading accounts...
+                      </div>
+                    ) : compatibleAccounts.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        No accounts available for {formData.currency}
+                      </div>
+                    ) : (
+                      compatibleAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center gap-2">
+                            <Wallet className="h-4 w-4" />
+                            <span>{account.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({account.currency_code})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {formData.initialPaymentAmount > 0 && compatibleAccounts.length === 0 && (
+                  <p className="text-sm text-amber-600 mt-1">
+                    Please create an account with {formData.currency} currency first.
+                  </p>
+                )}
+              </div>
+
               <div>
                 <Label htmlFor="paymentNotes" className="text-sm font-semibold text-gray-700">Payment Notes (Optional)</Label>
                 <Textarea 
@@ -906,7 +973,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             <div className="flex justify-end pt-4">
               <Button 
                 onClick={handleSubmit} 
-                disabled={submitting || isCreating || formData.schedule.length === 0 || !formData.startDate}
+                disabled={submitting || isCreating || formData.schedule.length === 0 || !formData.startDate || (formData.initialPaymentAmount > 0 && !formData.accountId)}
                 className="min-w-[160px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 size="lg"
               >
