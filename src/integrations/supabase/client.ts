@@ -307,18 +307,63 @@ export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
 
 // Function to get school teachers
 export const getSchoolTeachers = async (schoolId: string) => {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('school_id', schoolId)
-    .eq('role', 'teacher');
-
-  if (error) {
-    console.error('Error fetching teachers:', error);
-    throw error;
+  console.log('=== getSchoolTeachers FUNCTION START ===');
+  console.log('Input schoolId:', schoolId);
+  
+  if (!schoolId) {
+    console.warn('No schoolId provided to getSchoolTeachers');
+    return [];
   }
 
-  return data || [];
+  try {
+    console.log('Querying users table for teachers with school_id:', schoolId);
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('role', 'teacher');
+
+    if (error) {
+      console.error('Supabase error in getSchoolTeachers:', error);
+      throw error;
+    }
+
+    console.log('Raw Supabase response:', data);
+    console.log('Number of teachers found:', data?.length || 0);
+    
+    if (data && data.length > 0) {
+      console.log('Teachers found:', data);
+      data.forEach((teacher, index) => {
+        console.log(`Teacher ${index + 1}:`, {
+          id: teacher.id,
+          first_name: teacher.first_name,
+          last_name: teacher.last_name,
+          email: teacher.email,
+          role: teacher.role,
+          school_id: teacher.school_id,
+          display_name: `${teacher.first_name} ${teacher.last_name}`
+        });
+      });
+      
+      // Add display_name field for easier rendering
+      const teachersWithDisplayName = data.map(teacher => ({
+        ...teacher,
+        display_name: `${teacher.first_name} ${teacher.last_name}`
+      }));
+      
+      console.log('Teachers with display_name:', teachersWithDisplayName);
+      return teachersWithDisplayName;
+    } else {
+      console.warn('No teachers found for school:', schoolId);
+      return [];
+    }
+  } catch (error) {
+    console.error('Exception in getSchoolTeachers:', error);
+    throw error;
+  } finally {
+    console.log('=== getSchoolTeachers FUNCTION END ===');
+  }
 };
 
 // Function to update a course

@@ -101,34 +101,56 @@ export const useStudentForm = (
   } = useQuery({
     queryKey: ['teachers', schoolId, 'student-form'],
     queryFn: async () => {
+      console.log('=== TEACHERS QUERY START ===');
       console.log('Executing teacher query function with schoolId:', schoolId);
+      
       if (!schoolId) {
         console.warn('No school ID available for fetching teachers');
         return { data: [] };
       }
       
       try {
-        console.log('Fetching teachers using getSchoolTeachers function for student form');
-        const teachersData = await getSchoolTeachers(schoolId);
+        console.log('Calling getSchoolTeachers function with schoolId:', schoolId);
+        const teachersResult = await getSchoolTeachers(schoolId);
         
-        console.log('getSchoolTeachers response for student form:', teachersData);
+        console.log('Raw teachers response:', teachersResult);
+        console.log('Teachers response type:', typeof teachersResult);
+        console.log('Teachers array length:', teachersResult?.length);
         
-        if (teachersData && teachersData.length > 0) {
-          console.log('Successfully fetched teachers for student form:', teachersData);
-          return { data: teachersData };
+        if (teachersResult && Array.isArray(teachersResult) && teachersResult.length > 0) {
+          console.log('Teachers found:', teachersResult.length);
+          teachersResult.forEach((teacher, index) => {
+            console.log(`Teacher ${index + 1}:`, {
+              id: teacher.id,
+              first_name: teacher.first_name,
+              last_name: teacher.last_name,
+              email: teacher.email,
+              role: teacher.role,
+              school_id: teacher.school_id
+            });
+          });
+          
+          return { data: teachersResult };
+        } else {
+          console.warn('No teachers found or invalid response:', teachersResult);
+          return { data: [] };
         }
-        
-        console.log('No teachers found for student form');
-        return { data: [] };
       } catch (error) {
-        console.error('Exception in teachers query for student form:', error);
+        console.error('Exception in teachers query:', error);
+        console.error('Error details:', {
+          message: (error as Error).message,
+          stack: (error as Error).stack
+        });
         toast.error("Failed to load teachers: " + (error as Error).message);
         return { data: [] };
+      } finally {
+        console.log('=== TEACHERS QUERY END ===');
       }
     },
     staleTime: 0,
     enabled: !!schoolId && open,
-    retry: 1,
+    retry: 2,
+    retryDelay: 1000,
   });
   
   useEffect(() => {
@@ -291,13 +313,15 @@ export const useStudentForm = (
     }
   };
 
-  console.log('useStudentForm returning coursesData:', coursesData);
-  console.log('useStudentForm returning teachersData:', teachersData);
+  console.log('=== useStudentForm FINAL DEBUG ===');
+  console.log('Returning coursesData:', coursesData);
+  console.log('Returning teachersData:', teachersData);
   if (coursesData?.data) {
     console.log('Courses count to return:', coursesData.data.length);
   }
   if (teachersData?.data) {
     console.log('Teachers count to return:', teachersData.data.length);
+    console.log('Teachers to return:', teachersData.data);
   }
 
   return {

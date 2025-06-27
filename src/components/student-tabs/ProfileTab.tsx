@@ -41,9 +41,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   teachers = [],
   isLoading = false
 }) => {
+  console.log('=== ProfileTab RENDER DEBUG ===');
   console.log('ProfileTab render - teachers data:', teachers);
+  console.log('ProfileTab render - teachers length:', teachers?.length);
   console.log('ProfileTab render - courses data:', courses);
+  console.log('ProfileTab render - courses length:', courses?.length);
   console.log('ProfileTab render - studentData:', studentData);
+  console.log('ProfileTab render - isLoading:', isLoading);
   
   const handleInputChange = (field: keyof Student, value: string) => {
     setStudentData({ [field]: value });
@@ -254,7 +258,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
                 Loading teachers...
               </div>
-            ) : teachers.length > 0 ? (
+            ) : teachers && Array.isArray(teachers) && teachers.length > 0 ? (
               <Select
                 value={studentData.teacherId || ""}
                 onValueChange={(value) => handleInputChange("teacherId", value)}
@@ -266,7 +270,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                 <SelectContent>
                   {teachers.map((teacher) => (
                     <SelectItem key={teacher.id} value={teacher.id}>
-                      {teacher.display_name}
+                      {teacher.display_name || `${teacher.first_name} ${teacher.last_name}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -277,7 +281,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               </div>
             )}
             <p className="text-sm text-muted-foreground">
-              {teachers.length > 0 ? 
+              {teachers && Array.isArray(teachers) && teachers.length > 0 ? 
                 `${teachers.length} teacher${teachers.length > 1 ? 's' : ''} available` : 
                 'Please add teachers to your school first'
               }
