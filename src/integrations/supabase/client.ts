@@ -423,17 +423,32 @@ export const createCourse = async (name: string, type: 'individual' | 'group') =
     throw new Error('Authentication required to create a course.');
   }
 
-  const { data, error } = await supabase
-    .from('courses')
-    .insert([{ name, lesson_type: type, school_id: user.schoolId }])
-    .select()
-    .single();
+  console.log('Creating course with data:', {
+    course_name: name,
+    lesson_type: type,
+    school_id: user.schoolId
+  });
+
+  // Use the edge function approach for consistency
+  const { data, error } = await supabase.functions.invoke('create_course', {
+    body: {
+      course_name: name,
+      lesson_type: type,
+      school_id: user.schoolId
+    },
+    headers: {
+      'x-user-id': user.id,
+      'x-school-id': user.schoolId,
+      'x-user-role': user.role
+    }
+  });
 
   if (error) {
-    console.error('Error creating course:', error);
-    throw error;
+    console.error('Error creating course via edge function:', error);
+    throw new Error(error.message || 'Failed to create course');
   }
 
+  console.log('Course created successfully via edge function:', data);
   return data;
 };
 
