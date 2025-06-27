@@ -92,9 +92,9 @@ const Students = () => {
     }
   }, [schoolId, refetchStudents]);
   
-  const mapStudentRecordToStudent = (record: StudentRecord): Student => {
-    console.log('Mapping student record to UI model:', record);
-    console.log('Raw subscription_progress from database:', record.subscription_progress);
+  // Update the mapping function to work with the actual data structure
+  const mapStudentDataToStudent = (data: any): Student => {
+    console.log('Mapping student data to UI model:', data);
     
     // Format next session date for display
     const formatNextSession = (dateStr: string | null): string => {
@@ -115,22 +115,22 @@ const Students = () => {
     };
     
     const mappedStudent = {
-      id: record.id,
-      firstName: record.first_name || '',
-      lastName: record.last_name || '',
-      email: record.email || '',
-      courseName: record.course_name || '',
-      lessonType: (record.lesson_type as 'individual' | 'group') || 'individual',
-      ageGroup: (record.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
-      level: (record.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
-      phone: record.phone,
-      paymentStatus: (record.payment_status || 'pending') as 'paid' | 'pending' | 'overdue',
-      teacherId: record.teacher_id,
-      lessonsCompleted: record.lessons_count || 0,
-      nextLesson: formatNextSession(record.next_session_date),
-      nextPaymentDate: record.next_payment_date,
-      nextPaymentAmount: record.next_payment_amount,
-      subscriptionProgress: record.subscription_progress || '0/0'
+      id: data.id,
+      firstName: data.first_name || '',
+      lastName: data.last_name || '',
+      email: data.email || '',
+      courseName: data.course_name || '',
+      lessonType: (data.lesson_type as 'individual' | 'group') || 'individual',
+      ageGroup: (data.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
+      level: (data.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
+      phone: data.phone,
+      paymentStatus: (data.payment_status || 'pending') as 'paid' | 'pending' | 'overdue',
+      teacherId: data.teacher_id,
+      lessonsCompleted: data.lessons_count || 0,
+      nextLesson: formatNextSession(data.next_session_date),
+      nextPaymentDate: data.next_payment_date,
+      nextPaymentAmount: data.next_payment_amount,
+      subscriptionProgress: data.subscription_progress || '0/0'
     };
     
     console.log('Mapped student with subscription progress:', mappedStudent.subscriptionProgress);
@@ -151,7 +151,7 @@ const Students = () => {
   const students: Student[] = USE_MOCK_DATA 
     ? getMockStudents() 
     : (studentsData ? 
-      studentsData.map(mapStudentRecordToStudent) : 
+      studentsData.map(mapStudentDataToStudent) : 
       []);
   
   console.log('Mapped students for UI:', students);
