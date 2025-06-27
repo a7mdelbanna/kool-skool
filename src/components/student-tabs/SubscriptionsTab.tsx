@@ -232,20 +232,15 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [deletingSubscriptionId, setDeletingSubscriptionId] = useState<string | null>(null);
 
-  // Get school ID using RPC function instead of localStorage
-  const { data: userInfo } = useQuery({
-    queryKey: ['current-user-info'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_current_user_info');
-      if (error) {
-        console.error('❌ Error getting current user info:', error);
-        throw error;
-      }
-      return data?.[0] || null;
-    },
-  });
+  // Get school ID from localStorage
+  const getSchoolId = () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    const user = JSON.parse(userData);
+    return user.schoolId;
+  };
 
-  const schoolId = userInfo?.user_school_id;
+  const schoolId = getSchoolId();
 
   // Fetch school currencies from database
   const { data: currencies = [], isLoading: currenciesLoading } = useQuery({
