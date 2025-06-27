@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import PaymentDialog from '@/components/PaymentDialog';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
+import AddTransactionDialog from '@/components/AddTransactionDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, getCurrentUserInfo } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -48,6 +49,7 @@ interface PaymentRecord {
 const PaymentsPage = () => {
   const queryClient = useQueryClient();
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [addTransactionDialogOpen, setAddTransactionDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(undefined);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,20 +104,72 @@ const PaymentsPage = () => {
     enabled: !!userInfo?.[0]?.user_school_id,
   });
 
+  // Fetch all transactions from the new transactions table
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
+    queryKey: ['school-transactions', userInfo?.[0]?.user_school_id],
+    queryFn: async () => {
+      if (!userInfo?.[0]?.user_school_id) return [];
+      
+      const { data, error } = await supabase
+        .rpc('get_school_transactions', { p_school_id: userInfo[0].user_school_id });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!userInfo?.[0]?.user_school_id,
+  });
+
   // Calculate statistics from actual payment data
   const paidPayments = payments.filter(payment => payment.status === 'completed');
   const pendingPayments = payments.filter(payment => payment.status === 'pending');
   
   const totalRevenue = paidPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const pendingAmount = pendingPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const totalExpenses = 0; // TODO: Implement expenses tracking
-  const netIncome = totalRevenue - totalExpenses;
+  
+  // Add transaction stats
+  const incomeTransactions = transactions.filter(t => t.type === 'income');
+  const expenseTransactions = transactions.filter(t => t.type === 'expense');
+  
+  const totalTransactionIncome = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const netIncome = (totalRevenue + totalTransactionIncome) - totalExpenses;
 
-  // Filter payments based on search term
-  const filteredPayments = payments.filter(payment =>
-    payment.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    payment.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    payment.payment_method.toLowerCase().includes(searchTerm.toLowerCase())
+  // Combine payments and transactions for display
+  const allTransactions = [
+    ...payments.map(p => ({
+      id: p.id,
+      type: 'student_payment',
+      student_name: p.student_name,
+      amount: p.amount,
+      currency: p.currency,
+      date: p.payment_date,
+      method: p.payment_method,
+      status: p.status,
+      notes: p.notes,
+      created_at: p.created_at
+    })),
+    ...transactions.map(t => ({
+      id: t.id,
+      type: t.type,
+      student_name: t.contact_name,
+      amount: t.amount,
+      currency: t.currency,
+      date: t.transaction_date,
+      method: t.payment_method,
+      status: t.status,
+      notes: t.notes,
+      created_at: t.created_at,
+      category_name: t.category_name,
+      tags: t.tags
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Filter transactions based on search term
+  const filteredTransactions = allTransactions.filter(transaction =>
+    transaction.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    transaction.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    transaction.method?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    transaction.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Delete payment mutation
@@ -143,6 +197,10 @@ const PaymentsPage = () => {
     setPaymentDialogOpen(true);
   };
 
+  const handleAddTransaction = () => {
+    setAddTransactionDialogOpen(true);
+  };
+
   const handleEditPayment = (payment: PaymentRecord) => {
     setSelectedPayment({
       id: payment.id,
@@ -166,16 +224,18 @@ const PaymentsPage = () => {
 
   const handleExport = () => {
     // Create CSV content
-    const headers = ['Date', 'Student', 'Amount', 'Method', 'Status', 'Notes'];
+    const headers = ['Date', 'Type', 'Contact/Student', 'Amount', 'Method', 'Status', 'Category', 'Notes'];
     const csvContent = [
       headers.join(','),
-      ...filteredPayments.map(payment => [
-        payment.payment_date,
-        `"${payment.student_name}"`,
-        payment.amount,
-        payment.payment_method,
-        payment.status,
-        `"${payment.notes || ''}"`
+      ...filteredTransactions.map(transaction => [
+        transaction.date,
+        transaction.type,
+        `"${transaction.student_name || ''}"`,
+        transaction.amount,
+        transaction.method || '',
+        transaction.status,
+        transaction.category_name || '',
+        `"${transaction.notes || ''}"`
       ].join(','))
     ].join('\n');
 
@@ -184,13 +244,18 @@ const PaymentsPage = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `payments-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.download = `transactions-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-    toast.success('Payments exported successfully');
+    toast.success('Transactions exported successfully');
   };
 
-  if (paymentsLoading) {
+  const handleTransactionSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['school-transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['all-student-payments'] });
+  };
+
+  if (paymentsLoading || transactionsLoading) {
     return (
       <div className="container py-8">
         <div className="flex items-center justify-between mb-6">
@@ -200,7 +265,7 @@ const PaymentsPage = () => {
           </div>
         </div>
         <div className="text-center py-8">
-          <p className="text-muted-foreground">Loading payments...</p>
+          <p className="text-muted-foreground">Loading transactions...</p>
         </div>
       </div>
     );
@@ -218,6 +283,10 @@ const PaymentsPage = () => {
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
+          </Button>
+          <Button variant="outline" onClick={handleAddTransaction}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Transaction
           </Button>
           <Button onClick={handleAddPayment}>
             <Plus className="h-4 w-4 mr-2" />
@@ -245,7 +314,7 @@ const PaymentsPage = () => {
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${(totalRevenue + totalTransactionIncome).toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">From all payments</p>
           </CardContent>
         </Card>
@@ -294,23 +363,20 @@ const PaymentsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Payments Table */}
+      {/* Transactions Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex gap-4">
               <Button variant="outline" size="sm" className="text-blue-600 border-blue-200">
-                Payments ({filteredPayments.length})
-              </Button>
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                Expenses (0)
+                All Transactions ({filteredTransactions.length})
               </Button>
             </div>
             <div className="flex gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search payments..."
+                  placeholder="Search transactions..."
                   className="pl-10 w-64"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -327,70 +393,103 @@ const PaymentsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Student</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Contact/Student</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Method</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead>Tags</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPayments.map((payment) => (
-                <TableRow key={payment.id}>
+              {filteredTransactions.map((transaction) => (
+                <TableRow key={`${transaction.type}-${transaction.id}`}>
+                  <TableCell>
+                    <Badge 
+                      variant="outline"
+                      className={
+                        transaction.type === 'income' || transaction.type === 'student_payment'
+                          ? 'border-green-200 text-green-700' 
+                          : transaction.type === 'expense'
+                          ? 'border-red-200 text-red-700'
+                          : 'border-blue-200 text-blue-700'
+                      }
+                    >
+                      {transaction.type === 'student_payment' ? 'Payment' : transaction.type}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-600">
-                        {payment.student_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'S'}
+                        {transaction.student_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                       </div>
-                      <span>{payment.student_name}</span>
+                      <span>{transaction.student_name || 'Unknown'}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge 
-                      variant={payment.status === 'completed' ? 'default' : 'secondary'}
-                      className={payment.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
+                      variant={transaction.status === 'completed' ? 'default' : 'secondary'}
+                      className={transaction.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
                     >
-                      {payment.status === 'completed' ? 'Paid' : 'Pending'}
+                      {transaction.status === 'completed' ? 'Completed' : transaction.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>${Number(payment.amount).toFixed(2)}</TableCell>
-                  <TableCell>{format(new Date(payment.payment_date), 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>{payment.payment_method}</TableCell>
+                  <TableCell>${Number(transaction.amount).toFixed(2)}</TableCell>
+                  <TableCell>{format(new Date(transaction.date), 'MMM dd, yyyy')}</TableCell>
+                  <TableCell>{transaction.method || '-'}</TableCell>
+                  <TableCell>{transaction.category_name || '-'}</TableCell>
                   <TableCell>
-                    <PaymentTagSelector paymentId={payment.id} />
+                    {transaction.type === 'student_payment' ? (
+                      <PaymentTagSelector paymentId={transaction.id} />
+                    ) : (
+                      <div className="flex gap-1">
+                        {transaction.tags && Array.isArray(transaction.tags) && transaction.tags.map((tag: any) => (
+                          <Badge key={tag.id} variant="outline" className="text-xs">
+                            <div 
+                              className="w-2 h-2 rounded-full mr-1"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            {tag.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{payment.notes || '-'}</TableCell>
+                  <TableCell className="text-muted-foreground">{transaction.notes || '-'}</TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleEditPayment(payment)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-red-600"
-                          onClick={() => handleDeletePayment(payment.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {transaction.type === 'student_payment' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => handleEditPayment(transaction as any)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDeletePayment(transaction.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredPayments.length === 0 && (
+              {filteredTransactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No payments found
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    No transactions found
                   </TableCell>
                 </TableRow>
               )}
@@ -405,6 +504,13 @@ const PaymentsPage = () => {
         onOpenChange={setPaymentDialogOpen}
         payment={selectedPayment}
         mode={dialogMode}
+      />
+
+      {/* Add Transaction Dialog */}
+      <AddTransactionDialog
+        open={addTransactionDialogOpen}
+        onOpenChange={setAddTransactionDialogOpen}
+        onSuccess={handleTransactionSuccess}
       />
     </div>
   );
