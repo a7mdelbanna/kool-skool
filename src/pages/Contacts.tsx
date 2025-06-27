@@ -94,13 +94,18 @@ const Contacts = () => {
     if (!user?.schoolId) return;
 
     try {
+      // Use direct query instead of RPC to bypass RLS issues
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
         .eq('school_id', user.schoolId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
       setContacts(data || []);
     } catch (error) {
       console.error('Error fetching contacts:', error);
