@@ -218,7 +218,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     priceMode: 'perSession',
     pricePerSession: 0,
     fixedPrice: 0,
-    currency: 'USD',
+    currency: '',
     notes: '',
     // New payment fields
     initialPaymentAmount: 0,
@@ -242,6 +242,28 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
 
   const schoolId = getSchoolId();
 
+  // Fetch school currencies from database
+  const { data: currencies = [], isLoading: currenciesLoading } = useQuery({
+    queryKey: ['school-currencies', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_currencies', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Set default currency when currencies are loaded
+  useEffect(() => {
+    if (currencies.length > 0 && !formData.currency) {
+      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
+      setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
+    }
+  }, [currencies, formData.currency]);
+
   // Fetch school accounts
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: ['school-accounts', schoolId],
@@ -255,16 +277,6 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     },
     enabled: !!schoolId,
   });
-
-  // Enhanced currency options with proper symbols and codes
-  const currencies = [
-    { value: 'USD', label: 'US Dollar ($)', symbol: '$' },
-    { value: 'EUR', label: 'Euro (€)', symbol: '€' },
-    { value: 'RUB', label: 'Russian Ruble (₽)', symbol: '₽' },
-    { value: 'GBP', label: 'British Pound (£)', symbol: '£' },
-    { value: 'CAD', label: 'Canadian Dollar (C$)', symbol: 'C$' },
-    { value: 'AUD', label: 'Australian Dollar (A$)', symbol: 'A$' },
-  ];
 
   const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
 
@@ -396,7 +408,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   };
 
   const getCurrencySymbol = (currencyCode: string) => {
-    const currency = currencies.find(c => c.value === currencyCode);
+    const currency = currencies.find(c => c.code === currencyCode);
     return currency?.symbol || currencyCode;
   };
 
@@ -502,6 +514,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       await createSubscription(subscriptionFormData);
       
       // Reset form after successful creation
+      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
       setFormData({
         sessionCount: 4,
         durationMonths: 1,
@@ -511,7 +524,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         priceMode: 'perSession',
         pricePerSession: 0,
         fixedPrice: 0,
-        currency: 'USD',
+        currency: defaultCurrency?.code || '',
         notes: '',
         initialPaymentAmount: 0,
         paymentMethod: 'Cash',
@@ -630,16 +643,35 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               </div>
               <div>
                 <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
-                <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value, accountId: '' })}>
+                <Select 
+                  value={formData.currency} 
+                  onValueChange={(value) => setFormData({ ...formData, currency: value, accountId: '' })}
+                >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {currencies.map((currency) => (
-                      <SelectItem key={currency.value} value={currency.value}>
-                        {currency.label}
-                      </SelectItem>
-                    ))}
+                    {currenciesLoading ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Loading currencies...
+                      </div>
+                    ) : currencies.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        No currencies available
+                      </div>
+                    ) : (
+                      currencies.map((currency) => (
+                        <SelectItem key={currency.code} value={currency.code}>
+                          <div className="flex items-center gap-2">
+                            <span>{currency.name}</span>
+                            <span className="text-muted-foreground">({currency.symbol})</span>
+                            {currency.is_default && (
+                              <Badge variant="secondary" className="text-xs">Default</Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -973,7 +1005,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             <div className="flex justify-end pt-4">
               <Button 
                 onClick={handleSubmit} 
-                disabled={submitting || isCreating || formData.schedule.length === 0 || !formData.startDate || (formData.initialPaymentAmount > 0 && !formData.accountId)}
+                disabled={submitting || isCreating || formData.schedule.length === 0 || !formData.startDate || (formData.initialPaymentAmount > 0 && !formData.accountId) || !formData.currency}
                 className="min-w-[160px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 size="lg"
               >
