@@ -230,7 +230,7 @@ export const createStudent = async (studentData: {
       };
     }
 
-    return data as CreateStudentResponse;
+    return data as unknown as CreateStudentResponse;
   } catch (error: any) {
     console.error('Error in createStudent:', error);
     return {
