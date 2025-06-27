@@ -68,7 +68,7 @@ const Calendar = () => {
               id: session.id,
               studentId: student.id,
               studentName: `${student.first_name} ${student.last_name}`,
-              date: session.scheduled_date,
+              date: new Date(session.scheduled_date), // Convert string to Date
               time: format(new Date(session.scheduled_date), 'HH:mm'),
               duration: `${session.duration_minutes || 60} min`,
               status: session.status as Session['status'],
