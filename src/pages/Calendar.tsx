@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -19,6 +18,7 @@ import { usePayments } from '@/contexts/PaymentContext';
 import NewLessonDialog from '@/components/calendar/NewLessonDialog';
 import LessonDetailsDialog from '@/components/calendar/LessonDetailsDialog';
 import { Session } from '@/contexts/PaymentContext';
+import { getStudentLessonSessions, getStudentsWithDetails, LessonSession } from '@/integrations/supabase/client';
 
 type ViewMode = 'day' | 'week' | 'month';
 type DisplayMode = 'calendar' | 'list';
@@ -33,7 +33,69 @@ const Calendar = () => {
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const { sessions } = usePayments();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load sessions from all students
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        setLoading(true);
+        const userData = localStorage.getItem('user');
+        const user = userData ? JSON.parse(userData) : null;
+        
+        if (!user || !user.schoolId) {
+          console.warn('No user or school ID found');
+          return;
+        }
+
+        console.log('Loading sessions for school:', user.schoolId);
+        
+        // Get all students for the school
+        const students = await getStudentsWithDetails(user.schoolId);
+        console.log('Found students:', students.length);
+        
+        // Get sessions for each student
+        const allSessions: Session[] = [];
+        
+        for (const student of students) {
+          try {
+            const studentSessions = await getStudentLessonSessions(student.id);
+            console.log(`Sessions for student ${student.first_name} ${student.last_name}:`, studentSessions.length);
+            
+            // Convert lesson sessions to Session format
+            const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => ({
+              id: session.id,
+              studentId: student.id,
+              studentName: `${student.first_name} ${student.last_name}`,
+              date: session.scheduled_date,
+              time: format(new Date(session.scheduled_date), 'HH:mm'),
+              duration: `${session.duration_minutes || 60} min`,
+              status: session.status as Session['status'],
+              sessionNumber: session.index_in_sub || undefined,
+              totalSessions: undefined, // Will be filled from subscription if needed
+              notes: session.notes || '',
+              cost: session.cost,
+              paymentStatus: session.payment_status as Session['paymentStatus']
+            }));
+            
+            allSessions.push(...convertedSessions);
+          } catch (error) {
+            console.error(`Error loading sessions for student ${student.id}:`, error);
+          }
+        }
+        
+        console.log('Total sessions loaded:', allSessions.length);
+        setSessions(allSessions);
+      } catch (error) {
+        console.error('Error loading sessions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSessions();
+  }, []);
 
   const goToPreviousPeriod = () => {
     if (viewMode === 'day') {
@@ -126,6 +188,7 @@ const Calendar = () => {
   console.log("Filtered sessions:", filteredSessions.length);
   console.log("Current view mode:", viewMode);
   console.log("Current display mode:", displayMode);
+  console.log("Loading:", loading);
 
   return (
     <div className="space-y-6">
@@ -203,7 +266,11 @@ const Calendar = () => {
       </div>
 
       <div className="bg-card rounded-lg border shadow-sm p-4">
-        {displayMode === 'list' ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-muted-foreground">Loading sessions...</div>
+          </div>
+        ) : displayMode === 'list' ? (
           <UpcomingLessonsList 
             sessions={filteredSessions}
             onLessonClick={handleLessonClick}
