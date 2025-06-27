@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = 'https://clacmtyxfdtfgjkozmqf.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY'
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
@@ -230,7 +230,7 @@ export const createStudent = async (studentData: {
       };
     }
 
-    return data;
+    return data as CreateStudentResponse;
   } catch (error: any) {
     console.error('Error in createStudent:', error);
     return {
@@ -303,7 +303,10 @@ export const getSchoolCourses = async (schoolId: string): Promise<Course[]> => {
     throw error;
   }
 
-  return data || [];
+  return (data || []).map((course: any) => ({
+    ...course,
+    lesson_type: course.lesson_type as 'individual' | 'group'
+  }));
 };
 
 // Function to get school teachers using the same approach as team members
@@ -514,10 +517,10 @@ export const deleteStudentPayment = async (paymentId: string) => {
   return data;
 };
 
-// Function to create a new payment
+// Function to create a new payment - Use student_payments table instead of payments
 export const createPayment = async (paymentData: Omit<PaymentRecord, 'id' | 'created_at'>) => {
   const { data, error } = await supabase
-    .from('payments')
+    .from('student_payments')
     .insert([paymentData])
     .select()
     .single();
@@ -530,10 +533,10 @@ export const createPayment = async (paymentData: Omit<PaymentRecord, 'id' | 'cre
   return data;
 };
 
-// Function to update an existing payment
+// Function to update an existing payment - Use student_payments table instead of payments
 export const updatePayment = async (id: string, updates: Partial<PaymentRecord>) => {
   const { data, error } = await supabase
-    .from('payments')
+    .from('student_payments')
     .update(updates)
     .eq('id', id)
     .select()
@@ -547,10 +550,10 @@ export const updatePayment = async (id: string, updates: Partial<PaymentRecord>)
   return data;
 };
 
-// Function to delete a payment
+// Function to delete a payment - Use student_payments table instead of payments
 export const deletePayment = async (id: string) => {
   const { data, error } = await supabase
-    .from('payments')
+    .from('student_payments')
     .delete()
     .eq('id', id);
 
@@ -589,7 +592,7 @@ export const getCurrentUserInfo = async () => {
   }];
 };
 
-// Function to get school tags
+// Function to get school tags - Use transaction_tags table instead of school_tags
 export const getSchoolTags = async (schoolId: string | undefined) => {
   if (!schoolId) {
     console.warn('No school ID provided to getSchoolTags');
@@ -608,10 +611,10 @@ export const getSchoolTags = async (schoolId: string | undefined) => {
   return data || [];
 };
 
-// Function to create a new school tag
+// Function to create a new school tag - Use transaction_tags table instead of school_tags
 export const createSchoolTag = async (tagData: Omit<SchoolTag, 'id' | 'created_at'>) => {
   const { data, error } = await supabase
-    .from('school_tags')
+    .from('transaction_tags')
     .insert([tagData])
     .select()
     .single();
@@ -624,10 +627,10 @@ export const createSchoolTag = async (tagData: Omit<SchoolTag, 'id' | 'created_a
   return data;
 };
 
-// Function to update an existing school tag
+// Function to update an existing school tag - Use transaction_tags table instead of school_tags
 export const updateSchoolTag = async (id: string, updates: Partial<SchoolTag>) => {
   const { data, error } = await supabase
-    .from('school_tags')
+    .from('transaction_tags')
     .update(updates)
     .eq('id', id)
     .select()
@@ -641,10 +644,10 @@ export const updateSchoolTag = async (id: string, updates: Partial<SchoolTag>) =
   return data;
 };
 
-// Function to delete a school tag
+// Function to delete a school tag - Use transaction_tags table instead of school_tags
 export const deleteSchoolTag = async (id: string) => {
   const { data, error } = await supabase
-    .from('school_tags')
+    .from('transaction_tags')
     .delete()
     .eq('id', id);
 

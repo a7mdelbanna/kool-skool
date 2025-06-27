@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -156,7 +157,9 @@ const PaymentsPage = () => {
       method: p.payment_method,
       status: p.status,
       notes: p.notes,
-      created_at: p.created_at
+      created_at: p.created_at,
+      category_name: undefined as string | undefined,
+      tags: undefined as any
     })),
     ...transactions.map(t => ({
       id: t.id,
@@ -169,7 +172,7 @@ const PaymentsPage = () => {
       status: t.status,
       notes: t.notes,
       created_at: t.created_at,
-      category_name: t.category_name,
+      category_name: t.category_name || undefined,
       tags: t.tags
     }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
