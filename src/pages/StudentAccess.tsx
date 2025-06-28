@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -119,51 +120,72 @@ const StudentAccess = () => {
       console.log('Final students with passwords:', result);
       console.log('Students with passwords count:', result.filter(s => s.has_password).length);
       
-      // Add additional logging to verify the ID mapping
-      result.forEach(student => {
-        console.log(`Final mapping - ${student.first_name} ${student.last_name}: id=${student.id}, student_id=${student.student_id}`);
-      });
-      
       return result;
     },
     enabled: !!schoolId,
   });
 
-  // Fetch actual password hash for display using direct query instead of RPC
+  // Fetch actual password hash for display
   const fetchPasswordHash = async (userId: string) => {
     console.log('=== FETCH PASSWORD DEBUG ===');
-    console.log('Fetching password hash for user:', userId);
-    console.log('Type of userId:', typeof userId);
-    console.log('userId length:', userId.length);
+    console.log('Fetching password hash for user ID:', userId);
+    
+    // Validate input
+    if (!userId || userId.length === 0) {
+      console.error('Invalid user ID provided:', userId);
+      toast.error('Invalid user ID');
+      return null;
+    }
     
     // Check cache first
     if (passwordCache.has(userId)) {
-      console.log('Using cached password hash');
+      console.log('Using cached password hash for user:', userId);
       return passwordCache.get(userId);
     }
 
     try {
-      console.log('Querying users table directly...');
+      console.log('Querying users table for password hash...');
       
-      // Direct query to users table to get password hash
+      // Query users table directly with more robust error handling
       const { data, error } = await supabase
         .from('users')
-        .select('password_hash, role, email, id, first_name, last_name')
+        .select('id, email, first_name, last_name, role, password_hash')
         .eq('id', userId)
         .eq('role', 'student')
         .maybeSingle();
 
-      console.log('Query result:', { data, error });
+      console.log('Direct query result:', { data, error, userId });
 
       if (error) {
-        console.error('Error fetching password hash:', error);
-        toast.error('Failed to fetch password: ' + error.message);
+        console.error('Database error fetching password:', error);
+        toast.error('Database error: ' + error.message);
         return null;
       }
 
       if (!data) {
         console.log('No user found with ID:', userId);
-        toast.error('No password found for this user');
+        
+        // Try to find the user by email as a fallback
+        const student = studentsWithPasswords.find(s => s.id === userId);
+        if (student?.email) {
+          console.log('Trying fallback search by email:', student.email);
+          const { data: emailData, error: emailError } = await supabase
+            .from('users')
+            .select('id, email, first_name, last_name, role, password_hash')
+            .eq('email', student.email)
+            .eq('role', 'student')
+            .maybeSingle();
+
+          console.log('Email search result:', { emailData, emailError });
+          
+          if (emailData?.password_hash) {
+            console.log('Found user by email, caching password');
+            setPasswordCache(prev => new Map(prev).set(userId, emailData.password_hash));
+            return emailData.password_hash;
+          }
+        }
+        
+        toast.error('User not found');
         return null;
       }
 
@@ -176,17 +198,18 @@ const StudentAccess = () => {
         passwordLength: data.password_hash?.length || 0
       });
 
-      const passwordHash = data.password_hash || null;
+      const passwordHash = data.password_hash;
       
-      // Cache the result if we have a password
       if (passwordHash) {
+        // Cache the result
         setPasswordCache(prev => new Map(prev).set(userId, passwordHash));
-        console.log('Password cached for user:', userId);
+        console.log('Password found and cached for user:', userId);
+        return passwordHash;
       } else {
         console.log('No password hash found for user:', userId);
+        toast.error('No password set for this user');
+        return null;
       }
-      
-      return passwordHash;
     } catch (error) {
       console.error('Exception fetching password hash:', error);
       toast.error('Failed to fetch password');
@@ -292,7 +315,6 @@ const StudentAccess = () => {
   const togglePasswordVisibility = async (studentId: string) => {
     console.log('=== TOGGLE PASSWORD VISIBILITY ===');
     console.log('Student ID:', studentId);
-    console.log('Type of studentId:', typeof studentId);
     
     if (visiblePasswords.has(studentId)) {
       // Hide password
@@ -313,7 +335,6 @@ const StudentAccess = () => {
         console.log('Password visibility toggled on for:', studentId);
       } else {
         console.log('No password hash available, cannot show password');
-        toast.error('No password available to display');
       }
     }
   };
@@ -346,7 +367,6 @@ const StudentAccess = () => {
       }
     } else {
       console.log('No password hash available for copying');
-      toast.error('No password available to copy');
     }
   };
 
