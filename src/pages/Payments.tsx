@@ -27,7 +27,6 @@ import {
 import PaymentDialog from '@/components/PaymentDialog';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
-import TagManager from '@/components/TagManager';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -395,11 +394,6 @@ const PaymentsPage = () => {
             <p className="text-xs text-muted-foreground">Payments not yet received</p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Tags Section - Using TagManager component */}
-      <div className="mb-6">
-        <TagManager showUsageCount={true} />
       </div>
 
       {/* Transactions Table */}
