@@ -312,13 +312,13 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     );
   };
 
-  // Render quick action buttons for scheduled sessions (mirroring SessionsTab behavior)
+  // Render quick action buttons for scheduled sessions - now in a single row
   const renderQuickActionButtons = (session: Session) => {
     const sessionId = session.id;
     const isLoading = actionLoading === sessionId;
 
     return (
-      <div className="grid grid-cols-2 gap-2 mt-2">
+      <div className="grid grid-cols-4 gap-2 mt-2">
         <Button 
           onClick={(e) => {
             e.stopPropagation();
