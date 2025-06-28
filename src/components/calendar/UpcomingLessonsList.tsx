@@ -10,7 +10,7 @@ import {
   endOfMonth,
   isWithinInterval
 } from 'date-fns';
-import { Session } from '@/contexts/PaymentContext';
+import { Session, Subscription } from '@/contexts/PaymentContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
@@ -88,14 +88,14 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
             try {
               const subscriptions = await getStudentSubscriptions(studentId);
               
-              // Find the active subscription
-              const activeSubscription = subscriptions.find(sub => sub.status === 'active');
+              // Find the active subscription and properly type it
+              const activeSubscription = subscriptions.find(sub => sub.status === 'active') as Subscription | undefined;
               
               if (activeSubscription) {
-                // Count completed sessions - using the correct property name
+                // Count completed sessions - using the correct property names
                 const completedSessions = activeSubscription.sessions_completed ?? 0;
                 
-                // Calculate end date if not provided - using the correct property name
+                // Calculate end date if not provided - using the correct property names
                 let endDate = activeSubscription.end_date;
                 if (!endDate && activeSubscription.start_date && activeSubscription.duration_months) {
                   const startDate = new Date(activeSubscription.start_date);
