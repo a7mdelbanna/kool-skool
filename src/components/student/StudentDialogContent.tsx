@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -43,11 +44,21 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Fetch student subscriptions
+  // Enhanced subscription fetching with debugging
   const { data: subscriptions = [], refetch: refetchSubscriptions } = useQuery({
     queryKey: ['student-subscriptions', student?.id],
     queryFn: async () => {
-      if (!student?.id) return [];
+      console.log('===== SUBSCRIPTIONS FETCH DEBUG =====');
+      console.log('Student ID:', student?.id);
+      console.log('Dialog open:', open);
+      console.log('Is edit mode:', isEditMode);
+      
+      if (!student?.id) {
+        console.log('No student ID - returning empty array');
+        return [];
+      }
+      
+      console.log('Attempting to fetch subscriptions for student:', student.id);
       
       const { data, error } = await supabase
         .from('subscriptions')
@@ -57,13 +68,37 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
       
       if (error) {
         console.error('Error fetching subscriptions:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
       
+      console.log('Subscriptions fetched successfully:', data);
+      console.log('Number of subscriptions:', data?.length || 0);
+      
+      if (data && data.length > 0) {
+        console.log('First subscription details:', data[0]);
+      }
+      
+      console.log('===== END SUBSCRIPTIONS FETCH DEBUG =====');
+      
       return data || [];
     },
-    enabled: !!student?.id && open,
+    enabled: !!student?.id,
+    retry: 1,
   });
+
+  // Add effect to log subscription changes
+  useEffect(() => {
+    console.log('===== SUBSCRIPTIONS STATE UPDATE =====');
+    console.log('Current subscriptions state:', subscriptions);
+    console.log('Subscriptions length:', subscriptions.length);
+    console.log('===== END SUBSCRIPTIONS STATE UPDATE =====');
+  }, [subscriptions]);
 
   // Detailed course data debugging with clear section markers
   useEffect(() => {
@@ -151,6 +186,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
 
   // Handle subscription refresh
   const handleSubscriptionRefresh = () => {
+    console.log('Manually refreshing subscriptions...');
     refetchSubscriptions();
   };
 
