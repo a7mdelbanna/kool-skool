@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import { 
   Calendar as CalendarIcon, 
@@ -18,8 +19,7 @@ import { usePayments } from '@/contexts/PaymentContext';
 import NewLessonDialog from '@/components/calendar/NewLessonDialog';
 import LessonDetailsDialog from '@/components/calendar/LessonDetailsDialog';
 import { Session } from '@/contexts/PaymentContext';
-import { getStudentLessonSessions, getStudentsWithDetails, LessonSession } from '@/integrations/supabase/client';
-import { getEffectiveTimezone, convertUTCToUserTimezone, formatInUserTimezone, convertUserTimezoneToUTC } from '@/utils/timezone';
+import { useAttendanceData } from '@/hooks/useAttendanceData';
 import { UserContext } from '@/App';
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -27,7 +27,6 @@ type DisplayMode = 'calendar' | 'list';
 
 const Calendar = () => {
   const { user } = useContext(UserContext);
-  const userTimezone = getEffectiveTimezone(user?.timezone);
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
@@ -37,75 +36,22 @@ const Calendar = () => {
   const [newLessonDialogOpen, setNewLessonDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Load sessions from all students
-  const loadSessions = async () => {
-    try {
-      setLoading(true);
-      const userData = localStorage.getItem('user');
-      const user = userData ? JSON.parse(userData) : null;
-      
-      if (!user || !user.schoolId) {
-        console.warn('No user or school ID found');
-        return;
-      }
-
-      console.log('Loading sessions for school:', user.schoolId);
-      
-      // Get all students for the school
-      const students = await getStudentsWithDetails(user.schoolId);
-      console.log('Found students:', students.length);
-      
-      // Get sessions for each student
-      const allSessions: Session[] = [];
-      
-      for (const student of students) {
-        try {
-          const studentSessions = await getStudentLessonSessions(student.id);
-          console.log(`Sessions for student ${student.first_name} ${student.last_name}:`, studentSessions.length);
-          
-          // Convert lesson sessions to Session format with timezone conversion
-          const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => {
-            // Convert UTC stored time to user's timezone for display
-            const utcDate = new Date(session.scheduled_date);
-            const localDate = convertUTCToUserTimezone(utcDate, userTimezone);
-            
-            return {
-              id: session.id,
-              studentId: student.id,
-              studentName: `${student.first_name} ${student.last_name}`,
-              date: localDate, // Now in user's timezone
-              time: formatInUserTimezone(utcDate, userTimezone, 'HH:mm'),
-              duration: `${session.duration_minutes || 60} min`,
-              status: session.status as Session['status'],
-              sessionNumber: session.index_in_sub || undefined,
-              totalSessions: undefined,
-              notes: session.notes || '',
-              cost: session.cost,
-              paymentStatus: session.payment_status as Session['paymentStatus']
-            };
-          });
-          
-          allSessions.push(...convertedSessions);
-        } catch (error) {
-          console.error(`Error loading sessions for student ${student.id}:`, error);
-        }
-      }
-      
-      console.log('Total sessions loaded:', allSessions.length);
-      setSessions(allSessions);
-    } catch (error) {
-      console.error('Error loading sessions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    sessions,
+    subscriptionInfoMap,
+    studentInfoMap,
+    loading,
+    error,
+    loadSessions,
+    refreshSessions,
+    updateSessionOptimistically,
+    revertSessionUpdate
+  } = useAttendanceData(user?.timezone);
 
   useEffect(() => {
     loadSessions();
-  }, []);
+  }, [loadSessions]);
 
   const goToPreviousPeriod = () => {
     if (viewMode === 'day') {
@@ -162,7 +108,7 @@ const Calendar = () => {
 
   // Handle session updates - reload sessions data
   const handleSessionUpdate = () => {
-    loadSessions();
+    refreshSessions();
   };
 
   // Filter sessions based on view mode and search query
@@ -204,7 +150,7 @@ const Calendar = () => {
   console.log("Current view mode:", viewMode);
   console.log("Current display mode:", displayMode);
   console.log("Loading:", loading);
-  console.log("User timezone:", userTimezone);
+  console.log("User timezone:", user?.timezone);
 
   return (
     <div className="space-y-6">
@@ -213,9 +159,11 @@ const Calendar = () => {
           <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
           <p className="text-muted-foreground mt-1">
             Manage your lessons and schedule
-            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-              Viewing in: {userTimezone}
-            </span>
+            {user?.timezone && (
+              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                Viewing in: {user.timezone}
+              </span>
+            )}
           </p>
         </div>
 
@@ -296,9 +244,13 @@ const Calendar = () => {
             sessions={filteredSessions}
             onLessonClick={handleLessonClick}
             onSessionUpdate={handleSessionUpdate}
+            onOptimisticUpdate={updateSessionOptimistically}
+            onRevertUpdate={revertSessionUpdate}
             viewMode={viewMode}
             currentDate={currentDate}
             currentWeekStart={currentWeekStart}
+            subscriptionInfoMap={subscriptionInfoMap}
+            studentInfoMap={studentInfoMap}
           />
         ) : (
           <CalendarView 
