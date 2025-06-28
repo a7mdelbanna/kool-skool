@@ -73,6 +73,53 @@
   .element-transition {
     @apply animate-slide-up;
   }
+
+  /* Full-width responsive layout utilities */
+  .content-max-width {
+    max-width: 1400px;
+  }
+
+  .text-content-max-width {
+    max-width: 65ch;
+  }
+
+  /* Tables and data grids should expand to full available width */
+  .table-container {
+    @apply w-full overflow-x-auto;
+  }
+
+  .data-grid {
+    @apply w-full min-w-full;
+  }
+
+  /* Card grids should be responsive */
+  .card-grid {
+    @apply grid gap-4 sm:gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .card-grid-large {
+    @apply grid gap-4 sm:gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+
+  /* Stats cards layout */
+  .stats-grid {
+    @apply grid gap-4 sm:gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  @media (min-width: 1200px) {
+    .stats-grid {
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+  }
+
+  @media (min-width: 1600px) {
+    .stats-grid {
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+  }
 }
 
 /* Custom scrollbar */

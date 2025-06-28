@@ -12,9 +12,11 @@ const MainLayout = () => {
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <MobileNavbar />
-          <main className="flex-1 p-6 overflow-auto bg-white ml-0">
-            <div className="w-full transition-all duration-300 page-transition">
-              <Outlet />
+          <main className="flex-1 overflow-auto bg-white ml-0">
+            <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 transition-all duration-300 page-transition">
+              <div className="w-full">
+                <Outlet />
+              </div>
             </div>
           </main>
         </div>
