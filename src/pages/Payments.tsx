@@ -29,6 +29,7 @@ import PaymentDialog from '@/components/PaymentDialog';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
 import TagFilter from '@/components/TagFilter';
+import ExpectedPaymentsSection from '@/components/ExpectedPaymentsSection';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserInfo } from '@/integrations/supabase/client';
@@ -366,6 +367,9 @@ const PaymentsPage = () => {
           </Button>
         </div>
       </div>
+
+      {/* Expected Payments Section */}
+      <ExpectedPaymentsSection schoolId={schoolId} />
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
