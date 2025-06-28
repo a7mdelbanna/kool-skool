@@ -83,7 +83,7 @@ const MobileNavbar = () => {
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md z-40 flex items-center justify-between px-4 border-b mb-8">
+      <div className="h-16 bg-background/80 backdrop-blur-md z-40 flex items-center justify-between px-4 border-b lg:hidden">
         <div className="flex items-center">
           <SidebarTrigger />
           <h1 className="text-xl font-semibold ml-3">TutorPro</h1>
