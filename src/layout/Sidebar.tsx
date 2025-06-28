@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -169,14 +170,19 @@ const Sidebar = () => {
             );
           })}
         </div>
+
+        <Separator className="my-4 bg-gray-200" />
+
+        {/* User Profile Section - Now positioned after Admin section */}
+        <div className="space-y-1">
+          <UserProfile isCollapsed={isCollapsed} onLogout={handleLogout} />
+        </div>
       </nav>
 
-      {/* Footer with User Profile and Logout */}
+      {/* Footer */}
       <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <UserProfile isCollapsed={isCollapsed} onLogout={handleLogout} />
-        
         {!isCollapsed && (
-          <div className="text-xs text-gray-500 text-center mt-3">
+          <div className="text-xs text-gray-500 text-center">
             © 2024 TutorPro
           </div>
         )}
