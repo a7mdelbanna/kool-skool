@@ -1,4 +1,3 @@
-
 import { format, toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { parseISO } from 'date-fns';
 
@@ -120,8 +119,27 @@ export const formatInUserTimezone = (
   userTimezone: string, 
   formatString: string = 'yyyy-MM-dd HH:mm'
 ): string => {
-  const utcDate = typeof date === 'string' ? parseISO(date) : date;
-  return format(utcDate, formatString, { timeZone: userTimezone });
+  try {
+    const utcDate = typeof date === 'string' ? parseISO(date) : date;
+    console.log('formatInUserTimezone - Input date:', utcDate);
+    console.log('formatInUserTimezone - User timezone:', userTimezone);
+    console.log('formatInUserTimezone - Format string:', formatString);
+    
+    // Convert UTC date to user timezone first
+    const zonedDate = toZonedTime(utcDate, userTimezone);
+    console.log('formatInUserTimezone - Zoned date:', zonedDate);
+    
+    // Format the zoned date using the timezone
+    const result = format(zonedDate, formatString, { timeZone: userTimezone });
+    console.log('formatInUserTimezone - Final result:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('formatInUserTimezone - Error:', error);
+    // Fallback to basic formatting
+    const fallbackDate = typeof date === 'string' ? parseISO(date) : date;
+    return format(fallbackDate, formatString, { timeZone: userTimezone });
+  }
 };
 
 /**

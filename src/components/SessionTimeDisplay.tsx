@@ -24,6 +24,7 @@ const SessionTimeDisplay: React.FC<SessionTimeDisplayProps> = ({
   console.log('SessionTimeDisplay - Input date:', date);
   console.log('SessionTimeDisplay - User timezone:', userTimezone);
   console.log('SessionTimeDisplay - User object:', user);
+  console.log('SessionTimeDisplay - Props:', { showDate, showTime, use24Hour });
   
   if (!date) return <span className={className}>--</span>;
   
@@ -39,7 +40,10 @@ const SessionTimeDisplay: React.FC<SessionTimeDisplayProps> = ({
   };
   
   try {
-    const formattedDateTime = formatInUserTimezone(date, userTimezone, getFormatString());
+    const formatString = getFormatString();
+    console.log('SessionTimeDisplay - Using format string:', formatString);
+    
+    const formattedDateTime = formatInUserTimezone(date, userTimezone, formatString);
     console.log('SessionTimeDisplay - Formatted result:', formattedDateTime);
     
     return (
