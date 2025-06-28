@@ -7,11 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 
 interface StudentLevel {
   id: string;
@@ -56,7 +54,10 @@ const StudentLevelsManagement = () => {
         .eq('school_id', schoolId)
         .order('sort_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching student levels:', error);
+        throw error;
+      }
       return data || [];
     },
     enabled: !!schoolId,
@@ -79,7 +80,10 @@ const StudentLevelsManagement = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating student level:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -89,6 +93,7 @@ const StudentLevelsManagement = () => {
       toast.success('Student level created successfully');
     },
     onError: (error: any) => {
+      console.error('Create level error:', error);
       toast.error('Failed to create student level: ' + error.message);
     },
   });
@@ -98,12 +103,18 @@ const StudentLevelsManagement = () => {
     mutationFn: async ({ id, ...updates }: Partial<StudentLevel> & { id: string }) => {
       const { data, error } = await supabase
         .from('student_levels')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating student level:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -114,6 +125,7 @@ const StudentLevelsManagement = () => {
       toast.success('Student level updated successfully');
     },
     onError: (error: any) => {
+      console.error('Update level error:', error);
       toast.error('Failed to update student level: ' + error.message);
     },
   });
@@ -126,13 +138,17 @@ const StudentLevelsManagement = () => {
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting student level:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-levels', schoolId] });
       toast.success('Student level deleted successfully');
     },
     onError: (error: any) => {
+      console.error('Delete level error:', error);
       toast.error('Failed to delete student level: ' + error.message);
     },
   });

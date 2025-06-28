@@ -1,3 +1,4 @@
+
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
@@ -80,6 +81,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         return [];
       }
       
+      console.log('Fetched student levels:', data);
       return data || [];
     },
     enabled: !!schoolId,
