@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,7 +89,7 @@ const StudentDashboard = () => {
             name,
             lesson_type
           ),
-          teacher:teacher_id (
+          teacher:teacher_id!inner (
             first_name,
             last_name,
             email
@@ -108,8 +107,8 @@ const StudentDashboard = () => {
       console.log('Student data:', students);
       
       if (students) {
-        // Fetch subscriptions for this student to get next session info
-        await fetchSubscriptions(students.id);
+        // Fetch subscriptions for this student to get progress info
+        const subscriptionsData = await fetchSubscriptions(students.id);
         
         // Fetch sessions for this student to get the next session date
         const sessionsData = await fetchSessions(students.id);
@@ -118,6 +117,19 @@ const StudentDashboard = () => {
         const nextSession = sessionsData
           .filter(session => session.status === 'scheduled' && new Date(session.scheduled_date) >= new Date())
           .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime())[0];
+        
+        // Calculate subscription progress from active subscription
+        let progressText = '0/0';
+        if (subscriptionsData && subscriptionsData.length > 0) {
+          const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
+          if (activeSubscription) {
+            const completedSessions = sessionsData.filter(session => 
+              session.status === 'completed' && 
+              session.scheduled_date // Make sure it's linked to this subscription
+            ).length;
+            progressText = `${completedSessions}/${activeSubscription.session_count}`;
+          }
+        }
         
         const formattedStudentData: StudentData = {
           id: students.id,
@@ -129,7 +141,7 @@ const StudentDashboard = () => {
           teacher_first_name: students.teacher?.first_name || 'No teacher',
           teacher_last_name: students.teacher?.last_name || 'assigned',
           next_session_date: nextSession?.scheduled_date || null,
-          subscription_progress: '0/0' // Will be updated when we get subscriptions
+          subscription_progress: progressText
         };
         
         setStudentData(formattedStudentData);
@@ -156,23 +168,16 @@ const StudentDashboard = () => {
       
       if (subscriptionsError) {
         console.error('Error fetching subscriptions:', subscriptionsError);
-        return;
+        return [];
       }
       
       console.log('Subscriptions data:', subscriptionsData);
       setSubscriptions(subscriptionsData || []);
-      
-      // Update subscription progress in student data
-      if (subscriptionsData && subscriptionsData.length > 0) {
-        const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
-        if (activeSubscription) {
-          const progress = `${activeSubscription.sessions_completed || 0}/${activeSubscription.session_count}`;
-          setStudentData(prev => prev ? { ...prev, subscription_progress: progress } : null);
-        }
-      }
+      return subscriptionsData || [];
       
     } catch (error) {
       console.error('Error in fetchSubscriptions:', error);
+      return [];
     }
   };
 
