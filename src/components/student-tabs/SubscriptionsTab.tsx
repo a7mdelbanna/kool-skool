@@ -37,7 +37,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       subscriptionsWithPayments: subscriptions?.map(s => ({
         id: s.id,
         total_price: s.total_price,
-        total_paid: s.total_paid
+        total_paid: s.total_paid,
+        session_count: s.session_count,
+        status: s.status
       }))
     });
   }, [subscriptions, isLoading, studentId]);
@@ -132,6 +134,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         <div className="flex items-center space-x-2 mb-4">
           <Calendar className="h-5 w-5 text-gray-600" />
           <h3 className="text-lg font-semibold text-gray-900">Current Subscriptions</h3>
+          {subscriptions && subscriptions.length > 0 && (
+            <span className="text-sm text-gray-500">({subscriptions.length} total)</span>
+          )}
         </div>
 
         {!subscriptions || subscriptions.length === 0 ? (

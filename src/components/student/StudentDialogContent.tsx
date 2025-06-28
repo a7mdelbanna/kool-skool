@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -45,68 +44,84 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Fetch subscriptions with payment totals immediately when dialog opens
+  // Simplified subscription fetching with proper error handling
   const { data: subscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError } = useQuery({
     queryKey: ['student-subscriptions-with-payments', student?.id],
     queryFn: async () => {
-      console.log('🔄 Fetching subscriptions with payment totals for student:', student?.id);
+      console.log('🔄 Fetching subscriptions for student:', student?.id);
       
       if (!student?.id) {
         console.log('❌ No student ID for subscription fetch');
         return [];
       }
       
-      // First get the basic subscriptions
-      const { data: subscriptionsData, error: subscriptionsError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false });
-      
-      if (subscriptionsError) {
-        console.error('❌ Subscription fetch error:', subscriptionsError);
-        throw subscriptionsError;
-      }
+      try {
+        // Step 1: Get basic subscriptions first
+        const { data: subscriptionsData, error: subscriptionsError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false });
+        
+        if (subscriptionsError) {
+          console.error('❌ Subscription fetch error:', subscriptionsError);
+          throw subscriptionsError;
+        }
 
-      if (!subscriptionsData || subscriptionsData.length === 0) {
-        console.log('✅ No subscriptions found for student');
+        console.log('✅ Raw subscriptions data:', subscriptionsData);
+
+        if (!subscriptionsData || subscriptionsData.length === 0) {
+          console.log('✅ No subscriptions found for student');
+          return [];
+        }
+
+        // Step 2: For each subscription, calculate the total paid from transactions
+        const subscriptionsWithPayments = await Promise.all(
+          subscriptionsData.map(async (subscription) => {
+            console.log('💰 Calculating payments for subscription:', subscription.id);
+            
+            try {
+              // Get all income transactions linked to this subscription
+              const { data: payments, error: paymentsError } = await supabase
+                .from('transactions')
+                .select('amount')
+                .eq('subscription_id', subscription.id)
+                .eq('type', 'income')
+                .eq('status', 'completed');
+
+              if (paymentsError) {
+                console.error('❌ Error fetching payments for subscription:', subscription.id, paymentsError);
+                // Don't throw, just use 0 as fallback
+                return {
+                  ...subscription,
+                  total_paid: 0
+                };
+              }
+
+              const totalPaid = (payments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
+              console.log('✅ Total paid for subscription', subscription.id, ':', totalPaid);
+
+              return {
+                ...subscription,
+                total_paid: totalPaid
+              };
+            } catch (error) {
+              console.error('❌ Error calculating payments for subscription:', subscription.id, error);
+              return {
+                ...subscription,
+                total_paid: 0
+              };
+            }
+          })
+        );
+        
+        console.log('✅ Subscriptions with payment totals:', subscriptionsWithPayments);
+        return subscriptionsWithPayments;
+      } catch (error) {
+        console.error('❌ Error in subscription fetch:', error);
+        // Return empty array instead of throwing to prevent UI break
         return [];
       }
-
-      // For each subscription, calculate the total paid from transactions
-      const subscriptionsWithPayments = await Promise.all(
-        subscriptionsData.map(async (subscription) => {
-          console.log('💰 Calculating payments for subscription:', subscription.id);
-          
-          // Get all income transactions linked to this subscription
-          const { data: payments, error: paymentsError } = await supabase
-            .from('transactions')
-            .select('amount')
-            .eq('subscription_id', subscription.id)
-            .eq('type', 'income')
-            .eq('status', 'completed');
-
-          if (paymentsError) {
-            console.error('❌ Error fetching payments for subscription:', subscription.id, paymentsError);
-            // Don't throw, just use 0 as fallback
-            return {
-              ...subscription,
-              total_paid: 0
-            };
-          }
-
-          const totalPaid = (payments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
-          console.log('✅ Total paid for subscription', subscription.id, ':', totalPaid);
-
-          return {
-            ...subscription,
-            total_paid: totalPaid
-          };
-        })
-      );
-      
-      console.log('✅ Subscriptions with payment totals fetched:', subscriptionsWithPayments.length);
-      return subscriptionsWithPayments;
     },
     enabled: !!student?.id && open,
     retry: 1,
@@ -218,47 +233,15 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     setActiveTab(value);
   };
 
-  // Pre-load subscriptions data when dialog opens
+  // Debug subscription data when it changes
   useEffect(() => {
-    if (open && student?.id) {
-      console.log('🎯 Dialog opened - ensuring subscriptions are prefetched for student:', student.id);
-      // This will trigger the subscription query if it hasn't been fetched yet
-      queryClient.prefetchQuery({
-        queryKey: ['student-subscriptions-with-payments', student.id],
-        queryFn: async () => {
-          const { data: subscriptionsData, error } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('student_id', student.id)
-            .order('created_at', { ascending: false });
-          
-          if (error) throw error;
-          
-          // Calculate payment totals for each subscription
-          const subscriptionsWithPayments = await Promise.all(
-            (subscriptionsData || []).map(async (subscription) => {
-              const { data: payments } = await supabase
-                .from('transactions')
-                .select('amount')
-                .eq('subscription_id', subscription.id)
-                .eq('type', 'income')
-                .eq('status', 'completed');
-
-              const totalPaid = (payments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
-
-              return {
-                ...subscription,
-                total_paid: totalPaid
-              };
-            })
-          );
-          
-          return subscriptionsWithPayments;
-        },
-        staleTime: 30000,
-      });
-    }
-  }, [open, student?.id, queryClient]);
+    console.log('📊 Subscription data updated:', {
+      subscriptions: subscriptions,
+      count: subscriptions?.length || 0,
+      isLoading: subscriptionsLoading,
+      hasError: !!subscriptionsError
+    });
+  }, [subscriptions, subscriptionsLoading, subscriptionsError]);
 
   return (
     <>
