@@ -132,18 +132,17 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       setSessions(sessionsArray);
       console.log('Sessions loaded:', sessionsArray.length);
 
-      // Step 2: Load subscriptions with explicit error handling
-      console.log('Loading subscriptions for student:', studentData.id);
+      // Step 2: Load subscriptions using the same RPC function as SubscriptionsTab
+      console.log('Loading subscriptions using RPC function for student:', studentData.id);
       const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('student_id', studentData.id)
-        .order('created_at', { ascending: false });
+        .rpc('get_student_subscriptions', { 
+          p_student_id: studentData.id 
+        });
 
-      console.log('Subscription query result:', { data: subscriptionData, error: subscriptionError });
+      console.log('Subscription RPC query result:', { data: subscriptionData, error: subscriptionError });
 
       if (subscriptionError) {
-        console.error('❌ Error loading subscriptions:', subscriptionError);
+        console.error('❌ Error loading subscriptions via RPC:', subscriptionError);
         toast({
           title: "Error",
           description: `Failed to load subscriptions: ${subscriptionError.message}`,
@@ -152,7 +151,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         // Continue with empty subscriptions rather than throwing
         setSubscriptions([]);
       } else {
-        console.log('Subscriptions loaded:', subscriptionData?.length || 0);
+        console.log('Subscriptions loaded via RPC:', subscriptionData?.length || 0);
         
         // Step 3: Group sessions by subscription
         const subscriptionsWithSessions: SubscriptionInfo[] = (subscriptionData || []).map(sub => {
