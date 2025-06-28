@@ -92,10 +92,10 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
               const activeSubscription = subscriptions.find(sub => sub.status === 'active');
               
               if (activeSubscription) {
-                // Count completed sessions (attended or cancelled) - handle nullable value
+                // Count completed sessions - using the correct property name
                 const completedSessions = activeSubscription.sessions_completed ?? 0;
                 
-                // Calculate end date if not provided - handle nullable value
+                // Calculate end date if not provided - using the correct property name
                 let endDate = activeSubscription.end_date;
                 if (!endDate && activeSubscription.start_date && activeSubscription.duration_months) {
                   const startDate = new Date(activeSubscription.start_date);
