@@ -41,56 +41,15 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  // Enhanced logging when component receives new data
+  // Log when subscriptions prop changes
   useEffect(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`===== SUBSCRIPTIONS TAB RENDER (${timestamp}) =====`);
-    console.log('📊 Component render details:');
-    console.log('  - Subscriptions received:', subscriptions?.length || 0);
-    console.log('  - Subscriptions data:', subscriptions);
-    console.log('  - Student ID:', studentId);
-    console.log('  - Is loading:', isLoading);
-    console.log('  - Component instance:', Date.now());
-    
-    // Log each subscription in detail
-    if (subscriptions && subscriptions.length > 0) {
-      console.log('📋 Detailed subscription list:');
-      subscriptions.forEach((sub, index) => {
-        console.log(`  Subscription ${index + 1}:`, {
-          id: sub.id,
-          student_id: sub.student_id,
-          status: sub.status,
-          start_date: sub.start_date,
-          session_count: sub.session_count,
-          total_price: sub.total_price
-        });
-      });
-    } else {
-      console.log('❌ No subscriptions to display');
-    }
-    
-    console.log('===== END SUBSCRIPTIONS TAB RENDER =====');
-  }, [subscriptions, studentId, isLoading]);
-
-  // Log when props change
-  useEffect(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`===== SUBSCRIPTIONS TAB PROPS CHANGE (${timestamp}) =====`);
-    console.log('🔄 Props change detected:');
-    console.log('  - New subscriptions count:', subscriptions?.length || 0);
-    console.log('  - Previous vs current comparison:');
-    console.log('    - Is array?', Array.isArray(subscriptions));
-    console.log('    - Is loading?', isLoading);
-    console.log('    - Student ID valid?', !!studentId);
-    
-    if (!subscriptions || subscriptions.length === 0) {
-      console.log('⚠️ WARNING: Subscriptions is empty or null');
-      console.log('  - subscriptions value:', subscriptions);
-      console.log('  - type:', typeof subscriptions);
-    }
-    
-    console.log('===== END PROPS CHANGE LOG =====');
-  }, [subscriptions]);
+    console.log('📊 SubscriptionsTab received subscriptions:', {
+      count: subscriptions?.length || 0,
+      isLoading,
+      studentId,
+      subscriptions: subscriptions
+    });
+  }, [subscriptions, isLoading, studentId]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -181,7 +140,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     }
   };
 
-  // Enhanced loading state with debugging
+  // Loading state
   if (isLoading) {
     console.log('🔄 RENDERING LOADING STATE');
     return (
@@ -218,12 +177,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     );
   }
 
-  // Enhanced empty state with debugging
+  // Empty state
   if (!subscriptions || subscriptions.length === 0) {
-    console.log('📭 RENDERING EMPTY STATE');
-    console.log('  - subscriptions:', subscriptions);
-    console.log('  - subscriptions length:', subscriptions?.length);
-    console.log('  - studentId:', studentId);
+    console.log('📭 RENDERING EMPTY STATE - subscriptions:', subscriptions);
     
     return (
       <div className="space-y-6">
@@ -264,9 +220,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     );
   }
 
-  // Enhanced subscriptions display with debugging
-  console.log('📊 RENDERING SUBSCRIPTIONS LIST');
-  console.log('  - Rendering', subscriptions.length, 'subscriptions');
+  // Subscriptions display
+  console.log('📊 RENDERING SUBSCRIPTIONS LIST - count:', subscriptions.length);
   
   return (
     <div className="space-y-6">
