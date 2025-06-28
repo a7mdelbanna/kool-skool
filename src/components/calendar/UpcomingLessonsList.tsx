@@ -257,13 +257,13 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     return 1; // Default to 1 if we can't determine the session number
   };
 
-  // Render status change options
+  // Render status change options - now in a single row
   const renderStatusChangeOptions = (session: Session) => {
     const sessionId = session.id;
     const isLoading = actionLoading === sessionId;
 
     return (
-      <div className="grid grid-cols-2 gap-2 mt-2">
+      <div className="grid grid-cols-4 gap-2 mt-2">
         <Button 
           onClick={(e) => {
             e.stopPropagation();
