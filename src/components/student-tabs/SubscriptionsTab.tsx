@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit3, Calendar, Clock, DollarSign, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit3, Calendar, Clock, DollarSign, Users, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,18 +25,29 @@ interface SubscriptionsTabProps {
   subscriptions: Subscription[];
   onRefresh: () => void;
   studentId: string;
+  isLoading?: boolean;
 }
 
 const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   subscriptions,
   onRefresh,
-  studentId
+  studentId,
+  isLoading = false
 }) => {
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  // Log when component receives new data
+  useEffect(() => {
+    console.log('===== SUBSCRIPTIONS TAB RENDER =====');
+    console.log('Subscriptions received:', subscriptions.length);
+    console.log('Student ID:', studentId);
+    console.log('Is loading:', isLoading);
+    console.log('===== END SUBSCRIPTIONS TAB RENDER =====');
+  }, [subscriptions, studentId, isLoading]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -123,6 +133,42 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       return schedule?.toString() || 'No schedule';
     }
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Current Subscriptions</h3>
+            <p className="text-sm text-gray-600">Manage student subscription plans and schedules</p>
+          </div>
+          <Button 
+            onClick={() => setAddDialogOpen(true)} 
+            className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
+            disabled={isLoading}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Subscription
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <p className="text-gray-600">Loading subscriptions...</p>
+          </div>
+        </div>
+
+        <AddSubscriptionDialog
+          studentId={studentId}
+          open={addDialogOpen}
+          onOpenChange={setAddDialogOpen}
+          onSuccess={handleAddSuccess}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -9,7 +9,7 @@ import SessionsTab from "../student-tabs/SessionsTab";
 import { Student } from "../StudentCard";
 import { User, CreditCard, Calendar, BookOpen } from "lucide-react";
 import { useStudentForm } from "@/hooks/useStudentForm";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -29,6 +29,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
   open
 }) => {
   const [activeTab, setActiveTab] = useState("profile");
+  const queryClient = useQueryClient();
   
   const {
     studentData,
@@ -44,8 +45,33 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Enhanced subscription fetching with debugging
-  const { data: subscriptions = [], refetch: refetchSubscriptions } = useQuery({
+  // Prefetch subscriptions immediately when dialog opens
+  useEffect(() => {
+    if (open && student?.id) {
+      console.log('Dialog opened - prefetching subscriptions for student:', student.id);
+      queryClient.prefetchQuery({
+        queryKey: ['student-subscriptions', student.id],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('student_id', student.id)
+            .order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('Error prefetching subscriptions:', error);
+            throw error;
+          }
+          
+          console.log('Subscriptions prefetched successfully:', data?.length || 0, 'items');
+          return data || [];
+        },
+      });
+    }
+  }, [open, student?.id, queryClient]);
+
+  // Enhanced subscription fetching with immediate availability
+  const { data: subscriptions = [], refetch: refetchSubscriptions, isLoading: subscriptionsLoading } = useQuery({
     queryKey: ['student-subscriptions', student?.id],
     queryFn: async () => {
       console.log('===== SUBSCRIPTIONS FETCH DEBUG =====');
@@ -58,7 +84,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         return [];
       }
       
-      console.log('Attempting to fetch subscriptions for student:', student.id);
+      console.log('Fetching subscriptions for student:', student.id);
       
       const { data, error } = await supabase
         .from('subscriptions')
@@ -90,15 +116,23 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     },
     enabled: !!student?.id,
     retry: 1,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    cacheTime: 300000, // Keep in cache for 5 minutes
   });
 
-  // Add effect to log subscription changes
+  // Add effect to log subscription changes and force re-render
   useEffect(() => {
     console.log('===== SUBSCRIPTIONS STATE UPDATE =====');
     console.log('Current subscriptions state:', subscriptions);
     console.log('Subscriptions length:', subscriptions.length);
+    console.log('Subscriptions loading:', subscriptionsLoading);
     console.log('===== END SUBSCRIPTIONS STATE UPDATE =====');
-  }, [subscriptions]);
+    
+    // Force a re-render of the subscriptions tab when data changes
+    if (subscriptions.length > 0 && activeTab === 'subscriptions') {
+      console.log('Subscriptions data loaded and tab is active - ensuring render');
+    }
+  }, [subscriptions, subscriptionsLoading, activeTab]);
 
   // Detailed course data debugging with clear section markers
   useEffect(() => {
@@ -190,9 +224,22 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     refetchSubscriptions();
   };
 
+  // Handle tab changes and ensure data is available
+  const handleTabChange = (value: string) => {
+    console.log('Tab changed to:', value);
+    setActiveTab(value);
+    
+    // If switching to subscriptions tab, ensure data is fresh
+    if (value === 'subscriptions' && student?.id) {
+      console.log('Switching to subscriptions tab - ensuring fresh data');
+      // Invalidate and refetch to ensure we have the latest data
+      queryClient.invalidateQueries({ queryKey: ['student-subscriptions', student.id] });
+    }
+  };
+
   return (
     <>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4">
         <TabsList className="grid grid-cols-4 mb-6">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
@@ -233,6 +280,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
             subscriptions={subscriptions}
             onRefresh={handleSubscriptionRefresh}
             studentId={student?.id || ''}
+            isLoading={subscriptionsLoading}
           />
         </TabsContent>
         
