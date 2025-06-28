@@ -65,6 +65,14 @@ const StudentDashboard = () => {
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
 
+  // Force re-render when user timezone changes
+  const currentUserTimezone = getEffectiveTimezone(user?.timezone);
+
+  useEffect(() => {
+    console.log('StudentDashboard - User timezone changed:', currentUserTimezone);
+    setUserTimezone(currentUserTimezone);
+  }, [currentUserTimezone]);
+
   useEffect(() => {
     // Check if user is authenticated and is a student
     if (!user || user.role !== 'student') {
@@ -73,11 +81,7 @@ const StudentDashboard = () => {
       return;
     }
     
-    // Initialize timezone
-    const effectiveTimezone = getEffectiveTimezone(user.timezone);
-    console.log('Setting initial timezone:', effectiveTimezone);
-    setUserTimezone(effectiveTimezone);
-    
+    console.log('StudentDashboard - Initial load with user:', user);
     fetchStudentData();
   }, [user, navigate]);
 
@@ -236,9 +240,10 @@ const StudentDashboard = () => {
 
   const handleTimezoneChange = async (newTimezone: string) => {
     try {
-      console.log('=== TIMEZONE CHANGE ===');
+      console.log('=== TIMEZONE CHANGE DEBUG ===');
       console.log('Old timezone:', userTimezone);
       console.log('New timezone:', newTimezone);
+      console.log('Current user:', user);
       
       // Update in database
       const { error } = await supabase
@@ -247,34 +252,31 @@ const StudentDashboard = () => {
         .eq('id', user?.id);
 
       if (error) {
-        console.error('Error updating timezone:', error);
+        console.error('Error updating timezone in database:', error);
         toast.error('Failed to update timezone');
         return;
       }
 
-      // Update local state first
-      setUserTimezone(newTimezone);
-      console.log('Updated userTimezone state to:', newTimezone);
-      
-      // Update user context
+      console.log('Successfully updated timezone in database');
+
+      // Update user context immediately
       if (user) {
         const updatedUser = { ...user, timezone: newTimezone };
+        console.log('Updating user context with:', updatedUser);
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        console.log('Updated user context with new timezone');
       }
 
+      // Update local state
+      setUserTimezone(newTimezone);
       setTimezoneDialogOpen(false);
+      
       toast.success('Timezone updated successfully');
       
-      // Force a small delay to ensure state is updated before refreshing data
-      setTimeout(async () => {
-        console.log('Refreshing data with new timezone:', newTimezone);
-        await fetchStudentData();
-      }, 100);
+      console.log('Timezone change completed successfully');
       
     } catch (error) {
-      console.error('Error updating timezone:', error);
+      console.error('Error in handleTimezoneChange:', error);
       toast.error('Failed to update timezone');
     }
   };
@@ -329,6 +331,9 @@ const StudentDashboard = () => {
   const recentSessions = sessions.filter(
     session => session.status !== 'scheduled' || new Date(session.scheduled_date) < new Date()
   ).slice(0, 3);
+
+  console.log('StudentDashboard - Rendering with timezone:', userTimezone);
+  console.log('StudentDashboard - Upcoming sessions:', upcomingSessions);
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -461,6 +466,7 @@ const StudentDashboard = () => {
                   <SessionTimeDisplay 
                     date={studentData.next_session_date} 
                     className="text-sm font-semibold"
+                    key={`next-session-${userTimezone}`}
                   />
                   <Badge className="bg-green-100 text-green-800">
                     <Clock className="h-3 w-3 mr-1" />
@@ -491,9 +497,9 @@ const StudentDashboard = () => {
                       </Badge>
                     </CardTitle>
                     <CardDescription>
-                      Start Date: <SessionTimeDisplay date={subscription.start_date} showTime={false} />
+                      Start Date: <SessionTimeDisplay date={subscription.start_date} showTime={false} key={`sub-start-${subscription.id}-${userTimezone}`} />
                       {subscription.end_date && (
-                        <span> - End Date: <SessionTimeDisplay date={subscription.end_date} showTime={false} /></span>
+                        <span> - End Date: <SessionTimeDisplay date={subscription.end_date} showTime={false} key={`sub-end-${subscription.id}-${userTimezone}`} /></span>
                       )}
                     </CardDescription>
                   </CardHeader>
@@ -534,11 +540,13 @@ const StudentDashboard = () => {
                             date={session.scheduled_date} 
                             className="font-medium"
                             showTime={false}
+                            key={`upcoming-date-${session.id}-${userTimezone}`}
                           />
                           <p className="text-sm text-gray-500">
                             <SessionTimeDisplay 
                               date={session.scheduled_date} 
                               showDate={false}
+                              key={`upcoming-time-${session.id}-${userTimezone}`}
                             /> • {session.duration_minutes} min
                           </p>
                         </div>
@@ -573,11 +581,13 @@ const StudentDashboard = () => {
                             date={session.scheduled_date} 
                             className="font-medium"
                             showTime={false}
+                            key={`recent-date-${session.id}-${userTimezone}`}
                           />
                           <p className="text-sm text-gray-500">
                             <SessionTimeDisplay 
                               date={session.scheduled_date} 
                               showDate={false}
+                              key={`recent-time-${session.id}-${userTimezone}`}
                             /> • {session.duration_minutes} min
                           </p>
                         </div>

@@ -1,6 +1,6 @@
 
 import React, { useContext } from 'react';
-import { formatDateTimeDisplay, getEffectiveTimezone } from '@/utils/timezone';
+import { formatInUserTimezone, getEffectiveTimezone } from '@/utils/timezone';
 import { UserContext } from '@/App';
 
 interface SessionTimeDisplayProps {
@@ -21,9 +21,13 @@ const SessionTimeDisplay: React.FC<SessionTimeDisplayProps> = ({
   const { user } = useContext(UserContext);
   const userTimezone = getEffectiveTimezone(user?.timezone);
   
+  console.log('SessionTimeDisplay - Input date:', date);
+  console.log('SessionTimeDisplay - User timezone:', userTimezone);
+  console.log('SessionTimeDisplay - User object:', user);
+  
   if (!date) return <span className={className}>--</span>;
   
-  const formatString = () => {
+  const getFormatString = () => {
     if (showDate && showTime) {
       return use24Hour ? 'MMM d, yyyy HH:mm' : 'MMM d, yyyy h:mm a';
     } else if (showDate) {
@@ -34,13 +38,19 @@ const SessionTimeDisplay: React.FC<SessionTimeDisplayProps> = ({
     return 'MMM d, yyyy h:mm a';
   };
   
-  const formattedDateTime = formatDateTimeDisplay(date, userTimezone, use24Hour);
-  
-  return (
-    <span className={className} title={`${formattedDateTime} (${userTimezone})`}>
-      {formattedDateTime}
-    </span>
-  );
+  try {
+    const formattedDateTime = formatInUserTimezone(date, userTimezone, getFormatString());
+    console.log('SessionTimeDisplay - Formatted result:', formattedDateTime);
+    
+    return (
+      <span className={className} title={`${formattedDateTime} (${userTimezone})`}>
+        {formattedDateTime}
+      </span>
+    );
+  } catch (error) {
+    console.error('SessionTimeDisplay - Error formatting date:', error);
+    return <span className={className}>Invalid Date</span>;
+  }
 };
 
 export default SessionTimeDisplay;

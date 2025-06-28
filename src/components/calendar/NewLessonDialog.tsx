@@ -145,11 +145,12 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
       // Parse duration
       const durationMinutes = parseInt(duration.replace(' min', ''));
       
-      // Create lesson session in database
+      // Create lesson session in database - fix by adding subscription_id as null for standalone sessions
       const { error } = await supabase
         .from('lesson_sessions')
         .insert({
           student_id: studentId,
+          subscription_id: null, // Add this required field for standalone sessions
           scheduled_date: utcDateTime.toISOString(),
           duration_minutes: durationMinutes,
           status: 'scheduled',
