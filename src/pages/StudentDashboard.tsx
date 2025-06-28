@@ -120,16 +120,24 @@ const StudentDashboard = () => {
         
         // Calculate subscription progress from active subscription
         let progressText = '0/0';
-        if (subscriptionsData && subscriptionsData.length > 0) {
-          const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
-          if (activeSubscription) {
-            // Count sessions that are marked as attended (completed) or cancelled
-            const completedSessions = sessionsData.filter(session => 
-              session.status === 'completed' || session.status === 'cancelled'
-            ).length;
-            progressText = `${completedSessions}/${activeSubscription.session_count}`;
-          }
+        const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
+        
+        if (activeSubscription) {
+          console.log('Active subscription found:', activeSubscription);
+          console.log('Total sessions in subscription:', activeSubscription.session_count);
+          
+          // Count sessions that are marked as completed or cancelled for this specific subscription
+          const completedSessions = sessionsData.filter(session => 
+            (session.status === 'completed' || session.status === 'cancelled')
+          ).length;
+          
+          console.log('Completed/cancelled sessions:', completedSessions);
+          progressText = `${completedSessions}/${activeSubscription.session_count}`;
+        } else {
+          console.log('No active subscription found');
         }
+        
+        console.log('Final progress text:', progressText);
         
         const formattedStudentData: StudentData = {
           id: students.id,
@@ -506,6 +514,27 @@ const StudentDashboard = () => {
       </div>
     </div>
   );
+};
+
+const handleLogout = () => {
+  localStorage.removeItem('user');
+  setUser(null);
+  window.dispatchEvent(new Event('storage'));
+  toast.success('Logged out successfully');
+  navigate('/student-login');
+};
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+    case 'scheduled':
+      return <Badge className="bg-blue-100 text-blue-800"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
+    case 'cancelled':
+      return <Badge className="bg-red-100 text-red-800"><AlertCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
+    default:
+      return <Badge variant="secondary">{status}</Badge>;
+  }
 };
 
 export default StudentDashboard;
