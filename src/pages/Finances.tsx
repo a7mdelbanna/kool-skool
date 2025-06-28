@@ -3,6 +3,12 @@ import React from 'react';
 import { DollarSign } from 'lucide-react';
 import ExpectedPaymentsSection from '@/components/ExpectedPaymentsSection';
 import AccountsBalanceSection from '@/components/AccountsBalanceSection';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
 const FinancesPage = () => {
   // Get school ID from localStorage
@@ -45,13 +51,34 @@ const FinancesPage = () => {
         </div>
       </div>
 
-      {/* Account Balances Section */}
-      <div className="mb-6">
-        <AccountsBalanceSection schoolId={schoolId} />
-      </div>
+      {/* Collapsible Sections */}
+      <Accordion type="multiple" defaultValue={["accounts", "payments"]} className="w-full">
+        {/* Account Balances Section */}
+        <AccordionItem value="accounts" className="border rounded-lg mb-4">
+          <AccordionTrigger className="px-6 py-4 hover:no-underline">
+            <div className="flex items-center gap-2 text-lg font-semibold">
+              <DollarSign className="h-5 w-5" />
+              Account Balances
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 pb-4">
+            <AccountsBalanceSection schoolId={schoolId} />
+          </AccordionContent>
+        </AccordionItem>
 
-      {/* Expected Payments Section */}
-      <ExpectedPaymentsSection schoolId={schoolId} />
+        {/* Expected Payments Section */}
+        <AccordionItem value="payments" className="border rounded-lg mb-4">
+          <AccordionTrigger className="px-6 py-4 hover:no-underline">
+            <div className="flex items-center gap-2 text-lg font-semibold">
+              <DollarSign className="h-5 w-5" />
+              Expected Payments
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 pb-4">
+            <ExpectedPaymentsSection schoolId={schoolId} />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };
