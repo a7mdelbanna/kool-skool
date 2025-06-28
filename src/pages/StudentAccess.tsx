@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit } from 'lucide-react';
@@ -39,7 +40,7 @@ const StudentAccess = () => {
   console.log('=== STUDENT ACCESS DEBUG ===');
   console.log('School ID:', schoolId);
 
-  // Fetch students and their password info with simplified approach
+  // Fetch students and their password info with direct query approach
   const { data: studentsWithPasswords = [], isLoading } = useQuery({
     queryKey: ['students-with-passwords', schoolId],
     queryFn: async () => {
@@ -59,77 +60,41 @@ const StudentAccess = () => {
         return [];
       }
 
-      // Instead of a separate query, let's use the RPC function to get password info
-      // This bypasses potential RLS issues
-      console.log('Fetching password info using RPC...');
-      const { data: passwordData, error: passwordError } = await supabase.rpc('get_user_passwords', {
-        p_school_id: schoolId
-      });
+      // Get all unique user IDs that are not null
+      const userIds = studentsData
+        .map(s => s.user_id)
+        .filter(Boolean);
 
-      console.log('Password RPC result:', { data: passwordData, error: passwordError });
+      console.log('User IDs for password query:', userIds);
 
-      // If RPC doesn't exist, fall back to direct query with better error handling
       let userPasswordMap = new Map();
       
-      if (passwordError) {
-        console.log('RPC not available, trying direct query...');
-        
-        // Get all unique user IDs that are not null
-        const userIds = studentsData
-          .map(s => s.user_id)
-          .filter(Boolean);
-
-        console.log('User IDs for direct query:', userIds);
-
-        if (userIds.length > 0) {
-          // Try a more explicit query approach
+      if (userIds.length > 0) {
+        try {
+          // Direct query to get password hashes
           console.log('Executing direct password query...');
           
-          try {
-            const { data: directPasswordData, error: directError } = await supabase
-              .from('users')
-              .select('id, password_hash')
-              .in('id', userIds);
+          const { data: passwordData, error: passwordError } = await supabase
+            .from('users')
+            .select('id, password_hash')
+            .in('id', userIds);
 
-            console.log('Direct password query result:', { 
-              data: directPasswordData, 
-              error: directError,
-              count: directPasswordData?.length || 0
+          console.log('Password query result:', { 
+            data: passwordData, 
+            error: passwordError,
+            count: passwordData?.length || 0
+          });
+
+          if (passwordError) {
+            console.error('Password query error:', passwordError);
+          } else if (passwordData && Array.isArray(passwordData)) {
+            passwordData.forEach(p => {
+              userPasswordMap.set(p.id, p.password_hash);
             });
-
-            if (directError) {
-              console.error('Direct query error:', directError);
-              // Try with explicit authentication bypass
-              const { data: bypassData, error: bypassError } = await supabase
-                .from('users')
-                .select('id, password_hash')
-                .in('id', userIds)
-                .eq('school_id', schoolId); // Add school_id filter to help with RLS
-
-              console.log('Bypass query result:', { 
-                data: bypassData, 
-                error: bypassError,
-                count: bypassData?.length || 0
-              });
-
-              if (bypassData) {
-                bypassData.forEach(p => {
-                  userPasswordMap.set(p.id, p.password_hash);
-                });
-              }
-            } else if (directPasswordData) {
-              directPasswordData.forEach(p => {
-                userPasswordMap.set(p.id, p.password_hash);
-              });
-            }
-          } catch (queryError) {
-            console.error('Query execution error:', queryError);
           }
+        } catch (queryError) {
+          console.error('Query execution error:', queryError);
         }
-      } else if (passwordData) {
-        passwordData.forEach(p => {
-          userPasswordMap.set(p.id, p.password_hash);
-        });
       }
 
       console.log('Password map size:', userPasswordMap.size);
