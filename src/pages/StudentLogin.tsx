@@ -19,7 +19,6 @@ const StudentLogin = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [debugInfo, setDebugInfo] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('checking');
   
   // Check if we're already authenticated and redirect if so
@@ -37,99 +36,32 @@ const StudentLogin = () => {
     }
   }, [navigate]);
 
-  // Test database connection and show sample data
+  // Test database connection
   const testDatabaseConnection = async () => {
     console.log("=== DATABASE CONNECTION TEST ===");
-    let debugMessage = '';
     
     try {
       setConnectionStatus('testing');
       
-      // Test basic connection
-      console.log("Testing basic database connection...");
-      const { data: testConnection, error: connectionError } = await supabase
-        .from('users')
-        .select('count')
+      // Test basic connection by checking for students
+      console.log("Testing database connection...");
+      const { data: students, error: connectionError } = await supabase
+        .from('students')
+        .select('id')
         .limit(1);
       
       if (connectionError) {
         console.error("❌ Database connection failed:", connectionError);
-        debugMessage += `❌ Database connection failed: ${connectionError.message}\n`;
         setConnectionStatus('failed');
-        setDebugInfo(debugMessage);
         return;
       }
       
       console.log("✅ Database connection successful");
-      debugMessage += "✅ Database connection successful\n\n";
-      
-      // Get sample student data with passwords info
-      console.log("Fetching sample students with password info...");
-      const { data: studentUsers, error: studentsError } = await supabase
-        .from('users')
-        .select('id, email, first_name, last_name, role, school_id, password_plain, password_hash')
-        .eq('role', 'student')
-        .limit(5);
-      
-      if (studentsError) {
-        console.error("❌ Error fetching students:", studentsError);
-        debugMessage += `❌ Error fetching students: ${studentsError.message}\n`;
-      } else {
-        console.log("📋 Sample students found:", studentUsers?.length || 0);
-        debugMessage += `📋 Sample students found: ${studentUsers?.length || 0}\n`;
-        if (studentUsers && studentUsers.length > 0) {
-          studentUsers.forEach((user, index) => {
-            const hasPlainPassword = !!(user.password_plain && user.password_plain.trim() !== '');
-            const hasHashedPassword = !!(user.password_hash && user.password_hash.trim() !== '');
-            debugMessage += `   ${index + 1}. ${user.email} (${user.first_name} ${user.last_name})\n`;
-            debugMessage += `      - Plain password: ${hasPlainPassword ? 'YES' : 'NO'}\n`;
-            debugMessage += `      - Hashed password: ${hasHashedPassword ? 'YES' : 'NO'}\n`;
-            if (hasPlainPassword) {
-              debugMessage += `      - Plain password value: "${user.password_plain}"\n`;
-            }
-          });
-        }
-        debugMessage += '\n';
-      }
-      
-      // Test specific email lookup if provided
-      if (email && email.includes('@')) {
-        console.log(`Testing lookup for email: ${email}`);
-        debugMessage += `🔍 Testing lookup for email: ${email}\n`;
-        
-        const { data: specificUser, error: lookupError } = await supabase
-          .from('users')
-          .select('id, email, first_name, last_name, role, school_id, password_plain, password_hash')
-          .eq('email', email)
-          .eq('role', 'student');
-        
-        if (lookupError) {
-          console.error("❌ Error in specific lookup:", lookupError);
-          debugMessage += `❌ Lookup error: ${lookupError.message}\n`;
-        } else {
-          debugMessage += `📧 Found ${specificUser?.length || 0} student(s) with email ${email}\n`;
-          if (specificUser && specificUser.length > 0) {
-            const user = specificUser[0];
-            const hasPlainPassword = !!(user.password_plain && user.password_plain.trim() !== '');
-            const hasHashedPassword = !!(user.password_hash && user.password_hash.trim() !== '');
-            debugMessage += `   Student: ${user.first_name} ${user.last_name}\n`;
-            debugMessage += `   Plain password: ${hasPlainPassword ? 'YES' : 'NO'}\n`;
-            debugMessage += `   Hashed password: ${hasHashedPassword ? 'YES' : 'NO'}\n`;
-            if (hasPlainPassword) {
-              debugMessage += `   Plain password value: "${user.password_plain}"\n`;
-            }
-          }
-        }
-      }
-      
       setConnectionStatus('connected');
-      setDebugInfo(debugMessage);
       
     } catch (error) {
       console.error('❌ Database test failed:', error);
-      debugMessage += `❌ Database test failed: ${error.message}\n`;
       setConnectionStatus('failed');
-      setDebugInfo(debugMessage);
     }
   };
 
@@ -137,13 +69,6 @@ const StudentLogin = () => {
   useEffect(() => {
     testDatabaseConnection();
   }, []);
-  
-  // Re-run test when email changes to show specific lookup
-  useEffect(() => {
-    if (email && email.includes('@')) {
-      testDatabaseConnection();
-    }
-  }, [email]);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,89 +84,43 @@ const StudentLogin = () => {
       
       console.log("=== STUDENT LOGIN ATTEMPT ===");
       console.log("Email:", email);
-      console.log("Password provided:", !!password);
+      console.log("Using new verify_student_login function...");
       
-      // Look for student user with this email
-      console.log("Looking for student user...");
-      const { data: users, error: userError } = await supabase
-        .from('users')
-        .select('id, email, first_name, last_name, role, school_id, password_plain, password_hash')
-        .eq('email', email.toLowerCase().trim())
-        .eq('role', 'student');
+      // Use the new database function to verify login
+      const { data: loginResults, error: loginError } = await supabase
+        .rpc('verify_student_login', {
+          p_email: email.toLowerCase().trim(),
+          p_password: password
+        });
       
-      if (userError) {
-        console.error("❌ Database error:", userError);
-        throw new Error(`Database error: ${userError.message}`);
+      if (loginError) {
+        console.error("❌ Login function error:", loginError);
+        throw new Error(`Login failed: ${loginError.message}`);
       }
       
-      console.log("Users found:", users?.length || 0);
+      console.log("Login results:", loginResults);
       
-      if (!users || users.length === 0) {
-        throw new Error('No student account found with this email address. Please check your email or contact your teacher.');
+      if (!loginResults || loginResults.length === 0) {
+        throw new Error('No response from login function');
       }
       
-      const user = users[0];
-      console.log("Student found:", user.first_name, user.last_name);
+      const result = loginResults[0];
       
-      // Check password
-      console.log("Checking password...");
-      let passwordMatch = false;
-      let passwordSource = '';
-      
-      // Try plain text password first
-      if (user.password_plain && user.password_plain.trim() !== '') {
-        console.log("Checking plain text password");
-        passwordMatch = password === user.password_plain;
-        passwordSource = 'plain';
-        console.log("Plain password match:", passwordMatch);
-        console.log("Expected:", user.password_plain, "| Provided:", password);
+      if (!result.success) {
+        console.error("❌ Login failed:", result.message);
+        throw new Error(result.message);
       }
       
-      // If no plain password match, try hashed password
-      if (!passwordMatch && user.password_hash && user.password_hash.trim() !== '') {
-        console.log("Checking hashed password");
-        passwordMatch = password === user.password_hash;
-        passwordSource = 'hash';
-        console.log("Hash password match:", passwordMatch);
-      }
-      
-      if (!passwordMatch) {
-        if (!user.password_plain && !user.password_hash) {
-          throw new Error('No password set for this student account. Please contact your teacher to set up your password.');
-        } else {
-          throw new Error(`Invalid password. Please check your password and try again. (Checked ${passwordSource})`);
-        }
-      }
-      
-      console.log("✅ Password verified using", passwordSource);
-      
-      // Check for student record
-      console.log("Checking for student record...");
-      const { data: studentRecords, error: studentError } = await supabase
-        .from('students')
-        .select('id, school_id, teacher_id, course_id')
-        .eq('user_id', user.id);
-      
-      if (studentError) {
-        console.error('❌ Error fetching student record:', studentError);
-        throw new Error(`Database error: ${studentError.message}`);
-      }
-      
-      if (!studentRecords || studentRecords.length === 0) {
-        throw new Error('Student profile not found. Please contact your administrator.');
-      }
-      
-      const studentRecord = studentRecords[0];
-      console.log("✅ Student record found");
+      console.log("✅ Login successful!");
       
       // Create user session
       const userData = {
-        id: user.id,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        email: user.email,
-        role: user.role,
-        schoolId: user.school_id || studentRecord.school_id
+        id: result.user_id,
+        firstName: result.first_name,
+        lastName: result.last_name,
+        email: result.email,
+        role: result.role,
+        schoolId: result.school_id
       };
       
       console.log("Creating user session:", userData);
@@ -254,10 +133,10 @@ const StudentLogin = () => {
       
       toast({
         title: "Welcome back!",
-        description: `Hello, ${user.first_name}! You're now logged in.`,
+        description: `Hello, ${result.first_name}! You're now logged in.`,
       });
       
-      console.log("✅ Login successful, redirecting...");
+      console.log("✅ Redirecting to dashboard...");
       navigate('/student-dashboard');
       
     } catch (error: any) {
@@ -378,38 +257,6 @@ const StudentLogin = () => {
             </div>
           </CardFooter>
         </Card>
-        
-        {debugInfo && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Database Debug Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md whitespace-pre-line font-mono">
-                {debugInfo}
-              </div>
-              <Button
-                onClick={testDatabaseConnection}
-                variant="outline"
-                size="sm"
-                className="mt-3 w-full"
-                disabled={connectionStatus === 'testing'}
-              >
-                {connectionStatus === 'testing' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  'Refresh Database Test'
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
