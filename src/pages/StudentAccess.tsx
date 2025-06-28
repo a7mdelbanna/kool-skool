@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -123,8 +122,9 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
-  // Fetch actual password hash for display using direct query
+  // Fetch actual password hash for display using direct query with better error handling
   const fetchPasswordHash = async (userId: string) => {
+    console.log('=== FETCH PASSWORD DEBUG ===');
     console.log('Fetching password hash for user:', userId);
     
     // Check cache first
@@ -134,31 +134,50 @@ const StudentAccess = () => {
     }
 
     try {
-      // Direct query to users table to get password hash
+      console.log('Querying users table...');
+      
+      // Direct query to users table to get password hash - using maybeSingle() instead of single()
       const { data, error } = await supabase
         .from('users')
-        .select('password_hash')
+        .select('password_hash, role, email')
         .eq('id', userId)
-        .eq('role', 'student')
-        .single();
+        .maybeSingle();
+
+      console.log('Query result:', { data, error });
 
       if (error) {
         console.error('Error fetching password hash:', error);
-        toast.error('Failed to fetch password');
+        toast.error('Failed to fetch password: ' + error.message);
         return null;
       }
 
-      console.log('Password hash fetch result:', data);
-      const passwordHash = data?.password_hash || null;
+      if (!data) {
+        console.log('No user found with ID:', userId);
+        toast.error('User not found');
+        return null;
+      }
+
+      console.log('User found:', { 
+        email: data.email, 
+        role: data.role, 
+        hasPassword: !!data.password_hash,
+        passwordLength: data.password_hash?.length || 0
+      });
+
+      const passwordHash = data.password_hash || null;
       
-      // Cache the result
+      // Cache the result if we have a password
       if (passwordHash) {
         setPasswordCache(prev => new Map(prev).set(userId, passwordHash));
+        console.log('Password cached for user:', userId);
+      } else {
+        console.log('No password hash found for user:', userId);
       }
       
       return passwordHash;
     } catch (error) {
       console.error('Exception fetching password hash:', error);
+      toast.error('Failed to fetch password');
       return null;
     }
   };
@@ -259,8 +278,12 @@ const StudentAccess = () => {
   };
 
   const togglePasswordVisibility = async (studentId: string) => {
+    console.log('=== TOGGLE PASSWORD VISIBILITY ===');
+    console.log('Student ID:', studentId);
+    
     if (visiblePasswords.has(studentId)) {
       // Hide password
+      console.log('Hiding password for:', studentId);
       setVisiblePasswords(prev => {
         const newSet = new Set(prev);
         newSet.delete(studentId);
@@ -268,20 +291,33 @@ const StudentAccess = () => {
       });
     } else {
       // Show password - fetch it first
+      console.log('Showing password for:', studentId);
       const passwordHash = await fetchPasswordHash(studentId);
+      console.log('Fetched password hash:', passwordHash ? 'Found' : 'Not found');
+      
       if (passwordHash) {
         setVisiblePasswords(prev => new Set(prev).add(studentId));
+        console.log('Password visibility toggled on for:', studentId);
+      } else {
+        console.log('No password hash available, cannot show password');
+        toast.error('No password available to display');
       }
     }
   };
 
   const copyPasswordToClipboard = async (studentId: string, studentName: string) => {
+    console.log('=== COPY PASSWORD ===');
+    console.log('Copying password for:', studentId, studentName);
+    
     const passwordHash = await fetchPasswordHash(studentId);
+    console.log('Password hash for copy:', passwordHash ? 'Found' : 'Not found');
+    
     if (passwordHash) {
       try {
         await navigator.clipboard.writeText(passwordHash);
         setCopiedPasswords(prev => new Set(prev).add(studentId));
         toast.success(`Password copied for ${studentName}`);
+        console.log('Password copied successfully for:', studentName);
         
         // Reset copied state after 2 seconds
         setTimeout(() => {
@@ -295,6 +331,9 @@ const StudentAccess = () => {
         console.error('Failed to copy password:', error);
         toast.error('Failed to copy password');
       }
+    } else {
+      console.log('No password hash available for copying');
+      toast.error('No password available to copy');
     }
   };
 
