@@ -76,10 +76,12 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusChangeSession, setStatusChangeSession] = useState<string | null>(null);
 
-  // Update local sessions when props change
+  // Update local sessions when props change, but only if we're not in the middle of an action
   useEffect(() => {
-    setLocalSessions(sessions);
-  }, [sessions]);
+    if (!actionLoading) {
+      setLocalSessions(sessions);
+    }
+  }, [sessions, actionLoading]);
 
   // Load subscription information for all students
   useEffect(() => {
@@ -145,11 +147,41 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     }
   }, [sessions]);
 
-  // Handle session actions with local state update
+  // Handle session actions with optimistic updates and no immediate parent refresh
   const handleSessionActionClick = async (sessionId: string, action: string, newDatetime?: Date) => {
     try {
       setActionLoading(sessionId);
       
+      // Immediately update local state for instant UI feedback
+      setLocalSessions(prevSessions => 
+        prevSessions.map(session => {
+          if (session.id === sessionId) {
+            let newStatus: Session['status'] = session.status;
+            
+            // Map action to new status
+            switch (action) {
+              case 'attended':
+                newStatus = 'completed';
+                break;
+              case 'cancelled':
+                newStatus = 'canceled';
+                break;
+              case 'moved':
+              case 'rescheduled':
+                // For moved/rescheduled, keep status as scheduled for now
+                newStatus = 'scheduled';
+                break;
+            }
+            
+            return {
+              ...session,
+              status: newStatus
+            };
+          }
+          return session;
+        })
+      );
+
       const response = await handleSessionAction(
         sessionId, 
         action, 
@@ -162,51 +194,26 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
       if (typedResponse.success) {
         toast.success(`Session ${action} successfully`);
         
-        // Update local session state immediately for better UX
-        setLocalSessions(prevSessions => 
-          prevSessions.map(session => {
-            if (session.id === sessionId) {
-              let newStatus: Session['status'] = session.status;
-              
-              // Map action to new status
-              switch (action) {
-                case 'attended':
-                  newStatus = 'completed';
-                  break;
-                case 'cancelled':
-                  newStatus = 'canceled';
-                  break;
-                case 'moved':
-                case 'rescheduled':
-                  // For moved/rescheduled, keep status as scheduled for now
-                  // The backend might create a new session
-                  newStatus = 'scheduled';
-                  break;
-              }
-              
-              return {
-                ...session,
-                status: newStatus
-              };
-            }
-            return session;
-          })
-        );
-        
         // Close status change popup
         setStatusChangeSession(null);
         
-        // Still trigger the parent update but without waiting for it
-        // This ensures the parent component stays in sync
+        // Only trigger parent update after a delay to allow for smooth UI transition
+        // This prevents the jarring reload effect
         if (onSessionUpdate) {
-          setTimeout(() => onSessionUpdate(), 100);
+          setTimeout(() => onSessionUpdate(), 2000);
         }
       } else {
         toast.error(typedResponse.message || `Failed to ${action} session`);
+        
+        // Revert the optimistic update on failure
+        setLocalSessions(sessions);
       }
     } catch (error) {
       console.error(`Error handling session action ${action}:`, error);
       toast.error(`Failed to ${action} session`);
+      
+      // Revert the optimistic update on error
+      setLocalSessions(sessions);
     } finally {
       setActionLoading(null);
     }
