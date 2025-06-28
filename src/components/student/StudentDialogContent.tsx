@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import ProfileTab from "../student-tabs/ProfileTab";
@@ -71,7 +71,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
   }, [open, student?.id, queryClient]);
 
   // Enhanced subscription fetching with immediate availability
-  const { data: subscriptions = [], refetch: refetchSubscriptions, isLoading: subscriptionsLoading } = useQuery({
+  const { data: rawSubscriptions = [], refetch: refetchSubscriptions, isLoading: subscriptionsLoading } = useQuery({
     queryKey: ['student-subscriptions', student?.id],
     queryFn: async () => {
       console.log('===== SUBSCRIPTIONS FETCH DEBUG =====');
@@ -120,12 +120,37 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     gcTime: 300000, // Keep in cache for 5 minutes (renamed from cacheTime)
   });
 
+  // Add reactive computation for subscriptions similar to PaymentsTab
+  const subscriptions = useMemo(() => {
+    console.log('===== SUBSCRIPTIONS MEMO RECALCULATION =====');
+    console.log('Raw subscriptions:', rawSubscriptions);
+    console.log('Raw subscriptions length:', rawSubscriptions.length);
+    console.log('Student ID for memo:', student?.id);
+    
+    if (!student?.id || !rawSubscriptions.length) {
+      console.log('No subscriptions available for memo calculation');
+      return [];
+    }
+    
+    // Process subscriptions if needed (for now just return as-is)
+    const processedSubscriptions = rawSubscriptions.map(subscription => ({
+      ...subscription,
+      // Add any additional processing here if needed
+    }));
+    
+    console.log('Processed subscriptions:', processedSubscriptions.length);
+    console.log('===== END SUBSCRIPTIONS MEMO RECALCULATION =====');
+    
+    return processedSubscriptions;
+  }, [rawSubscriptions, student?.id]);
+
   // Add effect to log subscription changes and force re-render
   useEffect(() => {
     console.log('===== SUBSCRIPTIONS STATE UPDATE =====');
     console.log('Current subscriptions state:', subscriptions);
     console.log('Subscriptions length:', subscriptions.length);
     console.log('Subscriptions loading:', subscriptionsLoading);
+    console.log('Active tab:', activeTab);
     console.log('===== END SUBSCRIPTIONS STATE UPDATE =====');
     
     // Force a re-render of the subscriptions tab when data changes
