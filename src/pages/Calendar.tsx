@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, 
@@ -37,63 +38,63 @@ const Calendar = () => {
   const [loading, setLoading] = useState(true);
 
   // Load sessions from all students
-  useEffect(() => {
-    const loadSessions = async () => {
-      try {
-        setLoading(true);
-        const userData = localStorage.getItem('user');
-        const user = userData ? JSON.parse(userData) : null;
-        
-        if (!user || !user.schoolId) {
-          console.warn('No user or school ID found');
-          return;
-        }
-
-        console.log('Loading sessions for school:', user.schoolId);
-        
-        // Get all students for the school
-        const students = await getStudentsWithDetails(user.schoolId);
-        console.log('Found students:', students.length);
-        
-        // Get sessions for each student
-        const allSessions: Session[] = [];
-        
-        for (const student of students) {
-          try {
-            const studentSessions = await getStudentLessonSessions(student.id);
-            console.log(`Sessions for student ${student.first_name} ${student.last_name}:`, studentSessions.length);
-            
-            // Convert lesson sessions to Session format
-            const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => ({
-              id: session.id,
-              studentId: student.id,
-              studentName: `${student.first_name} ${student.last_name}`,
-              date: new Date(session.scheduled_date), // Convert string to Date
-              time: format(new Date(session.scheduled_date), 'HH:mm'),
-              duration: `${session.duration_minutes || 60} min`,
-              status: session.status as Session['status'],
-              sessionNumber: session.index_in_sub || undefined,
-              totalSessions: undefined, // Will be filled from subscription if needed
-              notes: session.notes || '',
-              cost: session.cost,
-              paymentStatus: session.payment_status as Session['paymentStatus']
-            }));
-            
-            allSessions.push(...convertedSessions);
-          } catch (error) {
-            console.error(`Error loading sessions for student ${student.id}:`, error);
-          }
-        }
-        
-        console.log('Total sessions loaded:', allSessions.length);
-        setSessions(allSessions);
-      } catch (error) {
-        console.error('Error loading sessions:', error);
-      } finally {
-        setLoading(false);
+  const loadSessions = async () => {
+    try {
+      setLoading(true);
+      const userData = localStorage.getItem('user');
+      const user = userData ? JSON.parse(userData) : null;
+      
+      if (!user || !user.schoolId) {
+        console.warn('No user or school ID found');
+        return;
       }
-    };
 
+      console.log('Loading sessions for school:', user.schoolId);
+      
+      // Get all students for the school
+      const students = await getStudentsWithDetails(user.schoolId);
+      console.log('Found students:', students.length);
+      
+      // Get sessions for each student
+      const allSessions: Session[] = [];
+      
+      for (const student of students) {
+        try {
+          const studentSessions = await getStudentLessonSessions(student.id);
+          console.log(`Sessions for student ${student.first_name} ${student.last_name}:`, studentSessions.length);
+          
+          // Convert lesson sessions to Session format
+          const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => ({
+            id: session.id,
+            studentId: student.id,
+            studentName: `${student.first_name} ${student.last_name}`,
+            date: new Date(session.scheduled_date), // Convert string to Date
+            time: format(new Date(session.scheduled_date), 'HH:mm'),
+            duration: `${session.duration_minutes || 60} min`,
+            status: session.status as Session['status'],
+            sessionNumber: session.index_in_sub || undefined,
+            totalSessions: undefined, // Will be filled from subscription if needed
+            notes: session.notes || '',
+            cost: session.cost,
+            paymentStatus: session.payment_status as Session['paymentStatus']
+          }));
+          
+          allSessions.push(...convertedSessions);
+        } catch (error) {
+          console.error(`Error loading sessions for student ${student.id}:`, error);
+        }
+      }
+      
+      console.log('Total sessions loaded:', allSessions.length);
+      setSessions(allSessions);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadSessions();
   }, []);
 
@@ -148,6 +149,11 @@ const Calendar = () => {
   const handleLessonClick = (session: Session) => {
     setSelectedSession(session);
     setDetailsDialogOpen(true);
+  };
+
+  // Handle session updates - reload sessions data
+  const handleSessionUpdate = () => {
+    loadSessions();
   };
 
   // Filter sessions based on view mode and search query
@@ -274,6 +280,7 @@ const Calendar = () => {
           <UpcomingLessonsList 
             sessions={filteredSessions}
             onLessonClick={handleLessonClick}
+            onSessionUpdate={handleSessionUpdate}
             viewMode={viewMode}
             currentDate={currentDate}
             currentWeekStart={currentWeekStart}

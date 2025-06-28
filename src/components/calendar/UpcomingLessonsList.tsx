@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   format, 
@@ -12,6 +13,7 @@ import {
 } from 'date-fns';
 import { Session } from '@/contexts/PaymentContext';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   Calendar as CalendarIcon,
   Clock,
@@ -22,15 +24,21 @@ import {
   BookOpen,
   DollarSign,
   Calendar as CalendarScheduleIcon,
-  Hash
+  Hash,
+  Check,
+  X,
+  Calendar,
+  ArrowRight
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
-import { getStudentSubscriptions } from '@/integrations/supabase/client';
+import { getStudentSubscriptions, handleSessionAction } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface UpcomingLessonsListProps {
   sessions: Session[];
   onLessonClick?: (session: Session) => void;
+  onSessionUpdate?: () => void;
   viewMode: 'day' | 'week' | 'month';
   currentDate: Date;
   currentWeekStart: Date;
@@ -51,12 +59,14 @@ interface SubscriptionInfo {
 const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ 
   sessions, 
   onLessonClick,
+  onSessionUpdate,
   viewMode,
   currentDate,
   currentWeekStart
 }) => {
   const [subscriptionInfoMap, setSubscriptionInfoMap] = useState<Map<string, SubscriptionInfo>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Load subscription information for all students
   useEffect(() => {
@@ -121,6 +131,34 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
       setLoading(false);
     }
   }, [sessions]);
+
+  // Handle session actions
+  const handleSessionActionClick = async (sessionId: string, action: string, newDatetime?: Date) => {
+    try {
+      setActionLoading(sessionId);
+      
+      const response = await handleSessionAction(
+        sessionId, 
+        action, 
+        newDatetime?.toISOString()
+      );
+
+      if (response.success) {
+        toast.success(`Session ${action} successfully`);
+        // Trigger refresh of sessions data
+        if (onSessionUpdate) {
+          onSessionUpdate();
+        }
+      } else {
+        toast.error(response.message || `Failed to ${action} session`);
+      }
+    } catch (error) {
+      console.error(`Error handling session action ${action}:`, error);
+      toast.error(`Failed to ${action} session`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   // Group sessions by date
   const today = new Date();
@@ -205,6 +243,67 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     // Otherwise, try to calculate based on subscription info and session order
     // This is a fallback - ideally sessionNumber should come from the database
     return 1; // Default to 1 if we can't determine the session number
+  };
+
+  // Render action buttons for a session
+  const renderActionButtons = (session: Session) => {
+    const sessionId = session.id;
+    const isLoading = actionLoading === sessionId;
+    const isPast = isSessionPast(session);
+    
+    // Don't show action buttons for completed, cancelled, or missed sessions
+    if (session.status === 'completed' || session.status === 'canceled' || session.status === 'missed') {
+      return null;
+    }
+
+    return (
+      <div className="flex gap-1 mt-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, 'attended');
+          }}
+          disabled={isLoading}
+        >
+          <Check className="h-3 w-3 mr-1" />
+          Mark as Attended
+        </Button>
+        
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, 'cancelled');
+          }}
+          disabled={isLoading}
+        >
+          <X className="h-3 w-3 mr-1" />
+          Cancel
+        </Button>
+        
+        {!isPast && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              // For now, we'll move the session to the next available slot
+              handleSessionActionClick(sessionId, 'moved');
+            }}
+            disabled={isLoading}
+          >
+            <ArrowRight className="h-3 w-3 mr-1" />
+            Move
+          </Button>
+        )}
+      </div>
+    );
   };
 
   // Render sessions for a specific date group
@@ -330,6 +429,9 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                             Loading session details...
                           </div>
                         )}
+
+                        {/* Action Buttons */}
+                        {renderActionButtons(session)}
                       </div>
                       
                       {/* Status Badge */}
