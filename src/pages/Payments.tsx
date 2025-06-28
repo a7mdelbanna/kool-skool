@@ -417,7 +417,7 @@ const PaymentsPage = () => {
         </Card>
       </div>
 
-      {/* Tag Filter Section - Keep existing TagFilter component */}
+      {/* Tag Filter Section */}
       <TagFilter
         selectedTagFilter={selectedTagFilter}
         onTagFilterChange={setSelectedTagFilter}
