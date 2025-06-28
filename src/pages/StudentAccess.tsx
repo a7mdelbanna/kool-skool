@@ -44,17 +44,46 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
+  // Fetch password hash information separately for students
+  const { data: passwordData = [] } = useQuery({
+    queryKey: ['student-passwords', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, password_hash')
+        .eq('role', 'student')
+        .in('id', studentsData.map(s => s.user_id).filter(Boolean));
+
+      if (error) {
+        console.error('Error fetching password data:', error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!schoolId && studentsData.length > 0,
+  });
+
   // Transform the data to match our interface
-  const students: StudentAccessInfo[] = studentsData.map(student => ({
-    id: student.user_id || '',
-    student_id: student.id,
-    first_name: student.first_name || '',
-    last_name: student.last_name || '',
-    email: student.email || '',
-    password_hash: student.password_hash,
-    course_name: student.course_name || 'No Course',
-    teacher_name: student.teacher_name || 'No Teacher'
-  }));
+  const students: StudentAccessInfo[] = studentsData.map(student => {
+    const passwordInfo = passwordData.find(p => p.id === student.user_id);
+    const teacherName = student.teacher_first_name && student.teacher_last_name
+      ? `${student.teacher_first_name} ${student.teacher_last_name}`
+      : 'No Teacher';
+
+    return {
+      id: student.user_id || '',
+      student_id: student.id,
+      first_name: student.first_name || '',
+      last_name: student.last_name || '',
+      email: student.email || '',
+      password_hash: passwordInfo?.password_hash,
+      course_name: student.course_name || 'No Course',
+      teacher_name: teacherName
+    };
+  });
 
   // Update password mutation
   const updatePasswordMutation = useMutation({
@@ -85,6 +114,7 @@ const StudentAccess = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['student-passwords', schoolId] });
       setIsDialogOpen(false);
       setSelectedStudent(null);
       setNewPassword('');
