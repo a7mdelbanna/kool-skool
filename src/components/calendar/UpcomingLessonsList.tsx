@@ -32,30 +32,14 @@ interface LessonSession {
   };
 }
 
-interface UpcomingLessonsListProps {
-  sessions?: any[];
-  onLessonClick?: (session: any) => void;
-  onSessionUpdate?: () => void;
-  viewMode?: string;
-  currentDate?: Date;
-  currentWeekStart?: Date;
-}
-
-const UpcomingLessonsList = ({ 
-  sessions: externalSessions, 
-  onLessonClick, 
-  onSessionUpdate, 
-  viewMode, 
-  currentDate, 
-  currentWeekStart 
-}: UpcomingLessonsListProps = {}) => {
+const UpcomingLessonsList = () => {
   // Fetch user info
   const { data: userInfo } = useQuery({
     queryKey: ['current-user-info'],
     queryFn: getCurrentUserInfo,
   });
 
-  // Fetch upcoming lessons only if no external sessions provided
+  // Fetch upcoming lessons
   const { data: upcomingLessons = [], isLoading } = useQuery({
     queryKey: ['upcoming-lessons', userInfo?.[0]?.user_school_id],
     queryFn: async () => {
@@ -63,8 +47,7 @@ const UpcomingLessonsList = ({
       
       const nextWeek = addDays(new Date(), 7);
       
-      // First get lesson sessions
-      const { data: sessionsData, error: sessionsError } = await supabase
+      const { data, error } = await supabase
         .from('lesson_sessions')
         .select(`
           id,
@@ -73,72 +56,32 @@ const UpcomingLessonsList = ({
           status,
           cost,
           notes,
-          student_id,
-          subscription_id
+          student:students(
+            id,
+            user_id,
+            users(first_name, last_name)
+          ),
+          subscription:subscriptions(
+            id,
+            session_count,
+            sessions_completed,
+            end_date
+          )
         `)
+        .eq('students.school_id', userInfo[0].user_school_id)
         .gte('scheduled_date', new Date().toISOString())
         .lte('scheduled_date', nextWeek.toISOString())
         .eq('status', 'scheduled')
         .order('scheduled_date', { ascending: true })
         .limit(5);
 
-      if (sessionsError) throw sessionsError;
-      if (!sessionsData || sessionsData.length === 0) return [];
-
-      // Get student details for each session
-      const studentIds = [...new Set(sessionsData.map(session => session.student_id))];
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('students')
-        .select(`
-          id,
-          user_id,
-          school_id,
-          users!inner(first_name, last_name)
-        `)
-        .in('id', studentIds)
-        .eq('school_id', userInfo[0].user_school_id);
-
-      if (studentsError) throw studentsError;
-
-      // Get subscription details
-      const subscriptionIds = [...new Set(sessionsData.map(session => session.subscription_id))];
-      const { data: subscriptionsData, error: subscriptionsError } = await supabase
-        .from('subscriptions')
-        .select(`
-          id,
-          session_count,
-          sessions_completed,
-          end_date
-        `)
-        .in('id', subscriptionIds);
-
-      if (subscriptionsError) throw subscriptionsError;
-
-      // Combine the data
-      const combinedData = sessionsData.map(session => {
-        const student = studentsData?.find(s => s.id === session.student_id);
-        const subscription = subscriptionsData?.find(s => s.id === session.subscription_id);
-        
-        return {
-          ...session,
-          student: student ? {
-            id: student.id,
-            user_id: student.user_id,
-            users: student.users
-          } : null,
-          subscription: subscription || null
-        };
-      }).filter(session => session.student !== null);
-
-      return combinedData as LessonSession[];
+      if (error) throw error;
+      return data as LessonSession[];
     },
-    enabled: !!userInfo?.[0]?.user_school_id && !externalSessions,
+    enabled: !!userInfo?.[0]?.user_school_id,
   });
 
-  // Use external sessions if provided, otherwise use fetched lessons
-  const displaySessions = externalSessions || upcomingLessons;
-
-  if (isLoading && !externalSessions) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
@@ -154,50 +97,6 @@ const UpcomingLessonsList = ({
     );
   }
 
-  // If this is being used as a list view (with external sessions), show all sessions
-  if (externalSessions) {
-    return (
-      <div className="space-y-4">
-        {displaySessions.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">
-            No sessions found for the selected period
-          </p>
-        ) : (
-          displaySessions.map((session) => (
-            <div
-              key={session.id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
-              onClick={() => onLessonClick?.(session)}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">
-                    {session.studentName || 'Unknown Student'}
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    {format(new Date(session.date), 'MMM dd, h:mm a')}
-                    <span>• {session.duration || '60 min'}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-medium">${session.cost || 0}</p>
-                <Badge variant="outline" className="text-xs">
-                  {session.status}
-                </Badge>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    );
-  }
-
-  // Default card view for upcoming lessons
   return (
     <Card>
       <CardHeader>
@@ -207,12 +106,12 @@ const UpcomingLessonsList = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {displaySessions.length === 0 ? (
+        {upcomingLessons.length === 0 ? (
           <p className="text-muted-foreground text-center py-4">
             No upcoming lessons scheduled
           </p>
         ) : (
-          displaySessions.map((lesson) => (
+          upcomingLessons.map((lesson) => (
             <div
               key={lesson.id}
               className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
@@ -248,7 +147,7 @@ const UpcomingLessonsList = ({
             </div>
           ))
         )}
-        {displaySessions.length > 0 && !externalSessions && (
+        {upcomingLessons.length > 0 && (
           <Button variant="outline" className="w-full">
             <BookOpen className="h-4 w-4 mr-2" />
             View All Lessons
