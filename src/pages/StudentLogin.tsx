@@ -36,48 +36,93 @@ const StudentLogin = () => {
     }
   }, [navigate]);
 
-  // Debug function to check what students exist
-  const checkExistingStudents = async () => {
+  // Debug function to check what exists in the database
+  const checkDatabaseState = async () => {
     try {
-      console.log("=== DEBUGGING: Checking all students in database ===");
+      console.log("=== COMPREHENSIVE DATABASE DEBUG ===");
       
       // Check all users with role 'student'
-      const { data: allStudents, error: studentsError } = await supabase
+      const { data: studentUsers, error: studentUsersError } = await supabase
         .from('users')
         .select('id, email, first_name, last_name, role, school_id, password_plain, password_hash')
         .eq('role', 'student');
       
-      console.log("All students in database:", { allStudents, studentsError });
+      console.log("Student users in users table:", { studentUsers, studentUsersError });
       
-      if (allStudents && allStudents.length > 0) {
-        const studentInfo = allStudents.map(s => ({
-          email: s.email,
-          name: `${s.first_name} ${s.last_name}`,
-          hasPassword: !!(s.password_plain || s.password_hash),
-          schoolId: s.school_id
-        }));
-        console.log("Student accounts found:", studentInfo);
-        setDebugInfo(`Found ${allStudents.length} student(s) in database: ${studentInfo.map(s => s.email).join(', ')}`);
-      } else {
-        console.log("No student accounts found in database");
-        setDebugInfo("No student accounts found in database. You may need to create student accounts through the admin interface first.");
-      }
+      // Check all entries in students table
+      const { data: studentsTable, error: studentsTableError } = await supabase
+        .from('students')
+        .select('id, user_id, school_id, teacher_id, course_id');
       
-      // Also check if there are any schools
+      console.log("All entries in students table:", { studentsTable, studentsTableError });
+      
+      // Check all schools
       const { data: schools, error: schoolsError } = await supabase
         .from('schools')
         .select('id, name');
       
       console.log("Schools in database:", { schools, schoolsError });
       
+      // Build debug info
+      let debugMessage = '';
+      
+      if (studentUsers && studentUsers.length > 0) {
+        debugMessage += `Found ${studentUsers.length} student user(s) in users table:\n`;
+        studentUsers.forEach(user => {
+          debugMessage += `- ${user.email} (${user.first_name} ${user.last_name}) - School ID: ${user.school_id}\n`;
+        });
+      } else {
+        debugMessage += "No student users found in users table.\n";
+      }
+      
+      if (studentsTable && studentsTable.length > 0) {
+        debugMessage += `\nFound ${studentsTable.length} record(s) in students table:\n`;
+        studentsTable.forEach(student => {
+          debugMessage += `- Student ID: ${student.id}, User ID: ${student.user_id}, School ID: ${student.school_id}\n`;
+        });
+      } else {
+        debugMessage += "\nNo records found in students table.\n";
+      }
+      
+      if (schools && schools.length > 0) {
+        debugMessage += `\nFound ${schools.length} school(s):\n`;
+        schools.forEach(school => {
+          debugMessage += `- ${school.name} (ID: ${school.id})\n`;
+        });
+      } else {
+        debugMessage += "\nNo schools found in database.\n";
+      }
+      
+      // Check for the specific email
+      const targetUser = studentUsers?.find(user => user.email === 'bruhbruh@bruh.com');
+      if (targetUser) {
+        debugMessage += `\n✅ Found target user: ${targetUser.email}`;
+        debugMessage += `\n   - User ID: ${targetUser.id}`;
+        debugMessage += `\n   - School ID: ${targetUser.school_id}`;
+        debugMessage += `\n   - Has password: ${!!(targetUser.password_plain || targetUser.password_hash)}`;
+        
+        // Check if there's a matching student record
+        const matchingStudent = studentsTable?.find(student => student.user_id === targetUser.id);
+        if (matchingStudent) {
+          debugMessage += `\n   - ✅ Has matching student record`;
+        } else {
+          debugMessage += `\n   - ❌ Missing student record - this is the problem!`;
+        }
+      } else {
+        debugMessage += `\n❌ Target user bruhbruh@bruh.com not found in users table`;
+      }
+      
+      setDebugInfo(debugMessage);
+      
     } catch (error) {
       console.error('Debug check failed:', error);
+      setDebugInfo(`Debug check failed: ${error.message}`);
     }
   };
 
   // Run debug check on component mount
   useEffect(() => {
-    checkExistingStudents();
+    checkDatabaseState();
   }, []);
   
   const handleLogin = async (e: React.FormEvent) => {
@@ -91,27 +136,10 @@ const StudentLogin = () => {
       console.log("=== STUDENT LOGIN ATTEMPT ===");
       console.log("Attempting student login with email:", email);
       
-      // First, let's check if there are ANY users with this email (without role filter)
-      const { data: allUsers, error: allUsersError } = await supabase
-        .from('users')
-        .select('id, email, role, first_name, last_name, school_id, password_plain, password_hash')
-        .eq('email', email);
-      
-      console.log("All users with this email:", { allUsers, allUsersError });
-      
-      // Now check specifically for students
+      // First, check if user exists in users table with role 'student'
       const { data: users, error: userError } = await supabase
         .from('users')
-        .select(`
-          id,
-          email,
-          first_name,
-          last_name,
-          role,
-          school_id,
-          password_plain,
-          password_hash
-        `)
+        .select('id, email, first_name, last_name, role, school_id, password_plain, password_hash')
         .eq('email', email)
         .eq('role', 'student');
       
@@ -121,16 +149,8 @@ const StudentLogin = () => {
         throw new Error('Database error: ' + userError.message);
       }
       
-      // If no students found, but other users found, give specific error
-      if ((!users || users.length === 0) && allUsers && allUsers.length > 0) {
-        const userRole = allUsers[0].role;
-        throw new Error(`User found but with role '${userRole}'. This login is for students only. Please use the main login page.`);
-      }
-      
       if (!users || users.length === 0) {
-        // Run debug check again to see what students are available
-        await checkExistingStudents();
-        throw new Error('No student found with this email address. Check the debug info below to see available student accounts.');
+        throw new Error('No student found with this email address.');
       }
       
       const user = users[0];
@@ -139,22 +159,18 @@ const StudentLogin = () => {
         email: user.email, 
         role: user.role,
         hasPlainPassword: !!user.password_plain,
-        hasHashPassword: !!user.password_hash,
-        plainPasswordValue: user.password_plain, // For debugging
-        hashPasswordValue: user.password_hash ? 'exists' : 'null'
+        hasHashPassword: !!user.password_hash
       });
       
       // Check password - try plain text first, then hash
       let passwordMatch = false;
       
       if (user.password_plain) {
-        console.log("Checking against plain password:", user.password_plain);
+        console.log("Checking against plain password");
         passwordMatch = password === user.password_plain;
-        console.log("Plain password match:", passwordMatch, "Input:", password, "Stored:", user.password_plain);
+        console.log("Plain password match:", passwordMatch);
       } else if (user.password_hash) {
         console.log("Checking against hashed password");
-        // For now, we'll assume the hash check would be done server-side
-        // This is a temporary solution - in production you'd want proper bcrypt checking
         passwordMatch = password === user.password_hash;
         console.log("Hash password match:", passwordMatch);
       } else {
@@ -168,6 +184,25 @@ const StudentLogin = () => {
         throw new Error('Invalid email or password');
       }
       
+      // Now check if there's a corresponding student record
+      const { data: studentRecords, error: studentError } = await supabase
+        .from('students')
+        .select('id, school_id')
+        .eq('user_id', user.id);
+      
+      console.log("Student records query result:", { studentRecords, studentError });
+      
+      if (studentError) {
+        console.error('Error fetching student record:', studentError);
+        throw new Error('Database error while fetching student record: ' + studentError.message);
+      }
+      
+      if (!studentRecords || studentRecords.length === 0) {
+        throw new Error('Student record not found. Please contact your administrator to complete your account setup.');
+      }
+      
+      const studentRecord = studentRecords[0];
+      
       // Store user information in local storage
       const userData = {
         id: user.id,
@@ -175,7 +210,7 @@ const StudentLogin = () => {
         lastName: user.last_name,
         email: user.email,
         role: user.role,
-        schoolId: user.school_id
+        schoolId: user.school_id || studentRecord.school_id
       };
       
       localStorage.setItem('user', JSON.stringify(userData));
@@ -295,10 +330,10 @@ const StudentLogin = () => {
         {debugInfo && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Debug Information</CardTitle>
+              <CardTitle className="text-sm">Database Debug Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md">
+              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md whitespace-pre-line">
                 {debugInfo}
               </div>
             </CardContent>
