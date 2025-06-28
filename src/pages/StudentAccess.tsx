@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Key, Eye, EyeOff, Edit } from 'lucide-react';
+import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +29,8 @@ const StudentAccess = () => {
   const [selectedStudent, setSelectedStudent] = useState<StudentAccessInfo | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [copiedPasswords, setCopiedPasswords] = useState<Set<string>>(new Set());
 
   const queryClient = useQueryClient();
 
@@ -120,6 +121,23 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
+  // Fetch actual password for display
+  const fetchPassword = async (userId: string) => {
+    console.log('Fetching password for user:', userId);
+    const { data, error } = await supabase.rpc('get_student_password', {
+      p_user_id: userId
+    });
+
+    if (error) {
+      console.error('Error fetching password:', error);
+      toast.error('Failed to fetch password');
+      return null;
+    }
+
+    console.log('Password fetch result:', data);
+    return data?.[0]?.password_hash || null;
+  };
+
   // Update password mutation with verification
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
@@ -208,6 +226,46 @@ const StudentAccess = () => {
     });
   };
 
+  const togglePasswordVisibility = async (studentId: string) => {
+    if (visiblePasswords.has(studentId)) {
+      // Hide password
+      setVisiblePasswords(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(studentId);
+        return newSet;
+      });
+    } else {
+      // Show password - fetch it first
+      const password = await fetchPassword(studentId);
+      if (password) {
+        setVisiblePasswords(prev => new Set(prev).add(studentId));
+      }
+    }
+  };
+
+  const copyPasswordToClipboard = async (studentId: string, studentName: string) => {
+    const password = await fetchPassword(studentId);
+    if (password) {
+      try {
+        await navigator.clipboard.writeText(password);
+        setCopiedPasswords(prev => new Set(prev).add(studentId));
+        toast.success(`Password copied for ${studentName}`);
+        
+        // Reset copied state after 2 seconds
+        setTimeout(() => {
+          setCopiedPasswords(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(studentId);
+            return newSet;
+          });
+        }, 2000);
+      } catch (error) {
+        console.error('Failed to copy password:', error);
+        toast.error('Failed to copy password');
+      }
+    }
+  };
+
   const filteredStudents = studentsWithPasswords.filter(student =>
     `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -265,6 +323,7 @@ const StudentAccess = () => {
                   <TableHead>Course</TableHead>
                   <TableHead>Teacher</TableHead>
                   <TableHead>Password Status</TableHead>
+                  <TableHead>Password</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -286,6 +345,41 @@ const StudentAccess = () => {
                         <Badge variant="destructive">
                           No Password
                         </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {student.has_password && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePasswordVisibility(student.id)}
+                            className="h-8 w-8 p-0"
+                          >
+                            {visiblePasswords.has(student.id) ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyPasswordToClipboard(student.id, `${student.first_name} ${student.last_name}`)}
+                            className="h-8 w-8 p-0"
+                          >
+                            {copiedPasswords.has(student.id) ? (
+                              <CheckCheck className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                          {visiblePasswords.has(student.id) && (
+                            <span className="text-sm font-mono text-muted-foreground">
+                              ••••••••
+                            </span>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>
