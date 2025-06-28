@@ -89,7 +89,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     durationMonths: 1,
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
-    priceMode: 'perSession',
+    priceMode: 'perSession' as 'perSession' | 'fixedPrice',
     pricePerSession: 0,
     fixedPrice: 0,
     currency: '',

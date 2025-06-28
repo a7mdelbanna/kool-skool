@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Subscription, deleteStudentSubscriptionEnhanced, RpcResponse } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -205,17 +206,17 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-gray-900">
-                          {subscription.sessions_completed || 0} / {subscription.session_count} Sessions
+                          {(subscription as any).sessions_completed || 0} / {subscription.session_count} Sessions
                         </p>
                         <p className="text-xs text-gray-500">
-                          {Math.round(((subscription.sessions_completed || 0) / subscription.session_count) * 100)}%
+                          {Math.round((((subscription as any).sessions_completed || 0) / subscription.session_count) * 100)}%
                         </p>
                       </div>
                       <div className="mt-1 bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{ 
-                            width: `${Math.min(((subscription.sessions_completed || 0) / subscription.session_count) * 100, 100)}%` 
+                            width: `${Math.min((((subscription as any).sessions_completed || 0) / subscription.session_count) * 100, 100)}%` 
                           }}
                         />
                       </div>
@@ -226,8 +227,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   <div className="pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-500">
                       Duration: {subscription.duration_months} month{subscription.duration_months !== 1 ? 's' : ''}
-                      {subscription.end_date && (
-                        <> • Ends {format(new Date(subscription.end_date), 'MMM dd, yyyy')}</>
+                      {(subscription as any).end_date && (
+                        <> • Ends {format(new Date((subscription as any).end_date), 'MMM dd, yyyy')}</>
                       )}
                     </p>
                   </div>
