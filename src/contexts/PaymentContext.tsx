@@ -56,24 +56,30 @@ export interface ExpenseCategory {
 
 export interface Subscription {
   id: string;
-  student_id: string;
-  session_count: number;
-  duration_months: number;
-  start_date: string;
-  end_date: string | null;
+  studentId: string;
+  sessionCount: number;
+  durationMonths: number;
+  startDate: string;
+  endDate?: string;
   schedule: {
-    day: string;
+    days: string[];
     time: string;
-  }[];
-  price_mode: 'perSession' | 'fixed';
-  price_per_session?: number;
-  fixed_price?: number;
-  total_price: number;
+    duration: number;
+  };
+  priceMode: 'per_session' | 'fixed';
+  pricePerSession?: number;
+  fixedPrice?: number;
+  totalPrice: number;
   currency: string;
   notes?: string;
-  status: 'active' | 'inactive' | 'completed';
-  sessions_completed: number | null;
-  created_at: string;
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  // New progress tracking properties from the database function
+  sessions_completed?: number;
+  sessions_attended?: number;
+  sessions_cancelled?: number;
+  sessions_scheduled?: number;
 }
 
 interface PaymentContextType {
