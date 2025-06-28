@@ -20,6 +20,8 @@ import TeamAccess from "./pages/TeamAccess";
 import StudentAccess from "./pages/StudentAccess";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import StudentLogin from "./pages/StudentLogin";
+import StudentDashboard from "./pages/StudentDashboard";
 import LicenseManagement from "./pages/LicenseManagement";
 import { PaymentProvider } from "./contexts/PaymentContext";
 
@@ -93,12 +95,17 @@ const App = () => {
               <Sonner />
               <Routes>
                 {/* Authentication routes */}
-                <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
+                <Route path="/login" element={isAuthenticated && user?.role !== 'student' ? <Navigate to="/" replace /> : <Login />} />
+                <Route path="/student-login" element={isAuthenticated && user?.role === 'student' ? <Navigate to="/student-dashboard" replace /> : <StudentLogin />} />
+                
                 {/* School setup is only accessible if user is NOT authenticated */}
                 <Route path="/school-setup" element={isAuthenticated ? <Navigate to="/license" replace /> : <SchoolSetup />} />
                 
-                {/* Protected routes */}
-                <Route element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>
+                {/* Student-specific routes */}
+                <Route path="/student-dashboard" element={isAuthenticated && user?.role === 'student' ? <StudentDashboard /> : <Navigate to="/student-login" replace />} />
+                
+                {/* Protected routes for admin/teacher */}
+                <Route element={isAuthenticated && user?.role !== 'student' ? <MainLayout /> : <Navigate to="/login" replace />}>
                   <Route path="/" element={<Index />} />
                   <Route path="/students" element={<Students />} />
                   <Route path="/courses" element={<Courses />} />
