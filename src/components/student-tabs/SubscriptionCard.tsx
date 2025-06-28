@@ -34,6 +34,15 @@ interface SubscriptionCardProps {
   isDeleting: boolean;
 }
 
+// Type definition for the RPC response
+interface RenewSubscriptionResponse {
+  success: boolean;
+  message: string;
+  new_subscription_id?: string;
+  new_start_date?: string;
+  new_end_date?: string;
+}
+
 const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   subscription,
   onEdit,
@@ -84,10 +93,13 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
 
       console.log('✅ Renewal response:', data);
 
-      if (data && data.success) {
+      // Type assertion for the RPC response
+      const response = data as RenewSubscriptionResponse;
+
+      if (response && response.success) {
         toast({
           title: "Success",
-          description: data.message || "Subscription renewed successfully!",
+          description: response.message || "Subscription renewed successfully!",
         });
 
         // Trigger refresh if callback provided
@@ -95,7 +107,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           onRenew();
         }
       } else {
-        throw new Error(data?.message || 'Failed to renew subscription');
+        throw new Error(response?.message || 'Failed to renew subscription');
       }
     } catch (error: any) {
       console.error('❌ Error renewing subscription:', error);
