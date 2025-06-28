@@ -44,7 +44,15 @@ const StudentLogin = () => {
       
       console.log("Attempting student login with email:", email);
       
-      // First, find the user by email and role
+      // First, let's check if there are ANY users with this email (without role filter)
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('users')
+        .select('id, email, role, first_name, last_name, school_id, password_plain, password_hash')
+        .eq('email', email);
+      
+      console.log("All users with this email:", { allUsers, allUsersError });
+      
+      // Now check specifically for students
       const { data: users, error: userError } = await supabase
         .from('users')
         .select(`
@@ -60,10 +68,16 @@ const StudentLogin = () => {
         .eq('email', email)
         .eq('role', 'student');
       
-      console.log("User query result:", { users, userError });
+      console.log("Student users query result:", { users, userError });
       
       if (userError) {
         throw new Error('Database error: ' + userError.message);
+      }
+      
+      // If no students found, but other users found, give specific error
+      if ((!users || users.length === 0) && allUsers && allUsers.length > 0) {
+        const userRole = allUsers[0].role;
+        throw new Error(`User found but with role '${userRole}'. This login is for students only. Please use the main login page.`);
       }
       
       if (!users || users.length === 0) {
@@ -76,23 +90,30 @@ const StudentLogin = () => {
         email: user.email, 
         role: user.role,
         hasPlainPassword: !!user.password_plain,
-        hasHashPassword: !!user.password_hash
+        hasHashPassword: !!user.password_hash,
+        plainPasswordValue: user.password_plain, // For debugging
+        hashPasswordValue: user.password_hash ? 'exists' : 'null'
       });
       
       // Check password - try plain text first, then hash
       let passwordMatch = false;
       
       if (user.password_plain) {
-        console.log("Checking against plain password");
+        console.log("Checking against plain password:", user.password_plain);
         passwordMatch = password === user.password_plain;
+        console.log("Plain password match:", passwordMatch, "Input:", password, "Stored:", user.password_plain);
       } else if (user.password_hash) {
         console.log("Checking against hashed password");
         // For now, we'll assume the hash check would be done server-side
         // This is a temporary solution - in production you'd want proper bcrypt checking
         passwordMatch = password === user.password_hash;
+        console.log("Hash password match:", passwordMatch);
+      } else {
+        console.log("No password set for this user");
+        throw new Error('No password set for this student account. Please contact your teacher.');
       }
       
-      console.log("Password match result:", passwordMatch);
+      console.log("Final password match result:", passwordMatch);
       
       if (!passwordMatch) {
         throw new Error('Invalid email or password');
