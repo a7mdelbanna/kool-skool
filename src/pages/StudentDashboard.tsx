@@ -84,7 +84,6 @@ const StudentDashboard = () => {
           age_group,
           level,
           phone,
-          next_session_date,
           next_payment_date,
           next_payment_amount,
           courses:course_id (
@@ -109,6 +108,17 @@ const StudentDashboard = () => {
       console.log('Student data:', students);
       
       if (students) {
+        // Fetch subscriptions for this student to get next session info
+        await fetchSubscriptions(students.id);
+        
+        // Fetch sessions for this student to get the next session date
+        const sessionsData = await fetchSessions(students.id);
+        
+        // Find the next scheduled session
+        const nextSession = sessionsData
+          .filter(session => session.status === 'scheduled' && new Date(session.scheduled_date) >= new Date())
+          .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime())[0];
+        
         const formattedStudentData: StudentData = {
           id: students.id,
           first_name: user.firstName,
@@ -118,17 +128,11 @@ const StudentDashboard = () => {
           lesson_type: students.courses?.lesson_type || 'N/A',
           teacher_first_name: students.teacher?.first_name || 'No teacher',
           teacher_last_name: students.teacher?.last_name || 'assigned',
-          next_session_date: students.next_session_date,
+          next_session_date: nextSession?.scheduled_date || null,
           subscription_progress: '0/0' // Will be updated when we get subscriptions
         };
         
         setStudentData(formattedStudentData);
-        
-        // Fetch subscriptions for this student
-        await fetchSubscriptions(students.id);
-        
-        // Fetch sessions for this student
-        await fetchSessions(students.id);
       }
       
     } catch (error) {
@@ -185,14 +189,16 @@ const StudentDashboard = () => {
       
       if (sessionsError) {
         console.error('Error fetching sessions:', sessionsError);
-        return;
+        return [];
       }
       
       console.log('Sessions data:', sessionsData);
       setSessions(sessionsData || []);
+      return sessionsData || [];
       
     } catch (error) {
       console.error('Error in fetchSessions:', error);
+      return [];
     }
   };
 
