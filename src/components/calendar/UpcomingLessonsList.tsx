@@ -10,7 +10,7 @@ import {
   endOfMonth,
   isWithinInterval
 } from 'date-fns';
-import { Session, Subscription } from '@/contexts/PaymentContext';
+import { Session } from '@/contexts/PaymentContext';
 import { Badge } from '@/components/ui/badge';
 import { 
   Calendar as CalendarIcon,
