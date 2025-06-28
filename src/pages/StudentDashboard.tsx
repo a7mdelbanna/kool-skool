@@ -4,10 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserContext } from '@/App';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle, Settings, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { formatInUserTimezone, getEffectiveTimezone, getBrowserTimezone } from '@/utils/timezone';
+import TimezoneSelector from '@/components/TimezoneSelector';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface StudentData {
   id: string;
@@ -50,6 +60,8 @@ const StudentDashboard = () => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userTimezone, setUserTimezone] = useState<string>('');
+  const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated and is a student
@@ -58,6 +70,10 @@ const StudentDashboard = () => {
       navigate('/student-login');
       return;
     }
+    
+    // Initialize timezone
+    const effectiveTimezone = getEffectiveTimezone(user.timezone);
+    setUserTimezone(effectiveTimezone);
     
     fetchStudentData();
   }, [user, navigate]);
@@ -215,6 +231,43 @@ const StudentDashboard = () => {
     }
   };
 
+  const handleTimezoneChange = async (newTimezone: string) => {
+    try {
+      console.log('Updating student timezone to:', newTimezone);
+      
+      // Update in database
+      const { error } = await supabase
+        .from('users')
+        .update({ timezone: newTimezone, updated_at: new Date().toISOString() })
+        .eq('id', user?.id);
+
+      if (error) {
+        console.error('Error updating timezone:', error);
+        toast.error('Failed to update timezone');
+        return;
+      }
+
+      // Update local state
+      setUserTimezone(newTimezone);
+      
+      // Update user context
+      if (user) {
+        const updatedUser = { ...user, timezone: newTimezone };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+
+      setTimezoneDialogOpen(false);
+      toast.success('Timezone updated successfully');
+      
+      // Refresh data to show times in new timezone
+      await fetchStudentData();
+    } catch (error) {
+      console.error('Error updating timezone:', error);
+      toast.error('Failed to update timezone');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('user');
     setUser(null);
@@ -234,6 +287,16 @@ const StudentDashboard = () => {
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
+  };
+
+  const formatSessionTime = (dateTime: string) => {
+    if (!userTimezone) return format(new Date(dateTime), 'EEEE, MMMM d, yyyy');
+    return formatInUserTimezone(dateTime, userTimezone, 'EEEE, MMMM d, yyyy');
+  };
+
+  const formatSessionDateTime = (dateTime: string) => {
+    if (!userTimezone) return format(new Date(dateTime), 'HH:mm');
+    return formatInUserTimezone(dateTime, userTimezone, 'HH:mm');
   };
 
   if (loading) {
@@ -283,15 +346,40 @@ const StudentDashboard = () => {
                 <p className="text-sm text-gray-500">Student Portal</p>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
+            <div className="flex items-center gap-2">
+              <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    {userTimezone || 'Set Timezone'}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Select Your Timezone</DialogTitle>
+                    <DialogDescription>
+                      Choose your timezone to view all session times in your local time.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <TimezoneSelector
+                      value={userTimezone}
+                      onValueChange={handleTimezoneChange}
+                      placeholder="Select your timezone"
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -316,6 +404,10 @@ const StudentDashboard = () => {
               <div>
                 <span className="text-sm font-medium text-gray-500">Email:</span>
                 <p className="text-sm">{studentData.email}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-500">Timezone:</span>
+                <p className="text-sm">{userTimezone || getBrowserTimezone()}</p>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-500">Role:</span>
@@ -366,10 +458,10 @@ const StudentDashboard = () => {
               {studentData.next_session_date ? (
                 <div className="space-y-2">
                   <p className="text-sm font-semibold">
-                    {format(new Date(studentData.next_session_date), 'EEEE, MMMM d, yyyy')}
+                    {formatSessionTime(studentData.next_session_date)}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {format(new Date(studentData.next_session_date), 'HH:mm')}
+                    {formatSessionDateTime(studentData.next_session_date)}
                   </p>
                   <Badge className="bg-green-100 text-green-800">
                     <Clock className="h-3 w-3 mr-1" />
@@ -400,9 +492,9 @@ const StudentDashboard = () => {
                       </Badge>
                     </CardTitle>
                     <CardDescription>
-                      Start Date: {format(new Date(subscription.start_date), 'MMMM d, yyyy')}
+                      Start Date: {formatSessionTime(subscription.start_date)}
                       {subscription.end_date && (
-                        <span> - End Date: {format(new Date(subscription.end_date), 'MMMM d, yyyy')}</span>
+                        <span> - End Date: {formatSessionTime(subscription.end_date)}</span>
                       )}
                     </CardDescription>
                   </CardHeader>
@@ -440,10 +532,10 @@ const StudentDashboard = () => {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-medium">
-                            {format(new Date(session.scheduled_date), 'EEEE, MMM d')}
+                            {formatSessionTime(session.scheduled_date)}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {format(new Date(session.scheduled_date), 'HH:mm')} • {session.duration_minutes} min
+                            {formatSessionDateTime(session.scheduled_date)} • {session.duration_minutes} min
                           </p>
                         </div>
                         {getStatusBadge(session.status)}
@@ -474,10 +566,10 @@ const StudentDashboard = () => {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-medium">
-                            {format(new Date(session.scheduled_date), 'EEEE, MMM d')}
+                            {formatSessionTime(session.scheduled_date)}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {format(new Date(session.scheduled_date), 'HH:mm')} • {session.duration_minutes} min
+                            {formatSessionDateTime(session.scheduled_date)} • {session.duration_minutes} min
                           </p>
                         </div>
                         {getStatusBadge(session.status)}
@@ -505,7 +597,7 @@ const StudentDashboard = () => {
                 </h2>
                 <p className="text-gray-600">
                   This is your personal dashboard where you can view your courses, schedule, 
-                  and track your learning progress. More features will be available soon.
+                  and track your learning progress. You can set your timezone to view all session times in your local time.
                 </p>
               </div>
             </CardContent>
