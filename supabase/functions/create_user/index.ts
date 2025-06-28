@@ -156,6 +156,7 @@ serve(async (req) => {
       .insert({
         email,
         password_hash: hashResult,
+        password_plain: password, // Store plain text password as well for consistent login
         first_name,
         last_name,
         role,
