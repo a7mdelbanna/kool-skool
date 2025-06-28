@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DollarSign, Search, Filter as FilterIcon, Calendar } from 'lucide-react';
+import { DollarSign, Search, Filter as FilterIcon, Calendar, Clock } from 'lucide-react';
 import ExpectedPaymentsSection from '@/components/ExpectedPaymentsSection';
 import AccountsBalanceSection from '@/components/AccountsBalanceSection';
 import { Button } from '@/components/ui/button';
@@ -188,6 +188,34 @@ const FinancesPage = () => {
     enabled: !!schoolId,
   });
 
+  // Fetch expected payments for the new card
+  const { data: expectedPayments = [] } = useQuery({
+    queryKey: ['expected-payments-for-card', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      
+      const { data, error } = await supabase.rpc('get_students_with_details', {
+        p_school_id: schoolId
+      });
+
+      if (error) throw error;
+
+      // Filter students who have next payment information
+      const studentsWithPayments = data?.filter(student => 
+        student.next_payment_date && student.next_payment_amount
+      ).map(student => ({
+        student_id: student.id,
+        student_name: `${student.first_name} ${student.last_name}`,
+        next_payment_date: student.next_payment_date,
+        next_payment_amount: student.next_payment_amount,
+        currency: 'USD' // Default currency for expected payments
+      })) || [];
+
+      return studentsWithPayments;
+    },
+    enabled: !!schoolId,
+  });
+
   // Convert amount to selected currency
   const convertAmount = (amount: number, fromCurrency: string, toCurrencyId: string) => {
     if (!currencies.length || !selectedCurrency) return amount;
@@ -211,7 +239,7 @@ const FinancesPage = () => {
     return currency ? currency.symbol : '$';
   };
 
-  // Calculate statistics with currency conversion and date filtering
+  // Calculate statistics with currency conversion and date filtering including expected payments
   const calculateStats = () => {
     const filteredPayments = payments.filter(payment => 
       payment.status === 'completed' && isDateInRange(payment.payment_date)
@@ -248,13 +276,24 @@ const FinancesPage = () => {
       return sum + convertedAmount;
     }, 0);
     
+    // Calculate expected payments within date range
+    const filteredExpectedPayments = expectedPayments.filter(payment => 
+      isDateInRange(payment.next_payment_date)
+    );
+    
+    const totalExpectedPayments = filteredExpectedPayments.reduce((sum, payment) => {
+      const convertedAmount = convertAmount(Number(payment.next_payment_amount), payment.currency, selectedCurrency);
+      return sum + convertedAmount;
+    }, 0);
+    
     const netIncome = (totalRevenue + totalTransactionIncome) - totalExpenses;
 
     return {
       netIncome,
       totalRevenue: totalRevenue + totalTransactionIncome,
       totalExpenses,
-      pendingAmount
+      pendingAmount,
+      expectedPayments: totalExpectedPayments
     };
   };
 
@@ -399,7 +438,7 @@ const FinancesPage = () => {
       </div>
 
       {/* Financial Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-green-600">Net Income</CardTitle>
@@ -436,6 +475,19 @@ const FinancesPage = () => {
               {getCurrencySymbol()}{stats.totalExpenses.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">All business expenses</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-purple-600">Expected Payments</CardTitle>
+            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">
+              {getCurrencySymbol()}{stats.expectedPayments.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">Upcoming student payments</p>
           </CardContent>
         </Card>
       </div>
