@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +31,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   // Enhanced logging when subscriptions prop changes
   useEffect(() => {
     console.log('🔥 =====================================================');
-    console.log('🔥 SUBSCRIPTIONS TAB - DETAILED PROPS ANALYSIS');
+    console.log('🔥 SUBSCRIPTIONS TAB - SIMPLIFIED APPROACH');
     console.log('🔥 =====================================================');
     console.log('Props received:');
     console.log('  - subscriptions:', subscriptions);
@@ -43,7 +44,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     console.log('  - studentId truthy:', !!studentId);
     
     if (subscriptions && Array.isArray(subscriptions)) {
-      console.log('📊 DETAILED SUBSCRIPTION ANALYSIS:');
+      console.log('📊 SUBSCRIPTION DETAILS:');
       subscriptions.forEach((sub, index) => {
         console.log(`  Subscription ${index + 1}:`, {
           id: sub.id,
@@ -52,7 +53,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           total_paid: sub.total_paid,
           session_count: sub.session_count,
           status: sub.status,
-          start_date: sub.start_date
+          start_date: sub.start_date,
+          price_mode: sub.price_mode
         });
       });
     } else {
@@ -61,15 +63,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       console.log('  - JSON.stringify:', JSON.stringify(subscriptions));
     }
     
-    // Component state analysis
-    console.log('📱 COMPONENT STATE:');
-    console.log('  - editDialogOpen:', editDialogOpen);
-    console.log('  - addDialogOpen:', addDialogOpen);
-    console.log('  - deletingId:', deletingId);
-    console.log('  - editingSubscription:', editingSubscription);
-    
     console.log('🔥 =====================================================');
-  }, [subscriptions, isLoading, studentId, editDialogOpen, addDialogOpen, deletingId, editingSubscription]);
+  }, [subscriptions, isLoading, studentId]);
 
   const handleDeleteSubscription = async (subscriptionId: string) => {
     try {
@@ -181,7 +176,10 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Calendar className="h-12 w-12 text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h3>
-                <p className="text-gray-600 mb-4">This student doesn't have any active subscriptions yet.</p>
+                <p className="text-gray-600 mb-4 text-center">
+                  This student doesn't have any subscriptions yet.<br/>
+                  Create a subscription to get started with scheduled sessions and payments.
+                </p>
                 <Button 
                   onClick={() => {
                     console.log('➕ Create first subscription button clicked');
@@ -215,6 +213,24 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           </>
         )}
       </div>
+
+      {/* Debug Info Card - Remove this in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="bg-gray-50 border-gray-200">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <AlertCircle className="h-4 w-4 text-gray-500" />
+              <h4 className="text-sm font-medium text-gray-700">Debug Info</h4>
+            </div>
+            <div className="text-xs text-gray-600 space-y-1">
+              <div>Student ID: {studentId}</div>
+              <div>Subscriptions Count: {subscriptions?.length || 0}</div>
+              <div>Is Loading: {isLoading.toString()}</div>
+              <div>Array Check: {Array.isArray(subscriptions).toString()}</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Dialogs */}
       <EditSubscriptionDialog

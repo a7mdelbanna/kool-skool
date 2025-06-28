@@ -55,17 +55,12 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     console.log('Query should be enabled:', !!student?.id && open);
   }, [student, open, activeTab]);
 
-  // Enhanced subscription fetching with comprehensive logging
+  // Simplified subscription fetching using direct table query
   const { data: subscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError, refetch: refetchSubscriptions } = useQuery({
-    queryKey: ['student-subscriptions-with-payments', student?.id],
+    queryKey: ['student-subscriptions-simple', student?.id],
     queryFn: async () => {
-      console.log('🚀 SUBSCRIPTION QUERY EXECUTION START');
+      console.log('🚀 SIMPLIFIED SUBSCRIPTION QUERY START');
       console.log('Student ID for query:', student?.id);
-      console.log('Query enabled conditions:', {
-        hasStudentId: !!student?.id,
-        dialogOpen: open,
-        shouldExecute: !!student?.id && open
-      });
       
       if (!student?.id) {
         console.log('❌ No student ID - returning empty array');
@@ -73,63 +68,84 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
       }
       
       try {
-        console.log('🔄 Fetching subscriptions from database...');
+        // Step 1: Get subscriptions directly from table
+        console.log('🔄 Fetching subscriptions directly from subscriptions table...');
         
-        // Step 1: Get basic subscriptions first
         const { data: subscriptionsData, error: subscriptionsError } = await supabase
           .from('subscriptions')
           .select('*')
           .eq('student_id', student.id)
           .order('created_at', { ascending: false });
         
-        console.log('📊 Raw subscriptions query result:', {
+        console.log('📊 Direct subscriptions query result:', {
           data: subscriptionsData,
           error: subscriptionsError,
           dataLength: subscriptionsData?.length || 0
         });
         
         if (subscriptionsError) {
-          console.error('❌ Subscription fetch error:', subscriptionsError);
+          console.error('❌ Direct subscription fetch error:', subscriptionsError);
           throw subscriptionsError;
         }
 
         if (!subscriptionsData || subscriptionsData.length === 0) {
-          console.log('✅ No subscriptions found for student');
+          console.log('✅ No subscriptions found - checking if student exists in database');
+          
+          // Verify student exists
+          const { data: studentCheck } = await supabase
+            .from('students')
+            .select('id, user_id')
+            .eq('id', student.id)
+            .single();
+          
+          console.log('👤 Student check result:', studentCheck);
           return [];
         }
 
-        console.log('💰 Calculating payments for each subscription...');
+        console.log('💰 Calculating total paid for each subscription...');
         
-        // Step 2: For each subscription, calculate the total paid from transactions
+        // Step 2: Calculate total paid for each subscription
         const subscriptionsWithPayments = await Promise.all(
           subscriptionsData.map(async (subscription, index) => {
             console.log(`💳 Processing subscription ${index + 1}/${subscriptionsData.length}:`, subscription.id);
             
             try {
-              // Get all income transactions linked to this subscription
-              const { data: payments, error: paymentsError } = await supabase
+              // Get payments from student_payments table linked to this subscription
+              const { data: studentPayments, error: studentPaymentsError } = await supabase
+                .from('student_payments')
+                .select('amount')
+                .eq('student_id', student.id);
+
+              console.log(`💸 Student payments query result:`, {
+                payments: studentPayments,
+                error: studentPaymentsError,
+                paymentsCount: studentPayments?.length || 0
+              });
+
+              // Also check transactions table for subscription-specific payments
+              const { data: transactionPayments, error: transactionError } = await supabase
                 .from('transactions')
                 .select('amount')
                 .eq('subscription_id', subscription.id)
                 .eq('type', 'income')
                 .eq('status', 'completed');
 
-              console.log(`💸 Payments query for subscription ${subscription.id}:`, {
-                payments,
-                error: paymentsError,
-                paymentsCount: payments?.length || 0
+              console.log(`💰 Transaction payments query result:`, {
+                payments: transactionPayments,
+                error: transactionError,
+                paymentsCount: transactionPayments?.length || 0
               });
 
-              if (paymentsError) {
-                console.error('❌ Error fetching payments for subscription:', subscription.id, paymentsError);
-                return {
-                  ...subscription,
-                  total_paid: 0
-                };
-              }
+              // Calculate total from both sources
+              const studentPaymentTotal = (studentPayments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
+              const transactionPaymentTotal = (transactionPayments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
+              const totalPaid = studentPaymentTotal + transactionPaymentTotal;
 
-              const totalPaid = (payments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
-              console.log(`✅ Total paid for subscription ${subscription.id}:`, totalPaid);
+              console.log(`✅ Total calculations for subscription ${subscription.id}:`, {
+                studentPaymentTotal,
+                transactionPaymentTotal,
+                totalPaid
+              });
 
               return {
                 ...subscription,
@@ -146,34 +162,48 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         );
         
         console.log('🎉 FINAL SUBSCRIPTIONS WITH PAYMENTS:', subscriptionsWithPayments);
+        console.log('📊 Total subscriptions to return:', subscriptionsWithPayments.length);
+        
         return subscriptionsWithPayments;
       } catch (error) {
-        console.error('❌ CRITICAL ERROR in subscription fetch:', error);
-        // Return empty array instead of throwing to prevent UI break
-        return [];
+        console.error('❌ CRITICAL ERROR in simplified subscription fetch:', error);
+        throw error; // Let the error bubble up to show proper error state
       }
     },
     enabled: !!student?.id && open,
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 300000,
+    retry: 2,
+    staleTime: 10000, // 10 seconds
+    gcTime: 60000, // 1 minute
   });
 
   // Log subscription query state changes
   useEffect(() => {
-    console.log('📊 SUBSCRIPTION QUERY STATE UPDATE:');
+    console.log('📊 SIMPLIFIED SUBSCRIPTION QUERY STATE:');
     console.log('Subscriptions data:', subscriptions);
     console.log('Subscriptions count:', subscriptions?.length || 0);
     console.log('Is loading:', subscriptionsLoading);
     console.log('Has error:', !!subscriptionsError);
     console.log('Error details:', subscriptionsError);
+    
+    if (subscriptions && subscriptions.length > 0) {
+      subscriptions.forEach((sub, index) => {
+        console.log(`Subscription ${index + 1}:`, {
+          id: sub.id,
+          student_id: sub.student_id,
+          session_count: sub.session_count,
+          total_price: sub.total_price,
+          total_paid: sub.total_paid,
+          status: sub.status
+        });
+      });
+    }
   }, [subscriptions, subscriptionsLoading, subscriptionsError]);
 
   // Error handling for subscriptions
   useEffect(() => {
     if (subscriptionsError) {
       console.error("❌ SUBSCRIPTION ERROR:", subscriptionsError);
-      toast.error("Failed to load subscription history. Please refresh the page and try again.");
+      toast.error("Failed to load subscriptions. Please try refreshing the page.");
     }
   }, [subscriptionsError]);
 
@@ -265,8 +295,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
   const handleSubscriptionRefresh = () => {
     console.log('🔄 Manual subscription refresh triggered for student:', student?.id);
     if (student?.id) {
-      queryClient.invalidateQueries({ queryKey: ['student-subscriptions-with-payments', student.id] });
-      // Also try to refetch directly
+      queryClient.invalidateQueries({ queryKey: ['student-subscriptions-simple', student.id] });
       refetchSubscriptions();
     }
   };
