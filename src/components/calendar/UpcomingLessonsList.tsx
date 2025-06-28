@@ -32,14 +32,30 @@ interface LessonSession {
   };
 }
 
-const UpcomingLessonsList = () => {
+interface UpcomingLessonsListProps {
+  sessions?: any[];
+  onLessonClick?: (session: any) => void;
+  onSessionUpdate?: () => void;
+  viewMode?: string;
+  currentDate?: Date;
+  currentWeekStart?: Date;
+}
+
+const UpcomingLessonsList = ({ 
+  sessions: externalSessions, 
+  onLessonClick, 
+  onSessionUpdate, 
+  viewMode, 
+  currentDate, 
+  currentWeekStart 
+}: UpcomingLessonsListProps = {}) => {
   // Fetch user info
   const { data: userInfo } = useQuery({
     queryKey: ['current-user-info'],
     queryFn: getCurrentUserInfo,
   });
 
-  // Fetch upcoming lessons
+  // Fetch upcoming lessons only if no external sessions provided
   const { data: upcomingLessons = [], isLoading } = useQuery({
     queryKey: ['upcoming-lessons', userInfo?.[0]?.user_school_id],
     queryFn: async () => {
@@ -56,10 +72,10 @@ const UpcomingLessonsList = () => {
           status,
           cost,
           notes,
-          student:students(
+          student:students!inner(
             id,
             user_id,
-            users(first_name, last_name)
+            users:user_id(first_name, last_name)
           ),
           subscription:subscriptions(
             id,
@@ -78,10 +94,13 @@ const UpcomingLessonsList = () => {
       if (error) throw error;
       return data as LessonSession[];
     },
-    enabled: !!userInfo?.[0]?.user_school_id,
+    enabled: !!userInfo?.[0]?.user_school_id && !externalSessions,
   });
 
-  if (isLoading) {
+  // Use external sessions if provided, otherwise use fetched lessons
+  const displaySessions = externalSessions || upcomingLessons;
+
+  if (isLoading && !externalSessions) {
     return (
       <Card>
         <CardHeader>
@@ -97,6 +116,50 @@ const UpcomingLessonsList = () => {
     );
   }
 
+  // If this is being used as a list view (with external sessions), show all sessions
+  if (externalSessions) {
+    return (
+      <div className="space-y-4">
+        {displaySessions.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">
+            No sessions found for the selected period
+          </p>
+        ) : (
+          displaySessions.map((session) => (
+            <div
+              key={session.id}
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+              onClick={() => onLessonClick?.(session)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">
+                    {session.studentName || 'Unknown Student'}
+                  </p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    {format(new Date(session.date), 'MMM dd, h:mm a')}
+                    <span>• {session.duration || '60 min'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-medium">${session.cost || 0}</p>
+                <Badge variant="outline" className="text-xs">
+                  {session.status}
+                </Badge>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  // Default card view for upcoming lessons
   return (
     <Card>
       <CardHeader>
@@ -106,12 +169,12 @@ const UpcomingLessonsList = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {upcomingLessons.length === 0 ? (
+        {displaySessions.length === 0 ? (
           <p className="text-muted-foreground text-center py-4">
             No upcoming lessons scheduled
           </p>
         ) : (
-          upcomingLessons.map((lesson) => (
+          displaySessions.map((lesson) => (
             <div
               key={lesson.id}
               className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
@@ -147,7 +210,7 @@ const UpcomingLessonsList = () => {
             </div>
           ))
         )}
-        {upcomingLessons.length > 0 && (
+        {displaySessions.length > 0 && !externalSessions && (
           <Button variant="outline" className="w-full">
             <BookOpen className="h-4 w-4 mr-2" />
             View All Lessons
