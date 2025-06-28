@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import CurrencyManagement from '@/components/CurrencyManagement';
 import AccountsManagement from '@/components/AccountsManagement';
 import TransactionCategoriesManagement from '@/components/TransactionCategoriesManagement';
+import TagManager from '@/components/TagManager';
 
 const Settings = () => {
   return (
@@ -37,7 +38,7 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-7 mb-6">
+        <TabsList className="grid grid-cols-8 mb-6">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
@@ -57,6 +58,10 @@ const Settings = () => {
           <TabsTrigger value="categories" className="gap-2">
             <Tags className="h-4 w-4" />
             <span className="hidden sm:inline">Categories</span>
+          </TabsTrigger>
+          <TabsTrigger value="tags" className="gap-2">
+            <Tags className="h-4 w-4" />
+            <span className="hidden sm:inline">Tags</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
@@ -219,6 +224,10 @@ const Settings = () => {
 
         <TabsContent value="categories" className="mt-0 space-y-6">
           <TransactionCategoriesManagement />
+        </TabsContent>
+
+        <TabsContent value="tags" className="mt-0 space-y-6">
+          <TagManager showUsageCount={true} />
         </TabsContent>
         
         <TabsContent value="notifications" className="mt-0 space-y-6">
