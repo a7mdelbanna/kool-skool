@@ -11,6 +11,7 @@ import Students from "./pages/Students";
 import Courses from "./pages/Courses";
 import Contacts from "./pages/Contacts";
 import Calendar from "./pages/Calendar";
+import Attendance from "./pages/Attendance";
 import PaymentsOptimized from "./pages/PaymentsOptimized";
 import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
@@ -102,6 +103,7 @@ const App = () => {
                   <Route path="/courses" element={<Courses />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/attendance" element={<Attendance />} />
                   <Route path="/payments" element={<PaymentsOptimized />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<StatesReports />} />
