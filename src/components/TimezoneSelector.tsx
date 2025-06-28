@@ -1,6 +1,21 @@
 
-import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React, { useState } from 'react';
+import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { COMMON_TIMEZONES } from '@/utils/timezone';
 
@@ -19,24 +34,72 @@ const TimezoneSelector: React.FC<TimezoneSelectorProps> = ({
   placeholder = "Select timezone",
   disabled = false
 }) => {
+  const [open, setOpen] = useState(false);
+
+  const selectedTimezone = COMMON_TIMEZONES.find(
+    (timezone) => timezone.value === value
+  );
+
   return (
     <div className="space-y-2">
       <Label htmlFor="timezone">{label}</Label>
-      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-        <SelectTrigger id="timezone">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {COMMON_TIMEZONES.map((timezone) => (
-            <SelectItem key={timezone.value} value={timezone.value}>
-              <div className="flex flex-col">
-                <span className="font-medium">{timezone.label}</span>
-                <span className="text-xs text-muted-foreground">{timezone.offset}</span>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between h-auto min-h-[40px] px-3 py-2"
+            disabled={disabled}
+            id="timezone"
+          >
+            {selectedTimezone ? (
+              <div className="flex flex-col items-start text-left">
+                <span className="font-medium">{selectedTimezone.label}</span>
+                <span className="text-xs text-muted-foreground">{selectedTimezone.offset}</span>
               </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+            ) : (
+              <span className="text-muted-foreground">{placeholder}</span>
+            )}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[400px] p-0" align="start">
+          <Command>
+            <CommandInput 
+              placeholder="Search timezones..." 
+              className="h-9"
+            />
+            <CommandList>
+              <CommandEmpty>No timezone found.</CommandEmpty>
+              <CommandGroup>
+                {COMMON_TIMEZONES.map((timezone) => (
+                  <CommandItem
+                    key={timezone.value}
+                    value={`${timezone.label} ${timezone.value} ${timezone.offset}`}
+                    onSelect={() => {
+                      onValueChange(timezone.value);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-2 py-3"
+                  >
+                    <Check
+                      className={cn(
+                        "h-4 w-4",
+                        value === timezone.value ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="font-medium text-sm">{timezone.label}</span>
+                      <span className="text-xs text-muted-foreground">{timezone.offset}</span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };
