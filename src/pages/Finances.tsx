@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { DollarSign, Search, Filter as FilterIcon } from 'lucide-react';
+import { DollarSign, Search, Filter as FilterIcon, Calendar } from 'lucide-react';
 import ExpectedPaymentsSection from '@/components/ExpectedPaymentsSection';
 import AccountsBalanceSection from '@/components/AccountsBalanceSection';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import {
   Accordion,
   AccordionContent,
@@ -30,12 +35,20 @@ import {
 } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+type DateFilterType = 'today' | 'week' | 'month' | 'custom';
 
 const FinancesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('');
+  const [dateFilter, setDateFilter] = useState<DateFilterType>('month');
+  const [customDateRange, setCustomDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({ from: undefined, to: undefined });
 
   // Get school ID from localStorage
   const getSchoolId = () => {
@@ -46,6 +59,50 @@ const FinancesPage = () => {
   };
 
   const schoolId = getSchoolId();
+
+  // Get date range based on filter type
+  const getDateRange = () => {
+    const now = new Date();
+    
+    switch (dateFilter) {
+      case 'today':
+        return {
+          from: startOfDay(now),
+          to: endOfDay(now)
+        };
+      case 'week':
+        return {
+          from: startOfWeek(now),
+          to: endOfWeek(now)
+        };
+      case 'month':
+        return {
+          from: startOfMonth(now),
+          to: endOfMonth(now)
+        };
+      case 'custom':
+        return {
+          from: customDateRange.from || startOfMonth(now),
+          to: customDateRange.to || endOfMonth(now)
+        };
+      default:
+        return {
+          from: startOfMonth(now),
+          to: endOfMonth(now)
+        };
+    }
+  };
+
+  const dateRange = getDateRange();
+
+  // Filter function to check if a date is within the selected range
+  const isDateInRange = (date: string) => {
+    const transactionDate = new Date(date);
+    return isWithinInterval(transactionDate, {
+      start: dateRange.from,
+      end: dateRange.to
+    });
+  };
 
   // Fetch available currencies
   const { data: currencies = [] } = useQuery({
@@ -154,31 +211,39 @@ const FinancesPage = () => {
     return currency ? currency.symbol : '$';
   };
 
-  // Calculate statistics with currency conversion
+  // Calculate statistics with currency conversion and date filtering
   const calculateStats = () => {
-    const paidPayments = payments.filter(payment => payment.status === 'completed');
-    const pendingPayments = payments.filter(payment => payment.status === 'pending');
+    const filteredPayments = payments.filter(payment => 
+      payment.status === 'completed' && isDateInRange(payment.payment_date)
+    );
+    const filteredPendingPayments = payments.filter(payment => 
+      payment.status === 'pending' && isDateInRange(payment.payment_date)
+    );
     
-    const totalRevenue = paidPayments.reduce((sum, payment) => {
+    const totalRevenue = filteredPayments.reduce((sum, payment) => {
       const convertedAmount = convertAmount(Number(payment.amount), payment.currency, selectedCurrency);
       return sum + convertedAmount;
     }, 0);
     
-    const pendingAmount = pendingPayments.reduce((sum, payment) => {
+    const pendingAmount = filteredPendingPayments.reduce((sum, payment) => {
       const convertedAmount = convertAmount(Number(payment.amount), payment.currency, selectedCurrency);
       return sum + convertedAmount;
     }, 0);
     
-    // Add transaction stats
-    const incomeTransactions = transactions.filter(t => t.type === 'income');
-    const expenseTransactions = transactions.filter(t => t.type === 'expense');
+    // Add transaction stats with date filtering
+    const filteredIncomeTransactions = transactions.filter(t => 
+      t.type === 'income' && isDateInRange(t.transaction_date)
+    );
+    const filteredExpenseTransactions = transactions.filter(t => 
+      t.type === 'expense' && isDateInRange(t.transaction_date)
+    );
     
-    const totalTransactionIncome = incomeTransactions.reduce((sum, t) => {
+    const totalTransactionIncome = filteredIncomeTransactions.reduce((sum, t) => {
       const convertedAmount = convertAmount(Number(t.amount), t.currency, selectedCurrency);
       return sum + convertedAmount;
     }, 0);
     
-    const totalExpenses = expenseTransactions.reduce((sum, t) => {
+    const totalExpenses = filteredExpenseTransactions.reduce((sum, t) => {
       const convertedAmount = convertAmount(Number(t.amount), t.currency, selectedCurrency);
       return sum + convertedAmount;
     }, 0);
@@ -265,20 +330,71 @@ const FinancesPage = () => {
           </h1>
           <p className="text-muted-foreground">Overview of your financial accounts and expected payments</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Currency:</span>
-          <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Select currency" />
-            </SelectTrigger>
-            <SelectContent>
-              {currencies.map((currency) => (
-                <SelectItem key={currency.id} value={currency.id}>
-                  {currency.symbol} {currency.code}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-4">
+          {/* Date Filter Controls */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Period:</span>
+            <Select value={dateFilter} onValueChange={(value: DateFilterType) => setDateFilter(value)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {dateFilter === 'custom' && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-64 justify-start text-left font-normal">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {customDateRange.from ? (
+                      customDateRange.to ? (
+                        <>
+                          {format(customDateRange.from, "LLL dd, y")} -{" "}
+                          {format(customDateRange.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(customDateRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    initialFocus
+                    mode="range"
+                    defaultMonth={customDateRange.from}
+                    selected={customDateRange}
+                    onSelect={(range) => setCustomDateRange({ from: range?.from, to: range?.to })}
+                    numberOfMonths={2}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Currency:</span>
+            <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {currencies.map((currency) => (
+                  <SelectItem key={currency.id} value={currency.id}>
+                    {currency.symbol} {currency.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
