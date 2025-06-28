@@ -143,6 +143,41 @@ export const getEffectiveTimezone = (userTimezone?: string | null): string => {
 };
 
 /**
+ * Get the school's timezone for session creation
+ */
+export const getSchoolTimezone = async (schoolId: string): Promise<string> => {
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data, error } = await supabase
+      .from('schools')
+      .select('timezone')
+      .eq('id', schoolId)
+      .single();
+
+    if (error) {
+      console.warn('Could not fetch school timezone:', error.message);
+      return 'UTC';
+    }
+
+    return data?.timezone || 'UTC';
+  } catch (error) {
+    console.warn('Error fetching school timezone:', error);
+    return 'UTC';
+  }
+};
+
+/**
+ * Convert a date/time from school timezone to UTC for storage
+ */
+export const convertSchoolTimeToUTC = async (
+  localDate: Date, 
+  schoolId: string
+): Promise<Date> => {
+  const schoolTimezone = await getSchoolTimezone(schoolId);
+  return fromZonedTime(localDate, schoolTimezone);
+};
+
+/**
  * Format time for display in 12/24 hour format
  */
 export const formatTimeDisplay = (
@@ -163,5 +198,17 @@ export const formatDateTimeDisplay = (
   use24Hour: boolean = false
 ): string => {
   const formatString = use24Hour ? 'MMM d, yyyy HH:mm' : 'MMM d, yyyy h:mm a';
+  return formatInUserTimezone(date, userTimezone, formatString);
+};
+
+/**
+ * Format date and time for display with timezone abbreviation
+ */
+export const formatDateTimeDisplayWithTimezone = (
+  date: Date | string,
+  userTimezone: string,
+  use24Hour: boolean = false
+): string => {
+  const formatString = use24Hour ? 'MMM d, yyyy HH:mm zzz' : 'MMM d, yyyy h:mm a zzz';
   return formatInUserTimezone(date, userTimezone, formatString);
 };

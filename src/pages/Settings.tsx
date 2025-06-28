@@ -12,7 +12,8 @@ import {
   Save,
   Wallet,
   Tags,
-  GraduationCap
+  GraduationCap,
+  Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,7 @@ import AccountsManagement from '@/components/AccountsManagement';
 import TransactionCategoriesManagement from '@/components/TransactionCategoriesManagement';
 import TagManager from '@/components/TagManager';
 import StudentLevelsManagement from '@/components/StudentLevelsManagement';
+import SchoolTimezoneManagement from '@/components/SchoolTimezoneManagement';
 import TimezoneSelector from '@/components/TimezoneSelector';
 import { getEffectiveTimezone } from '@/utils/timezone';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,7 +69,7 @@ const Settings = () => {
 
       toast({
         title: "Success",
-        description: "Timezone updated successfully",
+        description: "Your personal timezone has been updated successfully",
       });
     } catch (error: any) {
       console.error('Error updating timezone:', error);
@@ -89,7 +91,7 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-9 mb-6">
+        <TabsList className="grid grid-cols-10 mb-6">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
@@ -97,6 +99,10 @@ const Settings = () => {
           <TabsTrigger value="business" className="gap-2">
             <Briefcase className="h-4 w-4" />
             <span className="hidden sm:inline">Business</span>
+          </TabsTrigger>
+          <TabsTrigger value="school-timezone" className="gap-2">
+            <Globe className="h-4 w-4" />
+            <span className="hidden sm:inline">School TZ</span>
           </TabsTrigger>
           <TabsTrigger value="levels" className="gap-2">
             <GraduationCap className="h-4 w-4" />
@@ -131,8 +137,8 @@ const Settings = () => {
         <TabsContent value="profile" className="mt-0 space-y-6">
           <Card className="glass glass-hover">
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal information and contact details</CardDescription>
+              <CardTitle>Personal Information</CardTitle>
+              <CardDescription>Update your personal information, contact details, and timezone preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
@@ -168,11 +174,18 @@ const Settings = () => {
                   <Input id="location" placeholder="City, Country" />
                 </div>
                 <div className="space-y-2 md:col-span-2">
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 mb-4">
+                    <h4 className="font-medium text-amber-900 mb-2">Personal Timezone Preference</h4>
+                    <p className="text-sm text-amber-800">
+                      This is your personal viewing preference. All times will be displayed in this timezone, 
+                      regardless of the school's default timezone setting.
+                    </p>
+                  </div>
                   <TimezoneSelector
                     value={currentTimezone}
                     onValueChange={handleTimezoneUpdate}
                     disabled={updating}
-                    label="Timezone"
+                    label="Your Personal Timezone"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
@@ -275,6 +288,10 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="school-timezone" className="mt-0 space-y-6">
+          {user?.schoolId && <SchoolTimezoneManagement schoolId={user.schoolId} />}
         </TabsContent>
 
         <TabsContent value="levels" className="mt-0 space-y-6">
