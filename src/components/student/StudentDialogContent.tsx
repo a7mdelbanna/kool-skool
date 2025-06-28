@@ -120,19 +120,15 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     gcTime: 300000, // Keep in cache for 5 minutes (renamed from cacheTime)
   });
 
-  // Add reactive computation for subscriptions similar to PaymentsTab
+  // Simplified reactive computation for subscriptions - always return rawSubscriptions
   const subscriptions = useMemo(() => {
     console.log('===== SUBSCRIPTIONS MEMO RECALCULATION =====');
     console.log('Raw subscriptions:', rawSubscriptions);
     console.log('Raw subscriptions length:', rawSubscriptions.length);
     console.log('Student ID for memo:', student?.id);
     
-    if (!student?.id || !rawSubscriptions.length) {
-      console.log('No subscriptions available for memo calculation');
-      return [];
-    }
-    
-    // Process subscriptions if needed (for now just return as-is)
+    // Always return the raw subscriptions array, don't filter based on conditions
+    // This ensures the component gets updated whenever rawSubscriptions changes
     const processedSubscriptions = rawSubscriptions.map(subscription => ({
       ...subscription,
       // Add any additional processing here if needed
@@ -142,7 +138,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     console.log('===== END SUBSCRIPTIONS MEMO RECALCULATION =====');
     
     return processedSubscriptions;
-  }, [rawSubscriptions, student?.id]);
+  }, [rawSubscriptions]);
 
   // Add effect to log subscription changes and force re-render
   useEffect(() => {
@@ -257,8 +253,8 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     // If switching to subscriptions tab, ensure data is fresh
     if (value === 'subscriptions' && student?.id) {
       console.log('Switching to subscriptions tab - ensuring fresh data');
-      // Invalidate and refetch to ensure we have the latest data
-      queryClient.invalidateQueries({ queryKey: ['student-subscriptions', student.id] });
+      // Don't invalidate, just ensure the query is active
+      refetchSubscriptions();
     }
   };
 
