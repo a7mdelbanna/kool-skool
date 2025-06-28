@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   format, 
@@ -192,7 +193,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
       return dateB.getTime() - dateA.getTime();
     });
     
-  // Render status icon
+  // Render status icon - fixed to only use valid status values
   const renderStatusIcon = (status: Session['status']) => {
     switch(status) {
       case "scheduled":
@@ -200,7 +201,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
       case "completed":
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "canceled":
-      case "cancelled":
         return <CalendarX className="h-4 w-4 text-orange-500" />;
       case "missed":
         return <XCircle className="h-4 w-4 text-red-500" />;
@@ -529,7 +529,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                         }
                       </div>
                       
-                      {/* Status Badge */}
+                      {/* Status Badge - fixed to only use valid status values */}
                       <div className="flex-shrink-0 ml-4">
                         <Badge 
                           variant="outline" 
@@ -537,7 +537,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                             isPastSession 
                               ? "bg-gray-100 text-gray-500 border-gray-300 opacity-70"
                               : session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
-                                (session.status === "canceled" || session.status === "cancelled") ? "bg-red-50 text-red-700 border-red-300" :
+                                session.status === "canceled" ? "bg-red-50 text-red-700 border-red-300" :
                                 session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
                                 "bg-blue-50 text-blue-700 border-blue-300"
                           }
