@@ -125,7 +125,7 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
-  // Fetch actual password hash for display
+  // Fetch actual password hash using the dedicated RPC function
   const fetchPasswordHash = async (userId: string) => {
     console.log('=== FETCH PASSWORD DEBUG ===');
     console.log('Fetching password hash for user ID:', userId);
@@ -144,61 +144,28 @@ const StudentAccess = () => {
     }
 
     try {
-      console.log('Querying users table for password hash...');
+      console.log('Using RPC function to get password hash...');
       
-      // Query users table directly with more robust error handling
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, email, first_name, last_name, role, password_hash')
-        .eq('id', userId)
-        .eq('role', 'student')
-        .maybeSingle();
+      // Use the dedicated RPC function to get password hash
+      const { data, error } = await supabase.rpc('get_user_password_hash', {
+        p_user_id: userId
+      });
 
-      console.log('Direct query result:', { data, error, userId });
+      console.log('RPC password hash result:', { data, error, userId });
 
       if (error) {
-        console.error('Database error fetching password:', error);
+        console.error('RPC error fetching password:', error);
         toast.error('Database error: ' + error.message);
         return null;
       }
 
-      if (!data) {
-        console.log('No user found with ID:', userId);
-        
-        // Try to find the user by email as a fallback
-        const student = studentsWithPasswords.find(s => s.id === userId);
-        if (student?.email) {
-          console.log('Trying fallback search by email:', student.email);
-          const { data: emailData, error: emailError } = await supabase
-            .from('users')
-            .select('id, email, first_name, last_name, role, password_hash')
-            .eq('email', student.email)
-            .eq('role', 'student')
-            .maybeSingle();
-
-          console.log('Email search result:', { emailData, emailError });
-          
-          if (emailData?.password_hash) {
-            console.log('Found user by email, caching password');
-            setPasswordCache(prev => new Map(prev).set(userId, emailData.password_hash));
-            return emailData.password_hash;
-          }
-        }
-        
-        toast.error('User not found');
+      if (!data || data.length === 0) {
+        console.log('No password hash found for user:', userId);
+        toast.error('No password found for this user');
         return null;
       }
 
-      console.log('User found:', { 
-        id: data.id,
-        email: data.email, 
-        role: data.role, 
-        name: `${data.first_name} ${data.last_name}`,
-        hasPassword: !!data.password_hash,
-        passwordLength: data.password_hash?.length || 0
-      });
-
-      const passwordHash = data.password_hash;
+      const passwordHash = data[0]?.password_hash;
       
       if (passwordHash) {
         // Cache the result
@@ -206,7 +173,7 @@ const StudentAccess = () => {
         console.log('Password found and cached for user:', userId);
         return passwordHash;
       } else {
-        console.log('No password hash found for user:', userId);
+        console.log('No password hash in RPC result for user:', userId);
         toast.error('No password set for this user');
         return null;
       }
