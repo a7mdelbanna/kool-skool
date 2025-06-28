@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -45,39 +44,12 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Prefetch subscriptions immediately when dialog opens
-  useEffect(() => {
-    if (open && student?.id) {
-      console.log('Dialog opened - prefetching subscriptions for student:', student.id);
-      queryClient.prefetchQuery({
-        queryKey: ['student-subscriptions', student.id],
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('student_id', student.id)
-            .order('created_at', { ascending: false });
-          
-          if (error) {
-            console.error('Error prefetching subscriptions:', error);
-            throw error;
-          }
-          
-          console.log('Subscriptions prefetched successfully:', data?.length || 0, 'items');
-          return data || [];
-        },
-      });
-    }
-  }, [open, student?.id, queryClient]);
-
-  // Enhanced subscription fetching with immediate availability
-  const { data: rawSubscriptions = [], refetch: refetchSubscriptions, isLoading: subscriptionsLoading } = useQuery({
+  // Direct subscription fetching - similar to PaymentsTab pattern
+  const { data: allSubscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError } = useQuery({
     queryKey: ['student-subscriptions', student?.id],
     queryFn: async () => {
-      console.log('===== SUBSCRIPTIONS FETCH DEBUG =====');
+      console.log('===== SUBSCRIPTIONS FETCH (Direct Pattern) =====');
       console.log('Student ID:', student?.id);
-      console.log('Dialog open:', open);
-      console.log('Is edit mode:', isEditMode);
       
       if (!student?.id) {
         console.log('No student ID - returning empty array');
@@ -94,66 +66,51 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
       
       if (error) {
         console.error('Error fetching subscriptions:', error);
-        console.error('Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
         throw error;
       }
       
       console.log('Subscriptions fetched successfully:', data);
       console.log('Number of subscriptions:', data?.length || 0);
-      
-      if (data && data.length > 0) {
-        console.log('First subscription details:', data[0]);
-      }
-      
-      console.log('===== END SUBSCRIPTIONS FETCH DEBUG =====');
+      console.log('===== END SUBSCRIPTIONS FETCH =====');
       
       return data || [];
     },
-    enabled: !!student?.id,
+    enabled: !!student?.id && open,
     retry: 1,
-    staleTime: 30000, // Consider data fresh for 30 seconds
-    gcTime: 300000, // Keep in cache for 5 minutes (renamed from cacheTime)
+    staleTime: 30000,
+    gcTime: 300000,
   });
 
-  // Simplified reactive computation for subscriptions - always return rawSubscriptions
+  // Process subscriptions using the same pattern as PaymentsTab
   const subscriptions = useMemo(() => {
-    console.log('===== SUBSCRIPTIONS MEMO RECALCULATION =====');
-    console.log('Raw subscriptions:', rawSubscriptions);
-    console.log('Raw subscriptions length:', rawSubscriptions.length);
-    console.log('Student ID for memo:', student?.id);
+    console.log('===== SUBSCRIPTIONS PROCESSING (PaymentsTab Pattern) =====');
+    console.log('All subscriptions raw:', allSubscriptions);
+    console.log('Student data:', studentData);
     
-    // Always return the raw subscriptions array, don't filter based on conditions
-    // This ensures the component gets updated whenever rawSubscriptions changes
-    const processedSubscriptions = rawSubscriptions.map(subscription => ({
+    if (!student?.id || !allSubscriptions.length) {
+      console.log('No subscriptions to process');
+      return [];
+    }
+    
+    // Direct processing like PaymentsTab - no complex filtering
+    const processedSubscriptions = allSubscriptions.map(subscription => ({
       ...subscription,
       // Add any additional processing here if needed
     }));
     
     console.log('Processed subscriptions:', processedSubscriptions.length);
-    console.log('===== END SUBSCRIPTIONS MEMO RECALCULATION =====');
+    console.log('===== END SUBSCRIPTIONS PROCESSING =====');
     
     return processedSubscriptions;
-  }, [rawSubscriptions]);
+  }, [allSubscriptions, student?.id]);
 
-  // Add effect to log subscription changes and force re-render
+  // Error handling for subscriptions
   useEffect(() => {
-    console.log('===== SUBSCRIPTIONS STATE UPDATE =====');
-    console.log('Current subscriptions state:', subscriptions);
-    console.log('Subscriptions length:', subscriptions.length);
-    console.log('Subscriptions loading:', subscriptionsLoading);
-    console.log('Active tab:', activeTab);
-    console.log('===== END SUBSCRIPTIONS STATE UPDATE =====');
-    
-    // Force a re-render of the subscriptions tab when data changes
-    if (subscriptions.length > 0 && activeTab === 'subscriptions') {
-      console.log('Subscriptions data loaded and tab is active - ensuring render');
+    if (subscriptionsError) {
+      console.error("Error loading subscriptions:", subscriptionsError);
+      toast.error("Failed to load subscription history. Please refresh the page and try again.");
     }
-  }, [subscriptions, subscriptionsLoading, activeTab]);
+  }, [subscriptionsError]);
 
   // Detailed course data debugging with clear section markers
   useEffect(() => {
@@ -242,20 +199,13 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
   // Handle subscription refresh
   const handleSubscriptionRefresh = () => {
     console.log('Manually refreshing subscriptions...');
-    refetchSubscriptions();
+    queryClient.invalidateQueries({ queryKey: ['student-subscriptions', student?.id] });
   };
 
-  // Handle tab changes and ensure data is available
+  // Handle tab changes
   const handleTabChange = (value: string) => {
     console.log('Tab changed to:', value);
     setActiveTab(value);
-    
-    // If switching to subscriptions tab, ensure data is fresh
-    if (value === 'subscriptions' && student?.id) {
-      console.log('Switching to subscriptions tab - ensuring fresh data');
-      // Don't invalidate, just ensure the query is active
-      refetchSubscriptions();
-    }
   };
 
   return (
