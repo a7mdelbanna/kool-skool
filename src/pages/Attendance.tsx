@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { 
   Calendar as CalendarIcon, 
@@ -34,7 +33,9 @@ const Attendance = () => {
     loading,
     error,
     loadSessions,
-    refreshSessions
+    refreshSessions,
+    updateSessionOptimistically,
+    revertSessionUpdate
   } = useAttendanceData(user?.timezone);
 
   useEffect(() => {
@@ -96,7 +97,6 @@ const Attendance = () => {
              session.studentName?.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
-    // Apply date filtering based on view mode
     if (viewMode === 'day') {
       filtered = filtered.filter(session => {
         const sessionDate = new Date(session.date);
@@ -214,6 +214,8 @@ const Attendance = () => {
           <UpcomingLessonsList 
             sessions={filteredSessions}
             onSessionUpdate={refreshSessions}
+            onOptimisticUpdate={updateSessionOptimistically}
+            onRevertUpdate={revertSessionUpdate}
             viewMode={viewMode}
             currentDate={currentDate}
             currentWeekStart={currentWeekStart}

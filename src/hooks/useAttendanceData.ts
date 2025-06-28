@@ -36,6 +36,50 @@ export const useAttendanceData = (userTimezone?: string) => {
 
   const effectiveTimezone = useMemo(() => getEffectiveTimezone(userTimezone), [userTimezone]);
 
+  // Optimistic update function for session status
+  const updateSessionOptimistically = useCallback((sessionId: string, newStatus: Session['status']) => {
+    setSessions(prevSessions => 
+      prevSessions.map(session => 
+        session.id === sessionId 
+          ? { ...session, status: newStatus }
+          : session
+      )
+    );
+
+    // Update subscription info if the status change affects completion counts
+    if (newStatus === 'completed') {
+      setSessions(prevSessions => {
+        const updatedSession = prevSessions.find(s => s.id === sessionId);
+        if (updatedSession) {
+          setSubscriptionInfoMap(prevMap => {
+            const newMap = new Map(prevMap);
+            const subscriptionInfo = newMap.get(updatedSession.studentId);
+            if (subscriptionInfo) {
+              newMap.set(updatedSession.studentId, {
+                ...subscriptionInfo,
+                completedSessions: subscriptionInfo.completedSessions + 1,
+                attendedSessions: subscriptionInfo.attendedSessions + 1
+              });
+            }
+            return newMap;
+          });
+        }
+        return prevSessions;
+      });
+    }
+  }, []);
+
+  // Revert optimistic update (in case of error)
+  const revertSessionUpdate = useCallback((sessionId: string, originalStatus: Session['status']) => {
+    setSessions(prevSessions => 
+      prevSessions.map(session => 
+        session.id === sessionId 
+          ? { ...session, status: originalStatus }
+          : session
+      )
+    );
+  }, []);
+
   const loadSessions = useCallback(async () => {
     try {
       setLoading(true);
@@ -199,6 +243,8 @@ export const useAttendanceData = (userTimezone?: string) => {
     loading,
     error,
     loadSessions,
-    refreshSessions
+    refreshSessions,
+    updateSessionOptimistically,
+    revertSessionUpdate
   };
 };

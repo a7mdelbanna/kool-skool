@@ -55,6 +55,8 @@ interface UpcomingLessonsListProps {
   sessions: Session[];
   onLessonClick?: (session: Session) => void;
   onSessionUpdate?: () => void;
+  onOptimisticUpdate?: (sessionId: string, newStatus: Session['status']) => void;
+  onRevertUpdate?: (sessionId: string, originalStatus: Session['status']) => void;
   viewMode: 'day' | 'week' | 'month';
   currentDate: Date;
   currentWeekStart: Date;
@@ -72,6 +74,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
   sessions, 
   onLessonClick,
   onSessionUpdate,
+  onOptimisticUpdate,
+  onRevertUpdate,
   viewMode,
   currentDate,
   currentWeekStart,
@@ -81,11 +85,45 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusChangeSession, setStatusChangeSession] = useState<string | null>(null);
 
-  // Handle session actions
+  // Handle session actions with optimistic updates
   const handleSessionActionClick = async (sessionId: string, action: string, newDatetime?: Date) => {
     try {
       setActionLoading(sessionId);
       
+      // Find the current session to get its original status
+      const currentSession = sessions.find(s => s.id === sessionId);
+      if (!currentSession) {
+        toast.error('Session not found');
+        return;
+      }
+
+      const originalStatus = currentSession.status;
+      
+      // Map action to status
+      let newStatus: Session['status'];
+      switch(action) {
+        case 'attended':
+          newStatus = 'completed';
+          break;
+        case 'cancelled':
+          newStatus = 'canceled';
+          break;
+        case 'moved':
+        case 'rescheduled':
+          newStatus = 'scheduled'; // Keep as scheduled for now
+          break;
+        default:
+          newStatus = originalStatus;
+      }
+
+      // Apply optimistic update immediately
+      if (onOptimisticUpdate && newStatus !== originalStatus) {
+        onOptimisticUpdate(sessionId, newStatus);
+      }
+
+      // Show immediate feedback
+      toast.success(`Session ${action} - updating...`);
+
       const response = await handleSessionAction(
         sessionId, 
         action, 
@@ -96,15 +134,30 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
 
       if (typedResponse.success) {
         toast.success(`Session ${action} successfully`);
-        if (onSessionUpdate) {
-          onSessionUpdate();
-        }
         setStatusChangeSession(null);
+        
+        // Optionally refresh data in background to ensure consistency
+        if (onSessionUpdate) {
+          setTimeout(() => {
+            onSessionUpdate();
+          }, 2000); // Refresh after 2 seconds to sync any server-side changes
+        }
       } else {
+        // Revert optimistic update on failure
+        if (onRevertUpdate) {
+          onRevertUpdate(sessionId, originalStatus);
+        }
         toast.error(typedResponse.message || `Failed to ${action} session`);
       }
     } catch (error) {
       console.error(`Error handling session action ${action}:`, error);
+      
+      // Revert optimistic update on error
+      const currentSession = sessions.find(s => s.id === sessionId);
+      if (currentSession && onRevertUpdate) {
+        onRevertUpdate(sessionId, currentSession.status);
+      }
+      
       toast.error(`Failed to ${action} session`);
     } finally {
       setActionLoading(null);
