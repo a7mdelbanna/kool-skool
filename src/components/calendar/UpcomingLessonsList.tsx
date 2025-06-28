@@ -27,7 +27,8 @@ import {
   Check,
   X,
   Calendar,
-  ArrowRight
+  ArrowRight,
+  RefreshCcw
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
 import { getStudentSubscriptions, handleSessionAction } from '@/integrations/supabase/client';
@@ -72,6 +73,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
   const [subscriptionInfoMap, setSubscriptionInfoMap] = useState<Map<string, SubscriptionInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [statusChangeSession, setStatusChangeSession] = useState<string | null>(null);
 
   // Load subscription information for all students
   useEffect(() => {
@@ -157,6 +159,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
         if (onSessionUpdate) {
           onSessionUpdate();
         }
+        // Close status change popup
+        setStatusChangeSession(null);
       } else {
         toast.error(typedResponse.message || `Failed to ${action} session`);
       }
@@ -253,63 +257,83 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     return 1; // Default to 1 if we can't determine the session number
   };
 
-  // Render action buttons for a session
-  const renderActionButtons = (session: Session) => {
+  // Render status change options
+  const renderStatusChangeOptions = (session: Session) => {
     const sessionId = session.id;
     const isLoading = actionLoading === sessionId;
-    const isPast = isSessionPast(session);
-    
-    // Don't show action buttons for completed, cancelled, or missed sessions
-    if (session.status === 'completed' || session.status === 'canceled' || session.status === 'missed') {
-      return null;
-    }
 
     return (
-      <div className="flex gap-1 mt-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2 text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <Button 
           onClick={(e) => {
             e.stopPropagation();
-            handleSessionActionClick(sessionId, 'attended');
-          }}
+            handleSessionActionClick(sessionId, "attended");
+          }} 
+          className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
           disabled={isLoading}
         >
           <Check className="h-3 w-3 mr-1" />
-          Mark as Attended
+          {actionLoading === "attended" ? "..." : "Mark Completed"}
         </Button>
-        
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2 text-xs bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+        <Button 
           onClick={(e) => {
             e.stopPropagation();
-            handleSessionActionClick(sessionId, 'cancelled');
-          }}
+            handleSessionActionClick(sessionId, "cancelled");
+          }} 
+          className="h-7 px-2 text-xs bg-orange-600 hover:bg-orange-700 text-white"
           disabled={isLoading}
         >
           <X className="h-3 w-3 mr-1" />
-          Cancel
+          {actionLoading === "cancelled" ? "..." : "Mark Cancelled"}
+        </Button>
+        <Button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, "moved");
+          }} 
+          className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+          disabled={isLoading}
+        >
+          <ArrowRight className="h-3 w-3 mr-1" />
+          {actionLoading === "moved" ? "..." : "Move"}
+        </Button>
+        <Button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, "rescheduled");
+          }} 
+          className="h-7 px-2 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+          disabled={isLoading}
+        >
+          <RefreshCcw className="h-3 w-3 mr-1" />
+          {actionLoading === "rescheduled" ? "..." : "Reschedule"}
+        </Button>
+      </div>
+    );
+  };
+
+  // Render change status button for ALL sessions (regardless of current status)
+  const renderChangeStatusButton = (session: Session) => {
+    const sessionId = session.id;
+    const isExpanded = statusChangeSession === sessionId;
+    
+    return (
+      <div className="mt-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs border-purple-500 text-purple-500 hover:bg-purple-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            setStatusChangeSession(isExpanded ? null : sessionId);
+          }}
+        >
+          <RefreshCcw className="h-3 w-3 mr-1" />
+          Change Status
         </Button>
         
-        {!isPast && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 px-2 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              // For now, we'll move the session to the next available slot
-              handleSessionActionClick(sessionId, 'moved');
-            }}
-            disabled={isLoading}
-          >
-            <ArrowRight className="h-3 w-3 mr-1" />
-            Move
-          </Button>
-        )}
+        {/* Show status change options when expanded */}
+        {isExpanded && renderStatusChangeOptions(session)}
       </div>
     );
   };
@@ -438,8 +462,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                           </div>
                         )}
 
-                        {/* Action Buttons */}
-                        {renderActionButtons(session)}
+                        {/* Change Status Button - Show for ALL sessions */}
+                        {renderChangeStatusButton(session)}
                       </div>
                       
                       {/* Status Badge */}
