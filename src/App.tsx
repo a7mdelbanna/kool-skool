@@ -1,8 +1,10 @@
+
 import React, { createContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import MainLayout from '@/layout/MainLayout';
 import Index from '@/pages/Index';
 import Login from '@/pages/Login';
 import StudentLogin from '@/pages/StudentLogin';
@@ -63,26 +65,32 @@ function App() {
       <UserContext.Provider value={{ user, setUser }}>
         <Router>
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* Auth routes - no sidebar needed */}
             <Route path="/login" element={<Login />} />
             <Route path="/student-login" element={<StudentLogin />} />
             <Route path="/superadmin-login" element={<SuperAdminLogin />} />
             <Route path="/superadmin" element={<SuperAdminDashboard />} />
-            <Route path="/school-setup" element={<SchoolSetup />} />
-            <Route path="/students" element={<Students />} />
-            <Route path="/courses" element={<Courses />} />
-            <Route path="/payments" element={<Payments />} />
-            <Route path="/payments-optimized" element={<PaymentsOptimized />} />
-            <Route path="/finances" element={<Finances />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/attendance" element={<Attendance />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/team-access" element={<TeamAccess />} />
-            <Route path="/student-access" element={<StudentAccess />} />
-            <Route path="/student-dashboard" element={<StudentDashboard />} />
-            <Route path="/contacts" element={<Contacts />} />
-            <Route path="/license-management" element={<LicenseManagement />} />
-            <Route path="/states-reports" element={<StatesReports />} />
+            
+            {/* School routes - with sidebar */}
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<Index />} />
+              <Route path="school-setup" element={<SchoolSetup />} />
+              <Route path="students" element={<Students />} />
+              <Route path="courses" element={<Courses />} />
+              <Route path="payments" element={<Payments />} />
+              <Route path="payments-optimized" element={<PaymentsOptimized />} />
+              <Route path="finances" element={<Finances />} />
+              <Route path="calendar" element={<Calendar />} />
+              <Route path="attendance" element={<Attendance />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="team-access" element={<TeamAccess />} />
+              <Route path="student-access" element={<StudentAccess />} />
+              <Route path="student-dashboard" element={<StudentDashboard />} />
+              <Route path="contacts" element={<Contacts />} />
+              <Route path="license-management" element={<LicenseManagement />} />
+              <Route path="states-reports" element={<StatesReports />} />
+            </Route>
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />
