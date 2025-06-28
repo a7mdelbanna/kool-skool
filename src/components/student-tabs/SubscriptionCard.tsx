@@ -41,6 +41,7 @@ interface RenewSubscriptionResponse {
   new_subscription_id?: string;
   new_start_date?: string;
   new_end_date?: string;
+  debug?: any;
 }
 
 const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
@@ -62,6 +63,30 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       userId: user.user_id || user.id || user.userId,
       schoolId: user.schoolId
     };
+  };
+
+  const testSubscriptionAccess = async () => {
+    const userData = getCurrentUserData();
+    if (!userData?.schoolId) return;
+
+    try {
+      console.log('🔍 Testing subscription access with debug function...');
+      
+      const { data: debugResult, error: debugError } = await supabase.rpc('debug_subscription_access', {
+        p_subscription_id: subscription.id,
+        p_school_id: userData.schoolId
+      });
+
+      console.log('🔍 Debug access test result:', { debugResult, debugError });
+      
+      if (debugError) {
+        console.error('❌ Debug test error:', debugError);
+      } else {
+        console.log('📊 Access test details:', debugResult);
+      }
+    } catch (error) {
+      console.error('❌ Failed to run debug test:', error);
+    }
   };
 
   const handleRenewSubscription = async () => {
@@ -87,11 +112,14 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
     try {
       setIsRenewing(true);
       
-      console.log('🔄 Renewing subscription:', {
+      console.log('🔄 Renewing subscription with enhanced debugging:', {
         subscriptionId: subscription.id,
         userId: userData.userId,
         schoolId: userData.schoolId
       });
+
+      // First, test subscription access for debugging
+      await testSubscriptionAccess();
       
       const { data, error } = await supabase.rpc('renew_subscription', {
         p_subscription_id: subscription.id,
@@ -99,7 +127,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         p_current_school_id: userData.schoolId
       });
 
-      console.log('📊 RPC call result:', { data, error });
+      console.log('📊 Enhanced RPC call result:', { data, error });
 
       if (error) {
         console.error('❌ RPC Error details:', {
@@ -115,7 +143,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         throw new Error('No response from renewal function');
       }
 
-      console.log('✅ Raw renewal response:', data);
+      console.log('✅ Raw renewal response with debug info:', data);
 
       // Handle the response - it should be a JSONB object
       let response: RenewSubscriptionResponse;
@@ -128,13 +156,17 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           throw new Error('Invalid response format from server');
         }
       } else if (typeof data === 'object' && data !== null) {
-        // Convert to unknown first, then to our expected type to satisfy TypeScript
         response = data as unknown as RenewSubscriptionResponse;
       } else {
         throw new Error('Unexpected response format from server');
       }
 
-      console.log('📋 Parsed response:', response);
+      console.log('📋 Parsed response with debug data:', response);
+
+      // Log debug information if available
+      if (response.debug) {
+        console.log('🐛 Debug information from server:', response.debug);
+      }
 
       if (response.success) {
         toast({
@@ -147,10 +179,19 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           onRenew();
         }
       } else {
-        throw new Error(response.message || 'Failed to renew subscription');
+        // Enhanced error message with debug info
+        let errorMessage = response.message || 'Failed to renew subscription';
+        if (response.debug) {
+          console.error('🚨 Server debug info for failure:', response.debug);
+          // Add debug info to user-friendly error if it provides useful context
+          if (response.debug.check) {
+            errorMessage += ` (Debug: ${response.debug.check} - ${response.debug.result})`;
+          }
+        }
+        throw new Error(errorMessage);
       }
     } catch (error: any) {
-      console.error('❌ Complete error details:', {
+      console.error('❌ Complete error details with enhanced debugging:', {
         error,
         message: error.message,
         stack: error.stack

@@ -1306,6 +1306,10 @@ export type Database = {
         }
         Returns: string
       }
+      debug_subscription_access: {
+        Args: { p_subscription_id: string; p_school_id: string }
+        Returns: Json
+      }
       delete_course: {
         Args: { p_course_id: string }
         Returns: undefined
