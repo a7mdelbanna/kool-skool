@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface StudentAccessInfo {
@@ -37,54 +37,24 @@ const StudentAccess = () => {
   const user = userData ? JSON.parse(userData) : null;
   const schoolId = user?.schoolId;
 
-  // Fetch students with access information
-  const { data: students = [], isLoading } = useQuery({
-    queryKey: ['student-access', schoolId],
-    queryFn: async () => {
-      if (!schoolId) return [];
-
-      const { data, error } = await supabase
-        .from('students')
-        .select(`
-          id,
-          user_id,
-          course_id,
-          teacher_id,
-          users!user_id(
-            id,
-            first_name,
-            last_name,
-            email,
-            password_hash
-          ),
-          courses(name),
-          teachers:users!teacher_id(
-            first_name,
-            last_name
-          )
-        `)
-        .eq('school_id', schoolId);
-
-      if (error) {
-        console.error('Error fetching student access info:', error);
-        throw error;
-      }
-
-      return (data || []).map(student => ({
-        id: student.users?.id || '',
-        student_id: student.id,
-        first_name: student.users?.first_name || '',
-        last_name: student.users?.last_name || '',
-        email: student.users?.email || '',
-        password_hash: student.users?.password_hash,
-        course_name: student.courses?.name || 'No Course',
-        teacher_name: student.teachers 
-          ? `${student.teachers.first_name} ${student.teachers.last_name}`
-          : 'No Teacher'
-      })) as StudentAccessInfo[];
-    },
+  // Fetch students using the same approach as the Students page
+  const { data: studentsData = [], isLoading } = useQuery({
+    queryKey: ['students', schoolId],
+    queryFn: () => getStudentsWithDetails(schoolId),
     enabled: !!schoolId,
   });
+
+  // Transform the data to match our interface
+  const students: StudentAccessInfo[] = studentsData.map(student => ({
+    id: student.user_id || '',
+    student_id: student.id,
+    first_name: student.first_name || '',
+    last_name: student.last_name || '',
+    email: student.email || '',
+    password_hash: student.password_hash,
+    course_name: student.course_name || 'No Course',
+    teacher_name: student.teacher_name || 'No Teacher'
+  }));
 
   // Update password mutation
   const updatePasswordMutation = useMutation({
@@ -114,7 +84,7 @@ const StudentAccess = () => {
       return { success: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-access', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
       setIsDialogOpen(false);
       setSelectedStudent(null);
       setNewPassword('');
@@ -211,7 +181,7 @@ const StudentAccess = () => {
               </TableHeader>
               <TableBody>
                 {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
+                  <TableRow key={student.student_id}>
                     <TableCell className="font-medium">
                       {student.first_name} {student.last_name}
                     </TableCell>
