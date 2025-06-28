@@ -136,12 +136,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
         toast.success(`Session ${action} successfully`);
         setStatusChangeSession(null);
         
-        // Optionally refresh data in background to ensure consistency
-        if (onSessionUpdate) {
-          setTimeout(() => {
-            onSessionUpdate();
-          }, 2000); // Refresh after 2 seconds to sync any server-side changes
-        }
+        // No longer doing a delayed refresh - optimistic update is sufficient
+        // The UI will stay updated with the optimistic change
       } else {
         // Revert optimistic update on failure
         if (onRevertUpdate) {
