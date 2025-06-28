@@ -323,12 +323,13 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         total_price: getTotalPrice()
       });
 
+      // Pass the schedule as a JSONB array directly, not as a JSON string
       const { data, error } = await supabase.rpc('update_subscription_with_related_data', {
         p_subscription_id: subscription.id,
         p_session_count: formData.sessionCount,
         p_duration_months: formData.durationMonths,
         p_start_date: formData.startDate.toISOString().split('T')[0],
-        p_schedule: JSON.stringify(scheduleForDatabase),
+        p_schedule: scheduleForDatabase, // Pass as array, not JSON string
         p_price_mode: formData.priceMode,
         p_price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
         p_fixed_price: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : null,
