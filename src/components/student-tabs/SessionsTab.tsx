@@ -121,49 +121,77 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     
     try {
       setLoading(true);
-      console.log('=== LOADING SESSIONS AND SUBSCRIPTIONS WITH GROUPING ===');
+      console.log('=== LOADING SESSIONS AND SUBSCRIPTIONS DEBUG ===');
       console.log('Loading sessions for student:', studentData.id);
       
-      // Load sessions
+      // Step 1: Load sessions
       const sessionsData = await getStudentLessonSessions(studentData.id);
       console.log('Raw sessions data received:', sessionsData);
       
       const sessionsArray = Array.isArray(sessionsData) ? sessionsData as DatabaseSession[] : [];
       setSessions(sessionsArray);
+      console.log('Sessions loaded:', sessionsArray.length);
 
-      // Load subscription details
+      // Step 2: Load subscriptions with explicit error handling
+      console.log('Loading subscriptions for student:', studentData.id);
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('student_id', studentData.id)
         .order('created_at', { ascending: false });
 
+      console.log('Subscription query result:', { data: subscriptionData, error: subscriptionError });
+
       if (subscriptionError) {
-        console.error('Error loading subscriptions:', subscriptionError);
-        throw subscriptionError;
+        console.error('❌ Error loading subscriptions:', subscriptionError);
+        toast({
+          title: "Error",
+          description: `Failed to load subscriptions: ${subscriptionError.message}`,
+          variant: "destructive",
+        });
+        // Continue with empty subscriptions rather than throwing
+        setSubscriptions([]);
+      } else {
+        console.log('Subscriptions loaded:', subscriptionData?.length || 0);
+        
+        // Step 3: Group sessions by subscription
+        const subscriptionsWithSessions: SubscriptionInfo[] = (subscriptionData || []).map(sub => {
+          console.log('Processing subscription:', sub.id);
+          const subscriptionSessions = sessionsArray.filter(session => session.subscription_id === sub.id);
+          console.log(`Found ${subscriptionSessions.length} sessions for subscription ${sub.id}`);
+          
+          return {
+            id: sub.id,
+            session_count: sub.session_count,
+            duration_months: sub.duration_months,
+            start_date: sub.start_date,
+            end_date: sub.end_date,
+            total_price: sub.total_price,
+            currency: sub.currency,
+            status: sub.status,
+            schedule: sub.schedule,
+            notes: sub.notes,
+            sessions: subscriptionSessions
+          };
+        });
+
+        setSubscriptions(subscriptionsWithSessions);
+        
+        console.log(`✅ Successfully loaded ${sessionsArray.length} sessions grouped into ${subscriptionsWithSessions.length} subscriptions`);
+        
+        // Debug each subscription
+        subscriptionsWithSessions.forEach((sub, index) => {
+          console.log(`Subscription ${index + 1}:`, {
+            id: sub.id,
+            sessionsCount: sub.sessions.length,
+            status: sub.status
+          });
+        });
       }
-
-      // Group sessions by subscription
-      const subscriptionsWithSessions: SubscriptionInfo[] = (subscriptionData || []).map(sub => ({
-        id: sub.id,
-        session_count: sub.session_count,
-        duration_months: sub.duration_months,
-        start_date: sub.start_date,
-        end_date: sub.end_date,
-        total_price: sub.total_price,
-        currency: sub.currency,
-        status: sub.status,
-        schedule: sub.schedule,
-        notes: sub.notes,
-        sessions: sessionsArray.filter(session => session.subscription_id === sub.id)
-      }));
-
-      setSubscriptions(subscriptionsWithSessions);
       
-      console.log(`✅ Successfully loaded ${sessionsArray.length} sessions grouped into ${subscriptionsWithSessions.length} subscriptions`);
-      console.log('=== END SESSION LOADING WITH GROUPING ===');
+      console.log('=== END SESSION LOADING DEBUG ===');
     } catch (error) {
-      console.error('❌ Error loading sessions and subscriptions:', error);
+      console.error('❌ Critical error loading sessions and subscriptions:', error);
       toast({
         title: "Error",
         description: "Failed to load sessions. Please try refreshing.",
