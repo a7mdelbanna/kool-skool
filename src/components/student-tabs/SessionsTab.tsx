@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { getStudentLessonSessions, handleSessionAction } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SessionsTabProps {
   studentData: Partial<Student>;
@@ -197,42 +198,61 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const handleUpdateSessionStatus = async (sessionId: string, newStatus: string) => {
     try {
       setLoading(true);
-      console.log(`🎯 Updating session ${sessionId} with action for status: ${newStatus}`);
+      console.log(`🎯 Updating session ${sessionId} with status change to: ${newStatus}`);
       
-      // Map status to appropriate action
-      let action: string;
-      switch (newStatus) {
-        case 'completed':
-          action = 'attended';
-          break;
-        case 'cancelled':
-          action = 'cancelled';
-          break;
-        case 'scheduled':
-          action = 'rescheduled';
-          break;
-        default:
-          throw new Error(`Unsupported status: ${newStatus}`);
-      }
-      
-      const rawResult = await handleSessionAction(sessionId, action);
-      
-      // Type cast the JSON response to our expected interface
-      const result = rawResult as unknown as SessionActionResponse;
-      
-      if (result.success) {
+      // Handle status change differently - use direct database update for simple status changes
+      if (newStatus === 'scheduled') {
+        // For changing back to scheduled, update the session directly in the database
+        const { error } = await supabase
+          .from('lesson_sessions')
+          .update({ 
+            status: 'scheduled',
+            counts_toward_completion: true // Reset to count toward completion
+          })
+          .eq('id', sessionId);
+        
+        if (error) {
+          console.error('❌ Error updating session status:', error);
+          throw error;
+        }
+        
         toast({
           title: "Success",
-          description: result.message || `Session ${action} successfully`,
+          description: "Session status updated to scheduled successfully",
         });
-        
-        // Reload sessions to reflect changes including any new sessions created
-        await loadSessions();
       } else {
-        throw new Error(result.message || 'Session action failed');
+        // For other status changes, use the existing session action system
+        let action: string;
+        switch (newStatus) {
+          case 'completed':
+            action = 'attended';
+            break;
+          case 'cancelled':
+            action = 'cancelled';
+            break;
+          default:
+            throw new Error(`Unsupported status: ${newStatus}`);
+        }
+        
+        const rawResult = await handleSessionAction(sessionId, action);
+        
+        // Type cast the JSON response to our expected interface
+        const result = rawResult as unknown as SessionActionResponse;
+        
+        if (result.success) {
+          toast({
+            title: "Success",
+            description: result.message || `Session ${action} successfully`,
+          });
+        } else {
+          throw new Error(result.message || 'Session action failed');
+        }
       }
+      
+      // Reload sessions to reflect changes
+      await loadSessions();
     } catch (error) {
-      console.error('❌ Error handling session action:', error);
+      console.error('❌ Error handling session status update:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update session",
@@ -714,14 +734,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                 >
                   <CalendarX className="h-3.5 w-3.5 mr-1" />
                   Mark as Cancelled
-                </Button>
-                <Button 
-                  onClick={() => handleChangeStatus("rescheduled")}
-                  variant="outline"
-                  className="border-purple-500 text-purple-500 hover:bg-purple-50"
-                >
-                  <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                  Mark as Rescheduled
                 </Button>
               </div>
             </div>
