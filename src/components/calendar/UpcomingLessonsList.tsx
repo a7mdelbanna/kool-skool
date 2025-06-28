@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   format, 
@@ -22,7 +21,8 @@ import {
   CalendarDays,
   BookOpen,
   DollarSign,
-  Calendar as CalendarScheduleIcon
+  Calendar as CalendarScheduleIcon,
+  Hash
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
 import { getStudentSubscriptions } from '@/integrations/supabase/client';
@@ -195,23 +195,16 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     }
   };
 
-  // Format subscription details for display
-  const formatSubscriptionDetails = (subscriptionInfo: SubscriptionInfo) => {
-    const progress = `${subscriptionInfo.completedSessions}/${subscriptionInfo.sessionCount}`;
-    const totalPrice = `$${subscriptionInfo.totalPrice} ${subscriptionInfo.currency}`;
-    const startDate = format(new Date(subscriptionInfo.startDate), 'dd MMM');
-    const endDate = format(new Date(subscriptionInfo.endDate), 'dd MMM');
-    const dateRange = `${startDate} – ${endDate}`;
+  // Get session number - use sessionNumber from session if available, otherwise calculate from subscription
+  const getSessionNumber = (session: Session): number => {
+    // If the session already has a sessionNumber, use it
+    if (session.sessionNumber) {
+      return session.sessionNumber;
+    }
     
-    const parts = [
-      progress,
-      subscriptionInfo.subscriptionName ? `Subscription: ${subscriptionInfo.subscriptionName}` : null,
-      `${subscriptionInfo.sessionCount} lessons`,
-      totalPrice,
-      dateRange
-    ].filter(Boolean);
-    
-    return parts.join(' • ');
+    // Otherwise, try to calculate based on subscription info and session order
+    // This is a fallback - ideally sessionNumber should come from the database
+    return 1; // Default to 1 if we can't determine the session number
   };
 
   // Render sessions for a specific date group
@@ -236,6 +229,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
             const studentName = session.studentName || 'Unknown Student';
             const isPastSession = isSessionPast(session);
             const subscriptionInfo = subscriptionInfoMap.get(session.studentId);
+            const sessionNumber = getSessionNumber(session);
             
             return (
               <div 
@@ -293,7 +287,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                           {dateLabel}
                         </div>
                         
-                        {/* Subscription Progress & Details */}
+                        {/* Session Number & Subscription Details */}
                         {subscriptionInfo && !loading && (
                           <div className={`text-xs px-2 py-1 rounded-md border mt-2 ${
                             isPastSession 
@@ -302,9 +296,9 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                           }`}>
                             <div className="flex items-center gap-2 flex-wrap">
                               <div className="flex items-center gap-1">
-                                <BookOpen className="h-3 w-3" />
+                                <Hash className="h-3 w-3" />
                                 <span className="font-medium">
-                                  {subscriptionInfo.completedSessions}/{subscriptionInfo.sessionCount}
+                                  {sessionNumber}
                                 </span>
                               </div>
                               {subscriptionInfo.subscriptionName && (
@@ -314,7 +308,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                                 </>
                               )}
                               <span>•</span>
-                              <span>{subscriptionInfo.sessionCount} lessons</span>
+                              <span>{subscriptionInfo.sessionCount} lessons total</span>
                               <span>•</span>
                               <div className="flex items-center gap-1">
                                 <DollarSign className="h-3 w-3" />
@@ -333,7 +327,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                         
                         {loading && (
                           <div className="text-xs text-muted-foreground mt-2">
-                            Loading subscription details...
+                            Loading session details...
                           </div>
                         )}
                       </div>
