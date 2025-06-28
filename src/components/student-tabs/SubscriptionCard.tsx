@@ -93,8 +93,8 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
 
       console.log('✅ Renewal response:', data);
 
-      // Type assertion for the RPC response
-      const response = data as RenewSubscriptionResponse;
+      // Type assertion for the RPC response - convert to unknown first, then to our type
+      const response = data as unknown as RenewSubscriptionResponse;
 
       if (response && response.success) {
         toast({
