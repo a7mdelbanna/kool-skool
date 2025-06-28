@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,15 +15,21 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
-  Shield
+  Shield,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Separator } from '@/components/ui/separator';
+import { UserContext } from '@/App';
+import { useToast } from '@/hooks/use-toast';
 
 const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { setUser } = useContext(UserContext);
+  const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const navigation = [
@@ -45,6 +50,26 @@ const Sidebar = () => {
     { name: 'Student Access', href: '/student-access', icon: Shield },
     { name: 'License', href: '/license-management', icon: Key },
   ];
+
+  const handleLogout = () => {
+    // Clear user data from localStorage
+    localStorage.removeItem('user');
+    
+    // Update authentication context
+    setUser(null);
+    
+    // Show logout notification
+    toast({
+      title: "Logged out successfully",
+      description: "You have been logged out of your account."
+    });
+    
+    // Trigger storage event to synchronize across tabs
+    window.dispatchEvent(new Event('storage'));
+    
+    // Redirect to login page
+    navigate('/login');
+  };
 
   return (
     <div className={cn(
@@ -146,8 +171,21 @@ const Sidebar = () => {
         </div>
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
+      {/* Footer with Logout */}
+      <div className="p-4 border-t border-gray-200 bg-gray-50 space-y-3">
+        <Button
+          onClick={handleLogout}
+          variant="ghost"
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-gray-700 hover:bg-red-50 hover:text-red-600 hover:shadow-sm border border-transparent hover:border-red-200",
+            isCollapsed && "justify-center px-2"
+          )}
+          title={isCollapsed ? "Logout" : undefined}
+        >
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          {!isCollapsed && <span>Logout</span>}
+        </Button>
+        
         {!isCollapsed && (
           <div className="text-xs text-gray-500 text-center">
             © 2024 TutorPro
