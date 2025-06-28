@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -44,18 +45,36 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Simplified subscription fetching with proper error handling
-  const { data: subscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError } = useQuery({
+  // Debug student data
+  useEffect(() => {
+    console.log('🔍 STUDENT DEBUG INFO:');
+    console.log('Student prop:', student);
+    console.log('Student ID:', student?.id);
+    console.log('Dialog open:', open);
+    console.log('Active tab:', activeTab);
+    console.log('Query should be enabled:', !!student?.id && open);
+  }, [student, open, activeTab]);
+
+  // Enhanced subscription fetching with comprehensive logging
+  const { data: subscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError, refetch: refetchSubscriptions } = useQuery({
     queryKey: ['student-subscriptions-with-payments', student?.id],
     queryFn: async () => {
-      console.log('🔄 Fetching subscriptions for student:', student?.id);
+      console.log('🚀 SUBSCRIPTION QUERY EXECUTION START');
+      console.log('Student ID for query:', student?.id);
+      console.log('Query enabled conditions:', {
+        hasStudentId: !!student?.id,
+        dialogOpen: open,
+        shouldExecute: !!student?.id && open
+      });
       
       if (!student?.id) {
-        console.log('❌ No student ID for subscription fetch');
+        console.log('❌ No student ID - returning empty array');
         return [];
       }
       
       try {
+        console.log('🔄 Fetching subscriptions from database...');
+        
         // Step 1: Get basic subscriptions first
         const { data: subscriptionsData, error: subscriptionsError } = await supabase
           .from('subscriptions')
@@ -63,22 +82,28 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
           .eq('student_id', student.id)
           .order('created_at', { ascending: false });
         
+        console.log('📊 Raw subscriptions query result:', {
+          data: subscriptionsData,
+          error: subscriptionsError,
+          dataLength: subscriptionsData?.length || 0
+        });
+        
         if (subscriptionsError) {
           console.error('❌ Subscription fetch error:', subscriptionsError);
           throw subscriptionsError;
         }
-
-        console.log('✅ Raw subscriptions data:', subscriptionsData);
 
         if (!subscriptionsData || subscriptionsData.length === 0) {
           console.log('✅ No subscriptions found for student');
           return [];
         }
 
+        console.log('💰 Calculating payments for each subscription...');
+        
         // Step 2: For each subscription, calculate the total paid from transactions
         const subscriptionsWithPayments = await Promise.all(
-          subscriptionsData.map(async (subscription) => {
-            console.log('💰 Calculating payments for subscription:', subscription.id);
+          subscriptionsData.map(async (subscription, index) => {
+            console.log(`💳 Processing subscription ${index + 1}/${subscriptionsData.length}:`, subscription.id);
             
             try {
               // Get all income transactions linked to this subscription
@@ -89,9 +114,14 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
                 .eq('type', 'income')
                 .eq('status', 'completed');
 
+              console.log(`💸 Payments query for subscription ${subscription.id}:`, {
+                payments,
+                error: paymentsError,
+                paymentsCount: payments?.length || 0
+              });
+
               if (paymentsError) {
                 console.error('❌ Error fetching payments for subscription:', subscription.id, paymentsError);
-                // Don't throw, just use 0 as fallback
                 return {
                   ...subscription,
                   total_paid: 0
@@ -99,7 +129,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
               }
 
               const totalPaid = (payments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
-              console.log('✅ Total paid for subscription', subscription.id, ':', totalPaid);
+              console.log(`✅ Total paid for subscription ${subscription.id}:`, totalPaid);
 
               return {
                 ...subscription,
@@ -115,10 +145,10 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
           })
         );
         
-        console.log('✅ Subscriptions with payment totals:', subscriptionsWithPayments);
+        console.log('🎉 FINAL SUBSCRIPTIONS WITH PAYMENTS:', subscriptionsWithPayments);
         return subscriptionsWithPayments;
       } catch (error) {
-        console.error('❌ Error in subscription fetch:', error);
+        console.error('❌ CRITICAL ERROR in subscription fetch:', error);
         // Return empty array instead of throwing to prevent UI break
         return [];
       }
@@ -128,6 +158,16 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     staleTime: 30000,
     gcTime: 300000,
   });
+
+  // Log subscription query state changes
+  useEffect(() => {
+    console.log('📊 SUBSCRIPTION QUERY STATE UPDATE:');
+    console.log('Subscriptions data:', subscriptions);
+    console.log('Subscriptions count:', subscriptions?.length || 0);
+    console.log('Is loading:', subscriptionsLoading);
+    console.log('Has error:', !!subscriptionsError);
+    console.log('Error details:', subscriptionsError);
+  }, [subscriptions, subscriptionsLoading, subscriptionsError]);
 
   // Error handling for subscriptions
   useEffect(() => {
@@ -223,25 +263,27 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
 
   // Handle subscription refresh
   const handleSubscriptionRefresh = () => {
-    console.log('🔄 Manual subscription refresh for student:', student?.id);
-    queryClient.invalidateQueries({ queryKey: ['student-subscriptions-with-payments', student?.id] });
+    console.log('🔄 Manual subscription refresh triggered for student:', student?.id);
+    if (student?.id) {
+      queryClient.invalidateQueries({ queryKey: ['student-subscriptions-with-payments', student.id] });
+      // Also try to refetch directly
+      refetchSubscriptions();
+    }
   };
 
   // Handle tab changes with detailed logging
   const handleTabChange = (value: string) => {
     console.log('🔄 Tab changed to:', value);
     setActiveTab(value);
+    
+    // If switching to subscriptions tab, ensure we have the latest data
+    if (value === 'subscriptions' && student?.id) {
+      console.log('🔄 Switching to subscriptions tab - ensuring fresh data');
+      setTimeout(() => {
+        refetchSubscriptions();
+      }, 100);
+    }
   };
-
-  // Debug subscription data when it changes
-  useEffect(() => {
-    console.log('📊 Subscription data updated:', {
-      subscriptions: subscriptions,
-      count: subscriptions?.length || 0,
-      isLoading: subscriptionsLoading,
-      hasError: !!subscriptionsError
-    });
-  }, [subscriptions, subscriptionsLoading, subscriptionsError]);
 
   return (
     <>

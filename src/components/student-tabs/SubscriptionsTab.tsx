@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,21 +27,49 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  // Log when subscriptions prop changes
+  // Enhanced logging when subscriptions prop changes
   useEffect(() => {
-    console.log('📊 SubscriptionsTab received subscriptions:', {
-      count: subscriptions?.length || 0,
-      isLoading,
-      studentId,
-      subscriptionsWithPayments: subscriptions?.map(s => ({
-        id: s.id,
-        total_price: s.total_price,
-        total_paid: s.total_paid,
-        session_count: s.session_count,
-        status: s.status
-      }))
-    });
-  }, [subscriptions, isLoading, studentId]);
+    console.log('🔥 =====================================================');
+    console.log('🔥 SUBSCRIPTIONS TAB - DETAILED PROPS ANALYSIS');
+    console.log('🔥 =====================================================');
+    console.log('Props received:');
+    console.log('  - subscriptions:', subscriptions);
+    console.log('  - subscriptions type:', typeof subscriptions);
+    console.log('  - subscriptions is Array:', Array.isArray(subscriptions));
+    console.log('  - subscriptions length:', subscriptions?.length || 'undefined');
+    console.log('  - isLoading:', isLoading);
+    console.log('  - studentId:', studentId);
+    console.log('  - studentId type:', typeof studentId);
+    console.log('  - studentId truthy:', !!studentId);
+    
+    if (subscriptions && Array.isArray(subscriptions)) {
+      console.log('📊 DETAILED SUBSCRIPTION ANALYSIS:');
+      subscriptions.forEach((sub, index) => {
+        console.log(`  Subscription ${index + 1}:`, {
+          id: sub.id,
+          student_id: sub.student_id,
+          total_price: sub.total_price,
+          total_paid: sub.total_paid,
+          session_count: sub.session_count,
+          status: sub.status,
+          start_date: sub.start_date
+        });
+      });
+    } else {
+      console.log('❌ SUBSCRIPTIONS IS NOT A VALID ARRAY');
+      console.log('  - subscriptions value:', subscriptions);
+      console.log('  - JSON.stringify:', JSON.stringify(subscriptions));
+    }
+    
+    // Component state analysis
+    console.log('📱 COMPONENT STATE:');
+    console.log('  - editDialogOpen:', editDialogOpen);
+    console.log('  - addDialogOpen:', addDialogOpen);
+    console.log('  - deletingId:', deletingId);
+    console.log('  - editingSubscription:', editingSubscription);
+    
+    console.log('🔥 =====================================================');
+  }, [subscriptions, isLoading, studentId, editDialogOpen, addDialogOpen, deletingId, editingSubscription]);
 
   const handleDeleteSubscription = async (subscriptionId: string) => {
     try {
@@ -97,6 +124,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
 
   // Loading state
   if (isLoading) {
+    console.log('⏳ SubscriptionsTab - Rendering loading state');
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
@@ -108,6 +136,10 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       </div>
     );
   }
+
+  console.log('🎨 SubscriptionsTab - Rendering main content');
+  console.log('  - Will show empty state?', !subscriptions || subscriptions.length === 0);
+  console.log('  - Will show subscription cards?', subscriptions && subscriptions.length > 0);
 
   return (
     <div className="space-y-8">
@@ -121,7 +153,10 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         </div>
         <p className="text-blue-700 mb-4">Set up a new subscription plan for this student with scheduled sessions and payment details.</p>
         <Button 
-          onClick={() => setAddDialogOpen(true)} 
+          onClick={() => {
+            console.log('➕ Create subscription button clicked');
+            setAddDialogOpen(true);
+          }} 
           className="bg-blue-600 hover:bg-blue-700 text-white"
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -140,32 +175,44 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         </div>
 
         {!subscriptions || subscriptions.length === 0 ? (
-          <Card className="border-dashed border-2 border-gray-300">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Calendar className="h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h3>
-              <p className="text-gray-600 mb-4">This student doesn't have any active subscriptions yet.</p>
-              <Button 
-                onClick={() => setAddDialogOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Create First Subscription
-              </Button>
-            </CardContent>
-          </Card>
+          <>
+            {console.log('🔸 Rendering empty state')}
+            <Card className="border-dashed border-2 border-gray-300">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Calendar className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h3>
+                <p className="text-gray-600 mb-4">This student doesn't have any active subscriptions yet.</p>
+                <Button 
+                  onClick={() => {
+                    console.log('➕ Create first subscription button clicked');
+                    setAddDialogOpen(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create First Subscription
+                </Button>
+              </CardContent>
+            </Card>
+          </>
         ) : (
-          <div className="space-y-4">
-            {subscriptions.map((subscription) => (
-              <SubscriptionCard
-                key={subscription.id}
-                subscription={subscription}
-                onEdit={handleEditSubscription}
-                onDelete={handleDeleteSubscription}
-                isDeleting={deletingId === subscription.id}
-              />
-            ))}
-          </div>
+          <>
+            {console.log('🔸 Rendering subscription cards:', subscriptions.length)}
+            <div className="space-y-4">
+              {subscriptions.map((subscription, index) => {
+                console.log(`🎯 Rendering subscription card ${index + 1}:`, subscription.id);
+                return (
+                  <SubscriptionCard
+                    key={subscription.id}
+                    subscription={subscription}
+                    onEdit={handleEditSubscription}
+                    onDelete={handleDeleteSubscription}
+                    isDeleting={deletingId === subscription.id}
+                  />
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
