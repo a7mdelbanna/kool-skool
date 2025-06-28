@@ -123,9 +123,9 @@ const StudentDashboard = () => {
         if (subscriptionsData && subscriptionsData.length > 0) {
           const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
           if (activeSubscription) {
+            // Count sessions that are marked as attended (completed) or cancelled
             const completedSessions = sessionsData.filter(session => 
-              session.status === 'completed' && 
-              session.scheduled_date // Make sure it's linked to this subscription
+              session.status === 'completed' || session.status === 'cancelled'
             ).length;
             progressText = `${completedSessions}/${activeSubscription.session_count}`;
           }
