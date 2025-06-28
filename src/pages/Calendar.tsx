@@ -306,7 +306,8 @@ const Calendar = () => {
         <LessonDetailsDialog 
           session={selectedSession} 
           open={detailsDialogOpen} 
-          onOpenChange={setDetailsDialogOpen} 
+          onOpenChange={setDetailsDialogOpen}
+          onSessionUpdate={handleSessionUpdate}
         />
       )}
     </div>

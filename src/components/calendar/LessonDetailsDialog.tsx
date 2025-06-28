@@ -20,21 +20,29 @@ import {
   CalendarDays,
   Pencil,
   Trash2,
-  RefreshCw,
+  RefreshCcw,
   Check,
-  RefreshCcw
+  X,
+  ArrowRight
 } from 'lucide-react';
 import { Session } from '@/contexts/PaymentContext';
 import { format } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { usePayments } from '@/contexts/PaymentContext';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import { handleSessionAction } from '@/integrations/supabase/client';
 
 interface LessonDetailsDialogProps {
   session: Session | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSessionUpdate?: () => void;
+}
+
+interface SessionActionResponse {
+  success: boolean;
+  message?: string;
+  new_session_id?: string;
 }
 
 const subjectColorMap: Record<string, { bg: string, border: string, text: string }> = {
@@ -55,11 +63,11 @@ const subjectColorMap: Record<string, { bg: string, border: string, text: string
 const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({ 
   session, 
   open, 
-  onOpenChange 
+  onOpenChange,
+  onSessionUpdate
 }) => {
-  const { updateSessionStatus, rescheduleSession } = usePayments();
-  const { toast } = useToast();
   const [statusChangeOpen, setStatusChangeOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   if (!session) return null;
 
@@ -85,50 +93,36 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
   const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
   const formattedDate = format(sessionDate, 'EEEE, MMMM d, yyyy');
 
-  // Handle session actions
-  const handleAttend = () => {
-    updateSessionStatus(session.id, "completed");
-    toast({
-      title: "Lesson marked as completed",
-      description: `${subject} lesson with ${studentName} marked as attended.`
-    });
-    onOpenChange(false);
-  };
+  // Handle session actions with proper backend integration
+  const handleSessionActionClick = async (action: string, newDatetime?: Date) => {
+    try {
+      setActionLoading(action);
+      
+      const response = await handleSessionAction(
+        session.id, 
+        action, 
+        newDatetime?.toISOString()
+      );
 
-  const handleCancel = () => {
-    updateSessionStatus(session.id, "canceled");
-    toast({
-      title: "Lesson canceled",
-      description: `${subject} lesson with ${studentName} has been canceled.`
-    });
-    onOpenChange(false);
-  };
+      // Type cast the response to our expected format
+      const typedResponse = response as unknown as SessionActionResponse;
 
-  const handleReschedule = () => {
-    rescheduleSession(session.id);
-    toast({
-      title: "Lesson rescheduled",
-      description: `${subject} lesson with ${studentName} has been rescheduled.`
-    });
-    onOpenChange(false);
-  };
-
-  const handleStatusChange = (newStatus: Session['status']) => {
-    updateSessionStatus(session.id, newStatus);
-    
-    const statusMessages = {
-      scheduled: "scheduled",
-      completed: "marked as attended",
-      canceled: "canceled",
-      missed: "marked as missed"
-    };
-    
-    toast({
-      title: `Lesson status updated`,
-      description: `${subject} lesson with ${studentName} ${statusMessages[newStatus]}.`
-    });
-    
-    setStatusChangeOpen(false);
+      if (typedResponse.success) {
+        toast.success(`Session ${action} successfully`);
+        // Trigger refresh of sessions data and close dialog
+        if (onSessionUpdate) {
+          onSessionUpdate();
+        }
+        onOpenChange(false);
+      } else {
+        toast.error(typedResponse.message || `Failed to ${action} session`);
+      }
+    } catch (error) {
+      console.error(`Error handling session action ${action}:`, error);
+      toast.error(`Failed to ${action} session`);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   // Render status badge
@@ -147,19 +141,9 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
     }
   };
 
-  // Render status icon
-  const renderStatusIcon = (status: Session['status']) => {
-    switch(status) {
-      case "scheduled":
-        return <CalendarDays className="h-4 w-4 text-blue-500" />;
-      case "completed":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "canceled":
-        return <CalendarX className="h-4 w-4 text-orange-500" />;
-      case "missed":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-    }
-  };
+  // Check if session actions should be shown (only for scheduled sessions)
+  const canTakeActions = session.status === 'scheduled';
+  const isLoading = actionLoading !== null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -236,83 +220,56 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
           )}
 
           {/* Status Change Button */}
-          <Button 
-            variant="outline" 
-            className="w-full flex items-center justify-center gap-2 border-purple-500 text-purple-500 hover:bg-purple-50"
-            onClick={() => setStatusChangeOpen(!statusChangeOpen)}
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Change Status
-          </Button>
-
-          {/* Status Change Options */}
-          {statusChangeOpen && (
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                onClick={() => handleStatusChange("scheduled")} 
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                size="sm"
-                disabled={session.status === "scheduled"}
-              >
-                <CalendarDays className="h-4 w-4 mr-1" />
-                Schedule
-              </Button>
-              <Button 
-                onClick={() => handleStatusChange("completed")} 
-                className="bg-green-600 hover:bg-green-700 text-white"
-                size="sm"
-                disabled={session.status === "completed"}
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Attend
-              </Button>
-              <Button 
-                onClick={() => handleStatusChange("canceled")} 
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-                size="sm"
-                disabled={session.status === "canceled"}
-              >
-                <CalendarX className="h-4 w-4 mr-1" />
-                Cancel
-              </Button>
-              <Button 
-                onClick={() => handleStatusChange("missed")} 
-                className="bg-red-600 hover:bg-red-700 text-white"
-                size="sm"
-                disabled={session.status === "missed"}
-              >
-                <XCircle className="h-4 w-4 mr-1" />
-                Mark Missed
-              </Button>
-            </div>
+          {canTakeActions && (
+            <Button 
+              variant="outline" 
+              className="w-full flex items-center justify-center gap-2 border-purple-500 text-purple-500 hover:bg-purple-50"
+              onClick={() => setStatusChangeOpen(!statusChangeOpen)}
+              disabled={isLoading}
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Change Status
+            </Button>
           )}
 
-          {/* Action Buttons - Only for scheduled sessions */}
-          {session.status === "scheduled" && (
-            <div className="grid grid-cols-3 gap-3 pt-2">
+          {/* Status Change Options - Only show when expanded and session is scheduled */}
+          {statusChangeOpen && canTakeActions && (
+            <div className="grid grid-cols-2 gap-3">
               <Button 
-                onClick={handleAttend} 
+                onClick={() => handleSessionActionClick("attended")} 
                 className="bg-green-600 hover:bg-green-700 text-white"
                 size="sm"
+                disabled={isLoading}
               >
                 <Check className="h-4 w-4 mr-1" />
-                Attend
+                {actionLoading === "attended" ? "..." : "Attend"}
               </Button>
               <Button 
-                onClick={handleCancel} 
-                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => handleSessionActionClick("cancelled")} 
+                className="bg-orange-600 hover:bg-orange-700 text-white"
                 size="sm"
+                disabled={isLoading}
               >
-                <XCircle className="h-4 w-4 mr-1" />
-                Cancel
+                <X className="h-4 w-4 mr-1" />
+                {actionLoading === "cancelled" ? "..." : "Cancel"}
               </Button>
               <Button 
-                onClick={handleReschedule} 
+                onClick={() => handleSessionActionClick("moved")} 
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 size="sm"
+                disabled={isLoading}
               >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Reschedule
+                <ArrowRight className="h-4 w-4 mr-1" />
+                {actionLoading === "moved" ? "..." : "Move"}
+              </Button>
+              <Button 
+                onClick={() => handleSessionActionClick("rescheduled")} 
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                size="sm"
+                disabled={isLoading}
+              >
+                <RefreshCcw className="h-4 w-4 mr-1" />
+                {actionLoading === "rescheduled" ? "..." : "Reschedule"}
               </Button>
             </div>
           )}
