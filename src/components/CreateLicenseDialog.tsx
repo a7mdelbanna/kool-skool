@@ -16,6 +16,12 @@ interface CreateLicenseDialogProps {
   onLicenseCreated: () => void;
 }
 
+interface CreateLicenseResponse {
+  success: boolean;
+  message: string;
+  license_id?: string;
+}
+
 const CreateLicenseDialog: React.FC<CreateLicenseDialogProps> = ({
   open,
   onOpenChange,
@@ -78,14 +84,17 @@ const CreateLicenseDialog: React.FC<CreateLicenseDialogProps> = ({
       
       console.log('License creation result:', data);
       
-      if (data?.success) {
+      // Type assertion for the response
+      const result = data as CreateLicenseResponse;
+      
+      if (result?.success) {
         toast.success('License created successfully');
         setLicenseKey('');
         setDurationDays('365');
         setIsActive(true);
         onLicenseCreated();
       } else {
-        toast.error(data?.message || 'Failed to create license');
+        toast.error(result?.message || 'Failed to create license');
       }
       
     } catch (error) {

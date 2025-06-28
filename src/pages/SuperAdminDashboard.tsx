@@ -32,6 +32,11 @@ interface License {
   school_created_at: string | null;
 }
 
+interface UpdateLicenseResponse {
+  success: boolean;
+  message: string;
+}
+
 const SuperAdminDashboard = () => {
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
@@ -106,11 +111,14 @@ const SuperAdminDashboard = () => {
       
       console.log('License status update result:', data);
       
-      if (data?.success) {
+      // Type assertion for the response
+      const result = data as UpdateLicenseResponse;
+      
+      if (result?.success) {
         toast.success(`License ${!currentStatus ? 'enabled' : 'disabled'} successfully`);
         fetchLicenses(); // Refresh the list
       } else {
-        toast.error(data?.message || 'Failed to update license status');
+        toast.error(result?.message || 'Failed to update license status');
       }
       
     } catch (error) {
