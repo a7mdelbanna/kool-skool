@@ -215,8 +215,8 @@ const StudentAccess = () => {
 
       console.log('Password update result:', data);
 
-      // Type the response properly
-      const response = data as UpdatePasswordResponse;
+      // Type the response properly - first convert to unknown, then to our expected type
+      const response = data as unknown as UpdatePasswordResponse;
 
       if (!response.success) {
         throw new Error(response.message || 'Failed to update password');
