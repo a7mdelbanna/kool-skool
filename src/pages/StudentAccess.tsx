@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -130,7 +129,7 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
-  // Fetch actual password hash for display using direct query with better error handling
+  // Fetch actual password hash for display using the new RPC function
   const fetchPasswordHash = async (userId: string) => {
     console.log('=== FETCH PASSWORD DEBUG ===');
     console.log('Fetching password hash for user:', userId);
@@ -144,59 +143,37 @@ const StudentAccess = () => {
     }
 
     try {
-      console.log('Querying users table...');
+      console.log('Using RPC function to get password hash...');
       
-      // Let's also try a broader query to see what users exist
-      console.log('First, let\'s see what users exist in the database...');
-      const { data: allUsers, error: allUsersError } = await supabase
-        .from('users')
-        .select('id, email, role, first_name, last_name')
-        .limit(5);
-      
-      console.log('Sample users from database:', { data: allUsers, error: allUsersError });
-      
-      // Direct query to users table to get password hash - using maybeSingle() instead of single()
-      const { data, error } = await supabase
-        .from('users')
-        .select('password_hash, role, email, id, first_name, last_name')
-        .eq('id', userId)
-        .maybeSingle();
+      // Use the new RPC function to get password hash
+      const { data, error } = await supabase.rpc('get_user_password_hash', {
+        p_user_id: userId
+      });
 
-      console.log('Query result:', { data, error });
+      console.log('RPC result:', { data, error });
 
       if (error) {
-        console.error('Error fetching password hash:', error);
+        console.error('Error fetching password hash via RPC:', error);
         toast.error('Failed to fetch password: ' + error.message);
         return null;
       }
 
-      if (!data) {
-        console.log('No user found with ID:', userId);
-        console.log('Let\'s check if this user exists with any role...');
-        
-        // Try without role filter to see if user exists at all
-        const { data: userCheck, error: userCheckError } = await supabase
-          .from('users')
-          .select('id, email, role, first_name, last_name')
-          .eq('id', userId)
-          .maybeSingle();
-          
-        console.log('User existence check:', { data: userCheck, error: userCheckError });
-        
-        toast.error('User not found');
+      if (!data || data.length === 0) {
+        console.log('No password data found for user ID:', userId);
+        toast.error('No password found for this user');
         return null;
       }
 
-      console.log('User found:', { 
-        id: data.id,
-        email: data.email, 
-        role: data.role, 
-        name: `${data.first_name} ${data.last_name}`,
-        hasPassword: !!data.password_hash,
-        passwordLength: data.password_hash?.length || 0
+      const userPasswordData = data[0];
+      console.log('Password data found:', { 
+        user_id: userPasswordData.user_id,
+        email: userPasswordData.email, 
+        name: `${userPasswordData.first_name} ${userPasswordData.last_name}`,
+        hasPassword: !!userPasswordData.password_hash,
+        passwordLength: userPasswordData.password_hash?.length || 0
       });
 
-      const passwordHash = data.password_hash || null;
+      const passwordHash = userPasswordData.password_hash || null;
       
       // Cache the result if we have a password
       if (passwordHash) {
