@@ -132,6 +132,18 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       setSessions(sessionsArray);
       console.log('Sessions loaded:', sessionsArray.length);
 
+      // DETAILED SESSION DEBUGGING - Log all session-subscription relationships
+      console.log('🔍 DETAILED SESSION-SUBSCRIPTION RELATIONSHIP DEBUG:');
+      sessionsArray.forEach((session, index) => {
+        console.log(`Session ${index + 1}:`, {
+          sessionId: session.id,
+          subscriptionId: session.subscription_id,
+          scheduledDate: session.scheduled_date,
+          status: session.status,
+          subscriptionIdType: typeof session.subscription_id
+        });
+      });
+
       // Step 2: Load subscriptions using the same RPC function as SubscriptionsTab
       console.log('Loading subscriptions using RPC function for student:', studentData.id);
       const { data: subscriptionData, error: subscriptionError } = await supabase
@@ -153,11 +165,60 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       } else {
         console.log('Subscriptions loaded via RPC:', subscriptionData?.length || 0);
         
-        // Step 3: Group sessions by subscription
+        // DETAILED SUBSCRIPTION DEBUGGING
+        console.log('🔍 DETAILED SUBSCRIPTION DEBUG:');
+        (subscriptionData || []).forEach((sub, index) => {
+          console.log(`Subscription ${index + 1}:`, {
+            subscriptionId: sub.id,
+            subscriptionIdType: typeof sub.id,
+            startDate: sub.start_date,
+            status: sub.status,
+            sessionCount: sub.session_count
+          });
+        });
+        
+        // Step 3: Group sessions by subscription WITH DETAILED DEBUGGING
+        console.log('🔄 STARTING SESSION GROUPING PROCESS:');
         const subscriptionsWithSessions: SubscriptionInfo[] = (subscriptionData || []).map(sub => {
-          console.log('Processing subscription:', sub.id);
-          const subscriptionSessions = sessionsArray.filter(session => session.subscription_id === sub.id);
-          console.log(`Found ${subscriptionSessions.length} sessions for subscription ${sub.id}`);
+          console.log(`\n🔍 Processing subscription: ${sub.id}`);
+          
+          // Filter sessions for this subscription with detailed logging
+          const subscriptionSessions = sessionsArray.filter(session => {
+            const matches = session.subscription_id === sub.id;
+            console.log(`  Session ${session.id}:`, {
+              sessionSubscriptionId: session.subscription_id,
+              targetSubscriptionId: sub.id,
+              matches: matches,
+              sessionSubscriptionIdType: typeof session.subscription_id,
+              targetSubscriptionIdType: typeof sub.id
+            });
+            return matches;
+          });
+          
+          console.log(`✅ Found ${subscriptionSessions.length} sessions for subscription ${sub.id}`);
+          
+          // Log sessions that were grouped
+          if (subscriptionSessions.length > 0) {
+            console.log(`  Sessions grouped for ${sub.id}:`, subscriptionSessions.map(s => ({
+              id: s.id,
+              date: s.scheduled_date,
+              status: s.status
+            })));
+          } else {
+            console.log(`⚠️  NO SESSIONS FOUND for subscription ${sub.id}`);
+            
+            // Debug: Check if there are any sessions with similar but not exact subscription_id
+            const similarSessions = sessionsArray.filter(session => 
+              session.subscription_id && session.subscription_id.includes(sub.id.substring(0, 8))
+            );
+            if (similarSessions.length > 0) {
+              console.log(`🔍 Found sessions with similar subscription IDs:`, similarSessions.map(s => ({
+                sessionId: s.id,
+                subscriptionId: s.subscription_id,
+                targetId: sub.id
+              })));
+            }
+          }
           
           return {
             id: sub.id,
@@ -178,14 +239,30 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         
         console.log(`✅ Successfully loaded ${sessionsArray.length} sessions grouped into ${subscriptionsWithSessions.length} subscriptions`);
         
-        // Debug each subscription
+        // FINAL SUMMARY DEBUGGING
+        console.log('📊 FINAL GROUPING SUMMARY:');
         subscriptionsWithSessions.forEach((sub, index) => {
-          console.log(`Subscription ${index + 1}:`, {
-            id: sub.id,
+          console.log(`Subscription ${index + 1} (${sub.id}):`, {
             sessionsCount: sub.sessions.length,
-            status: sub.status
+            status: sub.status,
+            startDate: sub.start_date,
+            hasRenewalNote: sub.notes?.includes('Renewed') || false
           });
         });
+
+        // Check for orphaned sessions (sessions not assigned to any subscription)
+        const allGroupedSessionIds = subscriptionsWithSessions.flatMap(sub => sub.sessions.map(s => s.id));
+        const orphanedSessions = sessionsArray.filter(session => !allGroupedSessionIds.includes(session.id));
+        if (orphanedSessions.length > 0) {
+          console.log('⚠️  ORPHANED SESSIONS (not assigned to any subscription):');
+          orphanedSessions.forEach(session => {
+            console.log(`  Orphaned session ${session.id}:`, {
+              subscriptionId: session.subscription_id,
+              scheduledDate: session.scheduled_date,
+              status: session.status
+            });
+          });
+        }
       }
       
       console.log('=== END SESSION LOADING DEBUG ===');
@@ -648,6 +725,14 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
               s.status === 'scheduled' && new Date(s.scheduled_date) >= new Date()
             ).length;
 
+            // DEBUG: Log rendering information for each subscription
+            console.log(`🎨 Rendering subscription ${subscription.id}:`, {
+              sessionsToRender: subscription.sessions.length,
+              completed: completedSessions,
+              upcoming: upcomingSessions,
+              isRenewed: subscription.notes?.includes('Renewed') || false
+            });
+
             return (
               <AccordionItem key={subscription.id} value={subscription.id} className="border rounded-lg">
                 <Card>
@@ -710,7 +795,8 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
 
                       {subscription.sessions.length === 0 ? (
                         <div className="text-center py-4 text-muted-foreground">
-                          No sessions found for this subscription
+                          <p>No sessions found for this subscription</p>
+                          <p className="text-xs mt-1">Subscription ID: {subscription.id}</p>
                         </div>
                       ) : (
                         <div className="space-y-0">
