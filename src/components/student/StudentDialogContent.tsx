@@ -9,6 +9,8 @@ import SessionsTab from "../student-tabs/SessionsTab";
 import { Student } from "../StudentCard";
 import { User, CreditCard, Calendar, BookOpen } from "lucide-react";
 import { useStudentForm } from "@/hooks/useStudentForm";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface StudentDialogContentProps {
@@ -41,6 +43,28 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     teachersData,
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
+
+  // Fetch student subscriptions
+  const { data: subscriptions = [], refetch: refetchSubscriptions } = useQuery({
+    queryKey: ['student-subscriptions', student?.id],
+    queryFn: async () => {
+      if (!student?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching subscriptions:', error);
+        throw error;
+      }
+      
+      return data || [];
+    },
+    enabled: !!student?.id && open,
+  });
 
   // Detailed course data debugging with clear section markers
   useEffect(() => {
@@ -126,6 +150,18 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     console.log('===== END TEACHERS DEBUG =====');
   }, [teachersData]);
 
+  // Handle subscription refresh
+  const handleSubscriptionRefresh = () => {
+    refetchSubscriptions();
+  };
+
+  // Handle add subscription - this would typically open a dialog
+  const handleAddSubscription = () => {
+    // TODO: Implement add subscription functionality
+    console.log('Add subscription clicked');
+    toast.info("Add subscription functionality to be implemented");
+  };
+
   return (
     <>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
@@ -165,7 +201,11 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         </TabsContent>
         
         <TabsContent value="subscriptions">
-          <SubscriptionsTab studentData={studentData} setStudentData={updateStudentData} isViewMode={false} />
+          <SubscriptionsTab 
+            subscriptions={subscriptions}
+            onRefresh={handleSubscriptionRefresh}
+            onAddSubscription={handleAddSubscription}
+          />
         </TabsContent>
         
         <TabsContent value="payments">
