@@ -536,7 +536,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                             isPastSession 
                               ? "bg-gray-100 text-gray-500 border-gray-300 opacity-70"
                               : session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
-                                session.status === "canceled" ? "bg-orange-50 text-orange-700 border-orange-300" :
+                                session.status === "canceled" ? "bg-red-50 text-red-700 border-red-300" :
                                 session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
                                 "bg-blue-50 text-blue-700 border-blue-300"
                           }
