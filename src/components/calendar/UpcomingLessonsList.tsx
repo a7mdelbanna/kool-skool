@@ -1,52 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   format, 
   isSameDay, 
   isPast, 
-  isFuture, 
   isToday, 
-  addDays,
-  startOfMonth,
-  endOfMonth,
-  isWithinInterval
+  addDays
 } from 'date-fns';
 import { Session } from '@/contexts/PaymentContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { 
   Calendar as CalendarIcon,
-  Clock,
   CheckCircle,
   CalendarX,
   XCircle,
   CalendarDays,
-  BookOpen,
   DollarSign,
   Calendar as CalendarScheduleIcon,
   Hash,
   Check,
   X,
-  Calendar,
   ArrowRight,
   RefreshCcw,
-  TrendingUp,
-  Target,
   CircleCheck
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
-import { getStudentSubscriptions, handleSessionAction, getStudentsWithDetails } from '@/integrations/supabase/client';
-import { useEffect, useState } from 'react';
+import { handleSessionAction } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-interface UpcomingLessonsListProps {
-  sessions: Session[];
-  onLessonClick?: (session: Session) => void;
-  onSessionUpdate?: () => void;
-  viewMode: 'day' | 'week' | 'month';
-  currentDate: Date;
-  currentWeekStart: Date;
-}
 
 interface SubscriptionInfo {
   id: string;
@@ -67,6 +47,19 @@ interface StudentInfo {
   id: string;
   courseName?: string;
   level?: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface UpcomingLessonsListProps {
+  sessions: Session[];
+  onLessonClick?: (session: Session) => void;
+  onSessionUpdate?: () => void;
+  viewMode: 'day' | 'week' | 'month';
+  currentDate: Date;
+  currentWeekStart: Date;
+  subscriptionInfoMap: Map<string, SubscriptionInfo>;
+  studentInfoMap: Map<string, StudentInfo>;
 }
 
 interface SessionActionResponse {
@@ -75,110 +68,18 @@ interface SessionActionResponse {
   new_session_id?: string;
 }
 
-const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ 
+const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({ 
   sessions, 
   onLessonClick,
   onSessionUpdate,
   viewMode,
   currentDate,
-  currentWeekStart
+  currentWeekStart,
+  subscriptionInfoMap,
+  studentInfoMap
 }) => {
-  const [subscriptionInfoMap, setSubscriptionInfoMap] = useState<Map<string, SubscriptionInfo>>(new Map());
-  const [studentInfoMap, setStudentInfoMap] = useState<Map<string, StudentInfo>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusChangeSession, setStatusChangeSession] = useState<string | null>(null);
-
-  // Load subscription and student information
-  useEffect(() => {
-    const loadAllInfo = async () => {
-      try {
-        setLoading(true);
-        const uniqueStudentIds = [...new Set(sessions.map(session => session.studentId))];
-        const subscriptionMap = new Map<string, SubscriptionInfo>();
-        const studentMap = new Map<string, StudentInfo>();
-
-        // Get school ID from user data
-        const userData = localStorage.getItem('user');
-        const user = userData ? JSON.parse(userData) : null;
-        
-        if (user && user.schoolId) {
-          // Fetch all students with details to get course and level info
-          const studentsWithDetails = await getStudentsWithDetails(user.schoolId);
-          
-          // Build student info map
-          studentsWithDetails.forEach(student => {
-            studentMap.set(student.id, {
-              id: student.id,
-              courseName: student.course_name,
-              level: student.level
-            });
-          });
-          
-          setStudentInfoMap(studentMap);
-        }
-
-        await Promise.all(
-          uniqueStudentIds.map(async (studentId) => {
-            try {
-              const subscriptions = await getStudentSubscriptions(studentId);
-              
-              // Find the active subscription
-              const activeSubscription = subscriptions.find(sub => sub.status === 'active');
-              
-              if (activeSubscription) {
-                // Use the progress tracking properties from the database function
-                const completedSessions = (activeSubscription as any).sessions_completed ?? 0;
-                const attendedSessions = (activeSubscription as any).sessions_attended ?? 0;
-                const cancelledSessions = (activeSubscription as any).sessions_cancelled ?? 0;
-                const scheduledSessions = (activeSubscription as any).sessions_scheduled ?? 0;
-                
-                // Calculate end date if not provided
-                let endDate = (activeSubscription as any).end_date;
-                if (!endDate && activeSubscription.start_date && activeSubscription.duration_months) {
-                  const startDate = new Date(activeSubscription.start_date);
-                  const calculatedEndDate = new Date(startDate);
-                  calculatedEndDate.setMonth(calculatedEndDate.getMonth() + activeSubscription.duration_months);
-                  endDate = calculatedEndDate.toISOString().split('T')[0];
-                }
-
-                const subscriptionInfo: SubscriptionInfo = {
-                  id: activeSubscription.id,
-                  studentId: studentId,
-                  sessionCount: activeSubscription.session_count,
-                  completedSessions: completedSessions,
-                  attendedSessions: attendedSessions,
-                  cancelledSessions: cancelledSessions,
-                  scheduledSessions: scheduledSessions,
-                  totalPrice: activeSubscription.total_price,
-                  currency: activeSubscription.currency,
-                  startDate: activeSubscription.start_date,
-                  endDate: endDate || activeSubscription.start_date,
-                  subscriptionName: activeSubscription.notes || undefined
-                };
-
-                subscriptionMap.set(studentId, subscriptionInfo);
-              }
-            } catch (error) {
-              console.error(`Error loading subscription for student ${studentId}:`, error);
-            }
-          })
-        );
-
-        setSubscriptionInfoMap(subscriptionMap);
-      } catch (error) {
-        console.error('Error loading subscription information:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (sessions.length > 0) {
-      loadAllInfo();
-    } else {
-      setLoading(false);
-    }
-  }, [sessions]);
 
   // Handle session actions
   const handleSessionActionClick = async (sessionId: string, action: string, newDatetime?: Date) => {
@@ -191,16 +92,13 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
         newDatetime?.toISOString()
       );
 
-      // Type cast the response to our expected format
       const typedResponse = response as unknown as SessionActionResponse;
 
       if (typedResponse.success) {
         toast.success(`Session ${action} successfully`);
-        // Trigger refresh of sessions data
         if (onSessionUpdate) {
           onSessionUpdate();
         }
-        // Close status change popup
         setStatusChangeSession(null);
       } else {
         toast.error(typedResponse.message || `Failed to ${action} session`);
@@ -568,8 +466,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                           {dateLabel}
                         </div>
                         
-                        {/* Session Number & Subscription Details - Improved Layout */}
-                        {subscriptionInfo && !loading && (
+                        {/* Session Number & Subscription Details */}
+                        {subscriptionInfo && (
                           <div className={`rounded-md border p-3 mb-4 ${
                             isPastSession 
                               ? 'bg-gray-100 border-gray-300' 
@@ -625,12 +523,6 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                             </div>
                           </div>
                         )}
-                        
-                        {loading && (
-                          <div className="text-xs text-muted-foreground mb-4">
-                            Loading session details...
-                          </div>
-                        )}
 
                         {/* Show Quick Action Buttons for SCHEDULED sessions, Change Status for others */}
                         {session.status === "scheduled" ? 
@@ -640,12 +532,12 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                       </div>
                       
                       {/* Progress Counter - Right Side */}
-                      {subscriptionInfo && !loading && !isPastSession && (
+                      {subscriptionInfo && !isPastSession && (
                         renderProgressCounter(subscriptionInfo)
                       )}
                       
                       {/* Status Badge - fallback when no progress info */}
-                      {(!subscriptionInfo || loading || isPastSession) && (
+                      {(!subscriptionInfo || isPastSession) && (
                         <div className="flex-shrink-0">
                           <Badge 
                             variant="outline" 
@@ -698,6 +590,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
       )}
     </div>
   );
-};
+});
+
+UpcomingLessonsList.displayName = 'UpcomingLessonsList';
 
 export default UpcomingLessonsList;

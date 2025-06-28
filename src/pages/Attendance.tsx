@@ -1,101 +1,45 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
   ChevronRight,
   Search,
-  LayoutGrid,
-  List
+  AlertCircle
 } from 'lucide-react';
 import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import UpcomingLessonsList from '@/components/calendar/UpcomingLessonsList';
-import { Session } from '@/contexts/PaymentContext';
-import { getStudentLessonSessions, getStudentsWithDetails, LessonSession } from '@/integrations/supabase/client';
-import { getEffectiveTimezone, convertUTCToUserTimezone, formatInUserTimezone } from '@/utils/timezone';
+import SessionSkeleton from '@/components/calendar/SessionSkeleton';
+import { useAttendanceData } from '@/hooks/useAttendanceData';
 import { UserContext } from '@/App';
 
 type ViewMode = 'day' | 'week' | 'month';
 
 const Attendance = () => {
   const { user } = useContext(UserContext);
-  const userTimezone = getEffectiveTimezone(user?.timezone);
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Load sessions from all students
-  const loadSessions = async () => {
-    try {
-      setLoading(true);
-      const userData = localStorage.getItem('user');
-      const user = userData ? JSON.parse(userData) : null;
-      
-      if (!user || !user.schoolId) {
-        console.warn('No user or school ID found');
-        return;
-      }
-
-      console.log('Loading sessions for school:', user.schoolId);
-      
-      // Get all students for the school
-      const students = await getStudentsWithDetails(user.schoolId);
-      console.log('Found students:', students.length);
-      
-      // Get sessions for each student
-      const allSessions: Session[] = [];
-      
-      for (const student of students) {
-        try {
-          const studentSessions = await getStudentLessonSessions(student.id);
-          console.log(`Sessions for student ${student.first_name} ${student.last_name}:`, studentSessions.length);
-          
-          // Convert lesson sessions to Session format with timezone conversion
-          const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => {
-            // Convert UTC stored time to user's timezone for display
-            const utcDate = new Date(session.scheduled_date);
-            const localDate = convertUTCToUserTimezone(utcDate, userTimezone);
-            
-            return {
-              id: session.id,
-              studentId: student.id,
-              studentName: `${student.first_name} ${student.last_name}`,
-              date: localDate, // Now in user's timezone
-              time: formatInUserTimezone(utcDate, userTimezone, 'HH:mm'),
-              duration: `${session.duration_minutes || 60} min`,
-              status: session.status as Session['status'],
-              sessionNumber: session.index_in_sub || undefined,
-              totalSessions: undefined,
-              notes: session.notes || '',
-              cost: session.cost,
-              paymentStatus: session.payment_status as Session['paymentStatus']
-            };
-          });
-          
-          allSessions.push(...convertedSessions);
-        } catch (error) {
-          console.error(`Error loading sessions for student ${student.id}:`, error);
-        }
-      }
-      
-      console.log('Total sessions loaded:', allSessions.length);
-      setSessions(allSessions);
-    } catch (error) {
-      console.error('Error loading sessions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    sessions,
+    subscriptionInfoMap,
+    studentInfoMap,
+    loading,
+    error,
+    loadSessions,
+    refreshSessions
+  } = useAttendanceData(user?.timezone);
 
   useEffect(() => {
     loadSessions();
-  }, []);
+  }, [loadSessions]);
 
   const goToPreviousPeriod = () => {
     if (viewMode === 'day') {
@@ -145,12 +89,6 @@ const Attendance = () => {
     }
   };
 
-  // Handle session updates - reload sessions data
-  const handleSessionUpdate = () => {
-    loadSessions();
-  };
-
-  // Filter sessions based on view mode and search query
   const getFilteredSessions = () => {
     let filtered = sessions.filter(session => {
       if (!searchQuery) return true;
@@ -186,10 +124,22 @@ const Attendance = () => {
 
   const filteredSessions = getFilteredSessions();
 
-  console.log("Sessions available:", sessions.length);
-  console.log("Filtered sessions:", filteredSessions.length);
-  console.log("Current view mode:", viewMode);
-  console.log("Loading:", loading);
+  const renderSkeletonLoader = () => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-4">
+        <div className="space-y-2">
+          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+      </div>
+      
+      <div className="space-y-3">
+        {Array(3).fill(0).map((_, i) => (
+          <SessionSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -198,9 +148,11 @@ const Attendance = () => {
           <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
           <p className="text-muted-foreground mt-1">
             Track and manage session attendance
-            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-              Viewing in: {userTimezone}
-            </span>
+            {user?.timezone && (
+              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                Viewing in: {user.timezone}
+              </span>
+            )}
           </p>
         </div>
 
@@ -249,17 +201,24 @@ const Attendance = () => {
       </div>
 
       <div className="bg-card rounded-lg border shadow-sm p-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">Loading sessions...</div>
-          </div>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {error}. <Button variant="link" onClick={refreshSessions} className="p-0 h-auto">Try again</Button>
+            </AlertDescription>
+          </Alert>
+        ) : loading ? (
+          renderSkeletonLoader()
         ) : (
           <UpcomingLessonsList 
             sessions={filteredSessions}
-            onSessionUpdate={handleSessionUpdate}
+            onSessionUpdate={refreshSessions}
             viewMode={viewMode}
             currentDate={currentDate}
             currentWeekStart={currentWeekStart}
+            subscriptionInfoMap={subscriptionInfoMap}
+            studentInfoMap={studentInfoMap}
           />
         )}
       </div>
