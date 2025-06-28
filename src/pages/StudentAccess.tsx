@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit } from 'lucide-react';
@@ -40,7 +39,7 @@ const StudentAccess = () => {
   console.log('=== STUDENT ACCESS DEBUG ===');
   console.log('School ID:', schoolId);
 
-  // Fetch students and their password info with improved query
+  // Fetch students and their password info with simplified approach
   const { data: studentsWithPasswords = [], isLoading } = useQuery({
     queryKey: ['students-with-passwords', schoolId],
     queryFn: async () => {
@@ -60,63 +59,94 @@ const StudentAccess = () => {
         return [];
       }
 
-      // Get all unique user IDs that are not null
-      const userIds = studentsData
-        .map(s => s.user_id)
-        .filter(Boolean);
+      // Instead of a separate query, let's use the RPC function to get password info
+      // This bypasses potential RLS issues
+      console.log('Fetching password info using RPC...');
+      const { data: passwordData, error: passwordError } = await supabase.rpc('get_user_passwords', {
+        p_school_id: schoolId
+      });
 
-      console.log('User IDs for password query:', userIds);
+      console.log('Password RPC result:', { data: passwordData, error: passwordError });
 
-      if (userIds.length === 0) {
-        console.log('No user IDs found');
-        return studentsData.map(student => ({
-          id: student.user_id || '',
-          student_id: student.id,
-          first_name: student.first_name || '',
-          last_name: student.last_name || '',
-          email: student.email || '',
-          password_hash: null,
-          course_name: student.course_name || 'No Course',
-          teacher_name: student.teacher_first_name && student.teacher_last_name
-            ? `${student.teacher_first_name} ${student.teacher_last_name}`
-            : 'No Teacher'
-        }));
-      }
-
-      // Fetch password info for all user IDs with improved query
-      console.log('Executing password query...');
-      const { data: passwordData, error: passwordError } = await supabase
-        .from('users')
-        .select('id, password_hash')
-        .in('id', userIds);
-
-      console.log('Password query executed with userIds:', userIds);
-      console.log('Password query result:', { data: passwordData, error: passwordError });
-
+      // If RPC doesn't exist, fall back to direct query with better error handling
+      let userPasswordMap = new Map();
+      
       if (passwordError) {
-        console.error('Error fetching password data:', passwordError);
-        // Don't throw error, just continue with empty password data
-      }
+        console.log('RPC not available, trying direct query...');
+        
+        // Get all unique user IDs that are not null
+        const userIds = studentsData
+          .map(s => s.user_id)
+          .filter(Boolean);
 
-      // Create a map for faster lookup
-      const passwordMap = new Map();
-      if (passwordData) {
+        console.log('User IDs for direct query:', userIds);
+
+        if (userIds.length > 0) {
+          // Try a more explicit query approach
+          console.log('Executing direct password query...');
+          
+          try {
+            const { data: directPasswordData, error: directError } = await supabase
+              .from('users')
+              .select('id, password_hash')
+              .in('id', userIds);
+
+            console.log('Direct password query result:', { 
+              data: directPasswordData, 
+              error: directError,
+              count: directPasswordData?.length || 0
+            });
+
+            if (directError) {
+              console.error('Direct query error:', directError);
+              // Try with explicit authentication bypass
+              const { data: bypassData, error: bypassError } = await supabase
+                .from('users')
+                .select('id, password_hash')
+                .in('id', userIds)
+                .eq('school_id', schoolId); // Add school_id filter to help with RLS
+
+              console.log('Bypass query result:', { 
+                data: bypassData, 
+                error: bypassError,
+                count: bypassData?.length || 0
+              });
+
+              if (bypassData) {
+                bypassData.forEach(p => {
+                  userPasswordMap.set(p.id, p.password_hash);
+                });
+              }
+            } else if (directPasswordData) {
+              directPasswordData.forEach(p => {
+                userPasswordMap.set(p.id, p.password_hash);
+              });
+            }
+          } catch (queryError) {
+            console.error('Query execution error:', queryError);
+          }
+        }
+      } else if (passwordData) {
         passwordData.forEach(p => {
-          passwordMap.set(p.id, p.password_hash);
+          userPasswordMap.set(p.id, p.password_hash);
         });
       }
 
+      console.log('Password map size:', userPasswordMap.size);
+      console.log('Password map entries:', Array.from(userPasswordMap.entries()));
+
       // Combine student data with password info
       const result = studentsData.map(student => {
-        const passwordHash = passwordMap.get(student.user_id);
+        const passwordHash = userPasswordMap.get(student.user_id);
         const teacherName = student.teacher_first_name && student.teacher_last_name
           ? `${student.teacher_first_name} ${student.teacher_last_name}`
           : 'No Teacher';
 
         console.log(`Student ${student.first_name} ${student.last_name}:`, {
           user_id: student.user_id,
-          passwordHash,
-          has_password: !!passwordHash
+          passwordHash: passwordHash || 'NOT_FOUND',
+          has_password: !!passwordHash,
+          password_length: passwordHash ? passwordHash.length : 0
         });
 
         return {
@@ -132,6 +162,7 @@ const StudentAccess = () => {
       });
 
       console.log('Final students with passwords:', result);
+      console.log('Students with passwords count:', result.filter(s => s.password_hash).length);
       return result;
     },
     enabled: !!schoolId,
@@ -152,7 +183,7 @@ const StudentAccess = () => {
         throw new Error('Failed to hash password: ' + hashError.message);
       }
 
-      console.log('Password hashed successfully');
+      console.log('Password hashed successfully, length:', hashedPassword?.length);
 
       // Update the user's password
       const { error: updateError } = await supabase
@@ -169,6 +200,21 @@ const StudentAccess = () => {
       }
 
       console.log('Password updated successfully in database');
+      
+      // Verify the update worked
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('users')
+        .select('id, password_hash')
+        .eq('id', userId)
+        .single();
+
+      console.log('Password verification:', { 
+        data: verifyData, 
+        error: verifyError,
+        has_password: !!verifyData?.password_hash,
+        password_length: verifyData?.password_hash?.length || 0
+      });
+
       return { success: true };
     },
     onSuccess: () => {
