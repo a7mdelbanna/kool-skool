@@ -75,10 +75,23 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       return;
     }
 
+    if (!userData.userId || !userData.schoolId) {
+      toast({
+        title: "Error",
+        description: "Missing user ID or school ID",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsRenewing(true);
       
-      console.log('🔄 Renewing subscription:', subscription.id);
+      console.log('🔄 Renewing subscription:', {
+        subscriptionId: subscription.id,
+        userId: userData.userId,
+        schoolId: userData.schoolId
+      });
       
       const { data, error } = await supabase.rpc('renew_subscription', {
         p_subscription_id: subscription.id,
@@ -86,17 +99,43 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         p_current_school_id: userData.schoolId
       });
 
+      console.log('📊 RPC call result:', { data, error });
+
       if (error) {
-        console.error('❌ Error renewing subscription:', error);
-        throw error;
+        console.error('❌ RPC Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Database error: ${error.message}`);
       }
 
-      console.log('✅ Renewal response:', data);
+      if (!data) {
+        throw new Error('No response from renewal function');
+      }
 
-      // Type assertion for the RPC response - convert to unknown first, then to our type
-      const response = data as unknown as RenewSubscriptionResponse;
+      console.log('✅ Raw renewal response:', data);
 
-      if (response && response.success) {
+      // Handle the response - it should be a JSONB object
+      let response: RenewSubscriptionResponse;
+      
+      if (typeof data === 'string') {
+        try {
+          response = JSON.parse(data);
+        } catch (parseError) {
+          console.error('Failed to parse response:', parseError);
+          throw new Error('Invalid response format from server');
+        }
+      } else if (typeof data === 'object' && data !== null) {
+        response = data as RenewSubscriptionResponse;
+      } else {
+        throw new Error('Unexpected response format from server');
+      }
+
+      console.log('📋 Parsed response:', response);
+
+      if (response.success) {
         toast({
           title: "Success",
           description: response.message || "Subscription renewed successfully!",
@@ -107,13 +146,18 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           onRenew();
         }
       } else {
-        throw new Error(response?.message || 'Failed to renew subscription');
+        throw new Error(response.message || 'Failed to renew subscription');
       }
     } catch (error: any) {
-      console.error('❌ Error renewing subscription:', error);
+      console.error('❌ Complete error details:', {
+        error,
+        message: error.message,
+        stack: error.stack
+      });
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to renew subscription",
+        description: error.message || "Failed to renew subscription. Please try again.",
         variant: "destructive",
       });
     } finally {
