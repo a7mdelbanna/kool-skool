@@ -1673,11 +1673,18 @@ export type Database = {
         Returns: Json
       }
       renew_subscription: {
-        Args: {
-          p_subscription_id: string
-          p_current_user_id: string
-          p_current_school_id: string
-        }
+        Args:
+          | {
+              p_subscription_id: string
+              p_current_user_id: string
+              p_current_school_id: string
+            }
+          | {
+              p_subscription_id: string
+              p_new_start_date: string
+              p_current_user_id: string
+              p_current_school_id: string
+            }
         Returns: Json
       }
       set_default_currency: {
