@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Plus, Loader2, CheckCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -346,7 +345,13 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-semibold text-gray-700">Price Mode</Label>
-              <Select value={formData.priceMode} onValueChange={(value) => setFormData({ ...formData, priceMode: value })}>
+              <Select 
+                value={formData.priceMode} 
+                onValueChange={(value) => setFormData({ 
+                  ...formData, 
+                  priceMode: value as 'perSession' | 'fixedPrice' 
+                })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select price mode" />
                 </SelectTrigger>
