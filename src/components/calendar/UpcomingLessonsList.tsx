@@ -31,14 +31,13 @@ import {
   ArrowRight,
   RefreshCcw,
   TrendingUp,
-  Target
+  Target,
+  CircleCheck
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
 import { getStudentSubscriptions, handleSessionAction } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-// Import the Supabase Subscription type directly
-import type { Subscription as SupabaseSubscription } from '@/integrations/supabase/client';
 
 interface UpcomingLessonsListProps {
   sessions: Session[];
@@ -96,18 +95,18 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
             try {
               const subscriptions = await getStudentSubscriptions(studentId);
               
-              // Find the active subscription - use the Supabase type directly
-              const activeSubscription = subscriptions.find(sub => sub.status === 'active') as SupabaseSubscription | undefined;
+              // Find the active subscription
+              const activeSubscription = subscriptions.find(sub => sub.status === 'active');
               
               if (activeSubscription) {
-                // Use the real-time calculated values from the updated database function
-                const completedSessions = activeSubscription.sessions_completed ?? 0;
-                const attendedSessions = activeSubscription.sessions_attended ?? 0;
-                const cancelledSessions = activeSubscription.sessions_cancelled ?? 0;
-                const scheduledSessions = activeSubscription.sessions_scheduled ?? 0;
+                // Use the progress tracking properties from the database function
+                const completedSessions = (activeSubscription as any).sessions_completed ?? 0;
+                const attendedSessions = (activeSubscription as any).sessions_attended ?? 0;
+                const cancelledSessions = (activeSubscription as any).sessions_cancelled ?? 0;
+                const scheduledSessions = (activeSubscription as any).sessions_scheduled ?? 0;
                 
                 // Calculate end date if not provided
-                let endDate = activeSubscription.end_date;
+                let endDate = (activeSubscription as any).end_date;
                 if (!endDate && activeSubscription.start_date && activeSubscription.duration_months) {
                   const startDate = new Date(activeSubscription.start_date);
                   const calculatedEndDate = new Date(startDate);
@@ -411,90 +410,36 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     );
   };
 
-  // Render progress section for subscription
-  const renderProgressSection = (subscriptionInfo: SubscriptionInfo) => {
-    const progressPercentage = Math.round((subscriptionInfo.completedSessions / subscriptionInfo.sessionCount) * 100);
-    const isNearCompletion = progressPercentage >= 80;
-    const isCompleted = progressPercentage >= 100;
+  // Render simple progress counter - replacing the complex progress widget
+  const renderProgressCounter = (subscriptionInfo: SubscriptionInfo) => {
+    const completedSessions = subscriptionInfo.completedSessions;
+    const totalSessions = subscriptionInfo.sessionCount;
+    const progressPercentage = Math.round((completedSessions / totalSessions) * 100);
     
     return (
-      <div className="flex-shrink-0 w-48 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="p-1.5 bg-blue-500 rounded-full">
-            <TrendingUp className="h-3 w-3 text-white" />
+      <div className="flex-shrink-0 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="p-1 bg-blue-500 rounded-full">
+            <CircleCheck className="h-3 w-3 text-white" />
           </div>
-          <h4 className="font-semibold text-sm text-blue-900">Progress</h4>
+          <span className="text-xs font-medium text-blue-900">Progress</span>
         </div>
         
-        {/* Main Progress Bar */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-blue-700">Overall Progress</span>
-            <span className={`text-xs font-bold ${
-              isCompleted ? 'text-green-600' : 
-              isNearCompletion ? 'text-orange-600' : 
-              'text-blue-600'
-            }`}>
-              {progressPercentage}%
-            </span>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-blue-700 mb-1">
+            {completedSessions}/{totalSessions}
           </div>
-          <Progress 
-            value={progressPercentage} 
-            className="h-2 mb-1"
-          />
-          <div className="flex justify-between text-xs text-blue-600">
-            <span>{subscriptionInfo.completedSessions} completed</span>
-            <span>{subscriptionInfo.sessionCount} total</span>
+          <div className="text-xs text-blue-600 mb-2">
+            Sessions completed
+          </div>
+          <div className={`text-xs px-2 py-1 rounded ${
+            progressPercentage >= 100 ? 'bg-green-100 text-green-700' :
+            progressPercentage >= 80 ? 'bg-orange-100 text-orange-700' :
+            'bg-blue-100 text-blue-700'
+          }`}>
+            {progressPercentage}% done
           </div>
         </div>
-        
-        {/* Detailed Breakdown */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-gray-600">Attended</span>
-            </div>
-            <span className="font-medium text-green-600">
-              {subscriptionInfo.attendedSessions}
-            </span>
-          </div>
-          
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-              <span className="text-gray-600">Cancelled</span>
-            </div>
-            <span className="font-medium text-orange-600">
-              {subscriptionInfo.cancelledSessions}
-            </span>
-          </div>
-          
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-gray-600">Scheduled</span>
-            </div>
-            <span className="font-medium text-blue-600">
-              {subscriptionInfo.scheduledSessions}
-            </span>
-          </div>
-        </div>
-        
-        {/* Completion Status */}
-        {isCompleted && (
-          <div className="mt-3 flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-            <Target className="h-3 w-3" />
-            <span className="font-medium">Completed!</span>
-          </div>
-        )}
-        
-        {isNearCompletion && !isCompleted && (
-          <div className="mt-3 flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
-            <Target className="h-3 w-3" />
-            <span className="font-medium">Near completion</span>
-          </div>
-        )}
       </div>
     );
   };
@@ -630,9 +575,9 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                         }
                       </div>
                       
-                      {/* Progress Section - Right Side */}
+                      {/* Progress Counter - Right Side */}
                       {subscriptionInfo && !loading && !isPastSession && (
-                        renderProgressSection(subscriptionInfo)
+                        renderProgressCounter(subscriptionInfo)
                       )}
                       
                       {/* Status Badge - fallback when no progress info */}
