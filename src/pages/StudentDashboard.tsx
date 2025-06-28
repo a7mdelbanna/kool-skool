@@ -1,4 +1,5 @@
-import React, { useContext, useEffect, useState } from 'react';
+
+import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +64,27 @@ const StudentDashboard = () => {
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
 
+  // Memoized formatting functions that depend on userTimezone
+  const formatSessionTime = useCallback((dateTime: string) => {
+    const effectiveTimezone = userTimezone || getBrowserTimezone();
+    console.log('Formatting session time:', dateTime, 'with timezone:', effectiveTimezone);
+    
+    if (!effectiveTimezone || effectiveTimezone === 'UTC') {
+      return format(new Date(dateTime), 'EEEE, MMMM d, yyyy');
+    }
+    return formatInUserTimezone(dateTime, effectiveTimezone, 'EEEE, MMMM d, yyyy');
+  }, [userTimezone]);
+
+  const formatSessionDateTime = useCallback((dateTime: string) => {
+    const effectiveTimezone = userTimezone || getBrowserTimezone();
+    console.log('Formatting session datetime:', dateTime, 'with timezone:', effectiveTimezone);
+    
+    if (!effectiveTimezone || effectiveTimezone === 'UTC') {
+      return format(new Date(dateTime), 'HH:mm');
+    }
+    return formatInUserTimezone(dateTime, effectiveTimezone, 'HH:mm');
+  }, [userTimezone]);
+
   useEffect(() => {
     // Check if user is authenticated and is a student
     if (!user || user.role !== 'student') {
@@ -73,6 +95,7 @@ const StudentDashboard = () => {
     
     // Initialize timezone
     const effectiveTimezone = getEffectiveTimezone(user.timezone);
+    console.log('Setting initial timezone:', effectiveTimezone);
     setUserTimezone(effectiveTimezone);
     
     fetchStudentData();
@@ -233,7 +256,9 @@ const StudentDashboard = () => {
 
   const handleTimezoneChange = async (newTimezone: string) => {
     try {
-      console.log('Updating student timezone to:', newTimezone);
+      console.log('=== TIMEZONE CHANGE ===');
+      console.log('Old timezone:', userTimezone);
+      console.log('New timezone:', newTimezone);
       
       // Update in database
       const { error } = await supabase
@@ -247,21 +272,27 @@ const StudentDashboard = () => {
         return;
       }
 
-      // Update local state
+      // Update local state first
       setUserTimezone(newTimezone);
+      console.log('Updated userTimezone state to:', newTimezone);
       
       // Update user context
       if (user) {
         const updatedUser = { ...user, timezone: newTimezone };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
+        console.log('Updated user context with new timezone');
       }
 
       setTimezoneDialogOpen(false);
       toast.success('Timezone updated successfully');
       
-      // Refresh data to show times in new timezone
-      await fetchStudentData();
+      // Force a small delay to ensure state is updated before refreshing data
+      setTimeout(async () => {
+        console.log('Refreshing data with new timezone:', newTimezone);
+        await fetchStudentData();
+      }, 100);
+      
     } catch (error) {
       console.error('Error updating timezone:', error);
       toast.error('Failed to update timezone');
@@ -287,16 +318,6 @@ const StudentDashboard = () => {
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
-  };
-
-  const formatSessionTime = (dateTime: string) => {
-    if (!userTimezone) return format(new Date(dateTime), 'EEEE, MMMM d, yyyy');
-    return formatInUserTimezone(dateTime, userTimezone, 'EEEE, MMMM d, yyyy');
-  };
-
-  const formatSessionDateTime = (dateTime: string) => {
-    if (!userTimezone) return format(new Date(dateTime), 'HH:mm');
-    return formatInUserTimezone(dateTime, userTimezone, 'HH:mm');
   };
 
   if (loading) {
