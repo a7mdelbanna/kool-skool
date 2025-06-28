@@ -72,7 +72,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     }
     
     if (modifier === 'PM') {
-      hours = parseInt(hours, 10) + 12;
+      hours = (parseInt(hours, 10) + 12).toString();
     }
     
     return `${hours.toString().padStart(2, '0')}:${minutes}`;
