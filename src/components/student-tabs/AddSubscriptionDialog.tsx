@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, X, Plus, Loader2, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, Plus, Loader2, CheckCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,29 +13,29 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { Subscription, RpcResponse } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { useSubscriptionCreation } from '@/hooks/useSubscriptionCreation';
 
 interface ScheduleItem {
   day: string;
   time: string;
 }
 
-interface EditSubscriptionDialogProps {
-  subscription: Subscription | null;
+interface AddSubscriptionDialogProps {
+  studentId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
-  subscription,
+const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
+  studentId,
   open,
   onOpenChange,
   onSuccess
 }) => {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const { createSubscription, isSubmitting } = useSubscriptionCreation(studentId, onSuccess);
 
   // Get school ID from localStorage
   const getSchoolId = () => {
@@ -44,15 +45,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     return user.schoolId;
   };
 
-  const getCurrentUserId = () => {
-    const userData = localStorage.getItem('user');
-    if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.user_id || user.id || user.userId;
-  };
-
   const schoolId = getSchoolId();
-  const currentUserId = getCurrentUserId();
 
   // Fetch school currencies
   const { data: currencies = [] } = useQuery({
@@ -91,31 +84,6 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     enabled: !!schoolId,
   });
 
-  // Fetch initial payment data
-  const { data: initialPaymentData } = useQuery({
-    queryKey: ['subscription-initial-payment', subscription?.id],
-    queryFn: async () => {
-      if (!subscription?.id) return null;
-      
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('subscription_id', subscription.id)
-        .eq('type', 'income')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching initial payment:', error);
-        return null;
-      }
-      
-      return data;
-    },
-    enabled: !!subscription?.id && open,
-  });
-
   const [formData, setFormData] = useState({
     sessionCount: 4,
     durationMonths: 1,
@@ -141,54 +109,37 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
   const paymentMethods = ['Cash', 'Card', 'Bank Transfer', 'Check', 'Online'];
 
-  // Populate form when subscription changes
-  useEffect(() => {
-    if (subscription && open) {
-      console.log('Populating form with subscription data:', subscription);
-      
-      // Parse schedule from JSONB
-      let parsedSchedule: ScheduleItem[] = [];
-      try {
-        if (subscription.schedule) {
-          if (typeof subscription.schedule === 'string') {
-            parsedSchedule = JSON.parse(subscription.schedule);
-          } else {
-            parsedSchedule = subscription.schedule as ScheduleItem[];
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing schedule:', error);
-        parsedSchedule = [];
-      }
-
-      setFormData({
-        sessionCount: subscription.session_count,
-        durationMonths: subscription.duration_months,
-        startDate: subscription.start_date ? new Date(subscription.start_date) : undefined,
-        schedule: parsedSchedule,
-        priceMode: subscription.price_mode,
-        pricePerSession: subscription.price_per_session || 0,
-        fixedPrice: subscription.fixed_price || 0,
-        currency: subscription.currency,
-        notes: subscription.notes || '',
-        status: subscription.status,
-        initialPayment: {
-          amount: initialPaymentData?.amount || 0,
-          method: initialPaymentData?.payment_method || 'Cash',
-          notes: initialPaymentData?.notes || '',
-          accountId: initialPaymentData?.to_account_id || ''
-        }
-      });
-    }
-  }, [subscription, open, initialPaymentData]);
-
   // Set default currency when currencies are loaded
   useEffect(() => {
-    if (currencies.length > 0 && !formData.currency && !subscription) {
+    if (currencies.length > 0 && !formData.currency) {
       const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
       setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
     }
-  }, [currencies, formData.currency, subscription]);
+  }, [currencies, formData.currency]);
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        sessionCount: 4,
+        durationMonths: 1,
+        startDate: undefined,
+        schedule: [],
+        priceMode: 'perSession',
+        pricePerSession: 0,
+        fixedPrice: 0,
+        currency: currencies.length > 0 ? (currencies.find(c => c.is_default) || currencies[0]).code : '',
+        notes: '',
+        status: 'active',
+        initialPayment: {
+          amount: 0,
+          method: 'Cash',
+          notes: '',
+          accountId: ''
+        }
+      });
+    }
+  }, [open, currencies]);
 
   const addScheduleItem = () => {
     setFormData({
@@ -226,15 +177,6 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!subscription || !currentUserId || !schoolId) {
-      toast({
-        title: "Error",
-        description: "Missing required data",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Validate required fields
     if (!formData.startDate || formData.schedule.length === 0) {
       toast({
@@ -256,63 +198,14 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       return;
     }
 
-    try {
-      setLoading(true);
-      console.log('Updating subscription with data:', {
-        subscription_id: subscription.id,
-        ...formData,
-        total_price: getTotalPrice()
-      });
+    const subscriptionData = {
+      ...formData,
+      totalPrice: getTotalPrice()
+    };
 
-      const { data, error } = await supabase.rpc('update_subscription_with_related_data', {
-        p_subscription_id: subscription.id,
-        p_session_count: formData.sessionCount,
-        p_duration_months: formData.durationMonths,
-        p_start_date: formData.startDate.toISOString().split('T')[0],
-        p_schedule: JSON.stringify(formData.schedule), // Convert to JSON string
-        p_price_mode: formData.priceMode,
-        p_price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
-        p_fixed_price: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : null,
-        p_total_price: getTotalPrice(),
-        p_currency: formData.currency,
-        p_notes: formData.notes,
-        p_status: formData.status,
-        p_current_user_id: currentUserId,
-        p_current_school_id: schoolId
-      });
-
-      if (error) {
-        console.error('Error updating subscription:', error);
-        throw error;
-      }
-
-      console.log('Subscription update result:', data);
-
-      const response = data as RpcResponse;
-      if (response && !response.success) {
-        throw new Error(response.message || 'Failed to update subscription');
-      }
-
-      toast({
-        title: "Success",
-        description: response?.message || "Subscription updated successfully!",
-      });
-
-      onSuccess();
-      onOpenChange(false);
-    } catch (error: any) {
-      console.error('Error updating subscription:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update subscription",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    await createSubscription(subscriptionData);
+    onOpenChange(false);
   };
-
-  if (!subscription) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -320,7 +213,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Edit Subscription
+            Add Subscription
           </DialogTitle>
         </DialogHeader>
 
@@ -631,24 +524,24 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
             <Button 
               variant="outline" 
               onClick={() => onOpenChange(false)}
-              disabled={loading}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSubmit} 
-              disabled={loading || formData.schedule.length === 0 || !formData.startDate}
+              disabled={isSubmitting || formData.schedule.length === 0 || !formData.startDate}
               className="min-w-[120px]"
             >
-              {loading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
+                  Creating...
                 </>
               ) : (
                 <>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Update
+                  Create
                 </>
               )}
             </Button>
@@ -659,4 +552,4 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   );
 };
 
-export default EditSubscriptionDialog;
+export default AddSubscriptionDialog;

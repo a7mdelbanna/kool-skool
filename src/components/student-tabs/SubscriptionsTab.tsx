@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit3, Calendar, Clock, DollarSign, Users, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,30 +19,32 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import EditSubscriptionDialog from './EditSubscriptionDialog';
+import AddSubscriptionDialog from './AddSubscriptionDialog';
 
 interface SubscriptionsTabProps {
   subscriptions: Subscription[];
   onRefresh: () => void;
-  onAddSubscription: () => void;
+  studentId: string;
 }
 
 const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   subscriptions,
   onRefresh,
-  onAddSubscription
+  studentId
 }) => {
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'green';
-      case 'paused': return 'yellow';
-      case 'completed': return 'blue';
-      case 'cancelled': return 'red';
-      default: return 'gray';
+      case 'active': return 'bg-green-100 text-green-800 border-green-200';
+      case 'paused': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'completed': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -98,87 +101,184 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     onRefresh();
   };
 
+  const handleAddSuccess = () => {
+    setAddDialogOpen(false);
+    onRefresh();
+  };
+
+  const formatSchedule = (schedule: any) => {
+    try {
+      if (typeof schedule === 'string') {
+        const parsed = JSON.parse(schedule);
+        return Array.isArray(parsed) 
+          ? parsed.map(s => `${s.day} at ${s.time}`).join(', ')
+          : schedule;
+      }
+      if (Array.isArray(schedule)) {
+        return schedule.map(s => `${s.day} at ${s.time}`).join(', ');
+      }
+      return JSON.stringify(schedule);
+    } catch {
+      return schedule?.toString() || 'No schedule';
+    }
+  };
+
   return (
-    <div>
-      <div className="mb-4 flex justify-end">
-        <Button onClick={onAddSubscription} className="bg-green-500 text-white hover:bg-green-700">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Current Subscriptions</h3>
+          <p className="text-sm text-gray-600">Manage student subscription plans and schedules</p>
+        </div>
+        <Button 
+          onClick={() => setAddDialogOpen(true)} 
+          className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
+        >
           <Plus className="mr-2 h-4 w-4" />
           Add Subscription
         </Button>
       </div>
 
       {subscriptions.length === 0 ? (
-        <div className="text-center text-gray-500">No subscriptions found.</div>
+        <div className="text-center py-12">
+          <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h3>
+          <p className="text-gray-600 mb-4">Get started by creating your first subscription plan</p>
+          <Button 
+            onClick={() => setAddDialogOpen(true)}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add First Subscription
+          </Button>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {subscriptions.map((subscription) => (
-            <Card key={subscription.id} className="bg-white shadow-md rounded-md overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  <Calendar className="mr-2 h-4 w-4 inline-block" />
-                  {format(new Date(subscription.start_date), 'MMM dd, yyyy')}
-                </CardTitle>
-                <Badge variant="secondary" className={`bg-${getStatusColor(subscription.status)}-500 text-white`}>
-                  {subscription.status}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-gray-600">
-                  <div className="flex items-center mb-1">
-                    <Clock className="mr-2 h-4 w-4 inline-block" />
-                    {subscription.schedule && typeof subscription.schedule === 'string' ? (
-                      <span>{subscription.schedule}</span>
-                    ) : (
-                      <span>{JSON.stringify(subscription.schedule)}</span>
-                    )}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {subscriptions.map((subscription) => {
+            const StatusIcon = getStatusIcon(subscription.status);
+            return (
+              <Card key={subscription.id} className="group hover:shadow-lg transition-all duration-200 border border-gray-200 bg-white">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <CardTitle className="text-sm font-medium text-gray-900">
+                        {format(new Date(subscription.start_date), 'MMM dd, yyyy')}
+                      </CardTitle>
+                    </div>
+                    <Badge className={cn("text-xs font-medium border", getStatusColor(subscription.status))}>
+                      <StatusIcon className="mr-1 h-3 w-3" />
+                      {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                    </Badge>
                   </div>
-                  <div className="flex items-center mb-1">
-                    <DollarSign className="mr-2 h-4 w-4 inline-block" />
-                    {subscription.price_mode}: {subscription.currency} {subscription.total_price}
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  {/* Schedule */}
+                  <div className="flex items-start space-x-2">
+                    <Clock className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {formatSchedule(subscription.schedule)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center mb-1">
-                    <Users className="mr-2 h-4 w-4 inline-block" />
-                    {subscription.session_count} Sessions
+
+                  {/* Price */}
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-4 w-4 text-gray-500" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {subscription.price_mode === 'perSession' ? 'Per Session' : 'Fixed Price'}: {subscription.currency} {subscription.total_price}
+                      </p>
+                      {subscription.price_mode === 'perSession' && subscription.price_per_session && (
+                        <p className="text-xs text-gray-500">
+                          {subscription.currency} {subscription.price_per_session} × {subscription.session_count} sessions
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-              <div className="p-2 flex justify-between items-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEditSubscription(subscription)}
-                >
-                  <Edit3 className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" disabled={deletingId === subscription.id}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
+
+                  {/* Sessions */}
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-4 w-4 text-gray-500" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900">
+                          {subscription.sessions_completed || 0} / {subscription.session_count} Sessions
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {Math.round(((subscription.sessions_completed || 0) / subscription.session_count) * 100)}%
+                        </p>
+                      </div>
+                      <div className="mt-1 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${Math.min(((subscription.sessions_completed || 0) / subscription.session_count) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Duration */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500">
+                      Duration: {subscription.duration_months} month{subscription.duration_months !== 1 ? 's' : ''}
+                      {subscription.end_date && (
+                        <> • Ends {format(new Date(subscription.end_date), 'MMM dd, yyyy')}</>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="pt-3 flex justify-between items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditSubscription(subscription)}
+                      className="flex-1 text-gray-700 border-gray-300 hover:bg-gray-50"
+                    >
+                      <Edit3 className="mr-1 h-3 w-3" />
+                      Edit
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. Are you sure you want to delete this subscription?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        disabled={deletingId === subscription.id}
-                        onClick={() => handleDeleteSubscription(subscription.id)}
-                      >
-                        {deletingId === subscription.id ? 'Deleting...' : 'Delete'}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </Card>
-          ))}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          disabled={deletingId === subscription.id}
+                          className="flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete this subscription and all related session data.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            disabled={deletingId === subscription.id}
+                            onClick={() => handleDeleteSubscription(subscription.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            {deletingId === subscription.id ? 'Deleting...' : 'Delete'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -187,6 +287,13 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         onOpenChange={setEditDialogOpen}
         subscription={editingSubscription}
         onSuccess={handleEditSuccess}
+      />
+
+      <AddSubscriptionDialog
+        studentId={studentId}
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onSuccess={handleAddSuccess}
       />
     </div>
   );

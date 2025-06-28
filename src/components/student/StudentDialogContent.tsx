@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -155,13 +154,6 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     refetchSubscriptions();
   };
 
-  // Handle add subscription - this would typically open a dialog
-  const handleAddSubscription = () => {
-    // TODO: Implement add subscription functionality
-    console.log('Add subscription clicked');
-    toast.info("Add subscription functionality to be implemented");
-  };
-
   return (
     <>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
@@ -204,7 +196,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
           <SubscriptionsTab 
             subscriptions={subscriptions}
             onRefresh={handleSubscriptionRefresh}
-            onAddSubscription={handleAddSubscription}
+            studentId={student?.id || ''}
           />
         </TabsContent>
         
