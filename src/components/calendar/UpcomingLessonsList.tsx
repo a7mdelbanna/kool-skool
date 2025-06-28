@@ -35,7 +35,7 @@ import {
   CircleCheck
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
-import { getStudentSubscriptions, handleSessionAction } from '@/integrations/supabase/client';
+import { getStudentSubscriptions, handleSessionAction, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -63,6 +63,12 @@ interface SubscriptionInfo {
   subscriptionName?: string;
 }
 
+interface StudentInfo {
+  id: string;
+  courseName?: string;
+  level?: string;
+}
+
 interface SessionActionResponse {
   success: boolean;
   message?: string;
@@ -78,17 +84,39 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
   currentWeekStart
 }) => {
   const [subscriptionInfoMap, setSubscriptionInfoMap] = useState<Map<string, SubscriptionInfo>>(new Map());
+  const [studentInfoMap, setStudentInfoMap] = useState<Map<string, StudentInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusChangeSession, setStatusChangeSession] = useState<string | null>(null);
 
-  // Load subscription information for all students
+  // Load subscription and student information
   useEffect(() => {
-    const loadSubscriptionInfo = async () => {
+    const loadAllInfo = async () => {
       try {
         setLoading(true);
         const uniqueStudentIds = [...new Set(sessions.map(session => session.studentId))];
         const subscriptionMap = new Map<string, SubscriptionInfo>();
+        const studentMap = new Map<string, StudentInfo>();
+
+        // Get school ID from user data
+        const userData = localStorage.getItem('user');
+        const user = userData ? JSON.parse(userData) : null;
+        
+        if (user && user.schoolId) {
+          // Fetch all students with details to get course and level info
+          const studentsWithDetails = await getStudentsWithDetails(user.schoolId);
+          
+          // Build student info map
+          studentsWithDetails.forEach(student => {
+            studentMap.set(student.id, {
+              id: student.id,
+              courseName: student.course_name,
+              level: student.level
+            });
+          });
+          
+          setStudentInfoMap(studentMap);
+        }
 
         await Promise.all(
           uniqueStudentIds.map(async (studentId) => {
@@ -146,7 +174,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     };
 
     if (sessions.length > 0) {
-      loadSubscriptionInfo();
+      loadAllInfo();
     } else {
       setLoading(false);
     }
@@ -226,9 +254,23 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     }
   };
 
-  // Extract subject from notes
-  const getSubject = (session: Session) => {
-    return session.notes?.includes('Mathematics') ? 'Mathematics' :
+  // Get lesson subject and level from student info
+  const getLessonSubjectAndLevel = (session: Session) => {
+    const studentInfo = studentInfoMap.get(session.studentId);
+    
+    if (studentInfo) {
+      const subject = studentInfo.courseName || 'General';
+      const level = studentInfo.level || '';
+      
+      if (level) {
+        return `${subject} - ${level}`;
+      } else {
+        return subject;
+      }
+    }
+    
+    // Fallback to extracting from notes if available
+    const subject = session.notes?.includes('Mathematics') ? 'Mathematics' :
            session.notes?.includes('Science') ? 'Science' :
            session.notes?.includes('English') ? 'English' :
            session.notes?.includes('Physics') ? 'Physics' :
@@ -238,6 +280,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
            session.notes?.includes('Literature') ? 'Literature' :
            session.notes?.includes('Computer Science') ? 'Computer Science' :
            'General';
+    
+    return subject;
   };
 
   // Check if session is in the past
@@ -462,7 +506,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                   : format(sessionDate, 'EEEE, MMMM d')
             ) : format(sessionDate, 'EEEE, MMMM d');
             
-            const subject = getSubject(session);
+            const subjectAndLevel = getLessonSubjectAndLevel(session);
             const studentName = session.studentName || 'Unknown Student';
             const isPastSession = isSessionPast(session);
             const subscriptionInfo = subscriptionInfoMap.get(session.studentId);
@@ -515,7 +559,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                         <div className={`text-sm mb-2 ${
                           isPastSession ? 'text-gray-400' : 'text-muted-foreground'
                         }`}>
-                          {subject} Lesson
+                          {subjectAndLevel} Lesson
                         </div>
                         <div className={`flex items-center text-sm mb-2 ${
                           isPastSession ? 'text-gray-400' : 'text-muted-foreground'
