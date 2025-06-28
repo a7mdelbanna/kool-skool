@@ -63,7 +63,8 @@ const UpcomingLessonsList = ({
       
       const nextWeek = addDays(new Date(), 7);
       
-      const { data, error } = await supabase
+      // First get lesson sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
         .from('lesson_sessions')
         .select(`
           id,
@@ -72,27 +73,64 @@ const UpcomingLessonsList = ({
           status,
           cost,
           notes,
-          student:students!inner(
-            id,
-            user_id,
-            users:user_id(first_name, last_name)
-          ),
-          subscription:subscriptions(
-            id,
-            session_count,
-            sessions_completed,
-            end_date
-          )
+          student_id,
+          subscription_id
         `)
-        .eq('students.school_id', userInfo[0].user_school_id)
         .gte('scheduled_date', new Date().toISOString())
         .lte('scheduled_date', nextWeek.toISOString())
         .eq('status', 'scheduled')
         .order('scheduled_date', { ascending: true })
         .limit(5);
 
-      if (error) throw error;
-      return data as LessonSession[];
+      if (sessionsError) throw sessionsError;
+      if (!sessionsData || sessionsData.length === 0) return [];
+
+      // Get student details for each session
+      const studentIds = [...new Set(sessionsData.map(session => session.student_id))];
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select(`
+          id,
+          user_id,
+          school_id,
+          users!inner(first_name, last_name)
+        `)
+        .in('id', studentIds)
+        .eq('school_id', userInfo[0].user_school_id);
+
+      if (studentsError) throw studentsError;
+
+      // Get subscription details
+      const subscriptionIds = [...new Set(sessionsData.map(session => session.subscription_id))];
+      const { data: subscriptionsData, error: subscriptionsError } = await supabase
+        .from('subscriptions')
+        .select(`
+          id,
+          session_count,
+          sessions_completed,
+          end_date
+        `)
+        .in('id', subscriptionIds);
+
+      if (subscriptionsError) throw subscriptionsError;
+
+      // Combine the data
+      const combinedData = sessionsData.map(session => {
+        const student = studentsData?.find(s => s.id === session.student_id);
+        const subscription = subscriptionsData?.find(s => s.id === session.subscription_id);
+        
+        return {
+          ...session,
+          student: student ? {
+            id: student.id,
+            user_id: student.user_id,
+            users: student.users
+          } : null,
+          subscription: subscription || null
+        };
+      }).filter(session => session.student !== null);
+
+      return combinedData as LessonSession[];
     },
     enabled: !!userInfo?.[0]?.user_school_id && !externalSessions,
   });
