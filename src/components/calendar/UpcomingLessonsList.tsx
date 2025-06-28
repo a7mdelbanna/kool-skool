@@ -10,7 +10,7 @@ import {
   endOfMonth,
   isWithinInterval
 } from 'date-fns';
-import { Session, Subscription } from '@/contexts/PaymentContext';
+import { Session } from '@/contexts/PaymentContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -37,6 +37,8 @@ import FunEmptyState from './FunEmptyState';
 import { getStudentSubscriptions, handleSessionAction } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+// Import the Supabase Subscription type directly
+import type { Subscription as SupabaseSubscription } from '@/integrations/supabase/client';
 
 interface UpcomingLessonsListProps {
   sessions: Session[];
@@ -94,8 +96,8 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
             try {
               const subscriptions = await getStudentSubscriptions(studentId);
               
-              // Find the active subscription and properly type it
-              const activeSubscription = subscriptions.find(sub => sub.status === 'active') as Subscription | undefined;
+              // Find the active subscription - use the Supabase type directly
+              const activeSubscription = subscriptions.find(sub => sub.status === 'active') as SupabaseSubscription | undefined;
               
               if (activeSubscription) {
                 // Use the real-time calculated values from the updated database function
