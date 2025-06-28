@@ -199,6 +199,16 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       return;
     }
 
+    // Validate account selection if initial payment amount > 0
+    if (formData.initialPayment.amount > 0 && !formData.initialPayment.accountId) {
+      toast({
+        title: "Error",
+        description: "Please select an account for the initial payment",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const subscriptionData = {
       ...formData,
       totalPrice: getTotalPrice()
