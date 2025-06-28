@@ -14,7 +14,8 @@ import {
   UserCog,
   Key,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  DollarSign
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ const Sidebar = () => {
     { name: 'Calendar', href: '/calendar', icon: Calendar },
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
     { name: 'Payments', href: '/payments', icon: CreditCard },
+    { name: 'Finances', href: '/finances', icon: DollarSign },
     { name: 'Contacts', href: '/contacts', icon: Phone },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
   ];

@@ -13,6 +13,7 @@ import Contacts from "./pages/Contacts";
 import Calendar from "./pages/Calendar";
 import Attendance from "./pages/Attendance";
 import PaymentsOptimized from "./pages/PaymentsOptimized";
+import Finances from "./pages/Finances";
 import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
@@ -105,6 +106,7 @@ const App = () => {
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/attendance" element={<Attendance />} />
                   <Route path="/payments" element={<PaymentsOptimized />} />
+                  <Route path="/finances" element={<Finances />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<StatesReports />} />
                   <Route path="/team-access" element={<TeamAccess />} />
