@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { 
@@ -123,7 +124,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       console.log('=== SESSIONS TAB: LOADING SUBSCRIPTIONS WITH SESSIONS ===');
       console.log('Student ID:', studentData.id);
       
-      // Use the EXACT same approach as SubscriptionsTab
+      // Get all subscriptions for the student
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .rpc('get_student_subscriptions', { 
           p_student_id: studentData.id 
@@ -151,7 +152,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         return;
       }
 
-      // Now load sessions for ALL subscriptions at once
+      // Get ALL sessions for the student (regardless of subscription)
       console.log('=== SESSIONS TAB: LOADING ALL SESSIONS ===');
       const { data: sessionsData, error: sessionsError } = await supabase
         .rpc('get_lesson_sessions', { 
@@ -176,52 +177,25 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
 
       const sessionsArray = Array.isArray(sessionsData) ? sessionsData as DatabaseSession[] : [];
       
-      // DETAILED MATCHING DEBUG
-      console.log('=== SESSIONS TAB: DETAILED SESSION-SUBSCRIPTION MATCHING ===');
+      // Create a map of all subscription IDs that exist in sessions
+      const sessionSubscriptionIds = new Set(sessionsArray.map(session => session.subscription_id));
+      
+      console.log('=== SESSIONS TAB: SESSION SUBSCRIPTION IDs ===');
+      console.log('Unique subscription IDs in sessions:', Array.from(sessionSubscriptionIds));
+      
+      // Group sessions by subscription, but include ALL subscriptions even if they don't have sessions
       const subscriptionsWithSessions: SubscriptionInfo[] = subscriptionData.map(sub => {
         console.log(`\n🔍 SESSIONS TAB: Processing subscription: ${sub.id}`);
         console.log(`   Subscription ID type: ${typeof sub.id}`);
         
-        // Filter sessions for this subscription with detailed logging
+        // Filter sessions for this specific subscription
         const subscriptionSessions = sessionsArray.filter(session => {
-          const sessionSubId = session.subscription_id;
-          const targetSubId = sub.id;
-          const matches = sessionSubId === targetSubId;
-          
-          console.log(`   Session ${session.id}:`);
-          console.log(`     session.subscription_id: "${sessionSubId}" (${typeof sessionSubId})`);
-          console.log(`     target subscription_id:  "${targetSubId}" (${typeof targetSubId})`);
-          console.log(`     matches: ${matches}`);
-          
+          const matches = session.subscription_id === sub.id;
+          console.log(`   Session ${session.id}: ${matches ? '✅' : '❌'} matches subscription ${sub.id}`);
           return matches;
         });
         
         console.log(`✅ SESSIONS TAB: Found ${subscriptionSessions.length} sessions for subscription ${sub.id}`);
-        
-        if (subscriptionSessions.length > 0) {
-          console.log(`   Sessions found:`, subscriptionSessions.map(s => ({
-            id: s.id,
-            date: s.scheduled_date,
-            status: s.status
-          })));
-        } else {
-          console.log(`⚠️ SESSIONS TAB: NO SESSIONS for subscription ${sub.id}`);
-          
-          // Debug: Check for partial matches
-          const partialMatches = sessionsArray.filter(session => 
-            session.subscription_id && 
-            (session.subscription_id.includes(sub.id.substring(0, 8)) || 
-             sub.id.includes(session.subscription_id.substring(0, 8)))
-          );
-          
-          if (partialMatches.length > 0) {
-            console.log(`   Partial matches found:`, partialMatches.map(s => ({
-              sessionId: s.id,
-              sessionSubId: s.subscription_id,
-              targetSubId: sub.id
-            })));
-          }
-        }
         
         return {
           id: sub.id,
@@ -238,22 +212,51 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         };
       });
 
-      console.log('=== SESSIONS TAB: FINAL RESULT ===');
-      console.log(`Total subscriptions: ${subscriptionsWithSessions.length}`);
-      subscriptionsWithSessions.forEach((sub, index) => {
-        console.log(`Subscription ${index + 1} (${sub.id}): ${sub.sessions.length} sessions`);
-      });
-
-      // Check for orphaned sessions
-      const allGroupedSessionIds = subscriptionsWithSessions.flatMap(sub => sub.sessions.map(s => s.id));
-      const orphanedSessions = sessionsArray.filter(session => !allGroupedSessionIds.includes(session.id));
+      // Also create virtual subscriptions for any sessions that don't match existing subscriptions
+      // This handles cases where sessions exist for old/deleted subscriptions
+      const orphanedSessions = sessionsArray.filter(session => 
+        !subscriptionData.some(sub => sub.id === session.subscription_id)
+      );
       
       if (orphanedSessions.length > 0) {
-        console.log('⚠️ SESSIONS TAB: ORPHANED SESSIONS:');
-        orphanedSessions.forEach(session => {
-          console.log(`   Session ${session.id} (sub: ${session.subscription_id})`);
+        console.log('=== SESSIONS TAB: HANDLING ORPHANED SESSIONS ===');
+        console.log(`Found ${orphanedSessions.length} orphaned sessions`);
+        
+        // Group orphaned sessions by subscription_id
+        const orphanedBySubscription = orphanedSessions.reduce((acc, session) => {
+          const subId = session.subscription_id;
+          if (!acc[subId]) {
+            acc[subId] = [];
+          }
+          acc[subId].push(session);
+          return acc;
+        }, {} as Record<string, DatabaseSession[]>);
+        
+        // Create virtual subscriptions for orphaned sessions
+        Object.entries(orphanedBySubscription).forEach(([subId, sessions]) => {
+          console.log(`Creating virtual subscription for ${subId} with ${sessions.length} sessions`);
+          
+          subscriptionsWithSessions.push({
+            id: subId,
+            session_count: sessions.length,
+            duration_months: 1, // Default value
+            start_date: sessions[0]?.scheduled_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+            end_date: null,
+            total_price: sessions.reduce((sum, s) => sum + (s.cost || 0), 0),
+            currency: 'USD',
+            status: 'completed', // Assuming these are from completed subscriptions
+            schedule: null,
+            notes: 'Legacy/Renewed subscription sessions',
+            sessions: sessions
+          });
         });
       }
+
+      console.log('=== SESSIONS TAB: FINAL RESULT ===');
+      console.log(`Total subscription groups: ${subscriptionsWithSessions.length}`);
+      subscriptionsWithSessions.forEach((sub, index) => {
+        console.log(`Group ${index + 1} (${sub.id}): ${sub.sessions.length} sessions`);
+      });
 
       setSubscriptions(subscriptionsWithSessions);
       console.log('=== SESSIONS TAB: LOAD COMPLETE ===');
@@ -716,12 +719,14 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
               s.status === 'scheduled' && new Date(s.scheduled_date) >= new Date()
             ).length;
 
-            // DEBUG: Log rendering information for each subscription
+            // Check if this is a legacy/orphaned subscription
+            const isLegacySubscription = subscription.notes?.includes('Legacy/Renewed');
+
             console.log(`🎨 SESSIONS TAB: Rendering subscription ${subscription.id}:`, {
               sessionsToRender: subscription.sessions.length,
               completed: completedSessions,
               upcoming: upcomingSessions,
-              isRenewed: subscription.notes?.includes('Renewed') || false
+              isLegacy: isLegacySubscription
             });
 
             return (
@@ -731,7 +736,11 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                     <div className="flex items-center justify-between w-full pr-4">
                       <div className="text-left">
                         <CardTitle className="text-base font-medium">
-                          {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
+                          {isLegacySubscription ? (
+                            <>Legacy Sessions ({subscription.session_count} sessions)</>
+                          ) : (
+                            <>{subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}</>
+                          )}
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           {format(new Date(subscription.start_date), 'MMMM dd, yyyy')} - {subscription.currency} {subscription.total_price.toFixed(2)}
@@ -782,6 +791,13 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                             <p className="text-sm">{subscription.notes}</p>
                           </div>
                         )}
+                        {isLegacySubscription && (
+                          <div className="mt-2">
+                            <Badge variant="outline" className="border-orange-300 text-orange-700">
+                              Legacy/Renewed Subscription Sessions
+                            </Badge>
+                          </div>
+                        )}
                       </div>
 
                       {subscription.sessions.length === 0 ? (
@@ -809,10 +825,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4 inline mr-1" />
-            Sessions are automatically generated when you add a subscription. Use actions to manage attendance and scheduling.
+            Sessions are displayed for all subscriptions, including renewed ones. Use actions to manage attendance and scheduling.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {subscriptions.reduce((total, sub) => total + sub.sessions.length, 0)} | Using same approach as Subscriptions tab ✅
+            Total sessions: {subscriptions.reduce((total, sub) => total + sub.sessions.length, 0)} | Shows ALL sessions regardless of renewal status ✅
           </p>
         </div>
       </div>
