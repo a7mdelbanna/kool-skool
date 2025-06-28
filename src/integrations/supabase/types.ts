@@ -1660,6 +1660,19 @@ export type Database = {
           last_updated: string
         }[]
       }
+      verify_school_login: {
+        Args: { p_email: string; p_password: string }
+        Returns: {
+          user_id: string
+          first_name: string
+          last_name: string
+          email: string
+          role: string
+          school_id: string
+          success: boolean
+          message: string
+        }[]
+      }
       verify_student_login: {
         Args: { p_email: string; p_password: string }
         Returns: {
