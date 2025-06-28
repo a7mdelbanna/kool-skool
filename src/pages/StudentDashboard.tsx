@@ -1,24 +1,200 @@
 
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserContext } from '@/App';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, BookOpen, Calendar, CreditCard } from 'lucide-react';
+import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+
+interface StudentData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  course_name: string;
+  lesson_type: string;
+  teacher_first_name: string;
+  teacher_last_name: string;
+  next_session_date: string | null;
+  subscription_progress: string;
+}
+
+interface Subscription {
+  id: string;
+  session_count: number;
+  duration_months: number;
+  start_date: string;
+  end_date: string | null;
+  total_price: number;
+  currency: string;
+  status: string;
+  sessions_completed: number;
+}
+
+interface Session {
+  id: string;
+  scheduled_date: string;
+  duration_minutes: number;
+  status: string;
+  cost: number;
+  notes: string | null;
+}
 
 const StudentDashboard = () => {
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
+  const [studentData, setStudentData] = useState<StudentData | null>(null);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check if user is authenticated and is a student
     if (!user || user.role !== 'student') {
       console.log('Non-student or unauthenticated user, redirecting to student login...');
       navigate('/student-login');
+      return;
     }
+    
+    fetchStudentData();
   }, [user, navigate]);
+
+  const fetchStudentData = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      console.log('=== FETCHING STUDENT DATA ===');
+      console.log('User ID:', user.id);
+      console.log('School ID:', user.schoolId);
+      
+      // First, get the student record to get the student ID
+      const { data: students, error: studentsError } = await supabase
+        .from('students')
+        .select(`
+          id,
+          school_id,
+          user_id,
+          course_id,
+          teacher_id,
+          age_group,
+          level,
+          phone,
+          next_session_date,
+          next_payment_date,
+          next_payment_amount,
+          courses:course_id (
+            name,
+            lesson_type
+          ),
+          teacher:teacher_id (
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (studentsError) {
+        console.error('Error fetching student:', studentsError);
+        toast.error('Failed to load student data');
+        return;
+      }
+      
+      console.log('Student data:', students);
+      
+      if (students) {
+        const formattedStudentData: StudentData = {
+          id: students.id,
+          first_name: user.firstName,
+          last_name: user.lastName,
+          email: user.email,
+          course_name: students.courses?.name || 'No course assigned',
+          lesson_type: students.courses?.lesson_type || 'N/A',
+          teacher_first_name: students.teacher?.first_name || 'No teacher',
+          teacher_last_name: students.teacher?.last_name || 'assigned',
+          next_session_date: students.next_session_date,
+          subscription_progress: '0/0' // Will be updated when we get subscriptions
+        };
+        
+        setStudentData(formattedStudentData);
+        
+        // Fetch subscriptions for this student
+        await fetchSubscriptions(students.id);
+        
+        // Fetch sessions for this student
+        await fetchSessions(students.id);
+      }
+      
+    } catch (error) {
+      console.error('Error in fetchStudentData:', error);
+      toast.error('Failed to load student data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSubscriptions = async (studentId: string) => {
+    try {
+      console.log('=== FETCHING SUBSCRIPTIONS ===');
+      console.log('Student ID:', studentId);
+      
+      const { data: subscriptionsData, error: subscriptionsError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+      
+      if (subscriptionsError) {
+        console.error('Error fetching subscriptions:', subscriptionsError);
+        return;
+      }
+      
+      console.log('Subscriptions data:', subscriptionsData);
+      setSubscriptions(subscriptionsData || []);
+      
+      // Update subscription progress in student data
+      if (subscriptionsData && subscriptionsData.length > 0) {
+        const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
+        if (activeSubscription) {
+          const progress = `${activeSubscription.sessions_completed || 0}/${activeSubscription.session_count}`;
+          setStudentData(prev => prev ? { ...prev, subscription_progress: progress } : null);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error in fetchSubscriptions:', error);
+    }
+  };
+
+  const fetchSessions = async (studentId: string) => {
+    try {
+      console.log('=== FETCHING SESSIONS ===');
+      console.log('Student ID:', studentId);
+      
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('lesson_sessions')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('scheduled_date', { ascending: true });
+      
+      if (sessionsError) {
+        console.error('Error fetching sessions:', sessionsError);
+        return;
+      }
+      
+      console.log('Sessions data:', sessionsData);
+      setSessions(sessionsData || []);
+      
+    } catch (error) {
+      console.error('Error in fetchSessions:', error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -28,13 +204,48 @@ const StudentDashboard = () => {
     navigate('/student-login');
   };
 
-  if (!user || user.role !== 'student') {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+      case 'scheduled':
+        return <Badge className="bg-blue-100 text-blue-800"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-red-100 text-red-800"><AlertCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
+
+  if (!user || user.role !== 'student' || !studentData) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-lg font-semibold">Unable to load student data</p>
+          <Button onClick={() => navigate('/student-login')} className="mt-4">
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const upcomingSessions = sessions.filter(
+    session => session.status === 'scheduled' && new Date(session.scheduled_date) >= new Date()
+  ).slice(0, 3);
+
+  const recentSessions = sessions.filter(
+    session => session.status !== 'scheduled' || new Date(session.scheduled_date) < new Date()
+  ).slice(0, 3);
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -48,7 +259,7 @@ const StudentDashboard = () => {
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">
-                  Welcome, {user.firstName}!
+                  Welcome, {studentData.first_name}!
                 </h1>
                 <p className="text-sm text-gray-500">Student Portal</p>
               </div>
@@ -81,11 +292,11 @@ const StudentDashboard = () => {
             <CardContent className="space-y-2">
               <div>
                 <span className="text-sm font-medium text-gray-500">Name:</span>
-                <p className="text-sm">{user.firstName} {user.lastName}</p>
+                <p className="text-sm">{studentData.first_name} {studentData.last_name}</p>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-500">Email:</span>
-                <p className="text-sm">{user.email}</p>
+                <p className="text-sm">{studentData.email}</p>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-500">Role:</span>
@@ -94,51 +305,173 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Courses Card */}
+          {/* Course Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5" />
-                My Courses
+                My Course
               </CardTitle>
-              <CardDescription>Your enrolled courses</CardDescription>
+              <CardDescription>Your enrolled course</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Course information will be displayed here once the feature is implemented.
-              </p>
+            <CardContent className="space-y-2">
+              <div>
+                <span className="text-sm font-medium text-gray-500">Course:</span>
+                <p className="text-sm font-semibold">{studentData.course_name}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-500">Lesson Type:</span>
+                <p className="text-sm">{studentData.lesson_type}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-500">Teacher:</span>
+                <p className="text-sm">{studentData.teacher_first_name} {studentData.teacher_last_name}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-500">Progress:</span>
+                <Badge variant="outline" className="ml-2">{studentData.subscription_progress}</Badge>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Schedule Card */}
+          {/* Next Session Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Schedule
+                Next Session
               </CardTitle>
-              <CardDescription>Upcoming lessons and sessions</CardDescription>
+              <CardDescription>Your upcoming lesson</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Your class schedule will be displayed here once the feature is implemented.
-              </p>
+              {studentData.next_session_date ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">
+                    {format(new Date(studentData.next_session_date), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {format(new Date(studentData.next_session_date), 'HH:mm')}
+                  </p>
+                  <Badge className="bg-green-100 text-green-800">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Scheduled
+                  </Badge>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No upcoming sessions scheduled
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Subscriptions Section */}
+        {subscriptions.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-4">Current Subscriptions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {subscriptions.map((subscription) => (
+                <Card key={subscription.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{subscription.session_count} Sessions - {subscription.duration_months} Month(s)</span>
+                      <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
+                        {subscription.status}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      Start Date: {format(new Date(subscription.start_date), 'MMMM d, yyyy')}
+                      {subscription.end_date && (
+                        <span> - End Date: {format(new Date(subscription.end_date), 'MMMM d, yyyy')}</span>
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-500">Total Price:</span>
+                        <span className="text-sm font-semibold">{subscription.currency} {subscription.total_price.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-500">Progress:</span>
+                        <span className="text-sm">{subscription.sessions_completed || 0}/{subscription.session_count}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sessions Section */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Upcoming Sessions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming Sessions</CardTitle>
+              <CardDescription>Your scheduled lessons</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {upcomingSessions.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingSessions.map((session) => (
+                    <div key={session.id} className="border rounded-md p-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">
+                            {format(new Date(session.scheduled_date), 'EEEE, MMM d')}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {format(new Date(session.scheduled_date), 'HH:mm')} • {session.duration_minutes} min
+                          </p>
+                        </div>
+                        {getStatusBadge(session.status)}
+                      </div>
+                      {session.notes && (
+                        <p className="text-xs text-gray-500 mt-2">{session.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No upcoming sessions</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Payments Card */}
+          {/* Recent Sessions */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Payments
-              </CardTitle>
-              <CardDescription>Payment history and status</CardDescription>
+              <CardTitle>Recent Sessions</CardTitle>
+              <CardDescription>Your completed lessons</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Payment information will be displayed here once the feature is implemented.
-              </p>
+              {recentSessions.length > 0 ? (
+                <div className="space-y-3">
+                  {recentSessions.map((session) => (
+                    <div key={session.id} className="border rounded-md p-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">
+                            {format(new Date(session.scheduled_date), 'EEEE, MMM d')}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {format(new Date(session.scheduled_date), 'HH:mm')} • {session.duration_minutes} min
+                          </p>
+                        </div>
+                        {getStatusBadge(session.status)}
+                      </div>
+                      {session.notes && (
+                        <p className="text-xs text-gray-500 mt-2">{session.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No recent sessions</p>
+              )}
             </CardContent>
           </Card>
         </div>
