@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface SubscriptionCardProps {
-  subscription: Subscription;
+  subscription: Subscription & { total_paid?: number };
   onEdit: (subscription: Subscription) => void;
   onDelete: (subscriptionId: string) => void;
   isDeleting: boolean;
@@ -32,7 +32,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   isDeleting
 }) => {
   const getPaymentStatus = () => {
-    const totalPaid = (subscription as any).total_paid || 0;
+    const totalPaid = subscription.total_paid || 0;
     const totalPrice = subscription.total_price || 0;
     
     if (totalPaid >= totalPrice) return { status: 'Fully Paid', color: 'bg-green-100 text-green-800' };
@@ -59,6 +59,9 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
 
   const paymentStatus = getPaymentStatus();
   const sessionsCompleted = (subscription as any).sessions_completed || 0;
+  const totalPaid = subscription.total_paid || 0;
+  const totalPrice = subscription.total_price || 0;
+  const remaining = Math.max(totalPrice - totalPaid, 0);
 
   return (
     <Card className="border border-gray-200 hover:shadow-md transition-shadow">
@@ -121,19 +124,19 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             <div>
               <p className="text-xs text-gray-600 mb-1">Total Subscription</p>
               <p className="font-semibold text-gray-900">
-                {subscription.currency} {subscription.total_price?.toFixed(2) || '0.00'}
+                {subscription.currency} {totalPrice.toFixed(2)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-600 mb-1">Total Paid</p>
               <p className="font-semibold text-green-600">
-                {subscription.currency} {((subscription as any).total_paid || 0).toFixed(2)}
+                {subscription.currency} {totalPaid.toFixed(2)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-600 mb-1">Remaining</p>
               <p className="font-semibold text-red-600">
-                {subscription.currency} {(subscription.total_price - ((subscription as any).total_paid || 0)).toFixed(2)}
+                {subscription.currency} {remaining.toFixed(2)}
               </p>
             </div>
           </div>
