@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { Subscription } from '@/integrations/supabase/client';
+import { Subscription, RpcResponse } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
 interface ScheduleItem {
@@ -208,7 +208,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         p_session_count: formData.sessionCount,
         p_duration_months: formData.durationMonths,
         p_start_date: formData.startDate.toISOString().split('T')[0],
-        p_schedule: formData.schedule,
+        p_schedule: JSON.stringify(formData.schedule), // Convert to JSON string
         p_price_mode: formData.priceMode,
         p_price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
         p_fixed_price: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : null,
@@ -227,13 +227,14 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
       console.log('Subscription update result:', data);
 
-      if (data && !data.success) {
-        throw new Error(data.message || 'Failed to update subscription');
+      const response = data as RpcResponse;
+      if (response && !response.success) {
+        throw new Error(response.message || 'Failed to update subscription');
       }
 
       toast({
         title: "Success",
-        description: data?.message || "Subscription updated successfully!",
+        description: response?.message || "Subscription updated successfully!",
       });
 
       onSuccess();

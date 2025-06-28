@@ -164,6 +164,13 @@ export interface TransactionRecord {
   recurring_end_date?: string;
 }
 
+// Add RPC response type interfaces
+export interface RpcResponse {
+  success: boolean;
+  message: string;
+  [key: string]: any;
+}
+
 // Function to get students with details using the proper SQL function
 export const getStudentsWithDetails = async (schoolId: string | undefined) => {
   if (!schoolId) {
@@ -829,12 +836,16 @@ export const deleteStudentSubscriptionEnhanced = async (subscriptionId: string) 
     throw error;
   }
 
-  if (data && !data.success) {
-    throw new Error(data.message || 'Failed to delete subscription');
+  const response = data as RpcResponse;
+  if (response && !response.success) {
+    throw new Error(response.message || 'Failed to delete subscription');
   }
 
-  return data;
+  return response;
 };
+
+// Add alias for backwards compatibility
+export const deleteStudentSubscription = deleteStudentSubscriptionEnhanced;
 
 // Enhanced subscription update
 export const updateStudentSubscriptionEnhanced = async (
@@ -887,11 +898,12 @@ export const updateStudentSubscriptionEnhanced = async (
     throw error;
   }
 
-  if (data && !data.success) {
-    throw new Error(data.message || 'Failed to update subscription');
+  const response = data as RpcResponse;
+  if (response && !response.success) {
+    throw new Error(response.message || 'Failed to update subscription');
   }
 
-  return data;
+  return response;
 };
 
 // Function to get team members
