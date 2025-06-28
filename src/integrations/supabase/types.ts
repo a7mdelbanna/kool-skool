@@ -1558,6 +1558,10 @@ export type Database = {
           status: string
           created_at: string
           end_date: string
+          sessions_completed: number
+          sessions_attended: number
+          sessions_cancelled: number
+          sessions_scheduled: number
         }[]
       }
       get_students_password_info: {

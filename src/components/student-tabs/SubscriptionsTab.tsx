@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,11 +24,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  // Fetch subscriptions using RPC function
+  // Fetch subscriptions using RPC function with real-time session progress
   const { data: subscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError, refetch: refetchSubscriptions } = useQuery({
     queryKey: ['student-subscriptions-rpc', studentId],
     queryFn: async () => {
-      console.log('🚀 FETCHING SUBSCRIPTIONS VIA RPC');
+      console.log('🚀 FETCHING SUBSCRIPTIONS VIA RPC WITH REAL-TIME SESSION PROGRESS');
       console.log('Student ID:', studentId);
       
       if (!studentId) {
@@ -38,12 +37,12 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       }
       
       try {
-        // Use the RPC function to get subscriptions
+        // Use the updated RPC function to get subscriptions with real-time session progress
         const { data: subscriptionsData, error } = await supabase.rpc('get_student_subscriptions', {
           p_student_id: studentId
         });
         
-        console.log('📊 RPC subscriptions result:', {
+        console.log('📊 RPC subscriptions result with real-time progress:', {
           data: subscriptionsData,
           error: error,
           dataLength: subscriptionsData?.length || 0
@@ -59,12 +58,18 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           return [];
         }
 
-        console.log('💰 Calculating total paid for each subscription...');
+        console.log('💰 Calculating total paid for each subscription with real-time progress...');
         
-        // Calculate total paid for each subscription
+        // Calculate total paid for each subscription (keeping payment calculation logic)
         const subscriptionsWithPayments = await Promise.all(
           subscriptionsData.map(async (subscription, index) => {
-            console.log(`💳 Processing subscription ${index + 1}/${subscriptionsData.length}:`, subscription.id);
+            console.log(`💳 Processing subscription ${index + 1}/${subscriptionsData.length}:`, {
+              id: subscription.id,
+              sessions_completed: subscription.sessions_completed,
+              sessions_attended: subscription.sessions_attended,
+              sessions_cancelled: subscription.sessions_cancelled,
+              sessions_scheduled: subscription.sessions_scheduled
+            });
             
             try {
               // Get payments for this student
@@ -101,7 +106,13 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               console.log(`✅ Total calculations for subscription ${subscription.id}:`, {
                 studentPaymentTotal,
                 transactionPaymentTotal,
-                totalPaid
+                totalPaid,
+                realTimeProgress: {
+                  completed: subscription.sessions_completed,
+                  attended: subscription.sessions_attended,
+                  cancelled: subscription.sessions_cancelled,
+                  scheduled: subscription.sessions_scheduled
+                }
               });
 
               return {
@@ -118,19 +129,19 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           })
         );
         
-        console.log('🎉 FINAL SUBSCRIPTIONS WITH PAYMENTS:', subscriptionsWithPayments);
-        console.log('📊 Total subscriptions to return:', subscriptionsWithPayments.length);
+        console.log('🎉 FINAL SUBSCRIPTIONS WITH REAL-TIME PROGRESS AND PAYMENTS:', subscriptionsWithPayments);
+        console.log('📊 Total subscriptions to return with enhanced data:', subscriptionsWithPayments.length);
         
         return subscriptionsWithPayments;
       } catch (error) {
-        console.error('❌ CRITICAL ERROR in RPC subscription fetch:', error);
+        console.error('❌ CRITICAL ERROR in RPC subscription fetch with real-time progress:', error);
         throw error;
       }
     },
     enabled: !!studentId,
     retry: 2,
-    staleTime: 10000,
-    gcTime: 60000,
+    staleTime: 5000, // Reduced stale time for more frequent updates
+    gcTime: 30000, // Reduced cache time for fresher data
   });
 
   // Handle subscription deletion
@@ -173,14 +184,14 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   };
 
   const handleEditSuccess = () => {
-    console.log('✅ Edit successful, refreshing data');
+    console.log('✅ Edit successful, refreshing data with real-time progress');
     setEditingSubscription(null);
     setEditDialogOpen(false);
     refetchSubscriptions();
   };
 
   const handleAddSuccess = () => {
-    console.log('➕ Add successful, refreshing data');
+    console.log('➕ Add successful, refreshing data with real-time progress');
     setAddDialogOpen(false);
     refetchSubscriptions();
   };
@@ -193,7 +204,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center space-x-2">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            <p className="text-gray-600">Loading subscriptions...</p>
+            <p className="text-gray-600">Loading subscriptions with real-time progress...</p>
           </div>
         </div>
       </div>
@@ -215,9 +226,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     );
   }
 
-  console.log('🎨 SubscriptionsTab - Rendering main content');
+  console.log('🎨 SubscriptionsTab - Rendering main content with real-time progress');
   console.log('  - Will show empty state?', !subscriptions || subscriptions.length === 0);
-  console.log('  - Will show subscription cards?', subscriptions && subscriptions.length > 0);
+  console.log('  - Will show subscription cards with enhanced progress?', subscriptions && subscriptions.length > 0);
 
   return (
     <div className="space-y-8">
@@ -248,7 +259,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           <Calendar className="h-5 w-5 text-gray-600" />
           <h3 className="text-lg font-semibold text-gray-900">Current Subscriptions</h3>
           {subscriptions && subscriptions.length > 0 && (
-            <span className="text-sm text-gray-500">({subscriptions.length} total)</span>
+            <span className="text-sm text-gray-500">({subscriptions.length} total with real-time progress)</span>
           )}
         </div>
 
@@ -278,10 +289,18 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           </>
         ) : (
           <>
-            {console.log('🔸 Rendering subscription cards:', subscriptions.length)}
+            {console.log('🔸 Rendering subscription cards with real-time progress:', subscriptions.length)}
             <div className="space-y-4">
               {subscriptions.map((subscription, index) => {
-                console.log(`🎯 Rendering subscription card ${index + 1}:`, subscription.id);
+                console.log(`🎯 Rendering enhanced subscription card ${index + 1}:`, {
+                  id: subscription.id,
+                  progress: {
+                    completed: subscription.sessions_completed,
+                    attended: subscription.sessions_attended,
+                    cancelled: subscription.sessions_cancelled,
+                    scheduled: subscription.sessions_scheduled
+                  }
+                });
                 return (
                   <SubscriptionCard
                     key={subscription.id}

@@ -18,8 +18,16 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+interface ExtendedSubscription extends Subscription {
+  total_paid?: number;
+  sessions_completed?: number;
+  sessions_attended?: number;
+  sessions_cancelled?: number;
+  sessions_scheduled?: number;
+}
+
 interface SubscriptionCardProps {
-  subscription: Subscription & { total_paid?: number };
+  subscription: ExtendedSubscription;
   onEdit: (subscription: Subscription) => void;
   onDelete: (subscriptionId: string) => void;
   isDeleting: boolean;
@@ -58,10 +66,16 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   };
 
   const paymentStatus = getPaymentStatus();
-  const sessionsCompleted = (subscription as any).sessions_completed || 0;
   const totalPaid = subscription.total_paid || 0;
   const totalPrice = subscription.total_price || 0;
   const remaining = Math.max(totalPrice - totalPaid, 0);
+
+  // Use real-time session progress data from the database function
+  const sessionsCompleted = subscription.sessions_completed || 0;
+  const sessionsAttended = subscription.sessions_attended || 0;
+  const sessionsCancelled = subscription.sessions_cancelled || 0;
+  const sessionsScheduled = subscription.sessions_scheduled || 0;
+  const sessionCount = subscription.session_count || 0;
 
   return (
     <Card className="border border-gray-200 hover:shadow-md transition-shadow">
@@ -147,21 +161,42 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           </div>
         </div>
 
-        {/* Session Progress */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-900">Session Progress</span>
-            <span className="text-sm text-gray-600">
-              {sessionsCompleted} / {subscription.session_count} completed
-            </span>
+        {/* Enhanced Session Progress with Real-time Data */}
+        <div className="bg-blue-50 rounded-lg p-4">
+          <h4 className="font-medium text-gray-900 mb-3">Session Progress</h4>
+          
+          {/* Main Progress Bar */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-900">Overall Progress</span>
+              <span className="text-sm text-gray-600">
+                {sessionsCompleted} / {sessionCount} completed
+              </span>
+            </div>
+            <div className="bg-gray-200 rounded-full h-3">
+              <div 
+                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${Math.min((sessionsCompleted / sessionCount) * 100, 100)}%` 
+                }}
+              />
+            </div>
           </div>
-          <div className="bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ 
-                width: `${Math.min((sessionsCompleted / subscription.session_count) * 100, 100)}%` 
-              }}
-            />
+
+          {/* Session Breakdown */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center">
+              <p className="text-sm font-semibold text-green-600">{sessionsAttended}</p>
+              <p className="text-xs text-gray-600">Attended</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-red-600">{sessionsCancelled}</p>
+              <p className="text-xs text-gray-600">Cancelled</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-blue-600">{sessionsScheduled}</p>
+              <p className="text-xs text-gray-600">Scheduled</p>
+            </div>
           </div>
         </div>
 
