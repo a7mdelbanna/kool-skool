@@ -129,7 +129,7 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
-  // Fetch actual password hash for display using the new RPC function
+  // Fetch actual password hash for display using direct query instead of RPC
   const fetchPasswordHash = async (userId: string) => {
     console.log('=== FETCH PASSWORD DEBUG ===');
     console.log('Fetching password hash for user:', userId);
@@ -143,37 +143,40 @@ const StudentAccess = () => {
     }
 
     try {
-      console.log('Using RPC function to get password hash...');
+      console.log('Querying users table directly...');
       
-      // Use the new RPC function to get password hash
-      const { data, error } = await supabase.rpc('get_user_password_hash', {
-        p_user_id: userId
-      });
+      // Direct query to users table to get password hash
+      const { data, error } = await supabase
+        .from('users')
+        .select('password_hash, role, email, id, first_name, last_name')
+        .eq('id', userId)
+        .eq('role', 'student')
+        .maybeSingle();
 
-      console.log('RPC result:', { data, error });
+      console.log('Query result:', { data, error });
 
       if (error) {
-        console.error('Error fetching password hash via RPC:', error);
+        console.error('Error fetching password hash:', error);
         toast.error('Failed to fetch password: ' + error.message);
         return null;
       }
 
-      if (!data || data.length === 0) {
-        console.log('No password data found for user ID:', userId);
+      if (!data) {
+        console.log('No user found with ID:', userId);
         toast.error('No password found for this user');
         return null;
       }
 
-      const userPasswordData = data[0];
-      console.log('Password data found:', { 
-        user_id: userPasswordData.user_id,
-        email: userPasswordData.email, 
-        name: `${userPasswordData.first_name} ${userPasswordData.last_name}`,
-        hasPassword: !!userPasswordData.password_hash,
-        passwordLength: userPasswordData.password_hash?.length || 0
+      console.log('User found:', { 
+        id: data.id,
+        email: data.email, 
+        role: data.role, 
+        name: `${data.first_name} ${data.last_name}`,
+        hasPassword: !!data.password_hash,
+        passwordLength: data.password_hash?.length || 0
       });
 
-      const passwordHash = userPasswordData.password_hash || null;
+      const passwordHash = data.password_hash || null;
       
       // Cache the result if we have a password
       if (passwordHash) {
