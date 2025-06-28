@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -31,6 +32,7 @@ const StudentAccess = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [copiedPasswords, setCopiedPasswords] = useState<Set<string>>(new Set());
+  const [passwordCache, setPasswordCache] = useState<Map<string, string>>(new Map());
 
   const queryClient = useQueryClient();
 
@@ -42,7 +44,7 @@ const StudentAccess = () => {
   console.log('=== STUDENT ACCESS DEBUG ===');
   console.log('School ID:', schoolId);
 
-  // Fetch students and their password info using the new RPC function
+  // Fetch students and their password info using the existing RPC function
   const { data: studentsWithPasswords = [], isLoading } = useQuery({
     queryKey: ['students-with-passwords', schoolId],
     queryFn: async () => {
@@ -62,7 +64,7 @@ const StudentAccess = () => {
         return [];
       }
 
-      // Use the new RPC function to get password information
+      // Use the existing RPC function to get password information
       console.log('Fetching password info using RPC function...');
       const { data: passwordInfo, error: passwordError } = await supabase.rpc('get_students_password_info', {
         p_school_id: schoolId
@@ -121,21 +123,44 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
-  // Fetch actual password for display
-  const fetchPassword = async (userId: string) => {
-    console.log('Fetching password for user:', userId);
-    const { data, error } = await supabase.rpc('get_student_password', {
-      p_user_id: userId
-    });
-
-    if (error) {
-      console.error('Error fetching password:', error);
-      toast.error('Failed to fetch password');
-      return null;
+  // Fetch actual password hash for display using direct query
+  const fetchPasswordHash = async (userId: string) => {
+    console.log('Fetching password hash for user:', userId);
+    
+    // Check cache first
+    if (passwordCache.has(userId)) {
+      console.log('Using cached password hash');
+      return passwordCache.get(userId);
     }
 
-    console.log('Password fetch result:', data);
-    return data?.[0]?.password_hash || null;
+    try {
+      // Direct query to users table to get password hash
+      const { data, error } = await supabase
+        .from('users')
+        .select('password_hash')
+        .eq('id', userId)
+        .eq('role', 'student')
+        .single();
+
+      if (error) {
+        console.error('Error fetching password hash:', error);
+        toast.error('Failed to fetch password');
+        return null;
+      }
+
+      console.log('Password hash fetch result:', data);
+      const passwordHash = data?.password_hash || null;
+      
+      // Cache the result
+      if (passwordHash) {
+        setPasswordCache(prev => new Map(prev).set(userId, passwordHash));
+      }
+      
+      return passwordHash;
+    } catch (error) {
+      console.error('Exception fetching password hash:', error);
+      return null;
+    }
   };
 
   // Update password mutation with verification
@@ -171,7 +196,14 @@ const StudentAccess = () => {
 
       console.log('Password updated successfully in database');
       
-      // Verify the update worked using the new RPC function
+      // Clear cache for this user
+      setPasswordCache(prev => {
+        const newCache = new Map(prev);
+        newCache.delete(userId);
+        return newCache;
+      });
+      
+      // Verify the update worked using the existing RPC function
       const { data: verifyData, error: verifyError } = await supabase.rpc('verify_password_update', {
         p_user_id: userId
       });
@@ -236,18 +268,18 @@ const StudentAccess = () => {
       });
     } else {
       // Show password - fetch it first
-      const password = await fetchPassword(studentId);
-      if (password) {
+      const passwordHash = await fetchPasswordHash(studentId);
+      if (passwordHash) {
         setVisiblePasswords(prev => new Set(prev).add(studentId));
       }
     }
   };
 
   const copyPasswordToClipboard = async (studentId: string, studentName: string) => {
-    const password = await fetchPassword(studentId);
-    if (password) {
+    const passwordHash = await fetchPasswordHash(studentId);
+    if (passwordHash) {
       try {
-        await navigator.clipboard.writeText(password);
+        await navigator.clipboard.writeText(passwordHash);
         setCopiedPasswords(prev => new Set(prev).add(studentId));
         toast.success(`Password copied for ${studentName}`);
         
@@ -375,8 +407,8 @@ const StudentAccess = () => {
                             )}
                           </Button>
                           {visiblePasswords.has(student.id) && (
-                            <span className="text-sm font-mono text-muted-foreground">
-                              ••••••••
+                            <span className="text-sm font-mono text-muted-foreground max-w-32 truncate">
+                              {passwordCache.get(student.id) || '••••••••'}
                             </span>
                           )}
                         </div>
