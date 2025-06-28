@@ -196,6 +196,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     refetchSubscriptions();
   };
 
+  const handleRenewSuccess = () => {
+    console.log('🔄 Renew successful, refreshing data with real-time progress');
+    refetchSubscriptions();
+  };
+
   // Show loading state
   if (isLoading || subscriptionsLoading) {
     console.log('⏳ SubscriptionsTab - Rendering loading state');
@@ -307,6 +312,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                     subscription={subscription}
                     onEdit={handleEditSubscription}
                     onDelete={handleDeleteSubscription}
+                    onRenew={handleRenewSuccess}
                     isDeleting={deletingId === subscription.id}
                   />
                 );

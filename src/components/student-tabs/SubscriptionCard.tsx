@@ -1,11 +1,11 @@
-
-import React from 'react';
-import { Edit, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit, Trash2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Subscription } from '@/integrations/supabase/client';
+import { Subscription, supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +30,7 @@ interface SubscriptionCardProps {
   subscription: ExtendedSubscription;
   onEdit: (subscription: Subscription) => void;
   onDelete: (subscriptionId: string) => void;
+  onRenew?: () => void;
   isDeleting: boolean;
 }
 
@@ -37,8 +38,77 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   subscription,
   onEdit,
   onDelete,
+  onRenew,
   isDeleting
 }) => {
+  const { toast } = useToast();
+  const [isRenewing, setIsRenewing] = useState(false);
+
+  // Get current user data from localStorage
+  const getCurrentUserData = () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    const user = JSON.parse(userData);
+    return {
+      userId: user.user_id || user.id || user.userId,
+      schoolId: user.schoolId
+    };
+  };
+
+  const handleRenewSubscription = async () => {
+    const userData = getCurrentUserData();
+    if (!userData) {
+      toast({
+        title: "Error",
+        description: "User authentication data not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsRenewing(true);
+      
+      console.log('🔄 Renewing subscription:', subscription.id);
+      
+      const { data, error } = await supabase.rpc('renew_subscription', {
+        p_subscription_id: subscription.id,
+        p_current_user_id: userData.userId,
+        p_current_school_id: userData.schoolId
+      });
+
+      if (error) {
+        console.error('❌ Error renewing subscription:', error);
+        throw error;
+      }
+
+      console.log('✅ Renewal response:', data);
+
+      if (data && data.success) {
+        toast({
+          title: "Success",
+          description: data.message || "Subscription renewed successfully!",
+        });
+
+        // Trigger refresh if callback provided
+        if (onRenew) {
+          onRenew();
+        }
+      } else {
+        throw new Error(data?.message || 'Failed to renew subscription');
+      }
+    } catch (error: any) {
+      console.error('❌ Error renewing subscription:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to renew subscription",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRenewing(false);
+    }
+  };
+
   const getPaymentStatus = () => {
     const totalPaid = subscription.total_paid || 0;
     const totalPrice = subscription.total_price || 0;
@@ -93,6 +163,39 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             >
               <Edit className="h-4 w-4" />
             </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isRenewing}
+                  className="text-green-600 border-green-300 hover:bg-green-50"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Renew Subscription</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will create a new subscription with the same details as this one. 
+                    The start date will be automatically calculated based on the current subscription's end date and schedule.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={isRenewing}
+                    onClick={handleRenewSubscription}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isRenewing ? 'Renewing...' : 'Renew Subscription'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button 

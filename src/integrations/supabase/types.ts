@@ -1238,6 +1238,10 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: undefined
       }
+      calculate_next_subscription_start_date: {
+        Args: { p_current_subscription_id: string }
+        Returns: string
+      }
       create_default_categories: {
         Args: { p_school_id: string }
         Returns: undefined
@@ -1662,6 +1666,14 @@ export type Database = {
       }
       remove_payment_tag: {
         Args: { p_payment_id: string; p_tag_id: string }
+        Returns: Json
+      }
+      renew_subscription: {
+        Args: {
+          p_subscription_id: string
+          p_current_user_id: string
+          p_current_school_id: string
+        }
         Returns: Json
       }
       set_default_currency: {
