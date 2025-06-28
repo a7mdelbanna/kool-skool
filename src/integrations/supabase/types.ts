@@ -1242,6 +1242,19 @@ export type Database = {
         Args: { p_current_subscription_id: string }
         Returns: string
       }
+      check_subscription_sessions: {
+        Args: { p_subscription_id: string }
+        Returns: {
+          subscription_id: string
+          student_id: string
+          session_count_expected: number
+          session_count_actual: number
+          schedule_valid: boolean
+          start_date: string
+          status: string
+          error_details: string
+        }[]
+      }
       create_default_categories: {
         Args: { p_school_id: string }
         Returns: undefined
@@ -1333,6 +1346,10 @@ export type Database = {
           p_current_school_id: string
         }
         Returns: Json
+      }
+      generate_lesson_sessions_v2: {
+        Args: { p_subscription_id: string }
+        Returns: undefined
       }
       get_all_licenses_with_schools: {
         Args: Record<PropertyKey, never>
@@ -1667,6 +1684,10 @@ export type Database = {
       recalculate_subscription_progress: {
         Args: { p_subscription_id: string }
         Returns: undefined
+      }
+      regenerate_missing_sessions: {
+        Args: { p_subscription_id: string }
+        Returns: Json
       }
       remove_payment_tag: {
         Args: { p_payment_id: string; p_tag_id: string }
