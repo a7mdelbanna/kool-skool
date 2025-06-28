@@ -560,19 +560,34 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                   )}
                   
                   {(session.status === "completed" || session.status === "cancelled" || session.status === "rescheduled") && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-purple-500 text-purple-500 hover:bg-purple-50"
-                      onClick={() => {
-                        setSelectedSession(session);
-                        setChangeStatusDialogOpen(true);
-                      }}
-                      disabled={loading}
-                    >
-                      <RefreshCcw className="h-3.5 w-3.5 mr-1" />
-                      Change Status
-                    </Button>
+                    <div className="flex gap-2 w-full flex-wrap">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-purple-500 text-purple-500 hover:bg-purple-50 flex-1"
+                        onClick={() => {
+                          setSelectedSession(session);
+                          setChangeStatusDialogOpen(true);
+                        }}
+                        disabled={loading}
+                      >
+                        <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                        Change Status
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-orange-500 text-orange-500 hover:bg-orange-50 flex-1"
+                        onClick={() => {
+                          setSelectedSession(session);
+                          setRescheduleDialogOpen(true);
+                        }}
+                        disabled={loading}
+                      >
+                        <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                        Reschedule
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
@@ -606,7 +621,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             Sessions are automatically generated when you add a subscription. Use actions to manage attendance and scheduling.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length} | Session actions: Attend, Cancel, Move ✅
+            Total sessions: {sessions.length} | Session actions: Attend, Cancel, Move, Reschedule ✅
           </p>
         </div>
       </div>
@@ -703,7 +718,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           <DialogHeader>
             <DialogTitle>Change Session Status</DialogTitle>
             <DialogDescription>
-              Select a new status for this session.
+              Select a new status for this session, or reschedule it to a new date and time.
             </DialogDescription>
           </DialogHeader>
           
@@ -734,6 +749,17 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                 >
                   <CalendarX className="h-3.5 w-3.5 mr-1" />
                   Mark as Cancelled
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setChangeStatusDialogOpen(false);
+                    setRescheduleDialogOpen(true);
+                  }}
+                  variant="outline"
+                  className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                >
+                  <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                  Reschedule Session
                 </Button>
               </div>
             </div>
