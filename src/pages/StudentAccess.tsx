@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -30,6 +29,11 @@ interface PasswordResult {
   email: string;
   first_name: string;
   last_name: string;
+}
+
+interface UpdatePasswordResponse {
+  success: boolean;
+  message: string;
 }
 
 const StudentAccess = () => {
@@ -211,8 +215,11 @@ const StudentAccess = () => {
 
       console.log('Password update result:', data);
 
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to update password');
+      // Type the response properly
+      const response = data as UpdatePasswordResponse;
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to update password');
       }
       
       // Clear cache for this user
