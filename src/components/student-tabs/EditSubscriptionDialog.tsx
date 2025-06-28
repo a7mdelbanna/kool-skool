@@ -57,6 +57,43 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   const schoolId = getSchoolId();
   const currentUserId = getCurrentUserId();
 
+  // Utility function to convert 12-hour format to 24-hour format
+  const convertTo24Hour = (time12h: string): string => {
+    if (!time12h || time12h.includes(':') && !time12h.includes('AM') && !time12h.includes('PM')) {
+      // Already in 24-hour format
+      return time12h;
+    }
+    
+    const [time, modifier] = time12h.split(' ');
+    let [hours, minutes] = time.split(':');
+    
+    if (hours === '12') {
+      hours = '00';
+    }
+    
+    if (modifier === 'PM') {
+      hours = parseInt(hours, 10) + 12;
+    }
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  };
+
+  // Utility function to convert 24-hour format to 12-hour format for display
+  const convertTo12Hour = (time24h: string): string => {
+    if (!time24h) return '';
+    
+    // If already in 12-hour format, return as is
+    if (time24h.includes('AM') || time24h.includes('PM')) {
+      return time24h;
+    }
+    
+    const [hours, minutes] = time24h.split(':');
+    const hour = parseInt(hours, 10);
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:${minutes} ${period}`;
+  };
+
   // Fetch school currencies
   const { data: currencies = [] } = useQuery({
     queryKey: ['school-currencies', schoolId],
@@ -158,6 +195,12 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
           } else {
             parsedSchedule = subscription.schedule as ScheduleItem[];
           }
+          
+          // Ensure consistent time format (convert to 24-hour for internal use)
+          parsedSchedule = parsedSchedule.map(item => ({
+            ...item,
+            time: convertTo24Hour(item.time)
+          }));
         }
       } catch (error) {
         console.error('Error parsing schedule:', error);
@@ -210,7 +253,12 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
   const updateScheduleItem = (index: number, field: 'day' | 'time', value: string) => {
     const newSchedule = [...formData.schedule];
-    newSchedule[index] = { ...newSchedule[index], [field]: value };
+    if (field === 'time') {
+      // Convert to 24-hour format for consistent internal storage
+      newSchedule[index] = { ...newSchedule[index], [field]: convertTo24Hour(value) };
+    } else {
+      newSchedule[index] = { ...newSchedule[index], [field]: value };
+    }
     setFormData({
       ...formData,
       schedule: newSchedule
@@ -261,9 +309,17 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
     try {
       setLoading(true);
+      
+      // Prepare schedule data - convert times back to 12-hour format for database consistency
+      const scheduleForDatabase = formData.schedule.map(item => ({
+        day: item.day,
+        time: convertTo12Hour(item.time)
+      }));
+      
       console.log('Updating subscription with data:', {
         subscription_id: subscription.id,
         ...formData,
+        schedule: scheduleForDatabase,
         total_price: getTotalPrice()
       });
 
@@ -272,7 +328,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         p_session_count: formData.sessionCount,
         p_duration_months: formData.durationMonths,
         p_start_date: formData.startDate.toISOString().split('T')[0],
-        p_schedule: JSON.stringify(formData.schedule), // Convert to JSON string
+        p_schedule: JSON.stringify(scheduleForDatabase),
         p_price_mode: formData.priceMode,
         p_price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
         p_fixed_price: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : null,
@@ -664,7 +720,10 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
           <div className="lg:col-span-1">
             <div className="sticky top-4">
               <SchedulePreview
-                schedule={formData.schedule}
+                schedule={formData.schedule.map(item => ({
+                  ...item,
+                  time: convertTo12Hour(item.time) // Convert back to 12-hour for display
+                }))}
                 startDate={formData.startDate}
                 sessionCount={formData.sessionCount}
                 durationMonths={formData.durationMonths}
