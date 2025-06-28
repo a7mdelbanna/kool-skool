@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -20,11 +19,15 @@ import NewLessonDialog from '@/components/calendar/NewLessonDialog';
 import LessonDetailsDialog from '@/components/calendar/LessonDetailsDialog';
 import { Session } from '@/contexts/PaymentContext';
 import { getStudentLessonSessions, getStudentsWithDetails, LessonSession } from '@/integrations/supabase/client';
+import { getEffectiveTimezone, convertUTCToUserTimezone, formatInUserTimezone, convertUserTimezoneToUTC } from '@/utils/timezone';
+import { UserContext } from '@/App';
 
 type ViewMode = 'day' | 'week' | 'month';
 type DisplayMode = 'calendar' | 'list';
 
 const Calendar = () => {
+  const { user } = useContext(UserContext);
+  const userTimezone = getEffectiveTimezone(user?.timezone);
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
@@ -63,21 +66,27 @@ const Calendar = () => {
           const studentSessions = await getStudentLessonSessions(student.id);
           console.log(`Sessions for student ${student.first_name} ${student.last_name}:`, studentSessions.length);
           
-          // Convert lesson sessions to Session format
-          const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => ({
-            id: session.id,
-            studentId: student.id,
-            studentName: `${student.first_name} ${student.last_name}`,
-            date: new Date(session.scheduled_date), // Convert string to Date
-            time: format(new Date(session.scheduled_date), 'HH:mm'),
-            duration: `${session.duration_minutes || 60} min`,
-            status: session.status as Session['status'],
-            sessionNumber: session.index_in_sub || undefined,
-            totalSessions: undefined, // Will be filled from subscription if needed
-            notes: session.notes || '',
-            cost: session.cost,
-            paymentStatus: session.payment_status as Session['paymentStatus']
-          }));
+          // Convert lesson sessions to Session format with timezone conversion
+          const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => {
+            // Convert UTC stored time to user's timezone for display
+            const utcDate = new Date(session.scheduled_date);
+            const localDate = convertUTCToUserTimezone(utcDate, userTimezone);
+            
+            return {
+              id: session.id,
+              studentId: student.id,
+              studentName: `${student.first_name} ${student.last_name}`,
+              date: localDate, // Now in user's timezone
+              time: formatInUserTimezone(utcDate, userTimezone, 'HH:mm'),
+              duration: `${session.duration_minutes || 60} min`,
+              status: session.status as Session['status'],
+              sessionNumber: session.index_in_sub || undefined,
+              totalSessions: undefined,
+              notes: session.notes || '',
+              cost: session.cost,
+              paymentStatus: session.payment_status as Session['paymentStatus']
+            };
+          });
           
           allSessions.push(...convertedSessions);
         } catch (error) {
@@ -164,23 +173,23 @@ const Calendar = () => {
              session.studentName?.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
-    // Apply date filtering based on view mode
+    // Apply date filtering based on view mode (sessions are already in user timezone)
     if (viewMode === 'day') {
       filtered = filtered.filter(session => {
-        const sessionDate = new Date(session.date);
+        const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
         return isSameDay(sessionDate, currentDate);
       });
     } else if (viewMode === 'week') {
       const weekEnd = addDays(currentWeekStart, 6);
       filtered = filtered.filter(session => {
-        const sessionDate = new Date(session.date);
+        const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
         return isWithinInterval(sessionDate, { start: currentWeekStart, end: weekEnd });
       });
     } else if (viewMode === 'month') {
       const monthStart = startOfMonth(currentDate);
       const monthEnd = endOfMonth(currentDate);
       filtered = filtered.filter(session => {
-        const sessionDate = new Date(session.date);
+        const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
         return isWithinInterval(sessionDate, { start: monthStart, end: monthEnd });
       });
     }
@@ -195,13 +204,21 @@ const Calendar = () => {
   console.log("Current view mode:", viewMode);
   console.log("Current display mode:", displayMode);
   console.log("Loading:", loading);
+  console.log("User timezone:", userTimezone);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
-          <p className="text-muted-foreground mt-1">Manage your lessons and schedule</p>
+          <p className="text-muted-foreground mt-1">
+            Manage your lessons and schedule
+            {userTimezone !== 'UTC' && (
+              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                {userTimezone}
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">

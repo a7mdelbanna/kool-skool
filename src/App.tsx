@@ -1,104 +1,82 @@
-
-import React, { createContext, useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import MainLayout from '@/layout/MainLayout';
-import Index from '@/pages/Index';
+import React, { useState, useEffect, createContext } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Login from '@/pages/Login';
 import StudentLogin from '@/pages/StudentLogin';
 import SuperAdminLogin from '@/pages/SuperAdminLogin';
-import SuperAdminDashboard from '@/pages/SuperAdminDashboard';
+import MainLayout from '@/layout/MainLayout';
 import SchoolSetup from '@/pages/SchoolSetup';
-import Students from '@/pages/Students';
-import Courses from '@/pages/Courses';
-import Payments from '@/pages/Payments';
-import PaymentsOptimized from '@/pages/PaymentsOptimized';
-import Finances from '@/pages/Finances';
-import Calendar from '@/pages/Calendar';
-import Attendance from '@/pages/Attendance';
-import Settings from '@/pages/Settings';
-import TeamAccess from '@/pages/TeamAccess';
-import StudentAccess from '@/pages/StudentAccess';
-import StudentDashboard from '@/pages/StudentDashboard';
-import Contacts from '@/pages/Contacts';
-import LicenseManagement from '@/pages/LicenseManagement';
-import StatesReports from '@/pages/StatesReports';
-import NotFound from '@/pages/NotFound';
-import './App.css';
-
-export const UserContext = createContext<{ user: any, setUser: any }>({ user: null, setUser: null });
-
-const queryClient = new QueryClient();
+import { Toaster } from "@/components/ui/toaster"
+import { PaymentProvider } from '@/contexts/PaymentContext';
 
 interface User {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  name?: string;
+  email?: string;
   role: string;
-  schoolId: string | null;
+  schoolId: string;
+  avatar?: string;
+  timezone?: string;
 }
 
-function App() {
-  const [user, setUser] = useState<User | null>(() => {
-    const storedUser = localStorage.getItem('user');
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+interface UserContextProps {
+  user: User | null;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+}
+
+export const UserContext = createContext<UserContextProps>({
+  user: null,
+  setUser: () => {},
+});
+
+const App = () => {
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const handleStorageChange = () => {
+    // Check if user data exists in localStorage on app load
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+
+    // Listen for storage events (e.g., user logged out in another tab)
+    const handleStorage = () => {
       const storedUser = localStorage.getItem('user');
       setUser(storedUser ? JSON.parse(storedUser) : null);
     };
 
-    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('storage', handleStorage);
 
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
+    // Clean up the event listener on unmount
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <UserContext.Provider value={{ user, setUser }}>
-        <Router>
-          <Routes>
-            {/* Auth routes - no sidebar needed */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/student-login" element={<StudentLogin />} />
-            <Route path="/superadmin-login" element={<SuperAdminLogin />} />
-            <Route path="/superadmin" element={<SuperAdminDashboard />} />
-            
-            {/* School routes - with sidebar */}
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Index />} />
-              <Route path="school-setup" element={<SchoolSetup />} />
-              <Route path="students" element={<Students />} />
-              <Route path="courses" element={<Courses />} />
-              <Route path="payments" element={<Payments />} />
-              <Route path="payments-optimized" element={<PaymentsOptimized />} />
-              <Route path="finances" element={<Finances />} />
-              <Route path="calendar" element={<Calendar />} />
-              <Route path="attendance" element={<Attendance />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="team-access" element={<TeamAccess />} />
-              <Route path="student-access" element={<StudentAccess />} />
-              <Route path="student-dashboard" element={<StudentDashboard />} />
-              <Route path="contacts" element={<Contacts />} />
-              <Route path="license-management" element={<LicenseManagement />} />
-              <Route path="states-reports" element={<StatesReports />} />
-            </Route>
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-          <Sonner />
-        </Router>
-      </UserContext.Provider>
-    </QueryClientProvider>
+    <UserContext.Provider value={{ user, setUser }}>
+      <Router>
+        <Toaster />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/student-login" element={<StudentLogin />} />
+          <Route path="/superadmin-login" element={<SuperAdminLogin />} />
+          <Route path="/school-setup" element={<SchoolSetup />} />
+          <Route
+            path="/*"
+            element={
+              user ? (
+                <PaymentProvider>
+                  <MainLayout />
+                </PaymentProvider>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+        </Routes>
+      </Router>
+    </UserContext.Provider>
   );
-}
+};
 
 export default App;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext, useState } from 'react';
 import { 
   User, 
   Mail, 
@@ -29,8 +29,58 @@ import AccountsManagement from '@/components/AccountsManagement';
 import TransactionCategoriesManagement from '@/components/TransactionCategoriesManagement';
 import TagManager from '@/components/TagManager';
 import StudentLevelsManagement from '@/components/StudentLevelsManagement';
+import TimezoneSelector from '@/components/TimezoneSelector';
+import { getEffectiveTimezone } from '@/utils/timezone';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { UserContext } from '@/App';
 
 const Settings = () => {
+  const { user, setUser } = useContext(UserContext);
+  const { toast } = useToast();
+  const [updating, setUpdating] = useState(false);
+  const currentTimezone = getEffectiveTimezone(user?.timezone);
+
+  const handleTimezoneUpdate = async (newTimezone: string) => {
+    if (!user?.id) return;
+
+    try {
+      setUpdating(true);
+      
+      const { error } = await supabase
+        .from('users')
+        .update({ timezone: newTimezone })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Update user context
+      setUser(prev => prev ? { ...prev, timezone: newTimezone } : prev);
+
+      // Update localStorage
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const parsedData = JSON.parse(userData);
+        parsedData.timezone = newTimezone;
+        localStorage.setItem('user', JSON.stringify(parsedData));
+      }
+
+      toast({
+        title: "Success",
+        description: "Timezone updated successfully",
+      });
+    } catch (error: any) {
+      console.error('Error updating timezone:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update timezone",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -116,6 +166,14 @@ const Settings = () => {
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
                   <Input id="location" placeholder="City, Country" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <TimezoneSelector
+                    value={currentTimezone}
+                    onValueChange={handleTimezoneUpdate}
+                    disabled={updating}
+                    label="Timezone"
+                  />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="bio">Bio</Label>

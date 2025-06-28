@@ -486,6 +486,7 @@ export type Database = {
           license_id: string | null
           logo: string | null
           name: string
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -495,6 +496,7 @@ export type Database = {
           license_id?: string | null
           logo?: string | null
           name: string
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -504,6 +506,7 @@ export type Database = {
           license_id?: string | null
           logo?: string | null
           name?: string
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1115,6 +1118,7 @@ export type Database = {
           phone: string | null
           role: string
           school_id: string | null
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -1129,6 +1133,7 @@ export type Database = {
           phone?: string | null
           role: string
           school_id?: string | null
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -1143,6 +1148,7 @@ export type Database = {
           phone?: string | null
           role?: string
           school_id?: string | null
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
