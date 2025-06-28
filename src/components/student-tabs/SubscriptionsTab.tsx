@@ -1,17 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt, Wallet, Edit } from "lucide-react";
-import { format, addDays } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
+import React, { useState } from 'react';
+import { Plus, Trash2, Edit3, Calendar, Clock, DollarSign, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { Subscription, deleteStudentSubscriptionEnhanced, RpcResponse } from '@/integrations/supabase/client';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -20,1270 +15,177 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import { useSubscriptionCreation } from "@/hooks/useSubscriptionCreation";
-import { Student } from "@/components/StudentCard";
-import { 
-  getStudentSubscriptions, 
-  addStudentSubscription, 
-  deleteStudentSubscription,
-  Subscription,
-  supabase,
-  getSchoolTransactions
-} from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import EditSubscriptionDialog from "./EditSubscriptionDialog";
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import EditSubscriptionDialog from './EditSubscriptionDialog';
 
 interface SubscriptionsTabProps {
-  studentData: Partial<Student>;
-  setStudentData: React.Dispatch<React.SetStateAction<Partial<Student>>>;
-  isViewMode?: boolean;
+  subscriptions: Subscription[];
+  onRefresh: () => void;
+  onAddSubscription: () => void;
 }
 
-interface ScheduleItem {
-  day: string;
-  time: string;
-}
-
-// Modern Time Picker Component
-const ModernTimePicker = ({ value, onChange }: { value: string; onChange: (time: string) => void }) => {
-  const [hour, setHour] = useState("09");
-  const [minute, setMinute] = useState("00");
-  const [period, setPeriod] = useState("AM");
-
-  // Parse existing time value
-  useEffect(() => {
-    if (value) {
-      const [time, meridiem] = value.split(' ');
-      if (time && meridiem) {
-        const [h, m] = time.split(':');
-        setHour(h.padStart(2, '0'));
-        setMinute(m.padStart(2, '0'));
-        setPeriod(meridiem);
-      } else if (time) {
-        // Handle 24-hour format
-        const [h, m] = time.split(':');
-        const hourNum = parseInt(h);
-        const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
-        const displayPeriod = hourNum >= 12 ? 'PM' : 'AM';
-        setHour(displayHour.toString().padStart(2, '0'));
-        setMinute(m.padStart(2, '0'));
-        setPeriod(displayPeriod);
-      }
-    }
-  }, [value]);
-
-  // Update parent when time changes
-  useEffect(() => {
-    const timeString = `${hour}:${minute} ${period}`;
-    onChange(timeString);
-  }, [hour, minute, period, onChange]);
-
-  const hours = Array.from({ length: 12 }, (_, i) => {
-    const h = i + 1;
-    return h.toString().padStart(2, '0');
-  });
-
-  const minutes = Array.from({ length: 60 }, (_, i) => {
-    return i.toString().padStart(2, '0');
-  });
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "w-full justify-start text-left font-normal",
-            !value && "text-muted-foreground"
-          )}
-        >
-          <Clock className="mr-2 h-4 w-4" />
-          {value || "Select time"}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
-        <div className="p-4 space-y-4">
-          <div className="text-sm font-medium text-center">Select Time</div>
-          <div className="flex items-center justify-center space-x-2">
-            {/* Hour Selector */}
-            <div className="flex flex-col items-center">
-              <Label className="text-xs text-muted-foreground mb-1">Hour</Label>
-              <Select value={hour} onValueChange={setHour}>
-                <SelectTrigger className="w-16 h-12 text-center">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-48">
-                  {hours.map((h) => (
-                    <SelectItem key={h} value={h} className="text-center">
-                      {h}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="text-2xl font-bold text-muted-foreground mt-6">:</div>
-
-            {/* Minute Selector */}
-            <div className="flex flex-col items-center">
-              <Label className="text-xs text-muted-foreground mb-1">Min</Label>
-              <Select value={minute} onValueChange={setMinute}>
-                <SelectTrigger className="w-16 h-12 text-center">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-48">
-                  {minutes.filter((_, i) => i % 5 === 0).map((m) => (
-                    <SelectItem key={m} value={m} className="text-center">
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* AM/PM Selector */}
-            <div className="flex flex-col items-center">
-              <Label className="text-xs text-muted-foreground mb-1">Period</Label>
-              <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger className="w-16 h-12 text-center">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AM" className="text-center">AM</SelectItem>
-                  <SelectItem value="PM" className="text-center">PM</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          {/* Quick Time Presets */}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Quick Select</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: "9:00 AM", value: "09:00 AM" },
-                { label: "10:00 AM", value: "10:00 AM" },
-                { label: "2:00 PM", value: "02:00 PM" },
-                { label: "3:00 PM", value: "03:00 PM" },
-                { label: "4:00 PM", value: "04:00 PM" },
-                { label: "5:00 PM", value: "05:00 PM" },
-              ].map((preset) => (
-                <Button
-                  key={preset.value}
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => {
-                    const [time, meridiem] = preset.value.split(' ');
-                    const [h, m] = time.split(':');
-                    setHour(h);
-                    setMinute(m);
-                    setPeriod(meridiem);
-                  }}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-};
-
-const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ 
-  studentData, 
-  setStudentData, 
-  isViewMode = false 
+const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
+  subscriptions,
+  onRefresh,
+  onAddSubscription
 }) => {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { createSubscription, isSubmitting, isCreating, preventRapidCalls } = useSubscriptionCreation(
-    studentData.id || '',
-    () => {
-      loadSubscriptions();
-    }
-  );
-  
-  // Enhanced form state with Date object for better date handling
-  const [formData, setFormData] = useState({
-    sessionCount: 4,
-    durationMonths: 1,
-    lessonDurationMinutes: 60, // New field for lesson duration
-    startDate: undefined as Date | undefined,
-    schedule: [] as ScheduleItem[],
-    priceMode: 'perSession',
-    pricePerSession: 0,
-    fixedPrice: 0,
-    currency: '',
-    notes: '',
-    // New payment fields
-    initialPaymentAmount: 0,
-    paymentMethod: 'Cash',
-    paymentNotes: '',
-    accountId: '' // Add account selection
-  });
-  
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [subscriptionToDelete, setSubscriptionToDelete] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [deletingSubscriptionId, setDeletingSubscriptionId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [subscriptionToEdit, setSubscriptionToEdit] = useState<Subscription | null>(null);
 
-  // Get school ID from localStorage
-  const getSchoolId = () => {
-    const userData = localStorage.getItem('user');
-    if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.schoolId;
-  };
-
-  const schoolId = getSchoolId();
-
-  // Fetch school currencies from database
-  const { data: currencies = [], isLoading: currenciesLoading } = useQuery({
-    queryKey: ['school-currencies', schoolId],
-    queryFn: async () => {
-      if (!schoolId) return [];
-      const { data, error } = await supabase.rpc('get_school_currencies', {
-        p_school_id: schoolId
-      });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!schoolId,
-  });
-
-  // Set default currency when currencies are loaded
-  useEffect(() => {
-    if (currencies.length > 0 && !formData.currency) {
-      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
-      setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
-    }
-  }, [currencies, formData.currency]);
-
-  // Fetch school accounts
-  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
-    queryKey: ['school-accounts', schoolId],
-    queryFn: async () => {
-      if (!schoolId) return [];
-      const { data, error } = await supabase.rpc('get_school_accounts', {
-        p_school_id: schoolId
-      });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!schoolId,
-  });
-
-  // Fetch school transactions to calculate payment status
-  const { data: allTransactions = [] } = useQuery({
-    queryKey: ['school-transactions', schoolId],
-    queryFn: () => getSchoolTransactions(schoolId),
-    enabled: !!schoolId,
-  });
-
-  const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
-
-  const daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-  ];
-
-  // Load subscriptions when component mounts or studentData changes
-  useEffect(() => {
-    if (studentData.id) {
-      loadSubscriptions();
-    }
-  }, [studentData.id]);
-
-  const loadSubscriptions = async () => {
-    if (!studentData.id) return;
-    
-    try {
-      setLoading(true);
-      console.log('🔄 Loading subscriptions for student:', studentData.id);
-      const data = await getStudentSubscriptions(studentData.id);
-      console.log('📊 Loaded subscriptions:', data);
-      setSubscriptions(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('❌ Error loading subscriptions:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load subscriptions",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'green';
+      case 'paused': return 'yellow';
+      case 'completed': return 'blue';
+      case 'cancelled': return 'red';
+      default: return 'gray';
     }
   };
 
-  // Calculate payment status for a subscription
-  const calculateSubscriptionPaymentStatus = (subscription: Subscription) => {
-    if (!studentData.firstName || !studentData.lastName || !allTransactions.length) {
-      return {
-        totalPaid: 0,
-        remaining: subscription.total_price,
-        status: 'Not Paid' as const,
-        payments: []
-      };
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active': return CheckCircle;
+      case 'paused': return AlertCircle;
+      case 'completed': return CheckCircle;
+      case 'cancelled': return AlertCircle;
+      default: return AlertCircle;
     }
-
-    const studentName = `${studentData.firstName} ${studentData.lastName}`;
-    
-    // Find all payments for this subscription
-    const subscriptionPayments = allTransactions.filter(transaction => 
-      transaction.type === 'income' && 
-      transaction.contact_name === studentName &&
-      transaction.contact_type === 'student' &&
-      transaction.subscription_id === subscription.id &&
-      transaction.status === 'completed'
-    );
-
-    const totalPaid = subscriptionPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    const remaining = Math.max(0, subscription.total_price - totalPaid);
-    
-    let status: 'Fully Paid' | 'Partially Paid' | 'Not Paid';
-    if (totalPaid >= subscription.total_price) {
-      status = 'Fully Paid';
-    } else if (totalPaid > 0) {
-      status = 'Partially Paid';
-    } else {
-      status = 'Not Paid';
-    }
-
-    return {
-      totalPaid,
-      remaining,
-      status,
-      payments: subscriptionPayments
-    };
   };
-
-  const addScheduleItem = () => {
-    setFormData({
-      ...formData,
-      schedule: [...formData.schedule, { day: '', time: '' }]
-    });
-  };
-
-  const removeScheduleItem = (index: number) => {
-    const newSchedule = formData.schedule.filter((_, i) => i !== index);
-    setFormData({
-      ...formData,
-      schedule: newSchedule
-    });
-  };
-
-  const updateScheduleItem = (index: number, field: 'day' | 'time', value: string) => {
-    const newSchedule = [...formData.schedule];
-    newSchedule[index] = { ...newSchedule[index], [field]: value };
-    setFormData({
-      ...formData,
-      schedule: newSchedule
-    });
-  };
-
-  const calculateIntelligentSessionDistribution = () => {
-    if (formData.schedule.length === 0 || formData.sessionCount === 0 || !formData.startDate) {
-      return [];
-    }
-
-    const validSchedules = formData.schedule.filter(s => s.day && s.time);
-    if (validSchedules.length === 0) return [];
-
-    // Sort schedules by day of week
-    const sortedSchedules = [...validSchedules].sort((a, b) => {
-      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      return dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
-    });
-
-    const startDate = new Date(formData.startDate);
-    const sessions: Array<{
-      sessionNumber: number;
-      day: string;
-      time: string;
-      date: string;
-    }> = [];
-
-    let currentDate = new Date(startDate);
-    let sessionsCreated = 0;
-
-    while (sessionsCreated < formData.sessionCount) {
-      // Try each scheduled day in order
-      for (const schedule of sortedSchedules) {
-        if (sessionsCreated >= formData.sessionCount) break;
-
-        // Find next occurrence of this day
-        const targetDayIndex = daysOfWeek.indexOf(schedule.day);
-        const currentDayIndex = currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1; // Convert Sunday=0 to Sunday=6
-        
-        let daysToAdd = targetDayIndex - currentDayIndex;
-        if (daysToAdd < 0) {
-          daysToAdd += 7; // Move to next week
-        }
-
-        const sessionDate = addDays(currentDate, daysToAdd);
-        
-        // Only add if on or after start date
-        if (sessionDate >= startDate) {
-          sessions.push({
-            sessionNumber: sessionsCreated + 1,
-            day: schedule.day,
-            time: schedule.time,
-            date: format(sessionDate, 'MMM dd, yyyy')
-          });
-          
-          sessionsCreated++;
-          // Move current date to the day after this session
-          currentDate = addDays(sessionDate, 1);
-        } else {
-          // If before start date, just move current date forward
-          currentDate = addDays(currentDate, 1);
-        }
-      }
-    }
-
-    return sessions;
-  };
-
-  const intelligentSessionDistribution = calculateIntelligentSessionDistribution();
-
-  const getTotalPrice = () => {
-    return formData.priceMode === 'perSession' 
-      ? formData.pricePerSession * formData.sessionCount 
-      : formData.fixedPrice;
-  };
-
-  const getCurrencySymbol = (currencyCode: string) => {
-    const currency = currencies.find(c => c.code === currencyCode);
-    return currency?.symbol || currencyCode;
-  };
-
-  // Filter accounts by selected currency
-  const compatibleAccounts = accounts.filter(account => 
-    account.currency_code === formData.currency
-  );
-
-  const handleSubmit = preventRapidCalls(async () => {
-    if (!studentData.id) {
-      toast({
-        title: "Error",
-        description: "Student ID is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate required fields
-    if (!formData.startDate || formData.schedule.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please fill in start date and at least one schedule",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate all schedule items are complete
-    const incompleteSchedules = formData.schedule.some(s => !s.day || !s.time);
-    if (incompleteSchedules) {
-      toast({
-        title: "Error",
-        description: "Please complete all schedule entries or remove incomplete ones",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate initial payment amount
-    if (formData.initialPaymentAmount < 0) {
-      toast({
-        title: "Error",
-        description: "Initial payment amount cannot be negative",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const totalPrice = getTotalPrice();
-    if (formData.initialPaymentAmount > totalPrice) {
-      toast({
-        title: "Error",
-        description: "Initial payment amount cannot exceed total subscription price",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate account selection if payment amount > 0
-    if (formData.initialPaymentAmount > 0 && !formData.accountId) {
-      toast({
-        title: "Error",
-        description: "Please select an account for the initial payment",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate lesson duration
-    if (formData.lessonDurationMinutes <= 0) {
-      toast({
-        title: "Error",
-        description: "Lesson duration must be greater than 0 minutes",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      console.log('🚀 Creating subscription with initial payment');
-      
-      const subscriptionFormData = {
-        sessionCount: formData.sessionCount,
-        durationMonths: formData.durationMonths,
-        startDate: formData.startDate,
-        schedule: formData.schedule,
-        priceMode: formData.priceMode as 'perSession' | 'fixedPrice',
-        pricePerSession: formData.priceMode === 'perSession' ? formData.pricePerSession : undefined,
-        fixedPrice: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : undefined,
-        totalPrice: totalPrice,
-        currency: formData.currency,
-        notes: formData.notes,
-        status: 'active',
-        initialPayment: {
-          amount: formData.initialPaymentAmount,
-          method: formData.paymentMethod,
-          notes: formData.paymentNotes,
-          accountId: formData.accountId
-        }
-      };
-
-      await createSubscription(subscriptionFormData);
-      
-      // Reset form after successful creation
-      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
-      setFormData({
-        sessionCount: 4,
-        durationMonths: 1,
-        lessonDurationMinutes: 60,
-        startDate: undefined,
-        schedule: [],
-        priceMode: 'perSession',
-        pricePerSession: 0,
-        fixedPrice: 0,
-        currency: defaultCurrency?.code || '',
-        notes: '',
-        initialPaymentAmount: 0,
-        paymentMethod: 'Cash',
-        paymentNotes: '',
-        accountId: ''
-      });
-      
-    } catch (error) {
-      console.error('❌ Error creating subscription:', error);
-    }
-  });
 
   const handleDeleteSubscription = async (subscriptionId: string) => {
-    if (!subscriptionId) {
-      console.error('❌ No subscription ID provided for deletion');
-      return;
-    }
-
     try {
-      console.log('🗑️ Starting enhanced subscription deletion for ID:', subscriptionId);
-      setDeletingSubscriptionId(subscriptionId);
+      setDeletingId(subscriptionId);
+      console.log('Deleting subscription:', subscriptionId);
       
-      const userData = localStorage.getItem('user');
-      const user = userData ? JSON.parse(userData) : null;
+      const response = await deleteStudentSubscriptionEnhanced(subscriptionId);
+      console.log('Delete response:', response);
       
-      if (!user || !user.schoolId) {
-        throw new Error('User authentication required');
+      // Type the response properly as RpcResponse
+      const typedResponse = response as RpcResponse;
+      if (typedResponse && !typedResponse.success) {
+        throw new Error(typedResponse.message || 'Failed to delete subscription');
       }
 
-      const currentUserId = user.user_id || user.id || user.userId;
-      if (!currentUserId) {
-        throw new Error('User ID not found');
-      }
-
-      // Use the enhanced deletion function
-      const { data, error } = await supabase.rpc('delete_subscription_with_related_data', {
-        p_subscription_id: subscriptionId,
-        p_current_user_id: currentUserId,
-        p_current_school_id: user.schoolId
-      });
-
-      if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
-      }
-
-      if (data && !data.success) {
-        throw new Error(data.message || 'Failed to delete subscription');
-      }
-
-      console.log('✅ Enhanced deletion successful:', data);
-      
       toast({
         title: "Success",
-        description: data?.message || "Subscription deleted successfully",
+        description: typedResponse?.message || "Subscription deleted successfully!",
       });
-      
-      // Reload subscriptions from database
-      console.log('🔄 Reloading subscriptions after successful deletion...');
-      await loadSubscriptions();
-      
-    } catch (error) {
-      console.error('❌ Error deleting subscription:', error);
-      
+
+      onRefresh();
+    } catch (error: any) {
+      console.error('Error deleting subscription:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete subscription",
+        description: error.message || "Failed to delete subscription",
         variant: "destructive",
       });
     } finally {
-      setDeletingSubscriptionId(null);
-      setDeleteDialogOpen(false);
-      setSubscriptionToDelete(null);
+      setDeletingId(null);
     }
   };
 
-  const handleOpenDeleteDialog = (subscriptionId: string) => {
-    console.log('🗑️ Opening delete dialog for subscription:', subscriptionId);
-    setSubscriptionToDelete(subscriptionId);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleOpenEditDialog = (subscription: Subscription) => {
-    console.log('✏️ Opening edit dialog for subscription:', subscription);
-    setSubscriptionToEdit(subscription);
+  const handleEditSubscription = (subscription: Subscription) => {
+    setEditingSubscription(subscription);
     setEditDialogOpen(true);
   };
 
   const handleEditSuccess = () => {
-    console.log('✅ Edit successful, reloading subscriptions');
-    loadSubscriptions();
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), "MMMM dd, yyyy");
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return "Invalid Date";
-    }
-  };
-
-  const getPaymentStatusColor = (status: 'Fully Paid' | 'Partially Paid' | 'Not Paid') => {
-    switch (status) {
-      case 'Fully Paid':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'Partially Paid':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Not Paid':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+    setEditingSubscription(null);
+    setEditDialogOpen(false);
+    onRefresh();
   };
 
   return (
-    <div className="space-y-6">
-      {!isViewMode && (
-        <Card className="border-2 border-dashed border-gray-200 hover:border-blue-300 transition-colors">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardTitle className="flex items-center gap-2 text-blue-800">
-              <Calendar className="h-5 w-5" />
-              Create New Subscription
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 p-6">
-            {/* Session Count, Duration, and Lesson Duration */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
-                <Input 
-                  type="number" 
-                  id="sessionCount" 
-                  value={formData.sessionCount} 
-                  onChange={(e) => setFormData({ ...formData, sessionCount: parseInt(e.target.value) || 0 })}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="durationMonths" className="text-sm font-semibold text-gray-700">Duration (Months)</Label>
-                <Input 
-                  type="number" 
-                  id="durationMonths" 
-                  value={formData.durationMonths} 
-                  onChange={(e) => setFormData({ ...formData, durationMonths: parseInt(e.target.value) || 0 })}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="lessonDurationMinutes" className="text-sm font-semibold text-gray-700">Lesson Duration</Label>
-                <Input 
-                  type="number" 
-                  id="lessonDurationMinutes" 
-                  value={formData.lessonDurationMinutes} 
-                  onChange={(e) => setFormData({ ...formData, lessonDurationMinutes: parseInt(e.target.value) || 60 })}
-                  className="mt-1"
-                  min="1"
-                  step="1"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Default: 60 minutes
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
-                <Select 
-                  value={formData.currency} 
-                  onValueChange={(value) => setFormData({ ...formData, currency: value, accountId: '' })}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select currency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currenciesLoading ? (
-                      <div className="p-2 text-sm text-muted-foreground text-center">
-                        Loading currencies...
-                      </div>
-                    ) : currencies.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground text-center">
-                        No currencies available
-                      </div>
+    <div>
+      <div className="mb-4 flex justify-end">
+        <Button onClick={onAddSubscription} className="bg-green-500 text-white hover:bg-green-700">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Subscription
+        </Button>
+      </div>
+
+      {subscriptions.length === 0 ? (
+        <div className="text-center text-gray-500">No subscriptions found.</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {subscriptions.map((subscription) => (
+            <Card key={subscription.id} className="bg-white shadow-md rounded-md overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  <Calendar className="mr-2 h-4 w-4 inline-block" />
+                  {format(new Date(subscription.start_date), 'MMM dd, yyyy')}
+                </CardTitle>
+                <Badge variant="secondary" className={`bg-${getStatusColor(subscription.status)}-500 text-white`}>
+                  {subscription.status}
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-gray-600">
+                  <div className="flex items-center mb-1">
+                    <Clock className="mr-2 h-4 w-4 inline-block" />
+                    {subscription.schedule && typeof subscription.schedule === 'string' ? (
+                      <span>{subscription.schedule}</span>
                     ) : (
-                      currencies.map((currency) => (
-                        <SelectItem key={currency.code} value={currency.code}>
-                          <div className="flex items-center gap-2">
-                            <span>{currency.name}</span>
-                            <span className="text-muted-foreground">({currency.symbol})</span>
-                            {currency.is_default && (
-                              <Badge variant="secondary" className="text-xs">Default</Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
+                      <span>{JSON.stringify(subscription.schedule)}</span>
                     )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Modern Date Picker */}
-            <div>
-              <Label className="text-sm font-semibold text-gray-700">Start Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal mt-1",
-                      !formData.startDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.startDate ? format(formData.startDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={formData.startDate}
-                    onSelect={(date) => setFormData({ ...formData, startDate: date })}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Schedule Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold text-gray-700">Schedule</Label>
-                <Button 
-                  type="button"
-                  variant="outline" 
+                  </div>
+                  <div className="flex items-center mb-1">
+                    <DollarSign className="mr-2 h-4 w-4 inline-block" />
+                    {subscription.price_mode}: {subscription.currency} {subscription.total_price}
+                  </div>
+                  <div className="flex items-center mb-1">
+                    <Users className="mr-2 h-4 w-4 inline-block" />
+                    {subscription.session_count} Sessions
+                  </div>
+                </div>
+              </CardContent>
+              <div className="p-2 flex justify-between items-center">
+                <Button
+                  variant="outline"
                   size="sm"
-                  onClick={addScheduleItem}
-                  className="flex items-center gap-2"
+                  onClick={() => handleEditSubscription(subscription)}
                 >
-                  <Plus className="h-4 w-4" />
-                  Add Schedule
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Edit
                 </Button>
-              </div>
-              
-              {formData.schedule.map((schedule, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <Label className="text-xs text-gray-600">Day</Label>
-                    <Select 
-                      value={schedule.day || ""}
-                      onValueChange={(value) => updateScheduleItem(index, 'day', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select day" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {daysOfWeek.map((day) => (
-                          <SelectItem key={day} value={day}>{day}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1">
-                    <Label className="text-xs text-gray-600">Time</Label>
-                    <ModernTimePicker 
-                      value={schedule.time}
-                      onChange={(time) => updateScheduleItem(index, 'time', time)}
-                    />
-                  </div>
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeScheduleItem(index)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-
-              {formData.schedule.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No schedules added yet. Click "Add Schedule" to begin.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Intelligent Session Distribution Preview */}
-            {intelligentSessionDistribution.length > 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Smart Session Schedule Preview ({formData.lessonDurationMinutes} min each)
-                </h4>
-                <p className="text-sm text-green-700 mb-3">
-                  Sessions will be distributed intelligently across your selected days, starting from the first available slot:
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                  {intelligentSessionDistribution.map((session, index) => (
-                    <div key={index} className="bg-white rounded-lg p-3 text-sm border border-green-100">
-                      <div className="font-medium text-green-800">
-                        Session {session.sessionNumber}
-                      </div>
-                      <div className="text-green-600">
-                        {session.day}, {session.date}
-                      </div>
-                      <div className="text-green-500 text-xs">
-                        at {session.time} ({formData.lessonDurationMinutes} min)
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 p-2 bg-green-100 rounded text-xs text-green-700">
-                  <strong>Scheduling Logic:</strong> Sessions rotate through selected days in weekly cycles, 
-                  ensuring even distribution and natural progression from your start date.
-                </div>
-              </div>
-            )}
-
-            {/* Price Section */}
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-semibold text-gray-700">Price Mode</Label>
-                <Select value={formData.priceMode} onValueChange={(value) => setFormData({ ...formData, priceMode: value })}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select price mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="perSession">Per Session</SelectItem>
-                    <SelectItem value="fixedPrice">Fixed Price</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.priceMode === 'perSession' && (
-                <div>
-                  <Label htmlFor="pricePerSession" className="text-sm font-semibold text-gray-700">
-                    Price Per Session ({getCurrencySymbol(formData.currency)})
-                  </Label>
-                  <Input 
-                    type="number" 
-                    id="pricePerSession" 
-                    value={formData.pricePerSession} 
-                    onChange={(e) => setFormData({ ...formData, pricePerSession: parseFloat(e.target.value) || 0 })}
-                    className="mt-1"
-                  />
-                  {formData.pricePerSession > 0 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Total: {getCurrencySymbol(formData.currency)} {(formData.pricePerSession * formData.sessionCount).toFixed(2)}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {formData.priceMode === 'fixedPrice' && (
-                <div>
-                  <Label htmlFor="fixedPrice" className="text-sm font-semibold text-gray-700">
-                    Fixed Price ({getCurrencySymbol(formData.currency)})
-                  </Label>
-                  <Input 
-                    type="number" 
-                    id="fixedPrice" 
-                    value={formData.fixedPrice} 
-                    onChange={(e) => setFormData({ ...formData, fixedPrice: parseFloat(e.target.value) || 0 })}
-                    className="mt-1"
-                  />
-                  {formData.fixedPrice > 0 && formData.sessionCount > 0 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Per session: {getCurrencySymbol(formData.currency)} {(formData.fixedPrice / formData.sessionCount).toFixed(2)}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Initial Payment Section */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-              <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Initial Payment
-              </h4>
-              <p className="text-sm text-blue-700 mb-3">
-                Specify how much the student is paying upfront. This can be the full amount, partial payment, or $0 for unpaid subscriptions.
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="initialPaymentAmount" className="text-sm font-semibold text-gray-700">
-                    Payment Amount ({getCurrencySymbol(formData.currency)})
-                  </Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      {getCurrencySymbol(formData.currency)}
-                    </span>
-                    <Input 
-                      type="number" 
-                      id="initialPaymentAmount" 
-                      value={formData.initialPaymentAmount} 
-                      onChange={(e) => setFormData({ ...formData, initialPaymentAmount: parseFloat(e.target.value) || 0 })}
-                      className="mt-1 pl-7"
-                      min="0"
-                      max={getTotalPrice()}
-                      step="0.01"
-                    />
-                  </div>
-                  {getTotalPrice() > 0 && (
-                    <p className="text-xs text-gray-600 mt-1">
-                      Total subscription: {getCurrencySymbol(formData.currency)}{getTotalPrice().toFixed(2)}
-                      {formData.initialPaymentAmount > 0 && (
-                        <span className="ml-2">
-                          ({formData.initialPaymentAmount >= getTotalPrice() ? 'Fully paid' : 
-                           `Remaining: ${getCurrencySymbol(formData.currency)}${(getTotalPrice() - formData.initialPaymentAmount).toFixed(2)}`})
-                        </span>
-                      )}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label className="text-sm font-semibold text-gray-700">Payment Method</Label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {paymentMethods.map((method) => (
-                      <Button
-                        key={method}
-                        type="button"
-                        variant={formData.paymentMethod === method ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setFormData({ ...formData, paymentMethod: method })}
-                        className={cn(
-                          "h-8 text-xs",
-                          method === "Credit Card" && formData.paymentMethod === method && "bg-blue-600",
-                          method === "PayPal" && formData.paymentMethod === method && "bg-indigo-600"
-                        )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={deletingId === subscription.id}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. Are you sure you want to delete this subscription?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={deletingId === subscription.id}
+                        onClick={() => handleDeleteSubscription(subscription.id)}
                       >
-                        {method === "Credit Card" && <CreditCard className="h-3 w-3 mr-1" />}
-                        {method === "Cash" && <Receipt className="h-3 w-3 mr-1" />}
-                        {method}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
+                        {deletingId === subscription.id ? 'Deleting...' : 'Delete'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
-
-              {/* Account Selection */}
-              <div>
-                <Label className="text-sm font-semibold text-gray-700">
-                  Deposit Account {formData.initialPaymentAmount > 0 && <span className="text-red-500">*</span>}
-                </Label>
-                <Select 
-                  value={formData.accountId} 
-                  onValueChange={(value) => setFormData({ ...formData, accountId: value })}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select account for payment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accountsLoading ? (
-                      <div className="p-2 text-sm text-muted-foreground text-center">
-                        Loading accounts...
-                      </div>
-                    ) : compatibleAccounts.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground text-center">
-                        No accounts available for {formData.currency}
-                      </div>
-                    ) : (
-                      compatibleAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          <div className="flex items-center gap-2">
-                            <Wallet className="h-4 w-4" />
-                            <span>{account.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({account.currency_code})
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {formData.initialPaymentAmount > 0 && compatibleAccounts.length === 0 && (
-                  <p className="text-sm text-amber-600 mt-1">
-                    Please create an account with {formData.currency} currency first.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="paymentNotes" className="text-sm font-semibold text-gray-700">Payment Notes (Optional)</Label>
-                <Textarea 
-                  id="paymentNotes" 
-                  placeholder="Add notes about this initial payment..."
-                  value={formData.paymentNotes} 
-                  onChange={(e) => setFormData({ ...formData, paymentNotes: e.target.value })}
-                  className="mt-1"
-                  rows={2}
-                />
-              </div>
-
-              {formData.initialPaymentAmount === 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-                  <p className="text-sm text-yellow-800">
-                    <strong>No Initial Payment:</strong> This subscription will be created without any payment. 
-                    You can add payments later via the Payments tab.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Notes */}
-            <div>
-              <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Subscription Notes</Label>
-              <Textarea 
-                id="notes" 
-                placeholder="Add any additional notes about this subscription..."
-                value={formData.notes} 
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="mt-1"
-                rows={3}
-              />
-            </div>
-            
-            {/* Submit Button */}
-            <div className="flex justify-end pt-4">
-              <Button 
-                onClick={handleSubmit} 
-                disabled={submitting || isCreating || formData.schedule.length === 0 || !formData.startDate || (formData.initialPaymentAmount > 0 && !formData.accountId) || !formData.currency}
-                className="min-w-[160px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                size="lg"
-              >
-                {submitting || isCreating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Create Subscription
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Current Subscriptions - Updated with Edit Button */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Current Subscriptions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading subscriptions...
-            </div>
-          ) : subscriptions.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertTriangle className="h-8 w-8 inline-block mb-3 text-amber-500" />
-              <p className="text-muted-foreground">No subscriptions found for this student.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {subscriptions.map((subscription) => {
-                const paymentStatus = calculateSubscriptionPaymentStatus(subscription);
-                return (
-                  <div key={subscription.id} className="py-6 first:pt-0 last:pb-0">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-3 flex-1">
-                        <div>
-                          <h3 className="text-lg font-semibold">
-                            {subscription.session_count} Sessions - {subscription.duration_months} Month(s)
-                          </h3>
-                          <p className="text-muted-foreground">
-                            Start Date: {formatDate(subscription.start_date)}
-                          </p>
-                        </div>
-                        
-                        {/* Payment Status Section */}
-                        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                          <h4 className="font-medium text-sm">Payment Information</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <p className="text-xs text-muted-foreground">Total Subscription</p>
-                              <p className="font-medium">
-                                {getCurrencySymbol(subscription.currency)} {subscription.total_price.toFixed(2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Total Paid</p>
-                              <p className="font-medium text-green-600">
-                                {getCurrencySymbol(subscription.currency)} {paymentStatus.totalPaid.toFixed(2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Remaining</p>
-                              <p className={cn(
-                                "font-medium",
-                                paymentStatus.remaining > 0 ? "text-red-600" : "text-green-600"
-                              )}>
-                                {getCurrencySymbol(subscription.currency)} {paymentStatus.remaining.toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="pt-2">
-                            <Badge className={cn("text-xs", getPaymentStatusColor(paymentStatus.status))}>
-                              {paymentStatus.status}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Badge variant="outline" className="capitalize">
-                            {subscription.status}
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      {!isViewMode && (
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleOpenEditDialog(subscription)}
-                            className="text-blue-600 hover:text-blue-800 border-blue-200 hover:border-blue-300"
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => handleOpenDeleteDialog(subscription.id)}
-                            disabled={deletingSubscriptionId === subscription.id}
-                          >
-                            {deletingSubscriptionId === subscription.id ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Deleting...
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    {subscription.notes && (
-                      <>
-                        <Separator className="my-3" />
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Notes:</strong> {subscription.notes}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Delete Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Subscription</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this subscription? This action cannot be undone and will also remove all associated lesson sessions and related payment records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => handleDeleteSubscription(subscriptionToDelete || '')}
-              className="bg-red-500 hover:bg-red-600"
-              disabled={deletingSubscriptionId !== null}
-            >
-              {deletingSubscriptionId ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Edit Subscription Dialog */}
-      <EditSubscriptionDialog 
-        subscription={subscriptionToEdit}
+      <EditSubscriptionDialog
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
+        subscription={editingSubscription}
         onSuccess={handleEditSuccess}
       />
     </div>
