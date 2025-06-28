@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -97,14 +98,15 @@ const StudentAccess = () => {
           : 'No Teacher';
 
         console.log(`Student ${student.first_name} ${student.last_name}:`, {
+          student_db_id: student.id,
           user_id: student.user_id,
           has_password: passwordInfo?.has_password || false,
           password_length: passwordInfo?.password_length || 0
         });
 
         return {
-          id: student.user_id || '',
-          student_id: student.id,
+          id: student.user_id || '', // This should be the user_id for password queries
+          student_id: student.id,    // This is the student table ID
           first_name: student.first_name || '',
           last_name: student.last_name || '',
           email: student.email || '',
@@ -117,6 +119,12 @@ const StudentAccess = () => {
 
       console.log('Final students with passwords:', result);
       console.log('Students with passwords count:', result.filter(s => s.has_password).length);
+      
+      // Add additional logging to verify the ID mapping
+      result.forEach(student => {
+        console.log(`Final mapping - ${student.first_name} ${student.last_name}: id=${student.id}, student_id=${student.student_id}`);
+      });
+      
       return result;
     },
     enabled: !!schoolId,
@@ -126,6 +134,8 @@ const StudentAccess = () => {
   const fetchPasswordHash = async (userId: string) => {
     console.log('=== FETCH PASSWORD DEBUG ===');
     console.log('Fetching password hash for user:', userId);
+    console.log('Type of userId:', typeof userId);
+    console.log('userId length:', userId.length);
     
     // Check cache first
     if (passwordCache.has(userId)) {
@@ -136,10 +146,19 @@ const StudentAccess = () => {
     try {
       console.log('Querying users table...');
       
+      // Let's also try a broader query to see what users exist
+      console.log('First, let\'s see what users exist in the database...');
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('users')
+        .select('id, email, role, first_name, last_name')
+        .limit(5);
+      
+      console.log('Sample users from database:', { data: allUsers, error: allUsersError });
+      
       // Direct query to users table to get password hash - using maybeSingle() instead of single()
       const { data, error } = await supabase
         .from('users')
-        .select('password_hash, role, email')
+        .select('password_hash, role, email, id, first_name, last_name')
         .eq('id', userId)
         .maybeSingle();
 
@@ -153,13 +172,26 @@ const StudentAccess = () => {
 
       if (!data) {
         console.log('No user found with ID:', userId);
+        console.log('Let\'s check if this user exists with any role...');
+        
+        // Try without role filter to see if user exists at all
+        const { data: userCheck, error: userCheckError } = await supabase
+          .from('users')
+          .select('id, email, role, first_name, last_name')
+          .eq('id', userId)
+          .maybeSingle();
+          
+        console.log('User existence check:', { data: userCheck, error: userCheckError });
+        
         toast.error('User not found');
         return null;
       }
 
       console.log('User found:', { 
+        id: data.id,
         email: data.email, 
         role: data.role, 
+        name: `${data.first_name} ${data.last_name}`,
         hasPassword: !!data.password_hash,
         passwordLength: data.password_hash?.length || 0
       });
@@ -280,6 +312,7 @@ const StudentAccess = () => {
   const togglePasswordVisibility = async (studentId: string) => {
     console.log('=== TOGGLE PASSWORD VISIBILITY ===');
     console.log('Student ID:', studentId);
+    console.log('Type of studentId:', typeof studentId);
     
     if (visiblePasswords.has(studentId)) {
       // Hide password
