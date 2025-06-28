@@ -128,7 +128,8 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           throw new Error('Invalid response format from server');
         }
       } else if (typeof data === 'object' && data !== null) {
-        response = data as RenewSubscriptionResponse;
+        // Convert to unknown first, then to our expected type to satisfy TypeScript
+        response = data as unknown as RenewSubscriptionResponse;
       } else {
         throw new Error('Unexpected response format from server');
       }
