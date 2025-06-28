@@ -1591,6 +1591,16 @@ export type Database = {
           created_at: string
         }[]
       }
+      get_user_password_hash: {
+        Args: { p_user_id: string }
+        Returns: {
+          user_id: string
+          password_hash: string
+          email: string
+          first_name: string
+          last_name: string
+        }[]
+      }
       handle_session_action: {
         Args: {
           p_session_id: string
