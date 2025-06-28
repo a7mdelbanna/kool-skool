@@ -19,9 +19,14 @@ import {
   CheckCircle,
   CalendarX,
   XCircle,
-  CalendarDays
+  CalendarDays,
+  BookOpen,
+  DollarSign,
+  Calendar as CalendarScheduleIcon
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
+import { getStudentSubscriptions } from '@/integrations/supabase/client';
+import { useEffect, useState } from 'react';
 
 interface UpcomingLessonsListProps {
   sessions: Session[];
@@ -31,6 +36,18 @@ interface UpcomingLessonsListProps {
   currentWeekStart: Date;
 }
 
+interface SubscriptionInfo {
+  id: string;
+  studentId: string;
+  sessionCount: number;
+  completedSessions: number;
+  totalPrice: number;
+  currency: string;
+  startDate: string;
+  endDate: string;
+  subscriptionName?: string;
+}
+
 const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ 
   sessions, 
   onLessonClick,
@@ -38,7 +55,73 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
   currentDate,
   currentWeekStart
 }) => {
-  
+  const [subscriptionInfoMap, setSubscriptionInfoMap] = useState<Map<string, SubscriptionInfo>>(new Map());
+  const [loading, setLoading] = useState(true);
+
+  // Load subscription information for all students
+  useEffect(() => {
+    const loadSubscriptionInfo = async () => {
+      try {
+        setLoading(true);
+        const uniqueStudentIds = [...new Set(sessions.map(session => session.studentId))];
+        const subscriptionMap = new Map<string, SubscriptionInfo>();
+
+        await Promise.all(
+          uniqueStudentIds.map(async (studentId) => {
+            try {
+              const subscriptions = await getStudentSubscriptions(studentId);
+              
+              // Find the active subscription
+              const activeSubscription = subscriptions.find(sub => sub.status === 'active');
+              
+              if (activeSubscription) {
+                // Count completed sessions (attended or cancelled)
+                const completedSessions = activeSubscription.sessions_completed || 0;
+                
+                // Calculate end date if not provided
+                let endDate = activeSubscription.end_date;
+                if (!endDate && activeSubscription.start_date && activeSubscription.duration_months) {
+                  const startDate = new Date(activeSubscription.start_date);
+                  const calculatedEndDate = new Date(startDate);
+                  calculatedEndDate.setMonth(calculatedEndDate.getMonth() + activeSubscription.duration_months);
+                  endDate = calculatedEndDate.toISOString().split('T')[0];
+                }
+
+                const subscriptionInfo: SubscriptionInfo = {
+                  id: activeSubscription.id,
+                  studentId: studentId,
+                  sessionCount: activeSubscription.session_count,
+                  completedSessions: completedSessions,
+                  totalPrice: activeSubscription.total_price,
+                  currency: activeSubscription.currency,
+                  startDate: activeSubscription.start_date,
+                  endDate: endDate || activeSubscription.start_date,
+                  subscriptionName: activeSubscription.notes || undefined
+                };
+
+                subscriptionMap.set(studentId, subscriptionInfo);
+              }
+            } catch (error) {
+              console.error(`Error loading subscription for student ${studentId}:`, error);
+            }
+          })
+        );
+
+        setSubscriptionInfoMap(subscriptionMap);
+      } catch (error) {
+        console.error('Error loading subscription information:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (sessions.length > 0) {
+      loadSubscriptionInfo();
+    } else {
+      setLoading(false);
+    }
+  }, [sessions]);
+
   // Group sessions by date
   const today = new Date();
   const tomorrow = addDays(today, 1);
@@ -112,6 +195,25 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     }
   };
 
+  // Format subscription details for display
+  const formatSubscriptionDetails = (subscriptionInfo: SubscriptionInfo) => {
+    const progress = `${subscriptionInfo.completedSessions}/${subscriptionInfo.sessionCount}`;
+    const totalPrice = `$${subscriptionInfo.totalPrice} ${subscriptionInfo.currency}`;
+    const startDate = format(new Date(subscriptionInfo.startDate), 'dd MMM');
+    const endDate = format(new Date(subscriptionInfo.endDate), 'dd MMM');
+    const dateRange = `${startDate} – ${endDate}`;
+    
+    const parts = [
+      progress,
+      subscriptionInfo.subscriptionName ? `Subscription: ${subscriptionInfo.subscriptionName}` : null,
+      `${subscriptionInfo.sessionCount} lessons`,
+      totalPrice,
+      dateRange
+    ].filter(Boolean);
+    
+    return parts.join(' • ');
+  };
+
   // Render sessions for a specific date group
   const renderSessionGroup = (title: string, sessions: Session[], showDateLabels: boolean = true) => {
     if (sessions.length === 0) return null;
@@ -133,6 +235,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
             const subject = getSubject(session);
             const studentName = session.studentName || 'Unknown Student';
             const isPastSession = isSessionPast(session);
+            const subscriptionInfo = subscriptionInfoMap.get(session.studentId);
             
             return (
               <div 
@@ -183,12 +286,56 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                         }`}>
                           {subject} Lesson
                         </div>
-                        <div className={`flex items-center text-sm ${
+                        <div className={`flex items-center text-sm mb-2 ${
                           isPastSession ? 'text-gray-400' : 'text-muted-foreground'
                         }`}>
                           <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                           {dateLabel}
                         </div>
+                        
+                        {/* Subscription Progress & Details */}
+                        {subscriptionInfo && !loading && (
+                          <div className={`text-xs px-2 py-1 rounded-md border mt-2 ${
+                            isPastSession 
+                              ? 'bg-gray-100 text-gray-500 border-gray-300' 
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex items-center gap-1">
+                                <BookOpen className="h-3 w-3" />
+                                <span className="font-medium">
+                                  {subscriptionInfo.completedSessions}/{subscriptionInfo.sessionCount}
+                                </span>
+                              </div>
+                              {subscriptionInfo.subscriptionName && (
+                                <>
+                                  <span>•</span>
+                                  <span>{subscriptionInfo.subscriptionName}</span>
+                                </>
+                              )}
+                              <span>•</span>
+                              <span>{subscriptionInfo.sessionCount} lessons</span>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="h-3 w-3" />
+                                <span>${subscriptionInfo.totalPrice} {subscriptionInfo.currency}</span>
+                              </div>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                <CalendarScheduleIcon className="h-3 w-3" />
+                                <span>
+                                  {format(new Date(subscriptionInfo.startDate), 'dd MMM')} – {format(new Date(subscriptionInfo.endDate), 'dd MMM')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {loading && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            Loading subscription details...
+                          </div>
+                        )}
                       </div>
                       
                       {/* Status Badge */}
