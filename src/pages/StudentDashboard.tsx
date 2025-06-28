@@ -89,7 +89,7 @@ const StudentDashboard = () => {
             name,
             lesson_type
           ),
-          teacher:teacher_id!inner (
+          users!students_teacher_id_fkey (
             first_name,
             last_name,
             email
@@ -138,8 +138,8 @@ const StudentDashboard = () => {
           email: user.email,
           course_name: students.courses?.name || 'No course assigned',
           lesson_type: students.courses?.lesson_type || 'N/A',
-          teacher_first_name: students.teacher?.first_name || 'No teacher',
-          teacher_last_name: students.teacher?.last_name || 'assigned',
+          teacher_first_name: students.users?.first_name || 'No teacher',
+          teacher_last_name: students.users?.last_name || 'assigned',
           next_session_date: nextSession?.scheduled_date || null,
           subscription_progress: progressText
         };
