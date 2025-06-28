@@ -84,8 +84,8 @@ const CreateLicenseDialog: React.FC<CreateLicenseDialogProps> = ({
       
       console.log('License creation result:', data);
       
-      // Type assertion for the response
-      const result = data as CreateLicenseResponse;
+      // Type assertion for the response - first cast to unknown, then to our interface
+      const result = data as unknown as CreateLicenseResponse;
       
       if (result?.success) {
         toast.success('License created successfully');

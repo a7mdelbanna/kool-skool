@@ -111,8 +111,8 @@ const SuperAdminDashboard = () => {
       
       console.log('License status update result:', data);
       
-      // Type assertion for the response
-      const result = data as UpdateLicenseResponse;
+      // Type assertion for the response - first cast to unknown, then to our interface
+      const result = data as unknown as UpdateLicenseResponse;
       
       if (result?.success) {
         toast.success(`License ${!currentStatus ? 'enabled' : 'disabled'} successfully`);
