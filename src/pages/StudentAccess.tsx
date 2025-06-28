@@ -40,25 +40,27 @@ const StudentAccess = () => {
   console.log('=== STUDENT ACCESS DEBUG ===');
   console.log('School ID:', schoolId);
 
-  // Fetch students using the same approach as the Students page
-  const { data: studentsData = [], isLoading } = useQuery({
-    queryKey: ['students', schoolId],
-    queryFn: () => getStudentsWithDetails(schoolId),
-    enabled: !!schoolId,
-  });
-
-  console.log('Students data:', studentsData);
-
-  // Fetch password hash information separately for students
-  const { data: passwordData = [], isLoading: passwordLoading } = useQuery({
-    queryKey: ['student-passwords', schoolId],
+  // Fetch students and their password info in a single optimized query
+  const { data: studentsWithPasswords = [], isLoading } = useQuery({
+    queryKey: ['students-with-passwords', schoolId],
     queryFn: async () => {
       if (!schoolId) {
-        console.log('No school ID for password query');
+        console.log('No school ID provided');
         return [];
       }
 
-      // Get all user IDs from students data
+      console.log('Fetching students with password info for school:', schoolId);
+
+      // First get all students with details
+      const studentsData = await getStudentsWithDetails(schoolId);
+      console.log('Students data received:', studentsData);
+
+      if (!studentsData || studentsData.length === 0) {
+        console.log('No students found');
+        return [];
+      }
+
+      // Get all unique user IDs
       const userIds = studentsData
         .map(s => s.user_id)
         .filter(Boolean);
@@ -66,56 +68,63 @@ const StudentAccess = () => {
       console.log('User IDs for password query:', userIds);
 
       if (userIds.length === 0) {
-        console.log('No user IDs found, returning empty array');
-        return [];
+        console.log('No user IDs found');
+        return studentsData.map(student => ({
+          id: student.user_id || '',
+          student_id: student.id,
+          first_name: student.first_name || '',
+          last_name: student.last_name || '',
+          email: student.email || '',
+          password_hash: undefined,
+          course_name: student.course_name || 'No Course',
+          teacher_name: student.teacher_first_name && student.teacher_last_name
+            ? `${student.teacher_first_name} ${student.teacher_last_name}`
+            : 'No Teacher'
+        }));
       }
 
-      // Remove the role filter since we already know these are student user IDs
-      const { data, error } = await supabase
+      // Fetch password info for all user IDs
+      const { data: passwordData, error: passwordError } = await supabase
         .from('users')
         .select('id, password_hash')
         .in('id', userIds);
 
-      console.log('Password query result:', { data, error });
+      console.log('Password query executed with userIds:', userIds);
+      console.log('Password query result:', { data: passwordData, error: passwordError });
 
-      if (error) {
-        console.error('Error fetching password data:', error);
-        return [];
+      if (passwordError) {
+        console.error('Error fetching password data:', passwordError);
       }
 
-      return data || [];
+      // Combine student data with password info
+      return studentsData.map(student => {
+        const passwordInfo = passwordData?.find(p => p.id === student.user_id);
+        const teacherName = student.teacher_first_name && student.teacher_last_name
+          ? `${student.teacher_first_name} ${student.teacher_last_name}`
+          : 'No Teacher';
+
+        console.log(`Student ${student.first_name} ${student.last_name}:`, {
+          user_id: student.user_id,
+          passwordInfo,
+          has_password: !!passwordInfo?.password_hash
+        });
+
+        return {
+          id: student.user_id || '',
+          student_id: student.id,
+          first_name: student.first_name || '',
+          last_name: student.last_name || '',
+          email: student.email || '',
+          password_hash: passwordInfo?.password_hash,
+          course_name: student.course_name || 'No Course',
+          teacher_name: teacherName
+        };
+      });
     },
-    enabled: !!schoolId && studentsData.length > 0,
+    enabled: !!schoolId,
   });
 
-  console.log('Password data:', passwordData);
-
-  // Transform the data to match our interface
-  const students: StudentAccessInfo[] = studentsData.map(student => {
-    const passwordInfo = passwordData.find(p => p.id === student.user_id);
-    const teacherName = student.teacher_first_name && student.teacher_last_name
-      ? `${student.teacher_first_name} ${student.teacher_last_name}`
-      : 'No Teacher';
-
-    console.log(`Student ${student.first_name} ${student.last_name}:`, {
-      user_id: student.user_id,
-      passwordInfo,
-      has_password: !!passwordInfo?.password_hash
-    });
-
-    return {
-      id: student.user_id || '',
-      student_id: student.id,
-      first_name: student.first_name || '',
-      last_name: student.last_name || '',
-      email: student.email || '',
-      password_hash: passwordInfo?.password_hash,
-      course_name: student.course_name || 'No Course',
-      teacher_name: teacherName
-    };
-  });
-
-  console.log('Transformed students:', students);
+  console.log('Final students with passwords:', studentsWithPasswords);
 
   // Update password mutation
   const updatePasswordMutation = useMutation({
@@ -150,8 +159,7 @@ const StudentAccess = () => {
     },
     onSuccess: () => {
       console.log('Password update mutation succeeded, invalidating queries...');
-      queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
-      queryClient.invalidateQueries({ queryKey: ['student-passwords', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['students-with-passwords', schoolId] });
       setIsDialogOpen(false);
       setSelectedStudent(null);
       setNewPassword('');
@@ -190,7 +198,7 @@ const StudentAccess = () => {
     });
   };
 
-  const filteredStudents = students.filter(student =>
+  const filteredStudents = studentsWithPasswords.filter(student =>
     `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -227,7 +235,7 @@ const StudentAccess = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading || passwordLoading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center p-8">
               <div className="text-muted-foreground">Loading students...</div>
             </div>
