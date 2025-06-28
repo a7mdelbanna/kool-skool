@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   format, 
@@ -92,7 +91,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
               
               if (activeSubscription) {
                 // Count completed sessions (attended or cancelled) - handle nullable value
-                const completedSessions = activeSubscription.sessions_completed || 0;
+                const completedSessions = activeSubscription.sessions_completed ?? 0;
                 
                 // Calculate end date if not provided - handle nullable value
                 let endDate = activeSubscription.end_date;
