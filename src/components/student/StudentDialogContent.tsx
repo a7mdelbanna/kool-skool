@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -44,19 +45,24 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Direct subscription fetching - similar to PaymentsTab pattern
-  const { data: allSubscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError } = useQuery({
+  // Enhanced subscription fetching with extensive debugging
+  const { data: allSubscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError, dataUpdatedAt, status } = useQuery({
     queryKey: ['student-subscriptions', student?.id],
     queryFn: async () => {
-      console.log('===== SUBSCRIPTIONS FETCH (Direct Pattern) =====');
-      console.log('Student ID:', student?.id);
+      const timestamp = new Date().toISOString();
+      console.log(`===== SUBSCRIPTIONS QUERY FIRING (${timestamp}) =====`);
+      console.log('🔍 Query trigger details:');
+      console.log('  - Student ID:', student?.id);
+      console.log('  - Dialog open:', open);
+      console.log('  - Active tab:', activeTab);
+      console.log('  - Is edit mode:', isEditMode);
       
       if (!student?.id) {
-        console.log('No student ID - returning empty array');
+        console.log('❌ No student ID - returning empty array');
         return [];
       }
       
-      console.log('Fetching subscriptions for student:', student.id);
+      console.log('🚀 Executing Supabase query for student:', student.id);
       
       const { data, error } = await supabase
         .from('subscriptions')
@@ -65,13 +71,15 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching subscriptions:', error);
+        console.error('❌ Supabase query error:', error);
         throw error;
       }
       
-      console.log('Subscriptions fetched successfully:', data);
-      console.log('Number of subscriptions:', data?.length || 0);
-      console.log('===== END SUBSCRIPTIONS FETCH =====');
+      console.log('✅ Supabase query completed successfully');
+      console.log('  - Raw data returned:', data);
+      console.log('  - Number of subscriptions:', data?.length || 0);
+      console.log('  - Data structure:', data?.[0] ? Object.keys(data[0]) : 'No data');
+      console.log('===== END SUBSCRIPTIONS QUERY =====');
       
       return data || [];
     },
@@ -81,33 +89,70 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     gcTime: 300000,
   });
 
-  // Process subscriptions using the same pattern as PaymentsTab
+  // Process subscriptions with detailed logging
   const subscriptions = useMemo(() => {
-    console.log('===== SUBSCRIPTIONS PROCESSING (PaymentsTab Pattern) =====');
-    console.log('All subscriptions raw:', allSubscriptions);
-    console.log('Student data:', studentData);
+    const timestamp = new Date().toISOString();
+    console.log(`===== SUBSCRIPTIONS PROCESSING (${timestamp}) =====`);
+    console.log('🔄 Memoization trigger details:');
+    console.log('  - allSubscriptions length:', allSubscriptions?.length || 0);
+    console.log('  - allSubscriptions data:', allSubscriptions);
+    console.log('  - student?.id:', student?.id);
+    console.log('  - subscriptionsLoading:', subscriptionsLoading);
+    console.log('  - Query status:', status);
+    console.log('  - Data updated at:', new Date(dataUpdatedAt).toISOString());
     
-    if (!student?.id || !allSubscriptions.length) {
-      console.log('No subscriptions to process');
+    if (!student?.id) {
+      console.log('❌ No student ID in processing');
       return [];
     }
     
-    // Direct processing like PaymentsTab - no complex filtering
-    const processedSubscriptions = allSubscriptions.map(subscription => ({
-      ...subscription,
-      // Add any additional processing here if needed
-    }));
+    if (!allSubscriptions || !Array.isArray(allSubscriptions)) {
+      console.log('❌ Invalid subscriptions data:', typeof allSubscriptions, allSubscriptions);
+      return [];
+    }
     
-    console.log('Processed subscriptions:', processedSubscriptions.length);
+    // Direct processing - no filtering, just like PaymentsTab
+    const processedSubscriptions = allSubscriptions.map((subscription, index) => {
+      console.log(`  Processing subscription ${index + 1}:`, {
+        id: subscription.id,
+        student_id: subscription.student_id,
+        status: subscription.status,
+        start_date: subscription.start_date
+      });
+      return {
+        ...subscription,
+        // Add any additional processing here if needed
+      };
+    });
+    
+    console.log('✅ Processing complete:');
+    console.log('  - Input count:', allSubscriptions.length);
+    console.log('  - Output count:', processedSubscriptions.length);
+    console.log('  - Final subscriptions:', processedSubscriptions);
     console.log('===== END SUBSCRIPTIONS PROCESSING =====');
     
     return processedSubscriptions;
-  }, [allSubscriptions, student?.id]);
+  }, [allSubscriptions, student?.id, subscriptionsLoading, status, dataUpdatedAt]);
+
+  // Log all state changes for subscriptions
+  useEffect(() => {
+    const timestamp = new Date().toISOString();
+    console.log(`===== SUBSCRIPTIONS STATE CHANGE (${timestamp}) =====`);
+    console.log('📊 State change details:');
+    console.log('  - Subscriptions count:', subscriptions?.length || 0);
+    console.log('  - Loading state:', subscriptionsLoading);
+    console.log('  - Error state:', subscriptionsError);
+    console.log('  - Query status:', status);
+    console.log('  - Active tab:', activeTab);
+    console.log('  - Dialog open:', open);
+    console.log('  - Student ID:', student?.id);
+    console.log('===== END STATE CHANGE LOG =====');
+  }, [subscriptions, subscriptionsLoading, subscriptionsError, status, activeTab, open, student?.id]);
 
   // Error handling for subscriptions
   useEffect(() => {
     if (subscriptionsError) {
-      console.error("Error loading subscriptions:", subscriptionsError);
+      console.error("❌ SUBSCRIPTION ERROR DETECTED:", subscriptionsError);
       toast.error("Failed to load subscription history. Please refresh the page and try again.");
     }
   }, [subscriptionsError]);
@@ -198,15 +243,48 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
 
   // Handle subscription refresh
   const handleSubscriptionRefresh = () => {
-    console.log('Manually refreshing subscriptions...');
+    const timestamp = new Date().toISOString();
+    console.log(`===== MANUAL SUBSCRIPTION REFRESH (${timestamp}) =====`);
+    console.log('🔄 Triggering manual refresh for student:', student?.id);
     queryClient.invalidateQueries({ queryKey: ['student-subscriptions', student?.id] });
+    console.log('✅ Manual refresh triggered');
+    console.log('===== END MANUAL REFRESH =====');
   };
 
-  // Handle tab changes
+  // Handle tab changes with detailed logging
   const handleTabChange = (value: string) => {
-    console.log('Tab changed to:', value);
+    const timestamp = new Date().toISOString();
+    console.log(`===== TAB CHANGE EVENT (${timestamp}) =====`);
+    console.log('🔄 Tab change details:');
+    console.log('  - Previous tab:', activeTab);
+    console.log('  - New tab:', value);
+    console.log('  - Current subscriptions count:', subscriptions?.length || 0);
+    console.log('  - Subscriptions loading:', subscriptionsLoading);
+    console.log('  - Query status:', status);
+    console.log('  - Student ID:', student?.id);
+    
     setActiveTab(value);
+    
+    // Log after state update
+    setTimeout(() => {
+      console.log('📊 Post tab-change state:');
+      console.log('  - Active tab updated to:', value);
+      console.log('  - Subscriptions still available:', subscriptions?.length || 0);
+      console.log('===== END TAB CHANGE EVENT =====');
+    }, 100);
   };
+
+  // Log when dialog open state changes
+  useEffect(() => {
+    const timestamp = new Date().toISOString();
+    console.log(`===== DIALOG OPEN STATE CHANGE (${timestamp}) =====`);
+    console.log('🚪 Dialog state details:');
+    console.log('  - Dialog open:', open);
+    console.log('  - Student ID:', student?.id);
+    console.log('  - Active tab:', activeTab);
+    console.log('  - Current subscriptions count:', subscriptions?.length || 0);
+    console.log('===== END DIALOG STATE CHANGE =====');
+  }, [open]);
 
   return (
     <>

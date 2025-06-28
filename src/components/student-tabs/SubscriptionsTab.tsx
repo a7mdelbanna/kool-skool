@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit3, Calendar, Clock, DollarSign, Users, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,14 +41,56 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  // Log when component receives new data
+  // Enhanced logging when component receives new data
   useEffect(() => {
-    console.log('===== SUBSCRIPTIONS TAB RENDER =====');
-    console.log('Subscriptions received:', subscriptions.length);
-    console.log('Student ID:', studentId);
-    console.log('Is loading:', isLoading);
+    const timestamp = new Date().toISOString();
+    console.log(`===== SUBSCRIPTIONS TAB RENDER (${timestamp}) =====`);
+    console.log('📊 Component render details:');
+    console.log('  - Subscriptions received:', subscriptions?.length || 0);
+    console.log('  - Subscriptions data:', subscriptions);
+    console.log('  - Student ID:', studentId);
+    console.log('  - Is loading:', isLoading);
+    console.log('  - Component instance:', Date.now());
+    
+    // Log each subscription in detail
+    if (subscriptions && subscriptions.length > 0) {
+      console.log('📋 Detailed subscription list:');
+      subscriptions.forEach((sub, index) => {
+        console.log(`  Subscription ${index + 1}:`, {
+          id: sub.id,
+          student_id: sub.student_id,
+          status: sub.status,
+          start_date: sub.start_date,
+          session_count: sub.session_count,
+          total_price: sub.total_price
+        });
+      });
+    } else {
+      console.log('❌ No subscriptions to display');
+    }
+    
     console.log('===== END SUBSCRIPTIONS TAB RENDER =====');
   }, [subscriptions, studentId, isLoading]);
+
+  // Log when props change
+  useEffect(() => {
+    const timestamp = new Date().toISOString();
+    console.log(`===== SUBSCRIPTIONS TAB PROPS CHANGE (${timestamp}) =====`);
+    console.log('🔄 Props change detected:');
+    console.log('  - New subscriptions count:', subscriptions?.length || 0);
+    console.log('  - Previous vs current comparison:');
+    console.log('    - Is array?', Array.isArray(subscriptions));
+    console.log('    - Is loading?', isLoading);
+    console.log('    - Student ID valid?', !!studentId);
+    
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log('⚠️ WARNING: Subscriptions is empty or null');
+      console.log('  - subscriptions value:', subscriptions);
+      console.log('  - type:', typeof subscriptions);
+    }
+    
+    console.log('===== END PROPS CHANGE LOG =====');
+  }, [subscriptions]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -72,10 +115,10 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const handleDeleteSubscription = async (subscriptionId: string) => {
     try {
       setDeletingId(subscriptionId);
-      console.log('Deleting subscription:', subscriptionId);
+      console.log('🗑️ Deleting subscription:', subscriptionId);
       
       const response = await deleteStudentSubscriptionEnhanced(subscriptionId);
-      console.log('Delete response:', response);
+      console.log('✅ Delete response:', response);
       
       // Type the response properly as RpcResponse
       const typedResponse = response as RpcResponse;
@@ -88,9 +131,10 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         description: typedResponse?.message || "Subscription deleted successfully!",
       });
 
+      console.log('🔄 Triggering refresh after deletion');
       onRefresh();
     } catch (error: any) {
-      console.error('Error deleting subscription:', error);
+      console.error('❌ Error deleting subscription:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to delete subscription",
@@ -102,17 +146,20 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   };
 
   const handleEditSubscription = (subscription: Subscription) => {
+    console.log('✏️ Editing subscription:', subscription.id);
     setEditingSubscription(subscription);
     setEditDialogOpen(true);
   };
 
   const handleEditSuccess = () => {
+    console.log('✅ Edit successful, refreshing data');
     setEditingSubscription(null);
     setEditDialogOpen(false);
     onRefresh();
   };
 
   const handleAddSuccess = () => {
+    console.log('➕ Add successful, refreshing data');
     setAddDialogOpen(false);
     onRefresh();
   };
@@ -134,8 +181,9 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     }
   };
 
-  // Show loading state
+  // Enhanced loading state with debugging
   if (isLoading) {
+    console.log('🔄 RENDERING LOADING STATE');
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -170,6 +218,56 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     );
   }
 
+  // Enhanced empty state with debugging
+  if (!subscriptions || subscriptions.length === 0) {
+    console.log('📭 RENDERING EMPTY STATE');
+    console.log('  - subscriptions:', subscriptions);
+    console.log('  - subscriptions length:', subscriptions?.length);
+    console.log('  - studentId:', studentId);
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Current Subscriptions</h3>
+            <p className="text-sm text-gray-600">Manage student subscription plans and schedules</p>
+          </div>
+          <Button 
+            onClick={() => setAddDialogOpen(true)} 
+            className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Subscription
+          </Button>
+        </div>
+
+        <div className="text-center py-12">
+          <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h3>
+          <p className="text-gray-600 mb-4">Get started by creating your first subscription plan</p>
+          <Button 
+            onClick={() => setAddDialogOpen(true)}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add First Subscription
+          </Button>
+        </div>
+
+        <AddSubscriptionDialog
+          studentId={studentId}
+          open={addDialogOpen}
+          onOpenChange={setAddDialogOpen}
+          onSuccess={handleAddSuccess}
+        />
+      </div>
+    );
+  }
+
+  // Enhanced subscriptions display with debugging
+  console.log('📊 RENDERING SUBSCRIPTIONS LIST');
+  console.log('  - Rendering', subscriptions.length, 'subscriptions');
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -186,148 +284,134 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         </Button>
       </div>
 
-      {subscriptions.length === 0 ? (
-        <div className="text-center py-12">
-          <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h3>
-          <p className="text-gray-600 mb-4">Get started by creating your first subscription plan</p>
-          <Button 
-            onClick={() => setAddDialogOpen(true)}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add First Subscription
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {subscriptions.map((subscription) => {
-            const StatusIcon = getStatusIcon(subscription.status);
-            return (
-              <Card key={subscription.id} className="group hover:shadow-lg transition-all duration-200 border border-gray-200 bg-white">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <CardTitle className="text-sm font-medium text-gray-900">
-                        {format(new Date(subscription.start_date), 'MMM dd, yyyy')}
-                      </CardTitle>
-                    </div>
-                    <Badge className={cn("text-xs font-medium border", getStatusColor(subscription.status))}>
-                      <StatusIcon className="mr-1 h-3 w-3" />
-                      {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  {/* Schedule */}
-                  <div className="flex items-start space-x-2">
-                    <Clock className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {formatSchedule(subscription.schedule)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Price */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {subscriptions.map((subscription, index) => {
+          console.log(`🃏 Rendering subscription card ${index + 1}:`, subscription.id);
+          const StatusIcon = getStatusIcon(subscription.status);
+          return (
+            <Card key={subscription.id} className="group hover:shadow-lg transition-all duration-200 border border-gray-200 bg-white">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <DollarSign className="h-4 w-4 text-gray-500" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {subscription.price_mode === 'perSession' ? 'Per Session' : 'Fixed Price'}: {subscription.currency} {subscription.total_price}
-                      </p>
-                      {subscription.price_mode === 'perSession' && subscription.price_per_session && (
-                        <p className="text-xs text-gray-500">
-                          {subscription.currency} {subscription.price_per_session} × {subscription.session_count} sessions
-                        </p>
-                      )}
-                    </div>
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <CardTitle className="text-sm font-medium text-gray-900">
+                      {format(new Date(subscription.start_date), 'MMM dd, yyyy')}
+                    </CardTitle>
                   </div>
-
-                  {/* Sessions */}
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-gray-500" />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900">
-                          {(subscription as any).sessions_completed || 0} / {subscription.session_count} Sessions
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {Math.round((((subscription as any).sessions_completed || 0) / subscription.session_count) * 100)}%
-                        </p>
-                      </div>
-                      <div className="mt-1 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ 
-                            width: `${Math.min((((subscription as any).sessions_completed || 0) / subscription.session_count) * 100, 100)}%` 
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Duration */}
-                  <div className="pt-2 border-t border-gray-100">
-                    <p className="text-xs text-gray-500">
-                      Duration: {subscription.duration_months} month{subscription.duration_months !== 1 ? 's' : ''}
-                      {(subscription as any).end_date && (
-                        <> • Ends {format(new Date((subscription as any).end_date), 'MMM dd, yyyy')}</>
-                      )}
+                  <Badge className={cn("text-xs font-medium border", getStatusColor(subscription.status))}>
+                    <StatusIcon className="mr-1 h-3 w-3" />
+                    {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {/* Schedule */}
+                <div className="flex items-start space-x-2">
+                  <Clock className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {formatSchedule(subscription.schedule)}
                     </p>
                   </div>
+                </div>
 
-                  {/* Action Buttons */}
-                  <div className="pt-3 flex justify-between items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditSubscription(subscription)}
-                      className="flex-1 text-gray-700 border-gray-300 hover:bg-gray-50"
-                    >
-                      <Edit3 className="mr-1 h-3 w-3" />
-                      Edit
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          disabled={deletingId === subscription.id}
-                          className="flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
-                        >
-                          <Trash2 className="mr-1 h-3 w-3" />
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete this subscription and all related session data.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            disabled={deletingId === subscription.id}
-                            onClick={() => handleDeleteSubscription(subscription.id)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            {deletingId === subscription.id ? 'Deleting...' : 'Delete'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                {/* Price */}
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-4 w-4 text-gray-500" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">
+                      {subscription.price_mode === 'perSession' ? 'Per Session' : 'Fixed Price'}: {subscription.currency} {subscription.total_price}
+                    </p>
+                    {subscription.price_mode === 'perSession' && subscription.price_per_session && (
+                      <p className="text-xs text-gray-500">
+                        {subscription.currency} {subscription.price_per_session} × {subscription.session_count} sessions
+                      </p>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                </div>
+
+                {/* Sessions */}
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-gray-500" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-900">
+                        {(subscription as any).sessions_completed || 0} / {subscription.session_count} Sessions
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {Math.round((((subscription as any).sessions_completed || 0) / subscription.session_count) * 100)}%
+                      </p>
+                    </div>
+                    <div className="mt-1 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${Math.min((((subscription as any).sessions_completed || 0) / subscription.session_count) * 100, 100)}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Duration */}
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-xs text-gray-500">
+                    Duration: {subscription.duration_months} month{subscription.duration_months !== 1 ? 's' : ''}
+                    {(subscription as any).end_date && (
+                      <> • Ends {format(new Date((subscription as any).end_date), 'MMM dd, yyyy')}</>
+                    )}
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-3 flex justify-between items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditSubscription(subscription)}
+                    className="flex-1 text-gray-700 border-gray-300 hover:bg-gray-50"
+                  >
+                    <Edit3 className="mr-1 h-3 w-3" />
+                    Edit
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        disabled={deletingId === subscription.id}
+                        className="flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="mr-1 h-3 w-3" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete this subscription and all related session data.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          disabled={deletingId === subscription.id}
+                          onClick={() => handleDeleteSubscription(subscription.id)}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {deletingId === subscription.id ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       <EditSubscriptionDialog
         open={editDialogOpen}
