@@ -516,25 +516,4 @@ const StudentDashboard = () => {
   );
 };
 
-const handleLogout = () => {
-  localStorage.removeItem('user');
-  setUser(null);
-  window.dispatchEvent(new Event('storage'));
-  toast.success('Logged out successfully');
-  navigate('/student-login');
-};
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
-    case 'scheduled':
-      return <Badge className="bg-blue-100 text-blue-800"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
-    case 'cancelled':
-      return <Badge className="bg-red-100 text-red-800"><AlertCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
-    default:
-      return <Badge variant="secondary">{status}</Badge>;
-  }
-};
-
 export default StudentDashboard;
