@@ -17,7 +17,7 @@ interface StudentAccessInfo {
   first_name: string;
   last_name: string;
   email: string;
-  password_hash?: string;
+  password_hash?: string | null;
   student_id: string;
   course_name: string;
   teacher_name: string;
@@ -40,7 +40,7 @@ const StudentAccess = () => {
   console.log('=== STUDENT ACCESS DEBUG ===');
   console.log('School ID:', schoolId);
 
-  // Fetch students and their password info in a single optimized query
+  // Fetch students and their password info with improved query
   const { data: studentsWithPasswords = [], isLoading } = useQuery({
     queryKey: ['students-with-passwords', schoolId],
     queryFn: async () => {
@@ -60,7 +60,7 @@ const StudentAccess = () => {
         return [];
       }
 
-      // Get all unique user IDs
+      // Get all unique user IDs that are not null
       const userIds = studentsData
         .map(s => s.user_id)
         .filter(Boolean);
@@ -75,7 +75,7 @@ const StudentAccess = () => {
           first_name: student.first_name || '',
           last_name: student.last_name || '',
           email: student.email || '',
-          password_hash: undefined,
+          password_hash: null,
           course_name: student.course_name || 'No Course',
           teacher_name: student.teacher_first_name && student.teacher_last_name
             ? `${student.teacher_first_name} ${student.teacher_last_name}`
@@ -83,7 +83,8 @@ const StudentAccess = () => {
         }));
       }
 
-      // Fetch password info for all user IDs
+      // Fetch password info for all user IDs with improved query
+      console.log('Executing password query...');
       const { data: passwordData, error: passwordError } = await supabase
         .from('users')
         .select('id, password_hash')
@@ -94,19 +95,28 @@ const StudentAccess = () => {
 
       if (passwordError) {
         console.error('Error fetching password data:', passwordError);
+        // Don't throw error, just continue with empty password data
+      }
+
+      // Create a map for faster lookup
+      const passwordMap = new Map();
+      if (passwordData) {
+        passwordData.forEach(p => {
+          passwordMap.set(p.id, p.password_hash);
+        });
       }
 
       // Combine student data with password info
-      return studentsData.map(student => {
-        const passwordInfo = passwordData?.find(p => p.id === student.user_id);
+      const result = studentsData.map(student => {
+        const passwordHash = passwordMap.get(student.user_id);
         const teacherName = student.teacher_first_name && student.teacher_last_name
           ? `${student.teacher_first_name} ${student.teacher_last_name}`
           : 'No Teacher';
 
         console.log(`Student ${student.first_name} ${student.last_name}:`, {
           user_id: student.user_id,
-          passwordInfo,
-          has_password: !!passwordInfo?.password_hash
+          passwordHash,
+          has_password: !!passwordHash
         });
 
         return {
@@ -115,32 +125,36 @@ const StudentAccess = () => {
           first_name: student.first_name || '',
           last_name: student.last_name || '',
           email: student.email || '',
-          password_hash: passwordInfo?.password_hash,
+          password_hash: passwordHash || null,
           course_name: student.course_name || 'No Course',
           teacher_name: teacherName
         };
       });
+
+      console.log('Final students with passwords:', result);
+      return result;
     },
     enabled: !!schoolId,
   });
-
-  console.log('Final students with passwords:', studentsWithPasswords);
 
   // Update password mutation
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
       console.log('Updating password for user:', userId);
       
-      const { data, error } = await supabase.rpc('hash_password', { password });
+      // Hash the password using Supabase RPC function
+      const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', { 
+        password: password 
+      });
       
-      if (error) {
-        console.error('Error hashing password:', error);
-        throw error;
+      if (hashError) {
+        console.error('Error hashing password:', hashError);
+        throw new Error('Failed to hash password: ' + hashError.message);
       }
 
-      const hashedPassword = data;
       console.log('Password hashed successfully');
 
+      // Update the user's password
       const { error: updateError } = await supabase
         .from('users')
         .update({ 
@@ -151,7 +165,7 @@ const StudentAccess = () => {
 
       if (updateError) {
         console.error('Error updating password:', updateError);
-        throw updateError;
+        throw new Error('Failed to update password: ' + updateError.message);
       }
 
       console.log('Password updated successfully in database');
