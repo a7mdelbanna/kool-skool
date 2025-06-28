@@ -1,5 +1,5 @@
-
-import { format, parseISO, toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { format, toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { parseISO } from 'date-fns';
 
 // Common timezone options for the UI
 export const COMMON_TIMEZONES = [
