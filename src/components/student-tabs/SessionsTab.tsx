@@ -19,6 +19,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +71,20 @@ interface DatabaseSession {
   moved_from_session_id?: string | null;
 }
 
+interface SubscriptionInfo {
+  id: string;
+  session_count: number;
+  duration_months: number;
+  start_date: string;
+  end_date: string | null;
+  total_price: number;
+  currency: string;
+  status: string;
+  schedule: any;
+  notes: string | null;
+  sessions: DatabaseSession[];
+}
+
 interface SessionActionResponse {
   success: boolean;
   message: string;
@@ -76,6 +97,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   isViewMode = false 
 }) => {
   const [sessions, setSessions] = useState<DatabaseSession[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
@@ -90,93 +112,82 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   // Load sessions when component mounts or studentData changes
   useEffect(() => {
     if (studentData.id) {
-      loadSessions();
+      loadSessionsAndSubscriptions();
     }
   }, [studentData.id]);
 
-  const loadSessions = async () => {
+  const loadSessionsAndSubscriptions = async () => {
     if (!studentData.id) return;
     
     try {
       setLoading(true);
-      console.log('=== LOADING SESSIONS WITH COMPREHENSIVE DATABASE STRUCTURE ===');
+      console.log('=== LOADING SESSIONS AND SUBSCRIPTIONS WITH GROUPING ===');
       console.log('Loading sessions for student:', studentData.id);
       
-      const data = await getStudentLessonSessions(studentData.id);
-      console.log('Raw sessions data received:', data);
+      // Load sessions
+      const sessionsData = await getStudentLessonSessions(studentData.id);
+      console.log('Raw sessions data received:', sessionsData);
       
-      // Ensure data is an array and properly typed
-      const sessionsArray = Array.isArray(data) ? data as DatabaseSession[] : [];
-      
-      // Comprehensive validation for the new database structure
-      if (sessionsArray.length > 0) {
-        console.log('=== VALIDATING SESSION DATA INTEGRITY WITH COMPREHENSIVE CHECKS ===');
-        const uniqueCheck = new Map();
-        const validSessions: DatabaseSession[] = [];
-        
-        sessionsArray.forEach((session, index) => {
-          const dateKey = session.scheduled_date;
-          console.log(`Session ${index + 1}:`, {
-            id: session.id,
-            scheduled_date: session.scheduled_date,
-            notes: session.notes,
-            index_in_sub: session.index_in_sub,
-            status: session.status
-          });
-          
-          if (uniqueCheck.has(dateKey)) {
-            console.warn(`⚠️  DUPLICATE DETECTED: Session at ${dateKey} - This should not happen with comprehensive constraints`);
-            // Don't add duplicates to the display
-          } else {
-            uniqueCheck.set(dateKey, session);
-            validSessions.push(session);
-          }
-        });
-        
-        if (validSessions.length !== sessionsArray.length) {
-          const duplicateCount = sessionsArray.length - validSessions.length;
-          console.error(`❌ FOUND ${duplicateCount} DUPLICATE SESSIONS - Comprehensive database constraints may not be working`);
-          toast({
-            title: "Warning: Data Integrity Issue",
-            description: `Found ${duplicateCount} duplicate session(s). Comprehensive database constraints should prevent this.`,
-            variant: "destructive",
-          });
-        } else {
-          console.log('✅ ALL SESSIONS ARE UNIQUE - Comprehensive database constraints working correctly');
-        }
-        
-        setSessions(validSessions);
-      } else {
-        setSessions([]);
+      const sessionsArray = Array.isArray(sessionsData) ? sessionsData as DatabaseSession[] : [];
+      setSessions(sessionsArray);
+
+      // Load subscription details
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('student_id', studentData.id)
+        .order('created_at', { ascending: false });
+
+      if (subscriptionError) {
+        console.error('Error loading subscriptions:', subscriptionError);
+        throw subscriptionError;
       }
+
+      // Group sessions by subscription
+      const subscriptionsWithSessions: SubscriptionInfo[] = (subscriptionData || []).map(sub => ({
+        id: sub.id,
+        session_count: sub.session_count,
+        duration_months: sub.duration_months,
+        start_date: sub.start_date,
+        end_date: sub.end_date,
+        total_price: sub.total_price,
+        currency: sub.currency,
+        status: sub.status,
+        schedule: sub.schedule,
+        notes: sub.notes,
+        sessions: sessionsArray.filter(session => session.subscription_id === sub.id)
+      }));
+
+      setSubscriptions(subscriptionsWithSessions);
       
-      console.log(`✅ Successfully loaded ${sessionsArray.length} sessions with comprehensive validation`);
-      console.log('=== END COMPREHENSIVE SESSION LOADING ===');
+      console.log(`✅ Successfully loaded ${sessionsArray.length} sessions grouped into ${subscriptionsWithSessions.length} subscriptions`);
+      console.log('=== END SESSION LOADING WITH GROUPING ===');
     } catch (error) {
-      console.error('❌ Error loading sessions:', error);
+      console.error('❌ Error loading sessions and subscriptions:', error);
       toast({
         title: "Error",
         description: "Failed to load sessions. Please try refreshing.",
         variant: "destructive",
       });
-      setSessions([]); // Set empty array on error
+      setSessions([]);
+      setSubscriptions([]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleRefreshSessions = async () => {
-    console.log('=== COMPREHENSIVE MANUAL REFRESH TRIGGERED ===');
+    console.log('=== MANUAL REFRESH TRIGGERED ===');
     setRefreshing(true);
     
     try {
-      await loadSessions();
+      await loadSessionsAndSubscriptions();
       toast({
         title: "Sessions Refreshed",
-        description: "Session data has been updated successfully with comprehensive validation",
+        description: "Session data has been updated successfully",
       });
     } catch (error) {
-      console.error('Error during comprehensive manual refresh:', error);
+      console.error('Error during manual refresh:', error);
       toast({
         title: "Refresh Failed",
         description: "Could not refresh session data",
@@ -186,28 +197,18 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       setRefreshing(false);
     }
   };
-  
-  const upcomingSessions = sessions.filter(
-    session => session.status === "scheduled" && new Date(session.scheduled_date) >= new Date()
-  ).sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
-  
-  const pastSessions = sessions.filter(
-    session => session.status !== "scheduled" || new Date(session.scheduled_date) < new Date()
-  ).sort((a, b) => new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime());
-  
+
   const handleUpdateSessionStatus = async (sessionId: string, newStatus: string) => {
     try {
       setLoading(true);
       console.log(`🎯 Updating session ${sessionId} with status change to: ${newStatus}`);
       
-      // Handle status change differently - use direct database update for simple status changes
       if (newStatus === 'scheduled') {
-        // For changing back to scheduled, update the session directly in the database
         const { error } = await supabase
           .from('lesson_sessions')
           .update({ 
             status: 'scheduled',
-            counts_toward_completion: true // Reset to count toward completion
+            counts_toward_completion: true
           })
           .eq('id', sessionId);
         
@@ -221,7 +222,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           description: "Session status updated to scheduled successfully",
         });
       } else {
-        // For other status changes, use the existing session action system
         let action: string;
         switch (newStatus) {
           case 'completed':
@@ -235,8 +235,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         }
         
         const rawResult = await handleSessionAction(sessionId, action);
-        
-        // Type cast the JSON response to our expected interface
         const result = rawResult as unknown as SessionActionResponse;
         
         if (result.success) {
@@ -249,8 +247,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         }
       }
       
-      // Reload sessions to reflect changes
-      await loadSessions();
+      await loadSessionsAndSubscriptions();
     } catch (error) {
       console.error('❌ Error handling session status update:', error);
       toast({
@@ -269,8 +266,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       console.log(`🔄 Moving session ${sessionId} to next available slot`);
       
       const rawResult = await handleSessionAction(sessionId, 'moved');
-      
-      // Type cast the JSON response to our expected interface
       const result = rawResult as unknown as SessionActionResponse;
       
       if (result.success) {
@@ -279,8 +274,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           description: result.message + (result.new_session_id ? ' New session created.' : ''),
         });
         
-        // Reload sessions to show both the moved session and new session
-        await loadSessions();
+        await loadSessionsAndSubscriptions();
       } else {
         throw new Error(result.message || 'Failed to move session');
       }
@@ -312,8 +306,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       console.log(`📅 Rescheduling session ${selectedSession.id} to ${newDateTime}`);
       
       const rawResult = await handleSessionAction(selectedSession.id, 'rescheduled', newDateTime);
-      
-      // Type cast the JSON response to our expected interface
       const result = rawResult as unknown as SessionActionResponse;
       
       if (result.success) {
@@ -322,8 +314,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           description: result.message || "Session has been rescheduled successfully",
         });
         
-        // Reload sessions to reflect changes
-        await loadSessions();
+        await loadSessionsAndSubscriptions();
         setRescheduleDialogOpen(false);
         setSelectedSession(null);
         setRescheduleDate("");
@@ -428,11 +419,178 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       </Badge>
     );
   };
-  
-  const renderSessionsList = (sessionsList: DatabaseSession[], title: string) => (
-    <div className="space-y-4">
+
+  const formatSchedule = (schedule: any) => {
+    try {
+      if (typeof schedule === 'string') {
+        const parsed = JSON.parse(schedule);
+        return Array.isArray(parsed) 
+          ? parsed.map(s => `${s.day} at ${s.time}`).join(', ')
+          : schedule;
+      }
+      if (Array.isArray(schedule)) {
+        return schedule.map(s => `${s.day} at ${s.time}`).join(', ');
+      }
+      return JSON.stringify(schedule);
+    } catch {
+      return schedule?.toString() || 'No schedule';
+    }
+  };
+
+  const renderSession = (session: DatabaseSession) => (
+    <div
+      key={session.id}
+      className={cn(
+        "border rounded-md p-4 mb-3",
+        (session.status === "cancelled" || !session.counts_toward_completion) && "bg-muted/30"
+      )}
+    >
+      <div className="flex flex-wrap justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">
+              {format(new Date(session.scheduled_date), "EEEE, MMMM d, yyyy")}
+            </span>
+            {session.index_in_sub && (
+              <Badge variant="secondary" className="text-xs">
+                #{session.original_session_index || session.index_in_sub}
+              </Badge>
+            )}
+            {session.moved_from_session_id && (
+              <Badge variant="outline" className="text-xs border-blue-500 text-blue-500">
+                Replacement
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+            <Clock className="h-3 w-3" />
+            <span>{format(new Date(session.scheduled_date), "HH:mm")} • {session.duration_minutes || 60} min</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-start gap-2">
+          {getStatusBadge(session)}
+          {getPaymentBadge(session)}
+        </div>
+      </div>
+      
+      {session.cost > 0 && (
+        <div className="mt-2 text-sm">
+          <span className="font-medium">${session.cost.toFixed(2)}</span>
+        </div>
+      )}
+      
+      {session.notes && (
+        <div className="mt-2 text-sm text-muted-foreground">
+          {session.notes}
+        </div>
+      )}
+
+      {!isViewMode && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {session.status === "scheduled" && (
+            <div className="flex gap-2 w-full">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-green-500 text-green-500 hover:bg-green-50 flex-1"
+                onClick={() => {
+                  setSelectedSession(session);
+                  setCompleteDialogOpen(true);
+                }}
+                disabled={loading}
+              >
+                <Check className="h-3.5 w-3.5 mr-1" />
+                Mark as Attended
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-red-500 text-red-500 hover:bg-red-50 flex-1"
+                onClick={() => {
+                  setSelectedSession(session);
+                  setCancelDialogOpen(true);
+                }}
+                disabled={loading}
+              >
+                <X className="h-3.5 w-3.5 mr-1" />
+                Cancel Session
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-orange-500 text-orange-500 hover:bg-orange-50 flex-1"
+                onClick={() => {
+                  setSelectedSession(session);
+                  setRescheduleDialogOpen(true);
+                }}
+                disabled={loading}
+              >
+                <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                Reschedule
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-blue-500 text-blue-500 hover:bg-blue-50 flex-1"
+                onClick={() => handleMoveSession(session.id)}
+                disabled={loading}
+              >
+                <ArrowRight className="h-3.5 w-3.5 mr-1" />
+                Move
+              </Button>
+            </div>
+          )}
+          
+          {(session.status === "completed" || session.status === "cancelled" || session.status === "rescheduled") && (
+            <div className="flex gap-2 w-full flex-wrap">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-purple-500 text-purple-500 hover:bg-purple-50 flex-1"
+                onClick={() => {
+                  setSelectedSession(session);
+                  setChangeStatusDialogOpen(true);
+                }}
+                disabled={loading}
+              >
+                <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                Change Status
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-orange-500 text-orange-500 hover:bg-orange-50 flex-1"
+                onClick={() => {
+                  setSelectedSession(session);
+                  setRescheduleDialogOpen(true);
+                }}
+                disabled={loading}
+              >
+                <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                Reschedule
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  if (loading && subscriptions.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Loading sessions grouped by subscription...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">{title}</h3>
+        <h3 className="text-lg font-medium">Sessions by Subscription</h3>
         <Button
           variant="outline"
           size="sm"
@@ -444,175 +602,104 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           {refreshing ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
-      {sessionsList.length === 0 ? (
+
+      {subscriptions.length === 0 ? (
         <div className="text-center py-6 border rounded-md bg-muted/30">
-          <p className="text-muted-foreground">No {title.toLowerCase()}</p>
-          {title === "Upcoming Sessions" && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Sessions will appear here after adding a subscription
-            </p>
-          )}
+          <p className="text-muted-foreground">No subscriptions found</p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Sessions will appear here after adding a subscription
+          </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {sessionsList.map((session) => (
-            <div
-              key={session.id}
-              className={cn(
-                "border rounded-md p-4",
-                (session.status === "cancelled" || !session.counts_toward_completion) && "bg-muted/30"
-              )}
-            >
-              <div className="flex flex-wrap justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">
-                      {format(new Date(session.scheduled_date), "EEEE, MMMM d, yyyy")}
-                    </span>
-                    {session.index_in_sub && (
-                      <Badge variant="secondary" className="text-xs">
-                        #{session.original_session_index || session.index_in_sub}
-                      </Badge>
-                    )}
-                    {session.moved_from_session_id && (
-                      <Badge variant="outline" className="text-xs border-blue-500 text-blue-500">
-                        Replacement
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                    <Clock className="h-3 w-3" />
-                    <span>{format(new Date(session.scheduled_date), "HH:mm")} • {session.duration_minutes || 60} min</span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-start gap-2">
-                  {getStatusBadge(session)}
-                  {getPaymentBadge(session)}
-                </div>
-              </div>
-              
-              {session.cost > 0 && (
-                <div className="mt-2 text-sm">
-                  <span className="font-medium">${session.cost.toFixed(2)}</span>
-                </div>
-              )}
-              
-              {session.notes && (
-                <div className="mt-2 text-sm text-muted-foreground">
-                  {session.notes}
-                </div>
-              )}
+        <Accordion type="multiple" defaultValue={subscriptions.map(sub => sub.id)} className="space-y-4">
+          {subscriptions.map((subscription) => {
+            const completedSessions = subscription.sessions.filter(s => 
+              s.status === 'completed' && s.counts_toward_completion
+            ).length;
+            
+            const upcomingSessions = subscription.sessions.filter(s => 
+              s.status === 'scheduled' && new Date(s.scheduled_date) >= new Date()
+            ).length;
 
-              {!isViewMode && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {session.status === "scheduled" && (
-                    <div className="flex gap-2 w-full">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-green-500 text-green-500 hover:bg-green-50 flex-1"
-                        onClick={() => {
-                          setSelectedSession(session);
-                          setCompleteDialogOpen(true);
-                        }}
-                        disabled={loading}
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Mark as Attended
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-red-500 text-red-500 hover:bg-red-50 flex-1"
-                        onClick={() => {
-                          setSelectedSession(session);
-                          setCancelDialogOpen(true);
-                        }}
-                        disabled={loading}
-                      >
-                        <X className="h-3.5 w-3.5 mr-1" />
-                        Cancel Session
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-orange-500 text-orange-500 hover:bg-orange-50 flex-1"
-                        onClick={() => {
-                          setSelectedSession(session);
-                          setRescheduleDialogOpen(true);
-                        }}
-                        disabled={loading}
-                      >
-                        <CalendarClock className="h-3.5 w-3.5 mr-1" />
-                        Reschedule
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-blue-500 text-blue-500 hover:bg-blue-50 flex-1"
-                        onClick={() => handleMoveSession(session.id)}
-                        disabled={loading}
-                      >
-                        <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                        Move
-                      </Button>
+            return (
+              <AccordionItem key={subscription.id} value={subscription.id} className="border rounded-lg">
+                <Card>
+                  <AccordionTrigger className="px-6 py-4 hover:no-underline">
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <div className="text-left">
+                        <CardTitle className="text-base font-medium">
+                          {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {format(new Date(subscription.start_date), 'MMMM dd, yyyy')} - {subscription.currency} {subscription.total_price.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="text-center">
+                          <div className="font-semibold text-green-600">{completedSessions}</div>
+                          <div className="text-xs text-muted-foreground">Completed</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-semibold text-blue-600">{upcomingSessions}</div>
+                          <div className="text-xs text-muted-foreground">Upcoming</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-semibold">{subscription.sessions.length}</div>
+                          <div className="text-xs text-muted-foreground">Total</div>
+                        </div>
+                        <Badge variant="outline" className={
+                          subscription.status === 'active' ? 'border-green-300 text-green-700' :
+                          subscription.status === 'paused' ? 'border-yellow-300 text-yellow-700' :
+                          subscription.status === 'completed' ? 'border-blue-300 text-blue-700' :
+                          'border-red-300 text-red-700'
+                        }>
+                          {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                        </Badge>
+                      </div>
                     </div>
-                  )}
+                  </AccordionTrigger>
                   
-                  {(session.status === "completed" || session.status === "cancelled" || session.status === "rescheduled") && (
-                    <div className="flex gap-2 w-full flex-wrap">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-purple-500 text-purple-500 hover:bg-purple-50 flex-1"
-                        onClick={() => {
-                          setSelectedSession(session);
-                          setChangeStatusDialogOpen(true);
-                        }}
-                        disabled={loading}
-                      >
-                        <RefreshCcw className="h-3.5 w-3.5 mr-1" />
-                        Change Status
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-orange-500 text-orange-500 hover:bg-orange-50 flex-1"
-                        onClick={() => {
-                          setSelectedSession(session);
-                          setRescheduleDialogOpen(true);
-                        }}
-                        disabled={loading}
-                      >
-                        <CalendarClock className="h-3.5 w-3.5 mr-1" />
-                        Reschedule
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <div className="mb-4 p-4 bg-muted/30 rounded-lg">
+                        <h5 className="font-medium mb-2">Subscription Details</h5>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Schedule:</span>
+                            <p>{formatSchedule(subscription.schedule)}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Duration:</span>
+                            <p>{subscription.start_date} to {subscription.end_date || 'Ongoing'}</p>
+                          </div>
+                        </div>
+                        {subscription.notes && (
+                          <div className="mt-2">
+                            <span className="text-muted-foreground">Notes:</span>
+                            <p className="text-sm">{subscription.notes}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {subscription.sessions.length === 0 ? (
+                        <div className="text-center py-4 text-muted-foreground">
+                          No sessions found for this subscription
+                        </div>
+                      ) : (
+                        <div className="space-y-0">
+                          {subscription.sessions
+                            .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime())
+                            .map(renderSession)}
+                        </div>
+                      )}
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       )}
-    </div>
-  );
-
-  if (loading && sessions.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading sessions with comprehensive validation...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {renderSessionsList(upcomingSessions, "Upcoming Sessions")}
-      {renderSessionsList(pastSessions, "Past Sessions")}
       
       <div className="border-t pt-4 mt-6">
         <div className="flex items-center justify-between">
@@ -621,7 +708,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             Sessions are automatically generated when you add a subscription. Use actions to manage attendance and scheduling.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length} | Session actions: Attend, Cancel, Move, Reschedule ✅
+            Total sessions: {sessions.length} | Grouped by subscription ✅
           </p>
         </div>
       </div>
