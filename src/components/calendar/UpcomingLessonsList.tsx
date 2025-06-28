@@ -312,7 +312,66 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     );
   };
 
-  // Render change status button for ALL sessions (regardless of current status)
+  // Render quick action buttons for scheduled sessions (mirroring SessionsTab behavior)
+  const renderQuickActionButtons = (session: Session) => {
+    const sessionId = session.id;
+    const isLoading = actionLoading === sessionId;
+
+    return (
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <Button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, "attended");
+          }} 
+          className="h-7 px-2 text-xs border-green-500 text-green-500 hover:bg-green-50"
+          variant="outline"
+          disabled={isLoading}
+        >
+          <Check className="h-3 w-3 mr-1" />
+          {actionLoading === sessionId && actionLoading === "attended" ? "..." : "Mark as Attended"}
+        </Button>
+        <Button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, "cancelled");
+          }} 
+          className="h-7 px-2 text-xs border-red-500 text-red-500 hover:bg-red-50"
+          variant="outline"
+          disabled={isLoading}
+        >
+          <X className="h-3 w-3 mr-1" />
+          {actionLoading === sessionId && actionLoading === "cancelled" ? "..." : "Cancel Session"}
+        </Button>
+        <Button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, "rescheduled");
+          }} 
+          className="h-7 px-2 text-xs border-orange-500 text-orange-500 hover:bg-orange-50"
+          variant="outline"
+          disabled={isLoading}
+        >
+          <RefreshCcw className="h-3 w-3 mr-1" />
+          {actionLoading === sessionId && actionLoading === "rescheduled" ? "..." : "Reschedule"}
+        </Button>
+        <Button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSessionActionClick(sessionId, "moved");
+          }} 
+          className="h-7 px-2 text-xs border-blue-500 text-blue-500 hover:bg-blue-50"
+          variant="outline"
+          disabled={isLoading}
+        >
+          <ArrowRight className="h-3 w-3 mr-1" />
+          {actionLoading === sessionId && actionLoading === "moved" ? "..." : "Move"}
+        </Button>
+      </div>
+    );
+  };
+
+  // Render change status button for NON-SCHEDULED sessions only
   const renderChangeStatusButton = (session: Session) => {
     const sessionId = session.id;
     const isExpanded = statusChangeSession === sessionId;
@@ -462,8 +521,11 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                           </div>
                         )}
 
-                        {/* Change Status Button - Show for ALL sessions */}
-                        {renderChangeStatusButton(session)}
+                        {/* Show Quick Action Buttons for SCHEDULED sessions, Change Status for others */}
+                        {session.status === "scheduled" ? 
+                          renderQuickActionButtons(session) : 
+                          renderChangeStatusButton(session)
+                        }
                       </div>
                       
                       {/* Status Badge */}
