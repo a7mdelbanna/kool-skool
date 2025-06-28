@@ -320,7 +320,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     const isLoading = actionLoading === sessionId;
 
     return (
-      <div className="grid grid-cols-4 gap-2 mt-2">
+      <div className="grid grid-cols-4 gap-2 mt-3">
         <Button 
           onClick={(e) => {
             e.stopPropagation();
@@ -375,7 +375,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     const isLoading = actionLoading === sessionId;
 
     return (
-      <div className="grid grid-cols-4 gap-2 mt-2">
+      <div className="grid grid-cols-4 gap-2 mt-3">
         <Button 
           onClick={(e) => {
             e.stopPropagation();
@@ -434,7 +434,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     const isExpanded = statusChangeSession === sessionId;
     
     return (
-      <div className="mt-2">
+      <div className="mt-3">
         <Button
           size="sm"
           variant="outline"
@@ -461,7 +461,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     const progressPercentage = Math.round((completedSessions / totalSessions) * 100);
     
     return (
-      <div className="flex-shrink-0 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <div className="flex-shrink-0 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 min-w-[120px]">
         <div className="flex items-center gap-2 mb-2">
           <div className="p-1 bg-blue-500 rounded-full">
             <CircleCheck className="h-3 w-3 text-white" />
@@ -522,7 +522,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                 }`}
                 onClick={() => handleLessonClick(session)}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-start gap-4">
                   {/* Time Section - Left Side */}
                   <div className="flex-shrink-0 text-center min-w-[80px]">
                     <div className={`text-2xl font-bold ${
@@ -549,54 +549,74 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                   
                   {/* Main Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className={`font-semibold text-lg truncate ${
                           isPastSession ? 'text-gray-500' : 'text-foreground'
                         }`}>
                           {studentName}
                         </div>
-                        <div className={`text-sm mb-2 ${
+                        <div className={`text-sm mb-3 ${
                           isPastSession ? 'text-gray-400' : 'text-muted-foreground'
                         }`}>
                           {subjectAndLevel} Lesson
                         </div>
-                        <div className={`flex items-center text-sm mb-2 ${
+                        <div className={`flex items-center text-sm mb-4 ${
                           isPastSession ? 'text-gray-400' : 'text-muted-foreground'
                         }`}>
                           <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                           {dateLabel}
                         </div>
                         
-                        {/* Session Number & Subscription Details */}
+                        {/* Session Number & Subscription Details - Improved Layout */}
                         {subscriptionInfo && !loading && (
-                          <div className={`text-xs px-2 py-1 rounded-md border mt-2 ${
+                          <div className={`rounded-md border p-3 mb-4 ${
                             isPastSession 
-                              ? 'bg-gray-100 text-gray-500 border-gray-300' 
-                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                              ? 'bg-gray-100 border-gray-300' 
+                              : 'bg-blue-50 border-blue-200'
                           }`}>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <div className="flex items-center gap-1">
+                            <div className="flex flex-wrap gap-2">
+                              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                                isPastSession 
+                                  ? 'bg-gray-200 text-gray-600' 
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
                                 <Hash className="h-3 w-3" />
-                                <span className="font-medium">
-                                  {sessionNumber}
-                                </span>
+                                <span className="font-medium">Session {sessionNumber}</span>
                               </div>
+                              
                               {subscriptionInfo.subscriptionName && (
-                                <>
-                                  <span>•</span>
-                                  <span>{subscriptionInfo.subscriptionName}</span>
-                                </>
+                                <div className={`px-2 py-1 rounded text-xs ${
+                                  isPastSession 
+                                    ? 'bg-gray-200 text-gray-600' 
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {subscriptionInfo.subscriptionName}
+                                </div>
                               )}
-                              <span>•</span>
-                              <span>{subscriptionInfo.sessionCount} lessons total</span>
-                              <span>•</span>
-                              <div className="flex items-center gap-1">
+                              
+                              <div className={`px-2 py-1 rounded text-xs ${
+                                isPastSession 
+                                  ? 'bg-gray-200 text-gray-600' 
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {subscriptionInfo.sessionCount} lessons total
+                              </div>
+                              
+                              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                                isPastSession 
+                                  ? 'bg-gray-200 text-gray-600' 
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
                                 <DollarSign className="h-3 w-3" />
                                 <span>${subscriptionInfo.totalPrice} {subscriptionInfo.currency}</span>
                               </div>
-                              <span>•</span>
-                              <div className="flex items-center gap-1">
+                              
+                              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                                isPastSession 
+                                  ? 'bg-gray-200 text-gray-600' 
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
                                 <CalendarScheduleIcon className="h-3 w-3" />
                                 <span>
                                   {format(new Date(subscriptionInfo.startDate), 'dd MMM')} – {format(new Date(subscriptionInfo.endDate), 'dd MMM')}
@@ -607,7 +627,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                         )}
                         
                         {loading && (
-                          <div className="text-xs text-muted-foreground mt-2">
+                          <div className="text-xs text-muted-foreground mb-4">
                             Loading session details...
                           </div>
                         )}
@@ -626,7 +646,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
                       
                       {/* Status Badge - fallback when no progress info */}
                       {(!subscriptionInfo || loading || isPastSession) && (
-                        <div className="flex-shrink-0 ml-4">
+                        <div className="flex-shrink-0">
                           <Badge 
                             variant="outline" 
                             className={
