@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   format, 
@@ -74,10 +75,10 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
               const activeSubscription = subscriptions.find(sub => sub.status === 'active');
               
               if (activeSubscription) {
-                // Count completed sessions (attended or cancelled)
+                // Count completed sessions (attended or cancelled) - handle nullable value
                 const completedSessions = activeSubscription.sessions_completed || 0;
                 
-                // Calculate end date if not provided
+                // Calculate end date if not provided - handle nullable value
                 let endDate = activeSubscription.end_date;
                 if (!endDate && activeSubscription.start_date && activeSubscription.duration_months) {
                   const startDate = new Date(activeSubscription.start_date);
