@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -146,8 +145,8 @@ const StudentAccess = () => {
     try {
       console.log('Using RPC function to get password hash...');
       
-      // Use the dedicated RPC function to get password hash
-      const { data, error } = await supabase.rpc('get_user_password_hash', {
+      // Use the dedicated RPC function to get password hash with type assertion
+      const { data, error } = await (supabase as any).rpc('get_user_password_hash', {
         p_user_id: userId
       });
 
@@ -159,7 +158,8 @@ const StudentAccess = () => {
         return null;
       }
 
-      if (!data || data.length === 0) {
+      // Properly check if data is an array and has length
+      if (!data || !Array.isArray(data) || data.length === 0) {
         console.log('No password hash found for user:', userId);
         toast.error('No password found for this user');
         return null;
