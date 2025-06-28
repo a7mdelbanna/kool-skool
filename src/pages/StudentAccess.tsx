@@ -37,6 +37,9 @@ const StudentAccess = () => {
   const user = userData ? JSON.parse(userData) : null;
   const schoolId = user?.schoolId;
 
+  console.log('=== STUDENT ACCESS DEBUG ===');
+  console.log('School ID:', schoolId);
+
   // Fetch students using the same approach as the Students page
   const { data: studentsData = [], isLoading } = useQuery({
     queryKey: ['students', schoolId],
@@ -44,17 +47,36 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
+  console.log('Students data:', studentsData);
+
   // Fetch password hash information separately for students
-  const { data: passwordData = [] } = useQuery({
+  const { data: passwordData = [], isLoading: passwordLoading } = useQuery({
     queryKey: ['student-passwords', schoolId],
     queryFn: async () => {
-      if (!schoolId) return [];
+      if (!schoolId) {
+        console.log('No school ID for password query');
+        return [];
+      }
+
+      // Get all user IDs from students data
+      const userIds = studentsData
+        .map(s => s.user_id)
+        .filter(Boolean);
+
+      console.log('User IDs for password query:', userIds);
+
+      if (userIds.length === 0) {
+        console.log('No user IDs found, returning empty array');
+        return [];
+      }
 
       const { data, error } = await supabase
         .from('users')
         .select('id, password_hash')
         .eq('role', 'student')
-        .in('id', studentsData.map(s => s.user_id).filter(Boolean));
+        .in('id', userIds);
+
+      console.log('Password query result:', { data, error });
 
       if (error) {
         console.error('Error fetching password data:', error);
@@ -66,12 +88,20 @@ const StudentAccess = () => {
     enabled: !!schoolId && studentsData.length > 0,
   });
 
+  console.log('Password data:', passwordData);
+
   // Transform the data to match our interface
   const students: StudentAccessInfo[] = studentsData.map(student => {
     const passwordInfo = passwordData.find(p => p.id === student.user_id);
     const teacherName = student.teacher_first_name && student.teacher_last_name
       ? `${student.teacher_first_name} ${student.teacher_last_name}`
       : 'No Teacher';
+
+    console.log(`Student ${student.first_name} ${student.last_name}:`, {
+      user_id: student.user_id,
+      passwordInfo,
+      has_password: !!passwordInfo?.password_hash
+    });
 
     return {
       id: student.user_id || '',
@@ -85,9 +115,13 @@ const StudentAccess = () => {
     };
   });
 
+  console.log('Transformed students:', students);
+
   // Update password mutation
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      console.log('Updating password for user:', userId);
+      
       const { data, error } = await supabase.rpc('hash_password', { password });
       
       if (error) {
@@ -96,6 +130,7 @@ const StudentAccess = () => {
       }
 
       const hashedPassword = data;
+      console.log('Password hashed successfully');
 
       const { error: updateError } = await supabase
         .from('users')
@@ -110,9 +145,11 @@ const StudentAccess = () => {
         throw updateError;
       }
 
+      console.log('Password updated successfully in database');
       return { success: true };
     },
     onSuccess: () => {
+      console.log('Password update mutation succeeded, invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
       queryClient.invalidateQueries({ queryKey: ['student-passwords', schoolId] });
       setIsDialogOpen(false);
@@ -127,6 +164,7 @@ const StudentAccess = () => {
   });
 
   const handleSetPassword = (student: StudentAccessInfo) => {
+    console.log('Setting password for student:', student);
     setSelectedStudent(student);
     setNewPassword('');
     setIsDialogOpen(true);
@@ -145,6 +183,7 @@ const StudentAccess = () => {
       return;
     }
 
+    console.log('Submitting password update for:', selectedStudent.id);
     updatePasswordMutation.mutate({
       userId: selectedStudent.id,
       password: newPassword.trim()
@@ -155,6 +194,8 @@ const StudentAccess = () => {
     `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  console.log('Filtered students for display:', filteredStudents);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -186,7 +227,7 @@ const StudentAccess = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading || passwordLoading ? (
             <div className="flex items-center justify-center p-8">
               <div className="text-muted-foreground">Loading students...</div>
             </div>
