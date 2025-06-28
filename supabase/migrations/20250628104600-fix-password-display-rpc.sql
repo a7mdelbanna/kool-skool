@@ -1,5 +1,8 @@
 
--- Create a function to get the actual password hash for a specific user
+-- Drop the existing function first
+DROP FUNCTION IF EXISTS public.get_user_password_hash(uuid);
+
+-- Create a more robust function to get the actual password hash for a specific user
 CREATE OR REPLACE FUNCTION public.get_user_password_hash(p_user_id uuid)
 RETURNS TABLE(
   user_id uuid,
@@ -12,6 +15,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  -- Add logging for debugging
+  RAISE NOTICE 'Getting password hash for user_id: %', p_user_id;
+  
   RETURN QUERY
   SELECT 
     u.id as user_id,
@@ -24,5 +30,13 @@ BEGIN
     AND u.role = 'student'
     AND u.password_hash IS NOT NULL
     AND u.password_hash != '';
+    
+  -- Log if no results found
+  IF NOT FOUND THEN
+    RAISE NOTICE 'No password hash found for user_id: %', p_user_id;
+  END IF;
 END;
 $$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.get_user_password_hash(uuid) TO authenticated;

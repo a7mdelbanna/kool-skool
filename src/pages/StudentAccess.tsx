@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Key, Eye, EyeOff, Edit, Copy, CheckCheck } from 'lucide-react';
@@ -145,8 +146,8 @@ const StudentAccess = () => {
     try {
       console.log('Using RPC function to get password hash...');
       
-      // Use the dedicated RPC function to get password hash with type assertion
-      const { data, error } = await (supabase as any).rpc('get_user_password_hash', {
+      // Use the dedicated RPC function to get password hash
+      const { data, error } = await supabase.rpc('get_user_password_hash', {
         p_user_id: userId
       });
 
