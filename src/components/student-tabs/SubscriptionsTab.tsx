@@ -297,25 +297,6 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         )}
       </div>
 
-      {/* Debug Info Card - Remove this in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="bg-gray-50 border-gray-200">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <AlertCircle className="h-4 w-4 text-gray-500" />
-              <h4 className="text-sm font-medium text-gray-700">Debug Info</h4>
-            </div>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div>Student ID: {studentId}</div>
-              <div>Subscriptions Count: {subscriptions?.length || 0}</div>
-              <div>Is Loading: {subscriptionsLoading.toString()}</div>
-              <div>Has Error: {!!subscriptionsError}</div>
-              <div>Array Check: {Array.isArray(subscriptions).toString()}</div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Dialogs */}
       <EditSubscriptionDialog
         open={editDialogOpen}
