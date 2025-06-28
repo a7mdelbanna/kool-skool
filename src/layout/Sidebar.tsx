@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
@@ -15,7 +14,8 @@ import {
   Key,
   ChevronLeft,
   ChevronRight,
-  DollarSign
+  DollarSign,
+  Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ const Sidebar = () => {
   const adminNavigation = [
     { name: 'Settings', href: '/settings', icon: Settings },
     { name: 'Team Access', href: '/team-access', icon: UserCog },
+    { name: 'Student Access', href: '/student-access', icon: Shield },
     { name: 'License', href: '/license', icon: Key },
   ];
 

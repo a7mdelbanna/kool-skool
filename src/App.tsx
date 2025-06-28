@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +17,7 @@ import Settings from "./pages/Settings";
 import SchoolSetup from "./pages/SchoolSetup";
 import StatesReports from "./pages/StatesReports";
 import TeamAccess from "./pages/TeamAccess";
+import StudentAccess from "./pages/StudentAccess";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import LicenseManagement from "./pages/LicenseManagement";
@@ -110,6 +110,7 @@ const App = () => {
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<StatesReports />} />
                   <Route path="/team-access" element={<TeamAccess />} />
+                  <Route path="/student-access" element={<StudentAccess />} />
                   <Route path="/license" element={<LicenseManagement />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
