@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2, Tag } from 'lucide-react';
+import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,7 @@ import {
 import PaymentDialog from '@/components/PaymentDialog';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
+import TagFilter from '@/components/TagFilter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserInfo } from '@/integrations/supabase/client';
@@ -70,22 +71,6 @@ const PaymentsPage = () => {
   const { data: userInfo } = useQuery({
     queryKey: ['current-user-info'],
     queryFn: getCurrentUserInfo,
-  });
-
-  // Fetch available tags for filtering
-  const { data: availableTags = [] } = useQuery({
-    queryKey: ['school-tags', userInfo?.[0]?.user_school_id],
-    queryFn: async () => {
-      if (!userInfo?.[0]?.user_school_id) return [];
-      
-      const { data, error } = await supabase.rpc('get_school_tags', {
-        p_school_id: userInfo[0].user_school_id
-      });
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!userInfo?.[0]?.user_school_id,
   });
 
   // Fetch all student payments
@@ -430,43 +415,10 @@ const PaymentsPage = () => {
       </div>
 
       {/* Tag Filter Section */}
-      {availableTags.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Tag className="h-5 w-5" />
-              Filter by Tags
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedTagFilter === null ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedTagFilter(null)}
-              >
-                All Transactions
-              </Button>
-              {availableTags.map((tag: any) => (
-                <Button
-                  key={tag.id}
-                  variant={selectedTagFilter === tag.id ? "default" : "outline"}
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => setSelectedTagFilter(selectedTagFilter === tag.id ? null : tag.id)}
-                  style={selectedTagFilter === tag.id ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
-                  {tag.name}
-                  {tag.usage_count > 0 && (
-                    <span className="text-xs opacity-70">({tag.usage_count})</span>
-                  )}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <TagFilter
+        selectedTagFilter={selectedTagFilter}
+        onTagFilterChange={setSelectedTagFilter}
+      />
 
       {/* Transactions Table */}
       <Card>
