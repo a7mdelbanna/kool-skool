@@ -50,7 +50,7 @@ const StudentAccess = () => {
           user_id,
           course_id,
           teacher_id,
-          users!inner(
+          users!user_id(
             id,
             first_name,
             last_name,
@@ -71,12 +71,12 @@ const StudentAccess = () => {
       }
 
       return (data || []).map(student => ({
-        id: student.users.id,
+        id: student.users?.id || '',
         student_id: student.id,
-        first_name: student.users.first_name || '',
-        last_name: student.users.last_name || '',
-        email: student.users.email,
-        password_hash: student.users.password_hash,
+        first_name: student.users?.first_name || '',
+        last_name: student.users?.last_name || '',
+        email: student.users?.email || '',
+        password_hash: student.users?.password_hash,
         course_name: student.courses?.name || 'No Course',
         teacher_name: student.teachers 
           ? `${student.teachers.first_name} ${student.teachers.last_name}`
