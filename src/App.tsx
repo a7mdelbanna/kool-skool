@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Login from '@/pages/Login';
@@ -37,13 +38,23 @@ const App = () => {
     // Check if user data exists in localStorage on app load
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error('Error parsing stored user data:', error);
+        localStorage.removeItem('user');
+      }
     }
 
     // Listen for storage events (e.g., user logged out in another tab)
     const handleStorage = () => {
       const storedUser = localStorage.getItem('user');
-      setUser(storedUser ? JSON.parse(storedUser) : null);
+      try {
+        setUser(storedUser ? JSON.parse(storedUser) : null);
+      } catch (error) {
+        console.error('Error parsing storage user data:', error);
+        setUser(null);
+      }
     };
 
     window.addEventListener('storage', handleStorage);
