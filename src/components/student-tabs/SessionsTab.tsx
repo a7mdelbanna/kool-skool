@@ -45,7 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { getStudentLessonSessions, handleSessionAction } from "@/integrations/supabase/client";
+import { handleSessionAction } from "@/integrations/supabase/client";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SessionsTabProps {
@@ -96,7 +96,6 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   setStudentData, 
   isViewMode = false 
 }) => {
-  const [sessions, setSessions] = useState<DatabaseSession[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -112,168 +111,160 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   // Load sessions when component mounts or studentData changes
   useEffect(() => {
     if (studentData.id) {
-      loadSessionsAndSubscriptions();
+      loadSubscriptionsWithSessions();
     }
   }, [studentData.id]);
 
-  const loadSessionsAndSubscriptions = async () => {
+  const loadSubscriptionsWithSessions = async () => {
     if (!studentData.id) return;
     
     try {
       setLoading(true);
-      console.log('=== LOADING SESSIONS AND SUBSCRIPTIONS DEBUG ===');
-      console.log('Loading sessions for student:', studentData.id);
+      console.log('=== SESSIONS TAB: LOADING SUBSCRIPTIONS WITH SESSIONS ===');
+      console.log('Student ID:', studentData.id);
       
-      // Step 1: Load sessions
-      const sessionsData = await getStudentLessonSessions(studentData.id);
-      console.log('Raw sessions data received:', sessionsData);
-      
-      const sessionsArray = Array.isArray(sessionsData) ? sessionsData as DatabaseSession[] : [];
-      setSessions(sessionsArray);
-      console.log('Sessions loaded:', sessionsArray.length);
-
-      // DETAILED SESSION DEBUGGING - Log all session-subscription relationships
-      console.log('🔍 DETAILED SESSION-SUBSCRIPTION RELATIONSHIP DEBUG:');
-      sessionsArray.forEach((session, index) => {
-        console.log(`Session ${index + 1}:`, {
-          sessionId: session.id,
-          subscriptionId: session.subscription_id,
-          scheduledDate: session.scheduled_date,
-          status: session.status,
-          subscriptionIdType: typeof session.subscription_id
-        });
-      });
-
-      // Step 2: Load subscriptions using the same RPC function as SubscriptionsTab
-      console.log('Loading subscriptions using RPC function for student:', studentData.id);
+      // Use the EXACT same approach as SubscriptionsTab
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .rpc('get_student_subscriptions', { 
           p_student_id: studentData.id 
         });
 
-      console.log('Subscription RPC query result:', { data: subscriptionData, error: subscriptionError });
+      console.log('=== SESSIONS TAB: SUBSCRIPTION RPC RESULT ===');
+      console.log('Error:', subscriptionError);
+      console.log('Data:', subscriptionData);
+      console.log('Subscription count:', subscriptionData?.length || 0);
 
       if (subscriptionError) {
-        console.error('❌ Error loading subscriptions via RPC:', subscriptionError);
+        console.error('❌ SESSIONS TAB: Error loading subscriptions:', subscriptionError);
         toast({
           title: "Error",
           description: `Failed to load subscriptions: ${subscriptionError.message}`,
           variant: "destructive",
         });
-        // Continue with empty subscriptions rather than throwing
         setSubscriptions([]);
-      } else {
-        console.log('Subscriptions loaded via RPC:', subscriptionData?.length || 0);
-        
-        // DETAILED SUBSCRIPTION DEBUGGING
-        console.log('🔍 DETAILED SUBSCRIPTION DEBUG:');
-        (subscriptionData || []).forEach((sub, index) => {
-          console.log(`Subscription ${index + 1}:`, {
-            subscriptionId: sub.id,
-            subscriptionIdType: typeof sub.id,
-            startDate: sub.start_date,
-            status: sub.status,
-            sessionCount: sub.session_count
-          });
-        });
-        
-        // Step 3: Group sessions by subscription WITH DETAILED DEBUGGING
-        console.log('🔄 STARTING SESSION GROUPING PROCESS:');
-        const subscriptionsWithSessions: SubscriptionInfo[] = (subscriptionData || []).map(sub => {
-          console.log(`\n🔍 Processing subscription: ${sub.id}`);
-          
-          // Filter sessions for this subscription with detailed logging
-          const subscriptionSessions = sessionsArray.filter(session => {
-            const matches = session.subscription_id === sub.id;
-            console.log(`  Session ${session.id}:`, {
-              sessionSubscriptionId: session.subscription_id,
-              targetSubscriptionId: sub.id,
-              matches: matches,
-              sessionSubscriptionIdType: typeof session.subscription_id,
-              targetSubscriptionIdType: typeof sub.id
-            });
-            return matches;
-          });
-          
-          console.log(`✅ Found ${subscriptionSessions.length} sessions for subscription ${sub.id}`);
-          
-          // Log sessions that were grouped
-          if (subscriptionSessions.length > 0) {
-            console.log(`  Sessions grouped for ${sub.id}:`, subscriptionSessions.map(s => ({
-              id: s.id,
-              date: s.scheduled_date,
-              status: s.status
-            })));
-          } else {
-            console.log(`⚠️  NO SESSIONS FOUND for subscription ${sub.id}`);
-            
-            // Debug: Check if there are any sessions with similar but not exact subscription_id
-            const similarSessions = sessionsArray.filter(session => 
-              session.subscription_id && session.subscription_id.includes(sub.id.substring(0, 8))
-            );
-            if (similarSessions.length > 0) {
-              console.log(`🔍 Found sessions with similar subscription IDs:`, similarSessions.map(s => ({
-                sessionId: s.id,
-                subscriptionId: s.subscription_id,
-                targetId: sub.id
-              })));
-            }
-          }
-          
-          return {
-            id: sub.id,
-            session_count: sub.session_count,
-            duration_months: sub.duration_months,
-            start_date: sub.start_date,
-            end_date: sub.end_date,
-            total_price: sub.total_price,
-            currency: sub.currency,
-            status: sub.status,
-            schedule: sub.schedule,
-            notes: sub.notes,
-            sessions: subscriptionSessions
-          };
-        });
-
-        setSubscriptions(subscriptionsWithSessions);
-        
-        console.log(`✅ Successfully loaded ${sessionsArray.length} sessions grouped into ${subscriptionsWithSessions.length} subscriptions`);
-        
-        // FINAL SUMMARY DEBUGGING
-        console.log('📊 FINAL GROUPING SUMMARY:');
-        subscriptionsWithSessions.forEach((sub, index) => {
-          console.log(`Subscription ${index + 1} (${sub.id}):`, {
-            sessionsCount: sub.sessions.length,
-            status: sub.status,
-            startDate: sub.start_date,
-            hasRenewalNote: sub.notes?.includes('Renewed') || false
-          });
-        });
-
-        // Check for orphaned sessions (sessions not assigned to any subscription)
-        const allGroupedSessionIds = subscriptionsWithSessions.flatMap(sub => sub.sessions.map(s => s.id));
-        const orphanedSessions = sessionsArray.filter(session => !allGroupedSessionIds.includes(session.id));
-        if (orphanedSessions.length > 0) {
-          console.log('⚠️  ORPHANED SESSIONS (not assigned to any subscription):');
-          orphanedSessions.forEach(session => {
-            console.log(`  Orphaned session ${session.id}:`, {
-              subscriptionId: session.subscription_id,
-              scheduledDate: session.scheduled_date,
-              status: session.status
-            });
-          });
-        }
+        return;
       }
+
+      if (!subscriptionData || subscriptionData.length === 0) {
+        console.log('⚠️ SESSIONS TAB: No subscriptions found for student');
+        setSubscriptions([]);
+        return;
+      }
+
+      // Now load sessions for ALL subscriptions at once
+      console.log('=== SESSIONS TAB: LOADING ALL SESSIONS ===');
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .rpc('get_lesson_sessions', { 
+          p_student_id: studentData.id 
+        });
+
+      console.log('=== SESSIONS TAB: SESSIONS RPC RESULT ===');
+      console.log('Sessions error:', sessionsError);
+      console.log('Sessions data:', sessionsData);
+      console.log('Sessions count:', sessionsData?.length || 0);
+
+      if (sessionsError) {
+        console.error('❌ SESSIONS TAB: Error loading sessions:', sessionsError);
+        toast({
+          title: "Error",
+          description: `Failed to load sessions: ${sessionsError.message}`,
+          variant: "destructive",
+        });
+        setSubscriptions([]);
+        return;
+      }
+
+      const sessionsArray = Array.isArray(sessionsData) ? sessionsData as DatabaseSession[] : [];
       
-      console.log('=== END SESSION LOADING DEBUG ===');
+      // DETAILED MATCHING DEBUG
+      console.log('=== SESSIONS TAB: DETAILED SESSION-SUBSCRIPTION MATCHING ===');
+      const subscriptionsWithSessions: SubscriptionInfo[] = subscriptionData.map(sub => {
+        console.log(`\n🔍 SESSIONS TAB: Processing subscription: ${sub.id}`);
+        console.log(`   Subscription ID type: ${typeof sub.id}`);
+        
+        // Filter sessions for this subscription with detailed logging
+        const subscriptionSessions = sessionsArray.filter(session => {
+          const sessionSubId = session.subscription_id;
+          const targetSubId = sub.id;
+          const matches = sessionSubId === targetSubId;
+          
+          console.log(`   Session ${session.id}:`);
+          console.log(`     session.subscription_id: "${sessionSubId}" (${typeof sessionSubId})`);
+          console.log(`     target subscription_id:  "${targetSubId}" (${typeof targetSubId})`);
+          console.log(`     matches: ${matches}`);
+          
+          return matches;
+        });
+        
+        console.log(`✅ SESSIONS TAB: Found ${subscriptionSessions.length} sessions for subscription ${sub.id}`);
+        
+        if (subscriptionSessions.length > 0) {
+          console.log(`   Sessions found:`, subscriptionSessions.map(s => ({
+            id: s.id,
+            date: s.scheduled_date,
+            status: s.status
+          })));
+        } else {
+          console.log(`⚠️ SESSIONS TAB: NO SESSIONS for subscription ${sub.id}`);
+          
+          // Debug: Check for partial matches
+          const partialMatches = sessionsArray.filter(session => 
+            session.subscription_id && 
+            (session.subscription_id.includes(sub.id.substring(0, 8)) || 
+             sub.id.includes(session.subscription_id.substring(0, 8)))
+          );
+          
+          if (partialMatches.length > 0) {
+            console.log(`   Partial matches found:`, partialMatches.map(s => ({
+              sessionId: s.id,
+              sessionSubId: s.subscription_id,
+              targetSubId: sub.id
+            })));
+          }
+        }
+        
+        return {
+          id: sub.id,
+          session_count: sub.session_count,
+          duration_months: sub.duration_months,
+          start_date: sub.start_date,
+          end_date: sub.end_date,
+          total_price: sub.total_price,
+          currency: sub.currency,
+          status: sub.status,
+          schedule: sub.schedule,
+          notes: sub.notes,
+          sessions: subscriptionSessions
+        };
+      });
+
+      console.log('=== SESSIONS TAB: FINAL RESULT ===');
+      console.log(`Total subscriptions: ${subscriptionsWithSessions.length}`);
+      subscriptionsWithSessions.forEach((sub, index) => {
+        console.log(`Subscription ${index + 1} (${sub.id}): ${sub.sessions.length} sessions`);
+      });
+
+      // Check for orphaned sessions
+      const allGroupedSessionIds = subscriptionsWithSessions.flatMap(sub => sub.sessions.map(s => s.id));
+      const orphanedSessions = sessionsArray.filter(session => !allGroupedSessionIds.includes(session.id));
+      
+      if (orphanedSessions.length > 0) {
+        console.log('⚠️ SESSIONS TAB: ORPHANED SESSIONS:');
+        orphanedSessions.forEach(session => {
+          console.log(`   Session ${session.id} (sub: ${session.subscription_id})`);
+        });
+      }
+
+      setSubscriptions(subscriptionsWithSessions);
+      console.log('=== SESSIONS TAB: LOAD COMPLETE ===');
+      
     } catch (error) {
-      console.error('❌ Critical error loading sessions and subscriptions:', error);
+      console.error('❌ SESSIONS TAB: Critical error:', error);
       toast({
         title: "Error",
         description: "Failed to load sessions. Please try refreshing.",
         variant: "destructive",
       });
-      setSessions([]);
       setSubscriptions([]);
     } finally {
       setLoading(false);
@@ -281,17 +272,17 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   };
 
   const handleRefreshSessions = async () => {
-    console.log('=== MANUAL REFRESH TRIGGERED ===');
+    console.log('=== SESSIONS TAB: MANUAL REFRESH TRIGGERED ===');
     setRefreshing(true);
     
     try {
-      await loadSessionsAndSubscriptions();
+      await loadSubscriptionsWithSessions();
       toast({
         title: "Sessions Refreshed",
         description: "Session data has been updated successfully",
       });
     } catch (error) {
-      console.error('Error during manual refresh:', error);
+      console.error('SESSIONS TAB: Error during manual refresh:', error);
       toast({
         title: "Refresh Failed",
         description: "Could not refresh session data",
@@ -351,7 +342,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         }
       }
       
-      await loadSessionsAndSubscriptions();
+      await loadSubscriptionsWithSessions();
     } catch (error) {
       console.error('❌ Error handling session status update:', error);
       toast({
@@ -378,7 +369,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           description: result.message + (result.new_session_id ? ' New session created.' : ''),
         });
         
-        await loadSessionsAndSubscriptions();
+        await loadSubscriptionsWithSessions();
       } else {
         throw new Error(result.message || 'Failed to move session');
       }
@@ -418,7 +409,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           description: result.message || "Session has been rescheduled successfully",
         });
         
-        await loadSessionsAndSubscriptions();
+        await loadSubscriptionsWithSessions();
         setRescheduleDialogOpen(false);
         setSelectedSession(null);
         setRescheduleDate("");
@@ -726,7 +717,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             ).length;
 
             // DEBUG: Log rendering information for each subscription
-            console.log(`🎨 Rendering subscription ${subscription.id}:`, {
+            console.log(`🎨 SESSIONS TAB: Rendering subscription ${subscription.id}:`, {
               sessionsToRender: subscription.sessions.length,
               completed: completedSessions,
               upcoming: upcomingSessions,
@@ -821,7 +812,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             Sessions are automatically generated when you add a subscription. Use actions to manage attendance and scheduling.
           </p>
           <p className="text-xs text-muted-foreground">
-            Total sessions: {sessions.length} | Grouped by subscription ✅
+            Total sessions: {subscriptions.reduce((total, sub) => total + sub.sessions.length, 0)} | Using same approach as Subscriptions tab ✅
           </p>
         </div>
       </div>
