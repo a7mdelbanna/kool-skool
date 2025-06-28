@@ -1521,6 +1521,14 @@ export type Database = {
           end_date: string
         }[]
       }
+      get_students_password_info: {
+        Args: { p_school_id: string }
+        Returns: {
+          user_id: string
+          has_password: boolean
+          password_length: number
+        }[]
+      }
       get_students_with_details: {
         Args: { p_school_id: string }
         Returns: {
@@ -1625,6 +1633,15 @@ export type Database = {
           admin_password: string
         }
         Returns: Json
+      }
+      verify_password_update: {
+        Args: { p_user_id: string }
+        Returns: {
+          user_id: string
+          has_password: boolean
+          password_hash_length: number
+          last_updated: string
+        }[]
       }
     }
     Enums: {

@@ -21,6 +21,7 @@ interface StudentAccessInfo {
   student_id: string;
   course_name: string;
   teacher_name: string;
+  has_password: boolean;
 }
 
 const StudentAccess = () => {
@@ -40,7 +41,7 @@ const StudentAccess = () => {
   console.log('=== STUDENT ACCESS DEBUG ===');
   console.log('School ID:', schoolId);
 
-  // Fetch students and their password info with direct query approach
+  // Fetch students and their password info using the new RPC function
   const { data: studentsWithPasswords = [], isLoading } = useQuery({
     queryKey: ['students-with-passwords', schoolId],
     queryFn: async () => {
@@ -60,58 +61,43 @@ const StudentAccess = () => {
         return [];
       }
 
-      // Get all unique user IDs that are not null
-      const userIds = studentsData
-        .map(s => s.user_id)
-        .filter(Boolean);
+      // Use the new RPC function to get password information
+      console.log('Fetching password info using RPC function...');
+      const { data: passwordInfo, error: passwordError } = await supabase.rpc('get_students_password_info', {
+        p_school_id: schoolId
+      });
 
-      console.log('User IDs for password query:', userIds);
+      console.log('Password RPC result:', { 
+        data: passwordInfo, 
+        error: passwordError,
+        count: passwordInfo?.length || 0
+      });
 
-      let userPasswordMap = new Map();
-      
-      if (userIds.length > 0) {
-        try {
-          // Direct query to get password hashes
-          console.log('Executing direct password query...');
-          
-          const { data: passwordData, error: passwordError } = await supabase
-            .from('users')
-            .select('id, password_hash')
-            .in('id', userIds);
-
-          console.log('Password query result:', { 
-            data: passwordData, 
-            error: passwordError,
-            count: passwordData?.length || 0
+      // Create a map of user_id to password info
+      const passwordMap = new Map();
+      if (passwordInfo && Array.isArray(passwordInfo)) {
+        passwordInfo.forEach((info: any) => {
+          passwordMap.set(info.user_id, {
+            has_password: info.has_password,
+            password_length: info.password_length
           });
-
-          if (passwordError) {
-            console.error('Password query error:', passwordError);
-          } else if (passwordData && Array.isArray(passwordData)) {
-            passwordData.forEach(p => {
-              userPasswordMap.set(p.id, p.password_hash);
-            });
-          }
-        } catch (queryError) {
-          console.error('Query execution error:', queryError);
-        }
+        });
       }
 
-      console.log('Password map size:', userPasswordMap.size);
-      console.log('Password map entries:', Array.from(userPasswordMap.entries()));
+      console.log('Password info map size:', passwordMap.size);
+      console.log('Password info map entries:', Array.from(passwordMap.entries()));
 
       // Combine student data with password info
       const result = studentsData.map(student => {
-        const passwordHash = userPasswordMap.get(student.user_id);
+        const passwordInfo = passwordMap.get(student.user_id);
         const teacherName = student.teacher_first_name && student.teacher_last_name
           ? `${student.teacher_first_name} ${student.teacher_last_name}`
           : 'No Teacher';
 
         console.log(`Student ${student.first_name} ${student.last_name}:`, {
           user_id: student.user_id,
-          passwordHash: passwordHash || 'NOT_FOUND',
-          has_password: !!passwordHash,
-          password_length: passwordHash ? passwordHash.length : 0
+          has_password: passwordInfo?.has_password || false,
+          password_length: passwordInfo?.password_length || 0
         });
 
         return {
@@ -120,20 +106,21 @@ const StudentAccess = () => {
           first_name: student.first_name || '',
           last_name: student.last_name || '',
           email: student.email || '',
-          password_hash: passwordHash || null,
+          password_hash: passwordInfo?.has_password ? 'SET' : null,
+          has_password: passwordInfo?.has_password || false,
           course_name: student.course_name || 'No Course',
           teacher_name: teacherName
         };
       });
 
       console.log('Final students with passwords:', result);
-      console.log('Students with passwords count:', result.filter(s => s.password_hash).length);
+      console.log('Students with passwords count:', result.filter(s => s.has_password).length);
       return result;
     },
     enabled: !!schoolId,
   });
 
-  // Update password mutation
+  // Update password mutation with verification
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
       console.log('Updating password for user:', userId);
@@ -166,18 +153,16 @@ const StudentAccess = () => {
 
       console.log('Password updated successfully in database');
       
-      // Verify the update worked
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('users')
-        .select('id, password_hash')
-        .eq('id', userId)
-        .single();
+      // Verify the update worked using the new RPC function
+      const { data: verifyData, error: verifyError } = await supabase.rpc('verify_password_update', {
+        p_user_id: userId
+      });
 
       console.log('Password verification:', { 
         data: verifyData, 
         error: verifyError,
-        has_password: !!verifyData?.password_hash,
-        password_length: verifyData?.password_hash?.length || 0
+        has_password: verifyData?.[0]?.has_password || false,
+        password_length: verifyData?.[0]?.password_hash_length || 0
       });
 
       return { success: true };
@@ -293,7 +278,7 @@ const StudentAccess = () => {
                     <TableCell>{student.course_name}</TableCell>
                     <TableCell>{student.teacher_name}</TableCell>
                     <TableCell>
-                      {student.password_hash ? (
+                      {student.has_password ? (
                         <Badge variant="default" className="bg-green-100 text-green-800">
                           Password Set
                         </Badge>
@@ -310,8 +295,8 @@ const StudentAccess = () => {
                         onClick={() => handleSetPassword(student)}
                         className="flex items-center gap-2"
                       >
-                        {student.password_hash ? <Edit className="h-4 w-4" /> : <Key className="h-4 w-4" />}
-                        {student.password_hash ? 'Update' : 'Set'} Password
+                        {student.has_password ? <Edit className="h-4 w-4" /> : <Key className="h-4 w-4" />}
+                        {student.has_password ? 'Update' : 'Set'} Password
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -326,10 +311,10 @@ const StudentAccess = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedStudent?.password_hash ? 'Update Password' : 'Set Password'}
+              {selectedStudent?.has_password ? 'Update Password' : 'Set Password'}
             </DialogTitle>
             <DialogDescription>
-              {selectedStudent?.password_hash 
+              {selectedStudent?.has_password 
                 ? `Update the login password for ${selectedStudent?.first_name} ${selectedStudent?.last_name}`
                 : `Set a login password for ${selectedStudent?.first_name} ${selectedStudent?.last_name}`
               }
