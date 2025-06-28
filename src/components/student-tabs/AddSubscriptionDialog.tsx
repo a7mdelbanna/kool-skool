@@ -14,8 +14,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useSubscriptionCreation } from '@/hooks/useSubscriptionCreation';
-import TimePicker from '@/components/ui/time-picker';
-import SchedulePreview from './SchedulePreview';
 
 interface ScheduleItem {
   day: string;
@@ -210,7 +208,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -218,354 +216,340 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
-          {/* Left Column - Form */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Session Count, Duration, and Currency */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-6 pt-4">
+          {/* Session Count, Duration, and Currency */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
+              <Input 
+                type="number" 
+                id="sessionCount" 
+                value={formData.sessionCount} 
+                onChange={(e) => setFormData({ ...formData, sessionCount: parseInt(e.target.value) || 0 })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="durationMonths" className="text-sm font-semibold text-gray-700">Duration (Months)</Label>
+              <Input 
+                type="number" 
+                id="durationMonths" 
+                value={formData.durationMonths} 
+                onChange={(e) => setFormData({ ...formData, durationMonths: parseInt(e.target.value) || 0 })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
+              <Select 
+                value={formData.currency} 
+                onValueChange={(value) => setFormData({ ...formData, currency: value })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencies.map((currency) => (
+                    <SelectItem key={currency.code} value={currency.code}>
+                      {currency.name} ({currency.symbol})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Start Date */}
+          <div>
+            <Label className="text-sm font-semibold text-gray-700">Start Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal mt-1",
+                    !formData.startDate && "text-muted-foreground"
+                  )}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {formData.startDate ? format(formData.startDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={formData.startDate}
+                  onSelect={(date) => setFormData({ ...formData, startDate: date })}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Schedule Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold text-gray-700">Schedule</Label>
+              <Button 
+                type="button"
+                variant="outline" 
+                size="sm"
+                onClick={addScheduleItem}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Schedule
+              </Button>
+            </div>
+            
+            {formData.schedule.map((schedule, index) => (
+              <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <Label className="text-xs text-gray-600">Day</Label>
+                  <Select 
+                    value={schedule.day || ""}
+                    onValueChange={(value) => updateScheduleItem(index, 'day', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select day" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {daysOfWeek.map((day) => (
+                        <SelectItem key={day} value={day}>{day}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <Label className="text-xs text-gray-600">Time</Label>
+                  <Input 
+                    type="time"
+                    value={schedule.time}
+                    onChange={(e) => updateScheduleItem(index, 'time', e.target.value)}
+                  />
+                </div>
+                <Button 
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeScheduleItem(index)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Price Section */}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-semibold text-gray-700">Price Mode</Label>
+              <Select 
+                value={formData.priceMode} 
+                onValueChange={(value) => setFormData({ 
+                  ...formData, 
+                  priceMode: value as 'perSession' | 'fixedPrice' 
+                })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select price mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="perSession">Per Session</SelectItem>
+                  <SelectItem value="fixedPrice">Fixed Price</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.priceMode === 'perSession' && (
               <div>
-                <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
+                <Label htmlFor="pricePerSession" className="text-sm font-semibold text-gray-700">
+                  Price Per Session ({getCurrencySymbol(formData.currency)})
+                </Label>
                 <Input 
                   type="number" 
-                  id="sessionCount" 
-                  value={formData.sessionCount} 
-                  onChange={(e) => setFormData({ ...formData, sessionCount: parseInt(e.target.value) || 0 })}
+                  id="pricePerSession" 
+                  value={formData.pricePerSession} 
+                  onChange={(e) => setFormData({ ...formData, pricePerSession: parseFloat(e.target.value) || 0 })}
                   className="mt-1"
+                  step="0.01"
+                />
+                {formData.pricePerSession > 0 && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Total: {getCurrencySymbol(formData.currency)} {(formData.pricePerSession * formData.sessionCount).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {formData.priceMode === 'fixedPrice' && (
+              <div>
+                <Label htmlFor="fixedPrice" className="text-sm font-semibold text-gray-700">
+                  Fixed Price ({getCurrencySymbol(formData.currency)})
+                </Label>
+                <Input 
+                  type="number" 
+                  id="fixedPrice" 
+                  value={formData.fixedPrice} 
+                  onChange={(e) => setFormData({ ...formData, fixedPrice: parseFloat(e.target.value) || 0 })}
+                  className="mt-1"
+                  step="0.01"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Status */}
+          <div>
+            <Label className="text-sm font-semibold text-gray-700">Status</Label>
+            <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="paused">Paused</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Initial Payment Section */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Initial Payment</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="initialAmount" className="text-sm font-semibold text-gray-700">
+                  Amount ({getCurrencySymbol(formData.currency)})
+                </Label>
+                <Input 
+                  type="number" 
+                  id="initialAmount" 
+                  value={formData.initialPayment.amount} 
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    initialPayment: { 
+                      ...formData.initialPayment, 
+                      amount: parseFloat(e.target.value) || 0 
+                    } 
+                  })}
+                  className="mt-1"
+                  step="0.01"
                 />
               </div>
               <div>
-                <Label htmlFor="durationMonths" className="text-sm font-semibold text-gray-700">Duration (Months)</Label>
-                <Input 
-                  type="number" 
-                  id="durationMonths" 
-                  value={formData.durationMonths} 
-                  onChange={(e) => setFormData({ ...formData, durationMonths: parseInt(e.target.value) || 0 })}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
+                <Label className="text-sm font-semibold text-gray-700">Payment Method</Label>
                 <Select 
-                  value={formData.currency} 
-                  onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                  value={formData.initialPayment.method} 
+                  onValueChange={(value) => setFormData({ 
+                    ...formData, 
+                    initialPayment: { 
+                      ...formData.initialPayment, 
+                      method: value 
+                    } 
+                  })}
                 >
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select currency" />
+                    <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>
-                    {currencies.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code}>
-                        {currency.name} ({currency.symbol})
-                      </SelectItem>
+                    {paymentMethods.map((method) => (
+                      <SelectItem key={method} value={method}>{method}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            {/* Start Date */}
-            <div>
-              <Label className="text-sm font-semibold text-gray-700">Start Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal mt-1",
-                      !formData.startDate && "text-muted-foreground"
-                    )}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {formData.startDate ? format(formData.startDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={formData.startDate}
-                    onSelect={(date) => setFormData({ ...formData, startDate: date })}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Schedule Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold text-gray-700">Schedule</Label>
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  size="sm"
-                  onClick={addScheduleItem}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Schedule
-                </Button>
-              </div>
-              
-              {formData.schedule.map((schedule, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <Label className="text-xs text-gray-600">Day</Label>
-                    <Select 
-                      value={schedule.day || ""}
-                      onValueChange={(value) => updateScheduleItem(index, 'day', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select day" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {daysOfWeek.map((day) => (
-                          <SelectItem key={day} value={day}>{day}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1">
-                    <Label className="text-xs text-gray-600">Time</Label>
-                    <TimePicker
-                      value={schedule.time}
-                      onChange={(value) => updateScheduleItem(index, 'time', value)}
-                      placeholder="Select time"
-                    />
-                  </div>
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeScheduleItem(index)}
-                    className="text-red-600 hover:text-red-800 mt-4"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {/* Price Section */}
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-semibold text-gray-700">Price Mode</Label>
-                <Select 
-                  value={formData.priceMode} 
-                  onValueChange={(value) => setFormData({ 
-                    ...formData, 
-                    priceMode: value as 'perSession' | 'fixedPrice' 
-                  })}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select price mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="perSession">Per Session</SelectItem>
-                    <SelectItem value="fixedPrice">Fixed Price</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.priceMode === 'perSession' && (
-                <div>
-                  <Label htmlFor="pricePerSession" className="text-sm font-semibold text-gray-700">
-                    Price Per Session ({getCurrencySymbol(formData.currency)})
-                  </Label>
-                  <Input 
-                    type="number" 
-                    id="pricePerSession" 
-                    value={formData.pricePerSession} 
-                    onChange={(e) => setFormData({ ...formData, pricePerSession: parseFloat(e.target.value) || 0 })}
-                    className="mt-1"
-                    step="0.01"
-                  />
-                  {formData.pricePerSession > 0 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Total: {getCurrencySymbol(formData.currency)} {(formData.pricePerSession * formData.sessionCount).toFixed(2)}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {formData.priceMode === 'fixedPrice' && (
-                <div>
-                  <Label htmlFor="fixedPrice" className="text-sm font-semibold text-gray-700">
-                    Fixed Price ({getCurrencySymbol(formData.currency)})
-                  </Label>
-                  <Input 
-                    type="number" 
-                    id="fixedPrice" 
-                    value={formData.fixedPrice} 
-                    onChange={(e) => setFormData({ ...formData, fixedPrice: parseFloat(e.target.value) || 0 })}
-                    className="mt-1"
-                    step="0.01"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Status */}
-            <div>
-              <Label className="text-sm font-semibold text-gray-700">Status</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Initial Payment Section */}
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Initial Payment</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="initialAmount" className="text-sm font-semibold text-gray-700">
-                    Amount ({getCurrencySymbol(formData.currency)})
-                  </Label>
-                  <Input 
-                    type="number" 
-                    id="initialAmount" 
-                    value={formData.initialPayment.amount} 
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      initialPayment: { 
-                        ...formData.initialPayment, 
-                        amount: parseFloat(e.target.value) || 0 
-                      } 
-                    })}
-                    className="mt-1"
-                    step="0.01"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-semibold text-gray-700">Payment Method</Label>
-                  <Select 
-                    value={formData.initialPayment.method} 
-                    onValueChange={(value) => setFormData({ 
-                      ...formData, 
-                      initialPayment: { 
-                        ...formData.initialPayment, 
-                        method: value 
-                      } 
-                    })}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentMethods.map((method) => (
-                        <SelectItem key={method} value={method}>{method}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              {formData.initialPayment.amount > 0 && (
-                <div className="mt-4">
-                  <Label className="text-sm font-semibold text-gray-700">Account</Label>
-                  <Select 
-                    value={formData.initialPayment.accountId} 
-                    onValueChange={(value) => setFormData({ 
-                      ...formData, 
-                      initialPayment: { 
-                        ...formData.initialPayment, 
-                        accountId: value 
-                      } 
-                    })}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts
-                        .filter(account => account.currencies?.code === formData.currency)
-                        .map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name} ({account.currencies?.symbol})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
+            
+            {formData.initialPayment.amount > 0 && (
               <div className="mt-4">
-                <Label htmlFor="paymentNotes" className="text-sm font-semibold text-gray-700">Payment Notes</Label>
-                <Textarea 
-                  id="paymentNotes" 
-                  placeholder="Add any notes about the initial payment..."
-                  value={formData.initialPayment.notes} 
-                  onChange={(e) => setFormData({ 
+                <Label className="text-sm font-semibold text-gray-700">Account</Label>
+                <Select 
+                  value={formData.initialPayment.accountId} 
+                  onValueChange={(value) => setFormData({ 
                     ...formData, 
                     initialPayment: { 
                       ...formData.initialPayment, 
-                      notes: e.target.value 
+                      accountId: value 
                     } 
                   })}
-                  className="mt-1"
-                  rows={2}
-                />
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts
+                      .filter(account => account.currencies?.code === formData.currency)
+                      .map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name} ({account.currencies?.symbol})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Notes</Label>
+            )}
+            
+            <div className="mt-4">
+              <Label htmlFor="paymentNotes" className="text-sm font-semibold text-gray-700">Payment Notes</Label>
               <Textarea 
-                id="notes" 
-                placeholder="Add any additional notes about this subscription..."
-                value={formData.notes} 
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                id="paymentNotes" 
+                placeholder="Add any notes about the initial payment..."
+                value={formData.initialPayment.notes} 
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  initialPayment: { 
+                    ...formData.initialPayment, 
+                    notes: e.target.value 
+                  } 
+                })}
                 className="mt-1"
-                rows={3}
+                rows={2}
               />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSubmit} 
-                disabled={isSubmitting || formData.schedule.length === 0 || !formData.startDate}
-                className="min-w-[120px]"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Create
-                  </>
-                )}
-              </Button>
             </div>
           </div>
 
-          {/* Right Column - Schedule Preview */}
-          <div className="lg:col-span-1">
-            <SchedulePreview
-              schedule={formData.schedule}
-              startDate={formData.startDate}
-              sessionCount={formData.sessionCount}
-              durationMonths={formData.durationMonths}
+          {/* Notes */}
+          <div>
+            <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Notes</Label>
+            <Textarea 
+              id="notes" 
+              placeholder="Add any additional notes about this subscription..."
+              value={formData.notes} 
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="mt-1"
+              rows={3}
             />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isSubmitting || formData.schedule.length === 0 || !formData.startDate}
+              className="min-w-[120px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Create
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </DialogContent>
