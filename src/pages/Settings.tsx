@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   User, 
@@ -12,7 +11,8 @@ import {
   HelpCircle, 
   Save,
   Wallet,
-  Tags
+  Tags,
+  GraduationCap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,7 @@ import CurrencyManagement from '@/components/CurrencyManagement';
 import AccountsManagement from '@/components/AccountsManagement';
 import TransactionCategoriesManagement from '@/components/TransactionCategoriesManagement';
 import TagManager from '@/components/TagManager';
+import StudentLevelsManagement from '@/components/StudentLevelsManagement';
 
 const Settings = () => {
   return (
@@ -38,7 +39,7 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-8 mb-6">
+        <TabsList className="grid grid-cols-9 mb-6">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
@@ -46,6 +47,10 @@ const Settings = () => {
           <TabsTrigger value="business" className="gap-2">
             <Briefcase className="h-4 w-4" />
             <span className="hidden sm:inline">Business</span>
+          </TabsTrigger>
+          <TabsTrigger value="levels" className="gap-2">
+            <GraduationCap className="h-4 w-4" />
+            <span className="hidden sm:inline">Levels</span>
           </TabsTrigger>
           <TabsTrigger value="accounts" className="gap-2">
             <Wallet className="h-4 w-4" />
@@ -212,6 +217,10 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="levels" className="mt-0 space-y-6">
+          <StudentLevelsManagement />
         </TabsContent>
 
         <TabsContent value="accounts" className="mt-0 space-y-6">

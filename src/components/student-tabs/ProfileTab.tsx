@@ -1,5 +1,5 @@
-
 import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,12 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Student } from "../StudentCard";
 import { Course } from "@/integrations/supabase/client";
 import { Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Teacher {
   id: string;
   first_name: string;
   last_name: string;
   display_name: string;
+}
+
+interface StudentLevel {
+  id: string;
+  name: string;
+  color: string;
+  is_active: boolean;
 }
 
 interface ProfileTabProps {
@@ -49,9 +57,37 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   console.log('ProfileTab render - courses length:', courses?.length);
   console.log('ProfileTab render - isLoading:', isLoading);
   
+  // Get current user's school ID for fetching levels
+  const userData = localStorage.getItem('user');
+  const user = userData ? JSON.parse(userData) : null;
+  const schoolId = user?.schoolId;
+
+  // Fetch student levels from the database
+  const { data: studentLevels = [], isLoading: levelsLoading } = useQuery({
+    queryKey: ['student-levels', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+
+      const { data, error } = await supabase
+        .from('student_levels')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching student levels:', error);
+        return [];
+      }
+      
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+  
   // Validate teachers data structure
   const validTeachers = Array.isArray(teachers) ? teachers : [];
-  
+
   const handleInputChange = (field: keyof Student, value: string) => {
     setStudentData({ [field]: value });
   };
@@ -242,21 +278,62 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           
           <div className="space-y-2">
             <Label htmlFor="level">Level*</Label>
-            <Select
-              value={studentData.level || ""}
-              onValueChange={(value) => handleInputChange("level", value)}
-              disabled={isViewMode}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Beginner" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="beginner">Beginner</SelectItem>
-                <SelectItem value="intermediate">Intermediate</SelectItem>
-                <SelectItem value="advanced">Advanced</SelectItem>
-                <SelectItem value="fluent">Fluent</SelectItem>
-              </SelectContent>
-            </Select>
+            {levelsLoading ? (
+              <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                Loading levels...
+              </div>
+            ) : studentLevels.length > 0 ? (
+              <Select
+                value={studentData.level || ""}
+                onValueChange={(value) => handleInputChange("level", value)}
+                disabled={isViewMode}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {studentLevels.map((level: StudentLevel) => (
+                    <SelectItem key={level.id} value={level.name.toLowerCase()}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: level.color }}
+                        />
+                        {level.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="space-y-3">
+                <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                  No levels available
+                </div>
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
+                  <div className="flex items-start space-x-3">
+                    <Users className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-800">
+                        No Student Levels Found
+                      </p>
+                      <p className="text-sm text-amber-700 mt-1">
+                        You need to add student levels in Settings before you can assign them.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-100"
+                        onClick={() => window.location.href = '/settings?tab=levels'}
+                      >
+                        Add Levels
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">
