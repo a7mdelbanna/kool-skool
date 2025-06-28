@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -418,7 +417,7 @@ const PaymentsPage = () => {
         </Card>
       </div>
 
-      {/* Tag Filter Section */}
+      {/* Tag Filter Section - Keep existing TagFilter component */}
       <TagFilter
         selectedTagFilter={selectedTagFilter}
         onTagFilterChange={setSelectedTagFilter}
