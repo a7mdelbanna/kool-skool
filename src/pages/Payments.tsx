@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2, Settings } from 'lucide-react';
+import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -28,11 +27,11 @@ import {
 import PaymentDialog from '@/components/PaymentDialog';
 import PaymentTagSelector from '@/components/PaymentTagSelector';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
+import TagManager from '@/components/TagManager';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
 
 interface PaymentRecord {
   id: string;
@@ -133,22 +132,6 @@ const PaymentsPage = () => {
       }
       
       console.log('📊 School transactions fetched:', data?.length || 0, data);
-      return data || [];
-    },
-    enabled: !!schoolId,
-  });
-
-  // Fetch tags for display
-  const { data: tags = [] } = useQuery({
-    queryKey: ['school-tags', schoolId],
-    queryFn: async () => {
-      if (!schoolId) return [];
-      
-      const { data, error } = await supabase.rpc('get_school_tags', {
-        p_school_id: schoolId
-      });
-      
-      if (error) throw error;
       return data || [];
     },
     enabled: !!schoolId,
@@ -414,47 +397,10 @@ const PaymentsPage = () => {
         </Card>
       </div>
 
-      {/* Tags Display Section */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              Available Tags
-            </CardTitle>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/settings?tab=tags">
-                <Settings className="h-4 w-4 mr-2" />
-                Manage Tags
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {tags.map((tag: any) => (
-              <Badge
-                key={tag.id}
-                variant="outline"
-                style={{ borderColor: tag.color, color: tag.color }}
-              >
-                <span className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: tag.color }} />
-                {tag.name}
-                {tag.usage_count > 0 && (
-                  <span className="ml-1 text-xs opacity-70">({tag.usage_count})</span>
-                )}
-              </Badge>
-            ))}
-            {tags.length === 0 && (
-              <p className="text-muted-foreground text-sm">
-                No tags created yet. 
-                <Link to="/settings?tab=tags" className="text-primary hover:underline ml-1">
-                  Create your first tag in Settings
-                </Link>
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Tags Section - Using TagManager component */}
+      <div className="mb-6">
+        <TagManager showUsageCount={true} />
+      </div>
 
       {/* Transactions Table */}
       <Card>
