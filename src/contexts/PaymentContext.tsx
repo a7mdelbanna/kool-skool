@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUserInfo, getStudentsWithDetails, supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
