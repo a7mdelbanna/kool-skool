@@ -1111,6 +1111,7 @@ export type Database = {
           id: string
           last_name: string | null
           password_hash: string | null
+          password_plain: string | null
           phone: string | null
           role: string
           school_id: string | null
@@ -1124,6 +1125,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           password_hash?: string | null
+          password_plain?: string | null
           phone?: string | null
           role: string
           school_id?: string | null
@@ -1137,6 +1139,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           password_hash?: string | null
+          password_plain?: string | null
           phone?: string | null
           role?: string
           school_id?: string | null
@@ -1628,6 +1631,10 @@ export type Database = {
       update_course: {
         Args: { p_course_id: string; p_name: string; p_lesson_type: string }
         Returns: undefined
+      }
+      update_student_password: {
+        Args: { p_user_id: string; p_password: string }
+        Returns: Json
       }
       user_login: {
         Args: { user_email: string; user_password: string }

@@ -24,7 +24,7 @@ interface StudentAccessInfo {
   has_password: boolean;
 }
 
-interface PasswordHashResult {
+interface PasswordResult {
   user_id: string;
   password_hash: string;
   email: string;
@@ -133,10 +133,10 @@ const StudentAccess = () => {
     enabled: !!schoolId,
   });
 
-  // Fetch actual password hash using the dedicated RPC function
-  const fetchPasswordHash = async (userId: string) => {
-    console.log('=== FETCH PASSWORD DEBUG ===');
-    console.log('Fetching password hash for user ID:', userId);
+  // Fetch actual plain-text password using the dedicated RPC function
+  const fetchPlainTextPassword = async (userId: string) => {
+    console.log('=== FETCH PLAIN PASSWORD DEBUG ===');
+    console.log('Fetching plain-text password for user ID:', userId);
     
     // Validate input
     if (!userId || userId.length === 0) {
@@ -147,84 +147,73 @@ const StudentAccess = () => {
     
     // Check cache first
     if (passwordCache.has(userId)) {
-      console.log('Using cached password hash for user:', userId);
+      console.log('Using cached plain-text password for user:', userId);
       return passwordCache.get(userId);
     }
 
     try {
-      console.log('Using RPC function to get password hash...');
+      console.log('Using RPC function to get plain-text password...');
       
-      // Use type assertion to call the RPC function that isn't in generated types
+      // Use the updated RPC function that returns plain-text passwords
       const { data, error } = await (supabase as any).rpc('get_user_password_hash', {
         p_user_id: userId
-      }) as { data: PasswordHashResult[] | null; error: any };
+      }) as { data: PasswordResult[] | null; error: any };
 
-      console.log('RPC password hash result:', { data, error, userId });
+      console.log('RPC plain-text password result:', { data, error, userId });
 
       if (error) {
-        console.error('RPC error fetching password:', error);
+        console.error('RPC error fetching plain-text password:', error);
         toast.error('Database error: ' + error.message);
         return null;
       }
 
       // Properly check if data is an array and has length
       if (!data || !Array.isArray(data) || data.length === 0) {
-        console.log('No password hash found for user:', userId);
+        console.log('No plain-text password found for user:', userId);
         toast.error('No password found for this user');
         return null;
       }
 
-      const passwordHash = data[0]?.password_hash;
+      const plainTextPassword = data[0]?.password_hash; // This is actually the plain-text password now
       
-      if (passwordHash) {
+      if (plainTextPassword) {
         // Cache the result
-        setPasswordCache(prev => new Map(prev).set(userId, passwordHash));
-        console.log('Password found and cached for user:', userId);
-        return passwordHash;
+        setPasswordCache(prev => new Map(prev).set(userId, plainTextPassword));
+        console.log('Plain-text password found and cached for user:', userId);
+        return plainTextPassword;
       } else {
-        console.log('No password hash in RPC result for user:', userId);
+        console.log('No plain-text password in RPC result for user:', userId);
         toast.error('No password set for this user');
         return null;
       }
     } catch (error) {
-      console.error('Exception fetching password hash:', error);
+      console.error('Exception fetching plain-text password:', error);
       toast.error('Failed to fetch password');
       return null;
     }
   };
 
-  // Update password mutation with verification
+  // Update password mutation using the new update_student_password function
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
       console.log('Updating password for user:', userId);
       
-      // Hash the password using Supabase RPC function
-      const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', { 
-        password: password 
+      // Use the new RPC function that handles both hashed and plain-text password storage
+      const { data, error } = await supabase.rpc('update_student_password', {
+        p_user_id: userId,
+        p_password: password
       });
       
-      if (hashError) {
-        console.error('Error hashing password:', hashError);
-        throw new Error('Failed to hash password: ' + hashError.message);
+      if (error) {
+        console.error('Error updating password:', error);
+        throw new Error('Failed to update password: ' + error.message);
       }
 
-      console.log('Password hashed successfully, length:', hashedPassword?.length);
+      console.log('Password update result:', data);
 
-      // Update the user's password
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ 
-          password_hash: hashedPassword,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (updateError) {
-        console.error('Error updating password:', updateError);
-        throw new Error('Failed to update password: ' + updateError.message);
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update password');
       }
-
-      console.log('Password updated successfully in database');
       
       // Clear cache for this user
       setPasswordCache(prev => {
@@ -303,14 +292,14 @@ const StudentAccess = () => {
     } else {
       // Show password - fetch it first
       console.log('Showing password for:', studentId);
-      const passwordHash = await fetchPasswordHash(studentId);
-      console.log('Fetched password hash:', passwordHash ? 'Found' : 'Not found');
+      const plainTextPassword = await fetchPlainTextPassword(studentId);
+      console.log('Fetched plain-text password:', plainTextPassword ? 'Found' : 'Not found');
       
-      if (passwordHash) {
+      if (plainTextPassword) {
         setVisiblePasswords(prev => new Set(prev).add(studentId));
         console.log('Password visibility toggled on for:', studentId);
       } else {
-        console.log('No password hash available, cannot show password');
+        console.log('No plain-text password available, cannot show password');
       }
     }
   };
@@ -319,12 +308,12 @@ const StudentAccess = () => {
     console.log('=== COPY PASSWORD ===');
     console.log('Copying password for:', studentId, studentName);
     
-    const passwordHash = await fetchPasswordHash(studentId);
-    console.log('Password hash for copy:', passwordHash ? 'Found' : 'Not found');
+    const plainTextPassword = await fetchPlainTextPassword(studentId);
+    console.log('Plain-text password for copy:', plainTextPassword ? 'Found' : 'Not found');
     
-    if (passwordHash) {
+    if (plainTextPassword) {
       try {
-        await navigator.clipboard.writeText(passwordHash);
+        await navigator.clipboard.writeText(plainTextPassword);
         setCopiedPasswords(prev => new Set(prev).add(studentId));
         toast.success(`Password copied for ${studentName}`);
         console.log('Password copied successfully for:', studentName);
@@ -342,7 +331,7 @@ const StudentAccess = () => {
         toast.error('Failed to copy password');
       }
     } else {
-      console.log('No password hash available for copying');
+      console.log('No plain-text password available for copying');
     }
   };
 
