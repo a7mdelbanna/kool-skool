@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, createContext } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Login from '@/pages/Login';
 import StudentLogin from '@/pages/StudentLogin';
 import SuperAdminLogin from '@/pages/SuperAdminLogin';
@@ -30,6 +31,9 @@ export const UserContext = createContext<UserContextProps>({
   user: null,
   setUser: () => {},
 });
+
+// Create a query client
+const queryClient = new QueryClient();
 
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -64,29 +68,31 @@ const App = () => {
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, setUser }}>
-      <Router>
-        <Toaster />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/student-login" element={<StudentLogin />} />
-          <Route path="/superadmin-login" element={<SuperAdminLogin />} />
-          <Route path="/school-setup" element={<SchoolSetup />} />
-          <Route
-            path="/*"
-            element={
-              user ? (
-                <PaymentProvider>
-                  <MainLayout />
-                </PaymentProvider>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-        </Routes>
-      </Router>
-    </UserContext.Provider>
+    <QueryClientProvider client={queryClient}>
+      <UserContext.Provider value={{ user, setUser }}>
+        <Router>
+          <Toaster />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/student-login" element={<StudentLogin />} />
+            <Route path="/superadmin-login" element={<SuperAdminLogin />} />
+            <Route path="/school-setup" element={<SchoolSetup />} />
+            <Route
+              path="/*"
+              element={
+                user ? (
+                  <PaymentProvider>
+                    <MainLayout />
+                  </PaymentProvider>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+          </Routes>
+        </Router>
+      </UserContext.Provider>
+    </QueryClientProvider>
   );
 };
 
