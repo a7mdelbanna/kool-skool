@@ -69,8 +69,13 @@ const Settings = () => {
 
       toast({
         title: "Success",
-        description: "Your personal timezone has been updated successfully",
+        description: "Your personal timezone has been updated successfully. All session times will now display in this timezone across the application.",
       });
+
+      // Force a page reload to ensure all components use the new timezone
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error('Error updating timezone:', error);
       toast({
@@ -174,12 +179,15 @@ const Settings = () => {
                   <Input id="location" placeholder="City, Country" />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 mb-4">
-                    <h4 className="font-medium text-amber-900 mb-2">Personal Timezone Preference</h4>
-                    <p className="text-sm text-amber-800">
-                      This is your personal viewing preference. All times will be displayed in this timezone, 
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Personal Timezone Preference</h4>
+                    <p className="text-sm text-blue-800 mb-2">
+                      This is your personal viewing preference. All session times will be displayed in this timezone across all screens (Calendar, Attendance, Student profiles, etc.), 
                       regardless of the school's default timezone setting.
                     </p>
+                    <div className="bg-blue-100 p-2 rounded text-xs text-blue-800">
+                      <strong>Note:</strong> Changing your timezone will refresh the application to ensure all times display correctly.
+                    </div>
                   </div>
                   <TimezoneSelector
                     value={currentTimezone}

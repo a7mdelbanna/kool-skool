@@ -67,10 +67,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
 
       toast({
         title: "Timezone updated",
-        description: `Your timezone has been changed to ${newTimezone}`,
+        description: `Your timezone has been changed to ${newTimezone}. All session times will now display in this timezone.`,
       });
 
       setSettingsOpen(false);
+
+      // Force a page reload to ensure all components use the new timezone
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error('Error updating timezone:', error);
       toast({
@@ -123,11 +128,18 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
                 </div>
               </div>
               
-              <TimezoneSelector
-                value={currentTimezone}
-                onValueChange={handleTimezoneChange}
-                disabled={updating}
-              />
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-900 text-sm mb-2">Timezone Preference</h4>
+                <p className="text-xs text-blue-800 mb-3">
+                  All session times across the application will display in your selected timezone.
+                </p>
+                <TimezoneSelector
+                  value={currentTimezone}
+                  onValueChange={handleTimezoneChange}
+                  disabled={updating}
+                  placeholder="Select your timezone"
+                />
+              </div>
             </div>
           </PopoverContent>
         </Popover>
@@ -162,6 +174,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
           <p className="text-xs text-gray-500 truncate">
             {userEmail}
           </p>
+          <p className="text-xs text-blue-600 truncate">
+            TZ: {currentTimezone}
+          </p>
         </div>
         
         <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -177,13 +192,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
           </PopoverTrigger>
           <PopoverContent className="w-80 p-4" side="top">
             <div className="space-y-4">
-              <h3 className="font-medium">User Settings</h3>
+              <h3 className="font-medium">Personal Settings</h3>
               
-              <TimezoneSelector
-                value={currentTimezone}
-                onValueChange={handleTimezoneChange}
-                disabled={updating}
-              />
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-900 text-sm mb-2">Timezone Preference</h4>
+                <p className="text-xs text-blue-800 mb-3">
+                  All session times across the application (Calendar, Attendance, etc.) will display in your selected timezone.
+                </p>
+                <TimezoneSelector
+                  value={currentTimezone}
+                  onValueChange={handleTimezoneChange}
+                  disabled={updating}
+                  placeholder="Select your timezone"
+                />
+              </div>
             </div>
           </PopoverContent>
         </Popover>
@@ -203,3 +225,4 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
 };
 
 export default UserProfile;
+

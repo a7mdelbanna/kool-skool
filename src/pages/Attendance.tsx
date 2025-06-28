@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -15,10 +14,14 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import UpcomingLessonsList from '@/components/calendar/UpcomingLessonsList';
 import { Session } from '@/contexts/PaymentContext';
 import { getStudentLessonSessions, getStudentsWithDetails, LessonSession } from '@/integrations/supabase/client';
+import { getEffectiveTimezone, convertUTCToUserTimezone, formatInUserTimezone } from '@/utils/timezone';
+import { UserContext } from '@/App';
 
 type ViewMode = 'day' | 'week' | 'month';
 
 const Attendance = () => {
+  const { user } = useContext(UserContext);
+  const userTimezone = getEffectiveTimezone(user?.timezone);
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
@@ -53,21 +56,27 @@ const Attendance = () => {
           const studentSessions = await getStudentLessonSessions(student.id);
           console.log(`Sessions for student ${student.first_name} ${student.last_name}:`, studentSessions.length);
           
-          // Convert lesson sessions to Session format
-          const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => ({
-            id: session.id,
-            studentId: student.id,
-            studentName: `${student.first_name} ${student.last_name}`,
-            date: new Date(session.scheduled_date), // Convert string to Date
-            time: format(new Date(session.scheduled_date), 'HH:mm'),
-            duration: `${session.duration_minutes || 60} min`,
-            status: session.status as Session['status'],
-            sessionNumber: session.index_in_sub || undefined,
-            totalSessions: undefined, // Will be filled from subscription if needed
-            notes: session.notes || '',
-            cost: session.cost,
-            paymentStatus: session.payment_status as Session['paymentStatus']
-          }));
+          // Convert lesson sessions to Session format with timezone conversion
+          const convertedSessions: Session[] = studentSessions.map((session: LessonSession) => {
+            // Convert UTC stored time to user's timezone for display
+            const utcDate = new Date(session.scheduled_date);
+            const localDate = convertUTCToUserTimezone(utcDate, userTimezone);
+            
+            return {
+              id: session.id,
+              studentId: student.id,
+              studentName: `${student.first_name} ${student.last_name}`,
+              date: localDate, // Now in user's timezone
+              time: formatInUserTimezone(utcDate, userTimezone, 'HH:mm'),
+              duration: `${session.duration_minutes || 60} min`,
+              status: session.status as Session['status'],
+              sessionNumber: session.index_in_sub || undefined,
+              totalSessions: undefined,
+              notes: session.notes || '',
+              cost: session.cost,
+              paymentStatus: session.payment_status as Session['paymentStatus']
+            };
+          });
           
           allSessions.push(...convertedSessions);
         } catch (error) {
@@ -187,7 +196,12 @@ const Attendance = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
-          <p className="text-muted-foreground mt-1">Track and manage session attendance</p>
+          <p className="text-muted-foreground mt-1">
+            Track and manage session attendance
+            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+              Viewing in: {userTimezone}
+            </span>
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">

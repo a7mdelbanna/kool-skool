@@ -213,11 +213,9 @@ const Calendar = () => {
           <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
           <p className="text-muted-foreground mt-1">
             Manage your lessons and schedule
-            {userTimezone !== 'UTC' && (
-              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                {userTimezone}
-              </span>
-            )}
+            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+              Viewing in: {userTimezone}
+            </span>
           </p>
         </div>
 
