@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { formatInUserTimezone, getEffectiveTimezone, getBrowserTimezone } from '@/utils/timezone';
 import TimezoneSelector from '@/components/TimezoneSelector';
+import SessionTimeDisplay from '@/components/SessionTimeDisplay';
 import {
   Dialog,
   DialogContent,
@@ -63,27 +64,6 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
-
-  // Memoized formatting functions that depend on userTimezone
-  const formatSessionTime = useCallback((dateTime: string) => {
-    const effectiveTimezone = userTimezone || getBrowserTimezone();
-    console.log('Formatting session time:', dateTime, 'with timezone:', effectiveTimezone);
-    
-    if (!effectiveTimezone || effectiveTimezone === 'UTC') {
-      return format(new Date(dateTime), 'EEEE, MMMM d, yyyy');
-    }
-    return formatInUserTimezone(dateTime, effectiveTimezone, 'EEEE, MMMM d, yyyy');
-  }, [userTimezone]);
-
-  const formatSessionDateTime = useCallback((dateTime: string) => {
-    const effectiveTimezone = userTimezone || getBrowserTimezone();
-    console.log('Formatting session datetime:', dateTime, 'with timezone:', effectiveTimezone);
-    
-    if (!effectiveTimezone || effectiveTimezone === 'UTC') {
-      return format(new Date(dateTime), 'HH:mm');
-    }
-    return formatInUserTimezone(dateTime, effectiveTimezone, 'HH:mm');
-  }, [userTimezone]);
 
   useEffect(() => {
     // Check if user is authenticated and is a student
@@ -478,12 +458,10 @@ const StudentDashboard = () => {
             <CardContent>
               {studentData.next_session_date ? (
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold">
-                    {formatSessionTime(studentData.next_session_date)}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formatSessionDateTime(studentData.next_session_date)}
-                  </p>
+                  <SessionTimeDisplay 
+                    date={studentData.next_session_date} 
+                    className="text-sm font-semibold"
+                  />
                   <Badge className="bg-green-100 text-green-800">
                     <Clock className="h-3 w-3 mr-1" />
                     Scheduled
@@ -513,9 +491,9 @@ const StudentDashboard = () => {
                       </Badge>
                     </CardTitle>
                     <CardDescription>
-                      Start Date: {formatSessionTime(subscription.start_date)}
+                      Start Date: <SessionTimeDisplay date={subscription.start_date} showTime={false} />
                       {subscription.end_date && (
-                        <span> - End Date: {formatSessionTime(subscription.end_date)}</span>
+                        <span> - End Date: <SessionTimeDisplay date={subscription.end_date} showTime={false} /></span>
                       )}
                     </CardDescription>
                   </CardHeader>
@@ -552,11 +530,16 @@ const StudentDashboard = () => {
                     <div key={session.id} className="border rounded-md p-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium">
-                            {formatSessionTime(session.scheduled_date)}
-                          </p>
+                          <SessionTimeDisplay 
+                            date={session.scheduled_date} 
+                            className="font-medium"
+                            showTime={false}
+                          />
                           <p className="text-sm text-gray-500">
-                            {formatSessionDateTime(session.scheduled_date)} • {session.duration_minutes} min
+                            <SessionTimeDisplay 
+                              date={session.scheduled_date} 
+                              showDate={false}
+                            /> • {session.duration_minutes} min
                           </p>
                         </div>
                         {getStatusBadge(session.status)}
@@ -586,11 +569,16 @@ const StudentDashboard = () => {
                     <div key={session.id} className="border rounded-md p-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium">
-                            {formatSessionTime(session.scheduled_date)}
-                          </p>
+                          <SessionTimeDisplay 
+                            date={session.scheduled_date} 
+                            className="font-medium"
+                            showTime={false}
+                          />
                           <p className="text-sm text-gray-500">
-                            {formatSessionDateTime(session.scheduled_date)} • {session.duration_minutes} min
+                            <SessionTimeDisplay 
+                              date={session.scheduled_date} 
+                              showDate={false}
+                            /> • {session.duration_minutes} min
                           </p>
                         </div>
                         {getStatusBadge(session.status)}
@@ -618,7 +606,7 @@ const StudentDashboard = () => {
                 </h2>
                 <p className="text-gray-600">
                   This is your personal dashboard where you can view your courses, schedule, 
-                  and track your learning progress. You can set your timezone to view all session times in your local time.
+                  and track your learning progress. All times are displayed in your personal timezone ({userTimezone}).
                 </p>
               </div>
             </CardContent>

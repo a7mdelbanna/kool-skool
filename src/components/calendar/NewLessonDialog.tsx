@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   Dialog,
   DialogContent,
@@ -24,10 +24,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
+import { UserContext } from '@/App';
+import { getSchoolTimezone, convertSchoolTimeToUTC, formatInUserTimezone, getEffectiveTimezone } from '@/utils/timezone';
 
 interface NewLessonDialogProps {
   open: boolean;
@@ -58,6 +61,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   onOpenChange,
   initialDate = new Date() 
 }) => {
+  const { user } = useContext(UserContext);
   const [date, setDate] = useState<Date | undefined>(initialDate);
   const [studentId, setStudentId] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
@@ -66,14 +70,18 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   const [cost, setCost] = useState<string>('');
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [schoolTimezone, setSchoolTimezone] = useState<string>('');
+  const userTimezone = getEffectiveTimezone(user?.timezone);
 
-  // Fetch students when dialog opens
+  // Fetch students and school timezone when dialog opens
   useEffect(() => {
-    const fetchStudents = async () => {
-      if (!open) return;
+    const fetchData = async () => {
+      if (!open || !user?.schoolId) return;
       
       try {
         setLoading(true);
+        
+        // Fetch students
         const userInfo = await getCurrentUserInfo();
         if (!userInfo || userInfo.length === 0) {
           console.error('No user info found');
@@ -83,11 +91,16 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         const currentUser = userInfo[0];
         const studentsData = await getStudentsWithDetails(currentUser.user_school_id);
         setStudents(studentsData);
+
+        // Fetch school timezone
+        const timezone = await getSchoolTimezone(user.schoolId);
+        setSchoolTimezone(timezone);
+        
       } catch (error) {
-        console.error('Error fetching students:', error);
+        console.error('Error fetching data:', error);
         toast({
           title: "Error",
-          description: "Failed to load students",
+          description: "Failed to load data",
           variant: "destructive"
         });
       } finally {
@@ -95,13 +108,13 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
       }
     };
 
-    fetchStudents();
-  }, [open]);
+    fetchData();
+  }, [open, user?.schoolId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!date || !studentId || !subject || !time || !duration) {
+    if (!date || !studentId || !subject || !time || !duration || !user?.schoolId) {
       toast({
         title: "Missing information",
         description: "Please fill out all required fields",
@@ -121,19 +134,41 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
     }
 
     try {
-      // Here you would typically call a function to create the lesson in the database
-      // For now, we'll show a success message
+      // Create datetime in school timezone
+      const [hours, minutes] = time.split(':').map(Number);
+      const localDateTime = new Date(date);
+      localDateTime.setHours(hours, minutes, 0, 0);
+      
+      // Convert to UTC for storage using school timezone
+      const utcDateTime = await convertSchoolTimeToUTC(localDateTime, user.schoolId);
+      
+      // Parse duration
+      const durationMinutes = parseInt(duration.replace(' min', ''));
+      
+      // Create lesson session in database
+      const { error } = await supabase
+        .from('lesson_sessions')
+        .insert({
+          student_id: studentId,
+          scheduled_date: utcDateTime.toISOString(),
+          duration_minutes: durationMinutes,
+          status: 'scheduled',
+          payment_status: 'pending',
+          cost: cost ? parseFloat(cost) : 0,
+          notes: `${subject} lesson - Created via calendar`
+        });
+
+      if (error) throw error;
+      
       toast({
         title: "Lesson scheduled",
-        description: `${subject} lesson with ${selectedStudent.first_name} ${selectedStudent.last_name} on ${format(date, 'MMM d')} at ${time}`,
+        description: `${subject} lesson with ${selectedStudent.first_name} ${selectedStudent.last_name} on ${format(date, 'MMM d')} at ${time} (${schoolTimezone})`,
       });
       
       // Reset form and close dialog
       resetForm();
       onOpenChange(false);
       
-      // You might want to refresh the sessions here
-      // await refreshSessions();
     } catch (error) {
       console.error('Error creating lesson:', error);
       toast({
@@ -153,11 +188,22 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
     setCost('');
   };
 
+  // Format the selected date for display in user's timezone
+  const formatDateForDisplay = (date: Date) => {
+    return formatInUserTimezone(date, userTimezone, 'PPP');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Lesson</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Add New Lesson
+            <div className="flex items-center text-sm text-muted-foreground ml-auto">
+              <Globe className="h-4 w-4 mr-1" />
+              School TZ: {schoolTimezone || 'Loading...'}
+            </div>
+          </DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
@@ -207,7 +253,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  {date ? formatDateForDisplay(date) : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -223,7 +269,9 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
           
           {/* Time */}
           <div className="space-y-2">
-            <Label htmlFor="time">Time</Label>
+            <Label htmlFor="time">
+              Time (in {schoolTimezone || 'school timezone'})
+            </Label>
             <Select value={time} onValueChange={setTime}>
               <SelectTrigger id="time" className="w-full">
                 <SelectValue placeholder="Select a time">
@@ -239,6 +287,9 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Time will be created in school timezone ({schoolTimezone}) and displayed in your timezone ({userTimezone})
+            </p>
           </div>
           
           {/* Duration */}
