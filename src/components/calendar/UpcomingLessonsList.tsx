@@ -70,18 +70,10 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
   currentDate,
   currentWeekStart
 }) => {
-  const [localSessions, setLocalSessions] = useState<Session[]>(sessions);
   const [subscriptionInfoMap, setSubscriptionInfoMap] = useState<Map<string, SubscriptionInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusChangeSession, setStatusChangeSession] = useState<string | null>(null);
-
-  // Update local sessions when props change, but only if we're not in the middle of an action
-  useEffect(() => {
-    if (!actionLoading) {
-      setLocalSessions(sessions);
-    }
-  }, [sessions, actionLoading]);
 
   // Load subscription information for all students
   useEffect(() => {
@@ -147,41 +139,11 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
     }
   }, [sessions]);
 
-  // Handle session actions with optimistic updates and no immediate parent refresh
+  // Handle session actions
   const handleSessionActionClick = async (sessionId: string, action: string, newDatetime?: Date) => {
     try {
       setActionLoading(sessionId);
       
-      // Immediately update local state for instant UI feedback
-      setLocalSessions(prevSessions => 
-        prevSessions.map(session => {
-          if (session.id === sessionId) {
-            let newStatus: Session['status'] = session.status;
-            
-            // Map action to new status
-            switch (action) {
-              case 'attended':
-                newStatus = 'completed';
-                break;
-              case 'cancelled':
-                newStatus = 'canceled';
-                break;
-              case 'moved':
-              case 'rescheduled':
-                // For moved/rescheduled, keep status as scheduled for now
-                newStatus = 'scheduled';
-                break;
-            }
-            
-            return {
-              ...session,
-              status: newStatus
-            };
-          }
-          return session;
-        })
-      );
-
       const response = await handleSessionAction(
         sessionId, 
         action, 
@@ -193,27 +155,18 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
 
       if (typedResponse.success) {
         toast.success(`Session ${action} successfully`);
-        
+        // Trigger refresh of sessions data
+        if (onSessionUpdate) {
+          onSessionUpdate();
+        }
         // Close status change popup
         setStatusChangeSession(null);
-        
-        // Only trigger parent update after a delay to allow for smooth UI transition
-        // This prevents the jarring reload effect
-        if (onSessionUpdate) {
-          setTimeout(() => onSessionUpdate(), 2000);
-        }
       } else {
         toast.error(typedResponse.message || `Failed to ${action} session`);
-        
-        // Revert the optimistic update on failure
-        setLocalSessions(sessions);
       }
     } catch (error) {
       console.error(`Error handling session action ${action}:`, error);
       toast.error(`Failed to ${action} session`);
-      
-      // Revert the optimistic update on error
-      setLocalSessions(sessions);
     } finally {
       setActionLoading(null);
     }
@@ -223,7 +176,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
   const today = new Date();
   const tomorrow = addDays(today, 1);
   
-  const upcomingSessions = localSessions
+  const upcomingSessions = sessions
     .filter(session => !isPast(new Date(session.date)) || isToday(new Date(session.date)))
     .sort((a, b) => {
       const dateA = new Date(a.date);
@@ -231,7 +184,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
       return dateA.getTime() - dateB.getTime();
     });
     
-  const pastSessions = localSessions
+  const pastSessions = sessions
     .filter(session => isPast(new Date(session.date)) && !isToday(new Date(session.date)))
     .sort((a, b) => {
       const dateA = new Date(a.date);
@@ -320,7 +273,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <Check className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Mark Completed"}
+          {actionLoading === "attended" ? "..." : "Mark Completed"}
         </Button>
         <Button 
           onClick={(e) => {
@@ -331,7 +284,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <X className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Mark Cancelled"}
+          {actionLoading === "cancelled" ? "..." : "Mark Cancelled"}
         </Button>
         <Button 
           onClick={(e) => {
@@ -342,7 +295,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <ArrowRight className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Move"}
+          {actionLoading === "moved" ? "..." : "Move"}
         </Button>
         <Button 
           onClick={(e) => {
@@ -353,7 +306,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <RefreshCcw className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Reschedule"}
+          {actionLoading === "rescheduled" ? "..." : "Reschedule"}
         </Button>
       </div>
     );
@@ -376,7 +329,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <Check className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Mark as Attended"}
+          {actionLoading === sessionId && actionLoading === "attended" ? "..." : "Mark as Attended"}
         </Button>
         <Button 
           onClick={(e) => {
@@ -388,7 +341,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <X className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Cancel Session"}
+          {actionLoading === sessionId && actionLoading === "cancelled" ? "..." : "Cancel Session"}
         </Button>
         <Button 
           onClick={(e) => {
@@ -400,7 +353,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <RefreshCcw className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Reschedule"}
+          {actionLoading === sessionId && actionLoading === "rescheduled" ? "..." : "Reschedule"}
         </Button>
         <Button 
           onClick={(e) => {
@@ -412,7 +365,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           disabled={isLoading}
         >
           <ArrowRight className="h-3 w-3 mr-1" />
-          {actionLoading === sessionId ? "..." : "Move"}
+          {actionLoading === sessionId && actionLoading === "moved" ? "..." : "Move"}
         </Button>
       </div>
     );
@@ -611,7 +564,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
           Lessons for {getViewTitle()}
         </h2>
         <p className="text-sm text-muted-foreground">
-          {localSessions.length} lesson{localSessions.length !== 1 ? 's' : ''} found
+          {sessions.length} lesson{sessions.length !== 1 ? 's' : ''} found
         </p>
       </div>
 
