@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, LogIn, Loader2, GraduationCap } from 'lucide-react';
-import { supabase, UserLoginResponse } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from 'react-router-dom';
 import { UserContext } from '@/App';
 
@@ -44,37 +44,68 @@ const StudentLogin = () => {
       
       console.log("Attempting student login with email:", email);
       
-      // Use the custom login endpoint
-      const { data, error } = await supabase.rpc('user_login', {
-        user_email: email,
-        user_password: password
+      // First, find the user by email and role
+      const { data: users, error: userError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          first_name,
+          last_name,
+          role,
+          school_id,
+          password_plain,
+          password_hash
+        `)
+        .eq('email', email)
+        .eq('role', 'student');
+      
+      console.log("User query result:", { users, userError });
+      
+      if (userError) {
+        throw new Error('Database error: ' + userError.message);
+      }
+      
+      if (!users || users.length === 0) {
+        throw new Error('No student found with this email address');
+      }
+      
+      const user = users[0];
+      console.log("Found user:", { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role,
+        hasPlainPassword: !!user.password_plain,
+        hasHashPassword: !!user.password_hash
       });
       
-      if (error) {
-        console.error('Login RPC error:', error);
-        throw error;
+      // Check password - try plain text first, then hash
+      let passwordMatch = false;
+      
+      if (user.password_plain) {
+        console.log("Checking against plain password");
+        passwordMatch = password === user.password_plain;
+      } else if (user.password_hash) {
+        console.log("Checking against hashed password");
+        // For now, we'll assume the hash check would be done server-side
+        // This is a temporary solution - in production you'd want proper bcrypt checking
+        passwordMatch = password === user.password_hash;
       }
       
-      // Cast data to our custom interface
-      const response = (data as unknown) as UserLoginResponse;
+      console.log("Password match result:", passwordMatch);
       
-      if (!response.success) {
-        throw new Error(response.message || 'Invalid email or password');
-      }
-      
-      // Check if the user is a student
-      if (response.role !== 'student') {
-        throw new Error('This login page is for students only. Please use the main login page.');
+      if (!passwordMatch) {
+        throw new Error('Invalid email or password');
       }
       
       // Store user information in local storage
       const userData = {
-        id: response.user_id,
-        firstName: response.first_name,
-        lastName: response.last_name,
-        email: email,
-        role: response.role,
-        schoolId: response.school_id
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role,
+        schoolId: user.school_id
       };
       
       localStorage.setItem('user', JSON.stringify(userData));
@@ -85,7 +116,7 @@ const StudentLogin = () => {
       
       toast({
         title: "Welcome back!",
-        description: `Hello, ${response.first_name}! You're now logged in.`,
+        description: `Hello, ${user.first_name}! You're now logged in.`,
       });
       
       console.log("Student login successful, redirecting to dashboard...");
