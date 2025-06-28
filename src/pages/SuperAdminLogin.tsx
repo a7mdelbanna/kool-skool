@@ -1,15 +1,16 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, LogIn, Loader2, School, AlertCircle } from 'lucide-react';
+import { Mail, Lock, LogIn, Loader2, Shield, AlertCircle } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from 'react-router-dom';
 import { UserContext } from '@/App';
 
-const Login = () => {
+const SuperAdminLogin = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { setUser } = useContext(UserContext);
@@ -18,56 +19,21 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [connectionStatus, setConnectionStatus] = useState('checking');
   
-  // Check if we're already authenticated and redirect if so
+  // Check if we're already authenticated as super admin and redirect if so
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (user) {
       const parsedUser = JSON.parse(user);
-      if (parsedUser.role === 'admin' || parsedUser.role === 'teacher') {
-        console.log("User already logged in, redirecting to dashboard...");
-        navigate('/');
+      if (parsedUser.role === 'superadmin') {
+        console.log("Super admin already logged in, redirecting to dashboard...");
+        navigate('/superadmin');
       } else {
-        // Clear non-admin/teacher user data
+        // Clear non-super admin user data
         localStorage.removeItem('user');
       }
     }
   }, [navigate]);
-
-  // Test database connection
-  const testDatabaseConnection = async () => {
-    console.log("=== DATABASE CONNECTION TEST ===");
-    
-    try {
-      setConnectionStatus('testing');
-      
-      // Test basic connection by checking for users
-      console.log("Testing database connection...");
-      const { data: users, error: connectionError } = await supabase
-        .from('users')
-        .select('id')
-        .limit(1);
-      
-      if (connectionError) {
-        console.error("❌ Database connection failed:", connectionError);
-        setConnectionStatus('failed');
-        return;
-      }
-      
-      console.log("✅ Database connection successful");
-      setConnectionStatus('connected');
-      
-    } catch (error) {
-      console.error('❌ Database test failed:', error);
-      setConnectionStatus('failed');
-    }
-  };
-
-  // Run connection test on component mount
-  useEffect(() => {
-    testDatabaseConnection();
-  }, []);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,23 +47,22 @@ const Login = () => {
     try {
       setLoading(true);
       
-      console.log("=== SCHOOL MANAGEMENT LOGIN ATTEMPT ===");
+      console.log("=== SUPER ADMIN LOGIN ATTEMPT ===");
       console.log("Email:", email);
-      console.log("Using new verify_school_login function...");
       
-      // Use the new database function to verify login
+      // Use the new database function to verify super admin login
       const { data: loginResults, error: loginError } = await supabase
-        .rpc('verify_school_login', {
+        .rpc('verify_superadmin_login', {
           p_email: email.toLowerCase().trim(),
           p_password: password
         });
       
       if (loginError) {
-        console.error("❌ Login function error:", loginError);
+        console.error("❌ Super admin login function error:", loginError);
         throw new Error(`Login failed: ${loginError.message}`);
       }
       
-      console.log("Login results:", loginResults);
+      console.log("Super admin login results:", loginResults);
       
       if (!loginResults || loginResults.length === 0) {
         throw new Error('No response from login function');
@@ -106,23 +71,23 @@ const Login = () => {
       const result = loginResults[0];
       
       if (!result.success) {
-        console.error("❌ Login failed:", result.message);
+        console.error("❌ Super admin login failed:", result.message);
         throw new Error(result.message);
       }
       
-      console.log("✅ Login successful!");
+      console.log("✅ Super admin login successful!");
       
-      // Create user session
+      // Create user session for super admin
       const userData = {
         id: result.user_id,
         firstName: result.first_name,
         lastName: result.last_name,
         email: result.email,
         role: result.role,
-        schoolId: result.school_id
+        schoolId: null // Super admin has no school
       };
       
-      console.log("Creating user session:", userData);
+      console.log("Creating super admin session:", userData);
       
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
@@ -131,15 +96,15 @@ const Login = () => {
       window.dispatchEvent(new Event('storage'));
       
       toast({
-        title: "Welcome back!",
+        title: "Welcome Super Admin!",
         description: `Hello, ${result.first_name}! You're now logged in.`,
       });
       
-      console.log("✅ Redirecting to dashboard...");
-      navigate('/');
+      console.log("✅ Redirecting to super admin dashboard...");
+      navigate('/superadmin');
       
     } catch (error: any) {
-      console.error('❌ Login error:', error);
+      console.error('❌ Super admin login error:', error);
       setError(error.message || 'Login failed. Please try again.');
       toast({
         title: "Login failed",
@@ -151,39 +116,20 @@ const Login = () => {
     }
   };
   
-  const getConnectionStatusIcon = () => {
-    switch (connectionStatus) {
-      case 'checking':
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      case 'testing':
-        return <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />;
-      case 'connected':
-        return <div className="h-4 w-4 rounded-full bg-green-500" />;
-      case 'failed':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return null;
-    }
-  };
-  
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-4">
         <Card>
           <CardHeader className="space-y-1">
             <div className="flex justify-center mb-4">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <School className="h-6 w-6 text-primary" />
+              <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                <Shield className="h-6 w-6 text-red-600" />
               </div>
             </div>
-            <CardTitle className="text-2xl text-center">School Management</CardTitle>
+            <CardTitle className="text-2xl text-center">Super Admin Portal</CardTitle>
             <CardDescription className="text-center">
-              Enter your credentials to access your school management dashboard
+              Access the license management system
             </CardDescription>
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              {getConnectionStatusIcon()}
-              <span>Database: {connectionStatus}</span>
-            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
@@ -200,7 +146,7 @@ const Login = () => {
                   <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
-                    placeholder="your.email@example.com"
+                    placeholder="superadmin@example.com"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -232,9 +178,9 @@ const Login = () => {
               
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-red-600 hover:bg-red-700"
                 size="lg"
-                disabled={loading || connectionStatus === 'failed'}
+                disabled={loading}
               >
                 {loading ? (
                   <>
@@ -244,7 +190,7 @@ const Login = () => {
                 ) : (
                   <>
                     <LogIn className="mr-2 h-4 w-4" />
-                    Log In
+                    Super Admin Login
                   </>
                 )}
               </Button>
@@ -252,15 +198,9 @@ const Login = () => {
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <div className="text-sm text-center text-muted-foreground">
-              Don't have a school account yet?{' '}
-              <Link to="/school-setup" className="text-primary hover:underline">
-                Set up your school
-              </Link>
-            </div>
-            <div className="text-sm text-center text-muted-foreground">
-              System administrator?{' '}
-              <Link to="/superadmin-login" className="text-red-600 hover:underline">
-                Super Admin Login
+              Need school access?{' '}
+              <Link to="/login" className="text-primary hover:underline">
+                School Login
               </Link>
             </div>
           </CardFooter>
@@ -270,4 +210,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default SuperAdminLogin;

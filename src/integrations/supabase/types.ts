@@ -1236,6 +1236,14 @@ export type Database = {
         Args: { p_school_id: string }
         Returns: undefined
       }
+      create_license: {
+        Args: {
+          p_license_key: string
+          p_duration_days: number
+          p_is_active?: boolean
+        }
+        Returns: Json
+      }
       create_student: {
         Args:
           | {
@@ -1303,6 +1311,20 @@ export type Database = {
       delete_student_subscription: {
         Args: { p_subscription_id: string }
         Returns: Json
+      }
+      get_all_licenses_with_schools: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          license_id: string
+          license_key: string
+          expires_at: string
+          duration_days: number
+          is_active: boolean
+          license_created_at: string
+          school_id: string
+          school_name: string
+          school_created_at: string
+        }[]
       }
       get_category_path: {
         Args: { category_id: string }
@@ -1632,6 +1654,10 @@ export type Database = {
         Args: { p_course_id: string; p_name: string; p_lesson_type: string }
         Returns: undefined
       }
+      update_license_status: {
+        Args: { p_license_id: string; p_is_active: boolean }
+        Returns: Json
+      }
       update_student_password: {
         Args: { p_user_id: string; p_password: string }
         Returns: Json
@@ -1683,6 +1709,18 @@ export type Database = {
           role: string
           school_id: string
           student_id: string
+          success: boolean
+          message: string
+        }[]
+      }
+      verify_superadmin_login: {
+        Args: { p_email: string; p_password: string }
+        Returns: {
+          user_id: string
+          first_name: string
+          last_name: string
+          email: string
+          role: string
           success: boolean
           message: string
         }[]

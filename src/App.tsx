@@ -1,131 +1,94 @@
+import React, { createContext, useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useState, useEffect, createContext } from 'react';
-import MainLayout from "./layout/MainLayout";
-import Index from "./pages/Index";
-import Students from "./pages/Students";
-import Courses from "./pages/Courses";
-import Contacts from "./pages/Contacts";
-import Calendar from "./pages/Calendar";
-import Attendance from "./pages/Attendance";
-import PaymentsOptimized from "./pages/PaymentsOptimized";
-import Finances from "./pages/Finances";
-import Settings from "./pages/Settings";
-import SchoolSetup from "./pages/SchoolSetup";
-import StatesReports from "./pages/StatesReports";
-import TeamAccess from "./pages/TeamAccess";
-import StudentAccess from "./pages/StudentAccess";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import StudentLogin from "./pages/StudentLogin";
-import StudentDashboard from "./pages/StudentDashboard";
-import LicenseManagement from "./pages/LicenseManagement";
-import { PaymentProvider } from "./contexts/PaymentContext";
+import Index from '@/pages/Index';
+import Login from '@/pages/Login';
+import StudentLogin from '@/pages/StudentLogin';
+import SuperAdminLogin from '@/pages/SuperAdminLogin';
+import SuperAdminDashboard from '@/pages/SuperAdminDashboard';
+import SchoolSetup from '@/pages/SchoolSetup';
+import Students from '@/pages/Students';
+import Courses from '@/pages/Courses';
+import Payments from '@/pages/Payments';
+import PaymentsOptimized from '@/pages/PaymentsOptimized';
+import Finances from '@/pages/Finances';
+import Calendar from '@/pages/Calendar';
+import Attendance from '@/pages/Attendance';
+import Settings from '@/pages/Settings';
+import TeamAccess from '@/pages/TeamAccess';
+import StudentAccess from '@/pages/StudentAccess';
+import StudentDashboard from '@/pages/StudentDashboard';
+import Contacts from '@/pages/Contacts';
+import LicenseManagement from '@/pages/LicenseManagement';
+import StatesReports from '@/pages/StatesReports';
+import NotFound from '@/pages/NotFound';
+import './App.css';
 
-// Create a context for the user
-export const UserContext = createContext<{
-  user: any;
-  isAuthenticated: boolean;
-  setUser: (user: any) => void;
-}>({
-  user: null,
-  isAuthenticated: false,
-  setUser: () => {},
-});
+export const UserContext = createContext<{ user: any, setUser: any }>({ user: null, setUser: null });
 
-// Optimized QueryClient configuration for better performance
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30000, // 30 seconds
-      gcTime: 300000, // 5 minutes
-      retry: 2,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
-const App = () => {
-  const [user, setUser] = useState<any>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  schoolId: string | null;
+}
+
+function App() {
+  const [user, setUser] = useState<User | null>(() => {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
 
   useEffect(() => {
-    // Check if user is authenticated
-    const checkAuth = () => {
+    const handleStorageChange = () => {
       const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        console.log("Auth check:", !!parsedUser, parsedUser);
-        setUser(parsedUser);
-        setIsAuthenticated(true);
-      } else {
-        setUser(null);
-        setIsAuthenticated(false);
-      }
-      setLoading(false);
+      setUser(storedUser ? JSON.parse(storedUser) : null);
     };
-    
-    checkAuth();
-    
-    // Listen for storage events to handle authentication across tabs
-    window.addEventListener('storage', checkAuth);
-    
+
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
-      window.removeEventListener('storage', checkAuth);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-    </div>;
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <UserContext.Provider value={{ user, isAuthenticated, setUser }}>
-          <PaymentProvider>
-            <BrowserRouter>
-              <Toaster />
-              <Sonner />
-              <Routes>
-                {/* Authentication routes */}
-                <Route path="/login" element={isAuthenticated && user?.role !== 'student' ? <Navigate to="/" replace /> : <Login />} />
-                <Route path="/student-login" element={isAuthenticated && user?.role === 'student' ? <Navigate to="/student-dashboard" replace /> : <StudentLogin />} />
-                
-                {/* School setup is only accessible if user is NOT authenticated */}
-                <Route path="/school-setup" element={isAuthenticated ? <Navigate to="/license" replace /> : <SchoolSetup />} />
-                
-                {/* Student-specific routes */}
-                <Route path="/student-dashboard" element={isAuthenticated && user?.role === 'student' ? <StudentDashboard /> : <Navigate to="/student-login" replace />} />
-                
-                {/* Protected routes for admin/teacher */}
-                <Route element={isAuthenticated && user?.role !== 'student' ? <MainLayout /> : <Navigate to="/login" replace />}>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/students" element={<Students />} />
-                  <Route path="/courses" element={<Courses />} />
-                  <Route path="/contacts" element={<Contacts />} />
-                  <Route path="/calendar" element={<Calendar />} />
-                  <Route path="/attendance" element={<Attendance />} />
-                  <Route path="/payments" element={<PaymentsOptimized />} />
-                  <Route path="/finances" element={<Finances />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/reports" element={<StatesReports />} />
-                  <Route path="/team-access" element={<TeamAccess />} />
-                  <Route path="/student-access" element={<StudentAccess />} />
-                  <Route path="/license" element={<LicenseManagement />} />
-                </Route>
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </PaymentProvider>
-        </UserContext.Provider>
-      </TooltipProvider>
+      <UserContext.Provider value={{ user, setUser }}>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/student-login" element={<StudentLogin />} />
+            <Route path="/superadmin-login" element={<SuperAdminLogin />} />
+            <Route path="/superadmin" element={<SuperAdminDashboard />} />
+            <Route path="/school-setup" element={<SchoolSetup />} />
+            <Route path="/students" element={<Students />} />
+            <Route path="/courses" element={<Courses />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/payments-optimized" element={<PaymentsOptimized />} />
+            <Route path="/finances" element={<Finances />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/attendance" element={<Attendance />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/team-access" element={<TeamAccess />} />
+            <Route path="/student-access" element={<StudentAccess />} />
+            <Route path="/student-dashboard" element={<StudentDashboard />} />
+            <Route path="/contacts" element={<Contacts />} />
+            <Route path="/license-management" element={<LicenseManagement />} />
+            <Route path="/states-reports" element={<StatesReports />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+          <Sonner />
+        </Router>
+      </UserContext.Provider>
     </QueryClientProvider>
   );
 }
