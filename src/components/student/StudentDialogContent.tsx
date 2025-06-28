@@ -45,11 +45,11 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Simplified subscription fetching - direct query like PaymentsTab
+  // Fetch subscriptions immediately when dialog opens - not conditional on active tab
   const { data: subscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError } = useQuery({
     queryKey: ['student-subscriptions', student?.id],
     queryFn: async () => {
-      console.log('🔄 Direct subscription fetch for student:', student?.id);
+      console.log('🔄 Immediate subscription fetch for student:', student?.id);
       
       if (!student?.id) {
         console.log('❌ No student ID for subscription fetch');
@@ -67,12 +67,12 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         throw error;
       }
       
-      console.log('✅ Subscriptions fetched successfully:', data?.length || 0);
+      console.log('✅ Subscriptions fetched immediately:', data?.length || 0);
       console.log('📋 Subscription data:', data);
       
       return data || [];
     },
-    enabled: !!student?.id && open,
+    enabled: !!student?.id && open, // Fetch as soon as dialog opens and we have student ID
     retry: 1,
     staleTime: 30000,
     gcTime: 300000,
@@ -181,6 +181,28 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     console.log('🔄 Tab changed to:', value);
     setActiveTab(value);
   };
+
+  // Pre-load subscriptions data when dialog opens
+  useEffect(() => {
+    if (open && student?.id) {
+      console.log('🎯 Dialog opened - ensuring subscriptions are prefetched for student:', student.id);
+      // This will trigger the subscription query if it hasn't been fetched yet
+      queryClient.prefetchQuery({
+        queryKey: ['student-subscriptions', student.id],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('student_id', student.id)
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          return data || [];
+        },
+        staleTime: 30000,
+      });
+    }
+  }, [open, student?.id, queryClient]);
 
   return (
     <>
