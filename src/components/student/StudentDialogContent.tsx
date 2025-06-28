@@ -117,7 +117,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     enabled: !!student?.id,
     retry: 1,
     staleTime: 30000, // Consider data fresh for 30 seconds
-    cacheTime: 300000, // Keep in cache for 5 minutes
+    gcTime: 300000, // Keep in cache for 5 minutes (renamed from cacheTime)
   });
 
   // Add effect to log subscription changes and force re-render
