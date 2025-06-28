@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt, Wallet } from "lucide-react";
+import { Calendar, Clock, DollarSign, FileText, Trash2, CheckCircle, AlertTriangle, Loader2, Plus, X, CalendarIcon, CreditCard, Receipt, Wallet, Edit } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,7 @@ import {
 } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
+import EditSubscriptionDialog from "./EditSubscriptionDialog";
 
 interface SubscriptionsTabProps {
   studentData: Partial<Student>;
@@ -232,6 +233,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [subscriptionToDelete, setSubscriptionToDelete] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingSubscriptionId, setDeletingSubscriptionId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [subscriptionToEdit, setSubscriptionToEdit] = useState<Subscription | null>(null);
 
   // Get school ID from localStorage
   const getSchoolId = () => {
@@ -594,19 +597,42 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     }
 
     try {
-      console.log('🗑️ SIMPLIFIED: Starting subscription deletion for ID:', subscriptionId);
+      console.log('🗑️ Starting enhanced subscription deletion for ID:', subscriptionId);
       setDeletingSubscriptionId(subscriptionId);
       
-      // Call the enhanced delete function (no optimistic updates)
-      console.log('🗑️ Calling enhanced deleteStudentSubscription...');
-      await deleteStudentSubscription(subscriptionId);
+      const userData = localStorage.getItem('user');
+      const user = userData ? JSON.parse(userData) : null;
       
-      console.log('✅ Subscription deleted successfully from database');
+      if (!user || !user.schoolId) {
+        throw new Error('User authentication required');
+      }
+
+      const currentUserId = user.user_id || user.id || user.userId;
+      if (!currentUserId) {
+        throw new Error('User ID not found');
+      }
+
+      // Use the enhanced deletion function
+      const { data, error } = await supabase.rpc('delete_subscription_with_related_data', {
+        p_subscription_id: subscriptionId,
+        p_current_user_id: currentUserId,
+        p_current_school_id: user.schoolId
+      });
+
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+
+      if (data && !data.success) {
+        throw new Error(data.message || 'Failed to delete subscription');
+      }
+
+      console.log('✅ Enhanced deletion successful:', data);
       
-      // Show success message
       toast({
         title: "Success",
-        description: "Subscription deleted successfully",
+        description: data?.message || "Subscription deleted successfully",
       });
       
       // Reload subscriptions from database
@@ -632,6 +658,17 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     console.log('🗑️ Opening delete dialog for subscription:', subscriptionId);
     setSubscriptionToDelete(subscriptionId);
     setDeleteDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (subscription: Subscription) => {
+    console.log('✏️ Opening edit dialog for subscription:', subscription);
+    setSubscriptionToEdit(subscription);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    console.log('✅ Edit successful, reloading subscriptions');
+    loadSubscriptions();
   };
 
   const formatDate = (dateString: string) => {
@@ -1089,7 +1126,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         </Card>
       )}
 
-      {/* Current Subscriptions - Updated with Payment Status */}
+      {/* Current Subscriptions - Updated with Edit Button */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1164,25 +1201,37 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                           </Badge>
                         </div>
                       </div>
+                      
                       {!isViewMode && (
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => handleOpenDeleteDialog(subscription.id)}
-                          disabled={deletingSubscriptionId === subscription.id}
-                        >
-                          {deletingSubscriptionId === subscription.id ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Deleting...
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleOpenEditDialog(subscription)}
+                            className="text-blue-600 hover:text-blue-800 border-blue-200 hover:border-blue-300"
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => handleOpenDeleteDialog(subscription.id)}
+                            disabled={deletingSubscriptionId === subscription.id}
+                          >
+                            {deletingSubscriptionId === subscription.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Deleting...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </div>
                     {subscription.notes && (
@@ -1207,7 +1256,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Subscription</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this subscription? This action cannot be undone and will also remove all associated lesson sessions.
+              Are you sure you want to delete this subscription? This action cannot be undone and will also remove all associated lesson sessions and related payment records.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1229,6 +1278,14 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Subscription Dialog */}
+      <EditSubscriptionDialog 
+        subscription={subscriptionToEdit}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 };

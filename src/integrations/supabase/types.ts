@@ -1318,6 +1318,14 @@ export type Database = {
         Args: { p_subscription_id: string }
         Returns: Json
       }
+      delete_subscription_with_related_data: {
+        Args: {
+          p_subscription_id: string
+          p_current_user_id: string
+          p_current_school_id: string
+        }
+        Returns: Json
+      }
       get_all_licenses_with_schools: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1666,6 +1674,25 @@ export type Database = {
       }
       update_student_password: {
         Args: { p_user_id: string; p_password: string }
+        Returns: Json
+      }
+      update_subscription_with_related_data: {
+        Args: {
+          p_subscription_id: string
+          p_session_count: number
+          p_duration_months: number
+          p_start_date: string
+          p_schedule: Json
+          p_price_mode: string
+          p_price_per_session: number
+          p_fixed_price: number
+          p_total_price: number
+          p_currency: string
+          p_notes: string
+          p_status: string
+          p_current_user_id: string
+          p_current_school_id: string
+        }
         Returns: Json
       }
       user_login: {

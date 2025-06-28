@@ -804,16 +804,91 @@ export const addStudentSubscription = async (subscriptionData: any) => {
   return data;
 };
 
-// Function to delete student subscription
-export const deleteStudentSubscription = async (subscriptionId: string) => {
-  const { data, error } = await supabase
-    .from('subscriptions')
-    .delete()
-    .eq('id', subscriptionId);
+// Enhanced subscription deletion
+export const deleteStudentSubscriptionEnhanced = async (subscriptionId: string) => {
+  const userData = localStorage.getItem('user');
+  const user = userData ? JSON.parse(userData) : null;
+  
+  if (!user || !user.schoolId) {
+    throw new Error('User authentication required');
+  }
+
+  const currentUserId = user.user_id || user.id || user.userId;
+  if (!currentUserId) {
+    throw new Error('User ID not found');
+  }
+
+  const { data, error } = await supabase.rpc('delete_subscription_with_related_data', {
+    p_subscription_id: subscriptionId,
+    p_current_user_id: currentUserId,
+    p_current_school_id: user.schoolId
+  });
 
   if (error) {
     console.error('Error deleting subscription:', error);
     throw error;
+  }
+
+  if (data && !data.success) {
+    throw new Error(data.message || 'Failed to delete subscription');
+  }
+
+  return data;
+};
+
+// Enhanced subscription update
+export const updateStudentSubscriptionEnhanced = async (
+  subscriptionId: string,
+  subscriptionData: {
+    sessionCount: number;
+    durationMonths: number;
+    startDate: Date;
+    schedule: any[];
+    priceMode: 'perSession' | 'fixedPrice';
+    pricePerSession?: number;
+    fixedPrice?: number;
+    totalPrice: number;
+    currency: string;
+    notes?: string;
+    status: string;
+  }
+) => {
+  const userData = localStorage.getItem('user');
+  const user = userData ? JSON.parse(userData) : null;
+  
+  if (!user || !user.schoolId) {
+    throw new Error('User authentication required');
+  }
+
+  const currentUserId = user.user_id || user.id || user.userId;
+  if (!currentUserId) {
+    throw new Error('User ID not found');
+  }
+
+  const { data, error } = await supabase.rpc('update_subscription_with_related_data', {
+    p_subscription_id: subscriptionId,
+    p_session_count: subscriptionData.sessionCount,
+    p_duration_months: subscriptionData.durationMonths,
+    p_start_date: subscriptionData.startDate.toISOString().split('T')[0],
+    p_schedule: subscriptionData.schedule,
+    p_price_mode: subscriptionData.priceMode,
+    p_price_per_session: subscriptionData.priceMode === 'perSession' ? subscriptionData.pricePerSession : null,
+    p_fixed_price: subscriptionData.priceMode === 'fixedPrice' ? subscriptionData.fixedPrice : null,
+    p_total_price: subscriptionData.totalPrice,
+    p_currency: subscriptionData.currency,
+    p_notes: subscriptionData.notes || '',
+    p_status: subscriptionData.status,
+    p_current_user_id: currentUserId,
+    p_current_school_id: user.schoolId
+  });
+
+  if (error) {
+    console.error('Error updating subscription:', error);
+    throw error;
+  }
+
+  if (data && !data.success) {
+    throw new Error(data.message || 'Failed to update subscription');
   }
 
   return data;
