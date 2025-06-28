@@ -56,6 +56,12 @@ interface SubscriptionInfo {
   subscriptionName?: string;
 }
 
+interface SessionActionResponse {
+  success: boolean;
+  message?: string;
+  new_session_id?: string;
+}
+
 const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({ 
   sessions, 
   onLessonClick,
@@ -143,14 +149,17 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = ({
         newDatetime?.toISOString()
       );
 
-      if (response.success) {
+      // Type cast the response to our expected format
+      const typedResponse = response as unknown as SessionActionResponse;
+
+      if (typedResponse.success) {
         toast.success(`Session ${action} successfully`);
         // Trigger refresh of sessions data
         if (onSessionUpdate) {
           onSessionUpdate();
         }
       } else {
-        toast.error(response.message || `Failed to ${action} session`);
+        toast.error(typedResponse.message || `Failed to ${action} session`);
       }
     } catch (error) {
       console.error(`Error handling session action ${action}:`, error);
