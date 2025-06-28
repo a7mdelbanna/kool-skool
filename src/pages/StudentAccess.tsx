@@ -70,10 +70,10 @@ const StudentAccess = () => {
         return [];
       }
 
+      // Remove the role filter since we already know these are student user IDs
       const { data, error } = await supabase
         .from('users')
         .select('id, password_hash')
-        .eq('role', 'student')
         .in('id', userIds);
 
       console.log('Password query result:', { data, error });
