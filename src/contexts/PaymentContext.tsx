@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUserInfo, getStudentsWithDetails, supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -55,6 +54,28 @@ export interface ExpenseCategory {
   expenseNames: string[];
 }
 
+export interface Subscription {
+  id: string;
+  student_id: string;
+  session_count: number;
+  duration_months: number;
+  start_date: string;
+  end_date: string | null; // Add this property
+  schedule: {
+    day: string;
+    time: string;
+  }[];
+  price_mode: 'perSession' | 'fixed';
+  price_per_session?: number;
+  fixed_price?: number;
+  total_price: number;
+  currency: string;
+  notes?: string;
+  status: 'active' | 'inactive' | 'completed';
+  sessions_completed: number | null; // Add this property
+  created_at: string;
+}
+
 interface PaymentContextType {
   sessions: Session[];
   loading: boolean;
@@ -64,6 +85,7 @@ interface PaymentContextType {
   expenses: Expense[];
   accounts: Account[];
   expenseCategories: ExpenseCategory[];
+  subscriptions: Subscription[];
   addPayment: (payment: Omit<Payment, 'id'>) => void;
   updatePayment: (id: string, payment: Partial<Payment>) => void;
   removePayment: (id: string) => void;
@@ -83,7 +105,8 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
   // Add back missing state for compatibility
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+
   // Mock data for compatibility
   const accounts: Account[] = [
     { id: '1', name: 'Main Account', currency: 'USD' },
@@ -241,6 +264,7 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
       expenses,
       accounts,
       expenseCategories,
+      subscriptions,
       addPayment,
       updatePayment,
       removePayment,
