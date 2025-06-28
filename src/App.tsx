@@ -7,6 +7,7 @@ import StudentLogin from '@/pages/StudentLogin';
 import SuperAdminLogin from '@/pages/SuperAdminLogin';
 import MainLayout from '@/layout/MainLayout';
 import SchoolSetup from '@/pages/SchoolSetup';
+import StudentDashboard from '@/pages/StudentDashboard';
 import { Toaster } from "@/components/ui/toaster"
 import { PaymentProvider } from '@/contexts/PaymentContext';
 
@@ -77,10 +78,20 @@ const App = () => {
             <Route path="/student-login" element={<StudentLogin />} />
             <Route path="/superadmin-login" element={<SuperAdminLogin />} />
             <Route path="/school-setup" element={<SchoolSetup />} />
+            <Route 
+              path="/student-dashboard" 
+              element={
+                user && user.role === 'student' ? (
+                  <StudentDashboard />
+                ) : (
+                  <Navigate to="/student-login" replace />
+                )
+              } 
+            />
             <Route
               path="/*"
               element={
-                user ? (
+                user && (user.role === 'admin' || user.role === 'teacher' || user.role === 'superadmin') ? (
                   <PaymentProvider>
                     <MainLayout />
                   </PaymentProvider>
