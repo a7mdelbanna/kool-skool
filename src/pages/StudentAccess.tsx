@@ -24,6 +24,14 @@ interface StudentAccessInfo {
   has_password: boolean;
 }
 
+interface PasswordHashResult {
+  user_id: string;
+  password_hash: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+}
+
 const StudentAccess = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -146,10 +154,10 @@ const StudentAccess = () => {
     try {
       console.log('Using RPC function to get password hash...');
       
-      // Use the dedicated RPC function to get password hash
-      const { data, error } = await supabase.rpc('get_user_password_hash', {
+      // Use type assertion to call the RPC function that isn't in generated types
+      const { data, error } = await (supabase as any).rpc('get_user_password_hash', {
         p_user_id: userId
-      });
+      }) as { data: PasswordHashResult[] | null; error: any };
 
       console.log('RPC password hash result:', { data, error, userId });
 
