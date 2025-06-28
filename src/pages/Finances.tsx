@@ -6,6 +6,14 @@ import AccountsBalanceSection from '@/components/AccountsBalanceSection';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Accordion,
   AccordionContent,
@@ -27,6 +35,7 @@ import { format } from 'date-fns';
 const FinancesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('');
 
   // Get school ID from localStorage
   const getSchoolId = () => {
@@ -37,6 +46,32 @@ const FinancesPage = () => {
   };
 
   const schoolId = getSchoolId();
+
+  // Fetch available currencies
+  const { data: currencies = [] } = useQuery({
+    queryKey: ['school-currencies', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      
+      const { data, error } = await supabase.rpc('get_school_currencies', {
+        p_school_id: schoolId
+      });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Set default currency when currencies are loaded
+  React.useEffect(() => {
+    if (currencies.length > 0 && !selectedCurrency) {
+      const defaultCurrency = currencies.find(c => c.is_default);
+      if (defaultCurrency) {
+        setSelectedCurrency(defaultCurrency.id);
+      }
+    }
+  }, [currencies, selectedCurrency]);
 
   // Fetch all student payments
   const { data: payments = [] } = useQuery({
@@ -95,6 +130,70 @@ const FinancesPage = () => {
     },
     enabled: !!schoolId,
   });
+
+  // Convert amount to selected currency
+  const convertAmount = (amount: number, fromCurrency: string, toCurrencyId: string) => {
+    if (!currencies.length || !selectedCurrency) return amount;
+    
+    const fromCurrencyData = currencies.find(c => c.code === fromCurrency);
+    const toCurrencyData = currencies.find(c => c.id === toCurrencyId);
+    
+    if (!fromCurrencyData || !toCurrencyData) return amount;
+    
+    // Convert to base currency first (default currency), then to target currency
+    const baseAmount = fromCurrencyData.is_default ? amount : amount / fromCurrencyData.exchange_rate;
+    const convertedAmount = toCurrencyData.is_default ? baseAmount : baseAmount * toCurrencyData.exchange_rate;
+    
+    return convertedAmount;
+  };
+
+  // Get currency symbol for display
+  const getCurrencySymbol = () => {
+    if (!selectedCurrency || !currencies.length) return '$';
+    const currency = currencies.find(c => c.id === selectedCurrency);
+    return currency ? currency.symbol : '$';
+  };
+
+  // Calculate statistics with currency conversion
+  const calculateStats = () => {
+    const paidPayments = payments.filter(payment => payment.status === 'completed');
+    const pendingPayments = payments.filter(payment => payment.status === 'pending');
+    
+    const totalRevenue = paidPayments.reduce((sum, payment) => {
+      const convertedAmount = convertAmount(Number(payment.amount), payment.currency, selectedCurrency);
+      return sum + convertedAmount;
+    }, 0);
+    
+    const pendingAmount = pendingPayments.reduce((sum, payment) => {
+      const convertedAmount = convertAmount(Number(payment.amount), payment.currency, selectedCurrency);
+      return sum + convertedAmount;
+    }, 0);
+    
+    // Add transaction stats
+    const incomeTransactions = transactions.filter(t => t.type === 'income');
+    const expenseTransactions = transactions.filter(t => t.type === 'expense');
+    
+    const totalTransactionIncome = incomeTransactions.reduce((sum, t) => {
+      const convertedAmount = convertAmount(Number(t.amount), t.currency, selectedCurrency);
+      return sum + convertedAmount;
+    }, 0);
+    
+    const totalExpenses = expenseTransactions.reduce((sum, t) => {
+      const convertedAmount = convertAmount(Number(t.amount), t.currency, selectedCurrency);
+      return sum + convertedAmount;
+    }, 0);
+    
+    const netIncome = (totalRevenue + totalTransactionIncome) - totalExpenses;
+
+    return {
+      netIncome,
+      totalRevenue: totalRevenue + totalTransactionIncome,
+      totalExpenses,
+      pendingAmount
+    };
+  };
+
+  const stats = calculateStats();
 
   // Combine payments and transactions for display
   const allTransactions = [
@@ -166,6 +265,63 @@ const FinancesPage = () => {
           </h1>
           <p className="text-muted-foreground">Overview of your financial accounts and expected payments</p>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Currency:</span>
+          <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Select currency" />
+            </SelectTrigger>
+            <SelectContent>
+              {currencies.map((currency) => (
+                <SelectItem key={currency.id} value={currency.id}>
+                  {currency.symbol} {currency.code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Financial Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-600">Net Income</CardTitle>
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {getCurrencySymbol()}{stats.netIncome.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">Revenue minus expenses</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {getCurrencySymbol()}{stats.totalRevenue.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">From all payments</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-600">Total Expenses</CardTitle>
+            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {getCurrencySymbol()}{stats.totalExpenses.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">All business expenses</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Collapsible Sections */}
@@ -297,7 +453,8 @@ const FinancesPage = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className={transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'}>
-                      {transaction.type === 'expense' ? '-' : ''}${Number(transaction.amount).toFixed(2)}
+                      {transaction.type === 'expense' ? '-' : ''}
+                      {getCurrencySymbol()}{convertAmount(Number(transaction.amount), transaction.currency, selectedCurrency).toFixed(2)}
                     </TableCell>
                     <TableCell>{format(new Date(transaction.date), 'MMM dd, yyyy')}</TableCell>
                     <TableCell>{transaction.method || '-'}</TableCell>
