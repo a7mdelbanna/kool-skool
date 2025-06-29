@@ -42,9 +42,12 @@ const IndividualSessionCard: React.FC<IndividualSessionCardProps> = ({
       case "completed":
         return <CheckCircle className="h-3 w-3 text-green-500" />;
       case "canceled":
+      case "cancelled":
         return <CalendarX className="h-3 w-3 text-orange-500" />;
       case "missed":
         return <XCircle className="h-3 w-3 text-red-500" />;
+      default:
+        return <CalendarDays className="h-3 w-3 text-gray-500" />;
     }
   };
 
@@ -53,10 +56,11 @@ const IndividualSessionCard: React.FC<IndividualSessionCardProps> = ({
       scheduled: { className: "border-blue-500 text-blue-500", text: "Scheduled" },
       completed: { className: "border-green-500 text-green-500", text: "Completed" },
       canceled: { className: "border-orange-500 text-orange-500", text: "Cancelled" },
+      cancelled: { className: "border-orange-500 text-orange-500", text: "Cancelled" },
       missed: { className: "border-red-500 text-red-500", text: "Missed" }
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status] || { className: "border-gray-500 text-gray-500", text: "Unknown" };
     return (
       <Badge variant="outline" className={`flex items-center gap-1 ${config.className}`}>
         {getStatusIcon(status)}
@@ -77,7 +81,7 @@ const IndividualSessionCard: React.FC<IndividualSessionCardProps> = ({
   const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
 
   return (
-    <Card className={cn("overflow-hidden", className, session.status === "canceled" && "bg-muted/30")}>
+    <Card className={cn("overflow-hidden", className, (session.status === "canceled" || session.status === "cancelled") && "bg-muted/30")}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -158,7 +162,7 @@ const IndividualSessionCard: React.FC<IndividualSessionCardProps> = ({
             </>
           )}
           
-          {(session.status === 'completed' || session.status === 'canceled') && (
+          {(session.status === 'completed' || session.status === 'canceled' || session.status === 'cancelled') && (
             <Button 
               variant="outline" 
               size="sm" 
