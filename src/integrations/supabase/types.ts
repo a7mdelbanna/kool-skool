@@ -383,6 +383,7 @@ export type Database = {
       }
       groups: {
         Row: {
+          course_id: string | null
           created_at: string
           currency: string
           description: string | null
@@ -399,6 +400,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          course_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -415,6 +417,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          course_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -431,6 +434,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "groups_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "groups_school_id_fkey"
             columns: ["school_id"]

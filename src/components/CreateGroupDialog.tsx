@@ -322,14 +322,14 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     try {
       console.log('Creating group...');
       
-      // Create the group first
+      // Create the group first with course_id included
       const { data: groupResult, error: groupError } = await supabase
         .from('groups')
         .insert({
           school_id: user.schoolId,
           name: groupData.name,
           description: groupData.description,
-          course_id: groupData.course_id,
+          course_id: groupData.course_id, // Now included in the insert
           teacher_id: groupData.teacher_id,
           session_count: groupData.session_count,
           schedule: groupData.schedule as any,
@@ -526,7 +526,6 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
               </CardContent>
             </Card>
 
-            
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -593,7 +592,6 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
               </CardContent>
             </Card>
 
-            
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
