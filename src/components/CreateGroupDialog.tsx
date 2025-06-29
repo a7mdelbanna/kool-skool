@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -45,6 +44,16 @@ interface StudentSelection {
   email: string;
 }
 
+interface Currency {
+  id: string;
+  name: string;
+  symbol: string;
+  code: string;
+  exchange_rate: number;
+  is_default: boolean;
+  created_at: string;
+}
+
 const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogProps) => {
   const { user } = useContext(UserContext);
   const [activeTab, setActiveTab] = useState('details');
@@ -87,6 +96,26 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
   const { data: students } = useQuery({
     queryKey: ['students', user?.schoolId],
     queryFn: () => getStudentsWithDetails(user?.schoolId || ''),
+    enabled: !!user?.schoolId && open
+  });
+
+  // Fetch school currencies
+  const { data: currencies } = useQuery({
+    queryKey: ['currencies', user?.schoolId],
+    queryFn: async () => {
+      if (!user?.schoolId) return [];
+      
+      const { data, error } = await supabase.rpc('get_school_currencies', {
+        p_school_id: user.schoolId
+      });
+
+      if (error) {
+        console.error('Error fetching currencies:', error);
+        throw error;
+      }
+
+      return data as Currency[];
+    },
     enabled: !!user?.schoolId && open
   });
 
@@ -350,9 +379,11 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
+                        {currencies?.map((currency) => (
+                          <SelectItem key={currency.id} value={currency.code}>
+                            {currency.name} ({currency.symbol})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
