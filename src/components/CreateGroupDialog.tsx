@@ -30,7 +30,6 @@ interface ScheduleItem {
 interface Course {
   id: string;
   name: string;
-  description: string;
   course_type: string;
   created_at: string;
 }
@@ -115,7 +114,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       
       const { data, error } = await supabase
         .from('courses')
-        .select('id, name, description, course_type, created_at')
+        .select('id, name, course_type, created_at')
         .eq('school_id', user.schoolId)
         .eq('course_type', 'Group')
         .order('name');
