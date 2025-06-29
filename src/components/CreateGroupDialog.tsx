@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase, getSchoolTeachers, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import { useContext } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 interface CreateGroupDialogProps {
   open: boolean;
@@ -82,6 +83,7 @@ interface Account {
 
 const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogProps) => {
   const { user } = useContext(UserContext);
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('details');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -279,11 +281,48 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
   };
 
   const handleSubmit = async () => {
-    if (!user?.schoolId) return;
+    console.log('=== CREATE GROUP SUBMISSION STARTED ===');
+    console.log('User:', user);
+    console.log('Group Data:', groupData);
+    console.log('Selected Students:', selectedStudents);
+    
+    if (!user?.schoolId) {
+      console.error('No school ID found');
+      toast({
+        title: "Error",
+        description: "No school ID found. Please try logging in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate form data
+    if (!isFormValid) {
+      console.error('Form validation failed');
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields: group name, course, teacher, and schedule.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedStudents.length === 0) {
+      console.error('No students selected');
+      toast({
+        title: "No Students Selected",
+        description: "Please add at least one student to the group.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
+    
     try {
-      // Create the group first - convert schedule to JSON format
+      console.log('Creating group...');
+      
+      // Create the group first
       const { data: groupResult, error: groupError } = await supabase
         .from('groups')
         .insert({
@@ -293,7 +332,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
           course_id: groupData.course_id,
           teacher_id: groupData.teacher_id,
           session_count: groupData.session_count,
-          schedule: groupData.schedule as any, // Cast to any to resolve JSON type issue
+          schedule: groupData.schedule as any,
           currency: groupData.currency,
           price_mode: groupData.price_mode,
           price_per_session: groupData.price_per_session,
@@ -303,32 +342,50 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         .select()
         .single();
 
-      if (groupError) throw groupError;
+      if (groupError) {
+        console.error('Group creation error:', groupError);
+        throw new Error(`Failed to create group: ${groupError.message}`);
+      }
 
-      // Create group subscriptions for selected students with individual details
+      console.log('Group created successfully:', groupResult);
+
+      // Create group subscriptions for selected students
       if (selectedStudents.length > 0 && groupResult) {
+        console.log('Creating subscriptions for students...');
+        
         for (const student of selectedStudents) {
-          const { error: subscriptionError } = await supabase.rpc('create_group_subscription', {
+          console.log(`Processing student: ${student.name} (${student.id})`);
+          
+          const { data: subscriptionResult, error: subscriptionError } = await supabase.rpc('create_group_subscription', {
             p_group_id: groupResult.id,
             p_student_ids: [student.id],
             p_start_date: student.paymentDetails.start_date || new Date().toISOString().split('T')[0],
             p_current_user_id: user.id,
             p_current_school_id: user.schoolId,
-            p_initial_payment_amount: student.paymentDetails.initial_payment_amount,
-            p_payment_method: student.paymentDetails.payment_method,
+            p_initial_payment_amount: student.paymentDetails.initial_payment_amount || 0,
+            p_payment_method: student.paymentDetails.payment_method || 'Cash',
             p_payment_account_id: student.paymentDetails.account_id || null,
-            p_payment_notes: student.paymentDetails.payment_notes,
+            p_payment_notes: student.paymentDetails.payment_notes || '',
             p_subscription_notes: `Group subscription for ${student.name}`
           });
 
-          if (subscriptionError) throw subscriptionError;
+          if (subscriptionError) {
+            console.error(`Subscription creation error for student ${student.name}:`, subscriptionError);
+            throw new Error(`Failed to create subscription for ${student.name}: ${subscriptionError.message}`);
+          }
+
+          console.log(`Subscription created for ${student.name}:`, subscriptionResult);
         }
       }
 
-      onSuccess?.();
-      onOpenChange(false);
+      console.log('=== CREATE GROUP SUBMISSION COMPLETED SUCCESSFULLY ===');
       
-      // Reset form
+      toast({
+        title: "Success!",
+        description: `Group "${groupData.name}" created with ${selectedStudents.length} student(s).`,
+      });
+
+      // Reset form and close dialog
       setGroupData({
         name: '',
         description: '',
@@ -343,8 +400,19 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       });
       setSelectedStudents([]);
       setActiveTab('details');
+      
+      onSuccess?.();
+      onOpenChange(false);
+      
     } catch (error) {
-      console.error('Error creating group:', error);
+      console.error('=== CREATE GROUP SUBMISSION FAILED ===');
+      console.error('Error details:', error);
+      
+      toast({
+        title: "Error Creating Group",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -806,7 +874,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                 </Button>
                 <Button 
                   onClick={handleSubmit}
-                  disabled={!isFormValid || isSubmitting}
+                  disabled={!isFormValid || isSubmitting || selectedStudents.length === 0}
                 >
                   {isSubmitting ? 'Creating...' : 'Create Group'}
                 </Button>
