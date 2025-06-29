@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { UserContext } from '@/App';
 import { useContext } from 'react';
 import GroupDetailsDialog from '@/components/GroupDetailsDialog';
+import CreateGroupDialog from '@/components/CreateGroupDialog';
 
 interface Group {
   id: string;
@@ -30,9 +31,10 @@ const Groups = () => {
   const { user } = useContext(UserContext);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
 
   // Fetch groups data
-  const { data: groups, isLoading, error } = useQuery({
+  const { data: groups, isLoading, error, refetch } = useQuery({
     queryKey: ['groups', user?.schoolId],
     queryFn: async () => {
       if (!user?.schoolId) {
@@ -85,6 +87,10 @@ const Groups = () => {
   const handleViewDetails = (group: Group) => {
     setSelectedGroup(group);
     setShowGroupDetails(true);
+  };
+
+  const handleCreateSuccess = () => {
+    refetch();
   };
 
   if (isLoading) {
@@ -153,7 +159,10 @@ const Groups = () => {
             <p className="text-gray-600">Manage group lessons and subscriptions</p>
           </div>
         </div>
-        <Button className="flex items-center gap-2">
+        <Button 
+          className="flex items-center gap-2"
+          onClick={() => setShowCreateGroup(true)}
+        >
           <Plus className="h-4 w-4" />
           Create Group
         </Button>
@@ -168,7 +177,10 @@ const Groups = () => {
             <p className="text-gray-600 mb-4">
               Create your first group to start managing group lessons and subscriptions.
             </p>
-            <Button className="flex items-center gap-2">
+            <Button 
+              className="flex items-center gap-2"
+              onClick={() => setShowCreateGroup(true)}
+            >
               <Plus className="h-4 w-4" />
               Create Your First Group
             </Button>
@@ -239,6 +251,13 @@ const Groups = () => {
         group={selectedGroup}
         open={showGroupDetails}
         onOpenChange={setShowGroupDetails}
+      />
+
+      {/* Create Group Dialog */}
+      <CreateGroupDialog
+        open={showCreateGroup}
+        onOpenChange={setShowCreateGroup}
+        onSuccess={handleCreateSuccess}
       />
     </div>
   );
