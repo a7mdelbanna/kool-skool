@@ -1368,6 +1368,21 @@ export type Database = {
           created_at: string
         }[]
       }
+      add_student_to_group: {
+        Args: {
+          p_group_id: string
+          p_student_id: string
+          p_start_date: string
+          p_current_user_id: string
+          p_current_school_id: string
+          p_initial_payment_amount?: number
+          p_payment_method?: string
+          p_payment_account_id?: string
+          p_payment_notes?: string
+          p_subscription_notes?: string
+        }
+        Returns: Json
+      }
       add_team_member: {
         Args: {
           member_first_name: string
@@ -1869,6 +1884,15 @@ export type Database = {
       }
       remove_payment_tag: {
         Args: { p_payment_id: string; p_tag_id: string }
+        Returns: Json
+      }
+      remove_student_from_group: {
+        Args: {
+          p_group_id: string
+          p_student_id: string
+          p_current_user_id: string
+          p_current_school_id: string
+        }
         Returns: Json
       }
       renew_subscription: {
