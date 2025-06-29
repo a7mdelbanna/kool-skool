@@ -58,7 +58,7 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<string | null>(null);
 
-  // Fetch group students with corrected query
+  // Fetch group students with explicit table joins
   const { data: groupStudents, isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
     queryKey: ['group-students', group?.id],
     queryFn: async () => {
@@ -66,69 +66,91 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
 
       console.log('Fetching students for group:', group.id);
 
-      // First, let's try a simpler query to debug
-      const { data: rawData, error } = await supabase
+      // First, get the group_students records
+      const { data: groupStudentsData, error: groupStudentsError } = await supabase
         .from('group_students')
-        .select('*')
+        .select('id, student_id, status, start_date')
         .eq('group_id', group.id)
         .eq('status', 'active');
 
-      if (error) {
-        console.error('Error fetching group_students:', error);
-        throw error;
+      if (groupStudentsError) {
+        console.error('Error fetching group_students:', groupStudentsError);
+        throw groupStudentsError;
       }
 
-      console.log('Raw group_students data:', rawData);
+      console.log('Group students data:', groupStudentsData);
 
-      if (!rawData || rawData.length === 0) {
+      if (!groupStudentsData || groupStudentsData.length === 0) {
         console.log('No active students found for group');
         return [];
       }
 
-      // Now fetch the student details for each student_id
-      const studentIds = rawData.map(gs => gs.student_id);
+      // Get student IDs
+      const studentIds = groupStudentsData.map(gs => gs.student_id);
       console.log('Student IDs to fetch:', studentIds);
 
+      // Fetch students with their user data
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select(`
           id,
-          user_id,
-          users!inner(
-            id,
-            first_name,
-            last_name,
-            email
-          )
+          user_id
         `)
         .in('id', studentIds);
 
       if (studentsError) {
-        console.error('Error fetching students details:', studentsError);
+        console.error('Error fetching students:', studentsError);
         throw studentsError;
       }
 
       console.log('Students data:', studentsData);
 
-      // Combine the data
-      const formattedStudents = rawData.map((groupStudent: any) => {
-        const studentData = studentsData?.find(s => s.id === groupStudent.student_id);
-        console.log('Matching student data for', groupStudent.student_id, ':', studentData);
+      if (!studentsData || studentsData.length === 0) {
+        console.log('No student records found');
+        return [];
+      }
+
+      // Get user IDs from students
+      const userIds = studentsData.map(s => s.user_id);
+      console.log('User IDs to fetch:', userIds);
+
+      // Fetch user data
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds);
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        throw usersError;
+      }
+
+      console.log('Users data:', usersData);
+
+      // Combine all the data
+      const formattedStudents = groupStudentsData.map((groupStudent) => {
+        const studentData = studentsData.find(s => s.id === groupStudent.student_id);
+        const userData = studentData ? usersData?.find(u => u.id === studentData.user_id) : null;
         
-        if (!studentData) {
-          console.warn('No student data found for student_id:', groupStudent.student_id);
+        console.log('Matching data for student:', groupStudent.student_id, {
+          studentData,
+          userData
+        });
+        
+        if (!studentData || !userData) {
+          console.warn('Missing data for student_id:', groupStudent.student_id);
           return null;
         }
 
         return {
           id: groupStudent.id,
           student_id: groupStudent.student_id,
-          student_name: `${studentData.users.first_name} ${studentData.users.last_name}`,
-          student_email: studentData.users.email,
+          student_name: `${userData.first_name} ${userData.last_name}`,
+          student_email: userData.email,
           status: groupStudent.status,
           start_date: groupStudent.start_date
         };
-      }).filter(Boolean); // Remove null entries
+      }).filter(Boolean) as GroupStudent[]; // Remove null entries and type assert
 
       console.log('Final formatted students:', formattedStudents);
       return formattedStudents;
