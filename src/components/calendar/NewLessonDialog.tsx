@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import { 
   Dialog,
@@ -112,11 +113,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load data",
-          variant: "destructive"
-        });
+        toast.error("Failed to load data");
       } finally {
         setLoading(false);
       }
@@ -237,10 +234,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
 
       if (error) throw error;
       
-      toast({
-        title: "Lesson scheduled",
-        description: `${subject} lesson with ${selectedStudent.first_name} ${selectedStudent.last_name} on ${format(date, 'MMM d')} at ${time} (${schoolTimezone})`,
-      });
+      toast.success(`${subject} lesson with ${selectedStudent.first_name} ${selectedStudent.last_name} on ${format(date, 'MMM d')} at ${time} (${schoolTimezone})`);
       
       // Reset form and close dialog
       resetForm();
