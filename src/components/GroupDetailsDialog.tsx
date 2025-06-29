@@ -58,11 +58,13 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<string | null>(null);
 
-  // Fetch group students
+  // Fetch group students with improved query
   const { data: groupStudents, isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
     queryKey: ['group-students', group?.id],
     queryFn: async () => {
       if (!group?.id) return [];
+
+      console.log('Fetching students for group:', group.id);
 
       const { data, error } = await supabase
         .from('group_students')
@@ -72,8 +74,10 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
           status,
           start_date,
           students!inner(
+            id,
             user_id,
             users!inner(
+              id,
               first_name,
               last_name,
               email
@@ -88,14 +92,22 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
         throw error;
       }
 
-      return data?.map((item: any) => ({
-        id: item.id,
-        student_id: item.student_id,
-        student_name: `${item.students.users.first_name} ${item.students.users.last_name}`,
-        student_email: item.students.users.email,
-        status: item.status,
-        start_date: item.start_date
-      })) || [];
+      console.log('Raw group students data:', data);
+
+      const formattedStudents = data?.map((item: any) => {
+        console.log('Processing student item:', item);
+        return {
+          id: item.id,
+          student_id: item.student_id,
+          student_name: `${item.students.users.first_name} ${item.students.users.last_name}`,
+          student_email: item.students.users.email,
+          status: item.status,
+          start_date: item.start_date
+        };
+      }) || [];
+
+      console.log('Formatted students:', formattedStudents);
+      return formattedStudents;
     },
     enabled: !!group?.id && open
   });
@@ -264,7 +276,7 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Users className="h-5 w-5" />
-                    Students ({group.student_count})
+                    Students ({groupStudents?.length || 0})
                   </CardTitle>
                   <Button 
                     onClick={() => setShowAddStudent(true)}
