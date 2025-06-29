@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import { 
   Dialog,
@@ -23,10 +22,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Clock, Globe, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { supabase } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
@@ -75,6 +83,8 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   const [schoolTimezone, setSchoolTimezone] = useState<string>('');
   const [validationError, setValidationError] = useState<string>('');
   const [isValidating, setIsValidating] = useState(false);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [conflictMessage, setConflictMessage] = useState<string>('');
   const userTimezone = getEffectiveTimezone(user?.timezone);
 
   // Fetch students and school timezone when dialog opens
@@ -166,31 +176,14 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (validationError) {
-      toast({
-        title: "Schedule Conflict",
-        description: validationError,
-        variant: "destructive"
-      });
-      return;
-    }
-    
     if (!date || !studentId || !subject || !time || !duration || !user?.schoolId) {
-      toast({
-        title: "Missing information",
-        description: "Please fill out all required fields",
-        variant: "destructive"
-      });
+      toast.error("Please fill out all required fields");
       return;
     }
 
     const selectedStudent = students.find(s => s.id === studentId);
     if (!selectedStudent) {
-      toast({
-        title: "Error",
-        description: "Selected student not found",
-        variant: "destructive"
-      });
+      toast.error("Selected student not found");
       return;
     }
 
@@ -210,11 +203,9 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         });
 
         if (result.hasConflict && result.conflictMessage) {
-          toast({
-            title: "Schedule Conflict",
-            description: result.conflictMessage,
-            variant: "destructive"
-          });
+          setConflictMessage(result.conflictMessage);
+          setShowConflictDialog(true);
+          setLoading(false);
           return;
         }
       }
@@ -257,11 +248,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
       
     } catch (error) {
       console.error('Error creating lesson:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create lesson",
-        variant: "destructive"
-      });
+      toast.error("Failed to create lesson");
     } finally {
       setLoading(false);
     }
@@ -275,6 +262,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
     setDuration('');
     setCost('');
     setValidationError('');
+    setConflictMessage('');
   };
 
   // Format the selected date for display in user's timezone
@@ -283,166 +271,189 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Add New Lesson
-            <div className="flex items-center text-sm text-muted-foreground ml-auto">
-              <Globe className="h-4 w-4 mr-1" />
-              School TZ: {schoolTimezone || 'Loading...'}
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Add New Lesson
+              <div className="flex items-center text-sm text-muted-foreground ml-auto">
+                <Globe className="h-4 w-4 mr-1" />
+                School TZ: {schoolTimezone || 'Loading...'}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+            {/* Student Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="student">Student</Label>
+              <Select value={studentId} onValueChange={setStudentId} disabled={loading}>
+                <SelectTrigger id="student">
+                  <SelectValue placeholder={loading ? "Loading students..." : "Select a student"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map((student) => (
+                    <SelectItem key={student.id} value={student.id}>
+                      {student.first_name} {student.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          {/* Student Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="student">Student</Label>
-            <Select value={studentId} onValueChange={setStudentId} disabled={loading}>
-              <SelectTrigger id="student">
-                <SelectValue placeholder={loading ? "Loading students..." : "Select a student"} />
-              </SelectTrigger>
-              <SelectContent>
-                {students.map((student) => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.first_name} {student.last_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Subject */}
-          <div className="space-y-2">
-            <Label htmlFor="subject">Subject</Label>
-            <Select value={subject} onValueChange={setSubject}>
-              <SelectTrigger id="subject">
-                <SelectValue placeholder="Select a subject" />
-              </SelectTrigger>
-              <SelectContent>
-                {subjects.map((sub) => (
-                  <SelectItem key={sub} value={sub}>{sub}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Date */}
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date"
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? formatDateForDisplay(date) : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          
-          {/* Time */}
-          <div className="space-y-2">
-            <Label htmlFor="time">
-              Time (in {schoolTimezone || 'school timezone'})
-            </Label>
-            <Select value={time} onValueChange={setTime}>
-              <SelectTrigger id="time" className="w-full">
-                <SelectValue placeholder="Select a time">
-                  <div className="flex items-center">
-                    <Clock className="mr-2 h-4 w-4" />
-                    {time || "Select a time"}
-                  </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {timeSlots.map((slot) => (
-                  <SelectItem key={slot} value={slot}>{slot}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Time will be created in school timezone ({schoolTimezone}) and displayed in your timezone ({userTimezone})
-            </p>
-          </div>
-          
-          {/* Duration */}
-          <div className="space-y-2">
-            <Label htmlFor="duration">Duration</Label>
-            <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger id="duration">
-                <SelectValue placeholder="Select duration" />
-              </SelectTrigger>
-              <SelectContent>
-                {durations.map((dur) => (
-                  <SelectItem key={dur} value={dur}>{dur}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            
+            {/* Subject */}
+            <div className="space-y-2">
+              <Label htmlFor="subject">Subject</Label>
+              <Select value={subject} onValueChange={setSubject}>
+                <SelectTrigger id="subject">
+                  <SelectValue placeholder="Select a subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.map((sub) => (
+                    <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Date */}
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? formatDateForDisplay(date) : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {/* Time */}
+            <div className="space-y-2">
+              <Label htmlFor="time">
+                Time (in {schoolTimezone || 'school timezone'})
+              </Label>
+              <Select value={time} onValueChange={setTime}>
+                <SelectTrigger id="time" className="w-full">
+                  <SelectValue placeholder="Select a time">
+                    <div className="flex items-center">
+                      <Clock className="mr-2 h-4 w-4" />
+                      {time || "Select a time"}
+                    </div>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {timeSlots.map((slot) => (
+                    <SelectItem key={slot} value={slot}>{slot}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Time will be created in school timezone ({schoolTimezone}) and displayed in your timezone ({userTimezone})
+              </p>
+            </div>
+            
+            {/* Duration */}
+            <div className="space-y-2">
+              <Label htmlFor="duration">Duration</Label>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger id="duration">
+                  <SelectValue placeholder="Select duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  {durations.map((dur) => (
+                    <SelectItem key={dur} value={dur}>{dur}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Validation Error Alert */}
-          {validationError && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                {validationError}
-              </AlertDescription>
-            </Alert>
-          )}
+            {/* Enhanced Validation Error Alert */}
+            {validationError && (
+              <Alert variant="destructive" className="border-red-200 bg-red-50">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-red-800 font-medium">
+                  {validationError}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {/* Validation Loading */}
-          {isValidating && (
-            <Alert>
-              <Clock className="h-4 w-4" />
-              <AlertDescription>
-                Checking teacher availability...
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {/* Cost */}
-          <div className="space-y-2">
-            <Label htmlFor="cost">Cost ($)</Label>
-            <Input 
-              id="cost" 
-              type="number" 
-              min="0" 
-              placeholder="Enter lesson cost" 
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-            />
-          </div>
-          
-          <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || isValidating || !!validationError}
-            >
-              {loading ? "Creating..." : isValidating ? "Validating..." : "Create Lesson"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            {/* Validation Loading */}
+            {isValidating && (
+              <Alert className="border-blue-200 bg-blue-50">
+                <Clock className="h-4 w-4" />
+                <AlertDescription className="text-blue-800">
+                  Checking teacher availability...
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Cost */}
+            <div className="space-y-2">
+              <Label htmlFor="cost">Cost ($)</Label>
+              <Input 
+                id="cost" 
+                type="number" 
+                min="0" 
+                placeholder="Enter lesson cost" 
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+              />
+            </div>
+            
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={loading || isValidating || !!validationError}
+                className={validationError ? "opacity-50 cursor-not-allowed" : ""}
+              >
+                {loading ? "Creating..." : isValidating ? "Validating..." : "Create Lesson"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Conflict Dialog */}
+      <AlertDialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
+        <AlertDialogContent className="sm:max-w-[500px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Schedule Conflict Detected
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left whitespace-pre-wrap">
+              {conflictMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowConflictDialog(false)}>
+              Choose Different Time
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
