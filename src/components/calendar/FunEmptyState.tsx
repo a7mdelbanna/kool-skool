@@ -1,74 +1,56 @@
 
-import React, { useEffect, useState } from 'react';
-import { PartyPopper, Coffee, Sparkles } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import React from 'react';
+import { Calendar, Coffee, BookOpen } from 'lucide-react';
 
-const FunEmptyState: React.FC = () => {
-  const [showConfetti, setShowConfetti] = useState(false);
+interface FunEmptyStateProps {
+  viewMode?: 'day' | 'week' | 'month';
+}
 
-  useEffect(() => {
-    setShowConfetti(true);
-    const timer = setTimeout(() => setShowConfetti(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+const FunEmptyState: React.FC<FunEmptyStateProps> = ({ viewMode = 'week' }) => {
+  const getEmptyMessage = () => {
+    switch (viewMode) {
+      case 'day':
+        return {
+          title: "No sessions today",
+          subtitle: "Time for a coffee break! ☕",
+          icon: <Coffee className="h-12 w-12 text-muted-foreground/50" />
+        };
+      case 'week':
+        return {
+          title: "No sessions this week",
+          subtitle: "Perfect time to plan ahead! 📅",
+          icon: <Calendar className="h-12 w-12 text-muted-foreground/50" />
+        };
+      case 'month':
+        return {
+          title: "No sessions this month",
+          subtitle: "Ready to schedule some learning? 📚",
+          icon: <BookOpen className="h-12 w-12 text-muted-foreground/50" />
+        };
+      default:
+        return {
+          title: "No sessions found",
+          subtitle: "Time to get started! 🚀",
+          icon: <Calendar className="h-12 w-12 text-muted-foreground/50" />
+        };
+    }
+  };
+
+  const message = getEmptyMessage();
 
   return (
-    <div className="relative">
-      {/* Confetti Effect */}
-      {showConfetti && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {[...Array(50)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute animate-bounce"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${2 + Math.random() * 2}s`
-              }}
-            >
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dda0dd'][Math.floor(Math.random() * 6)]
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Card className="border-2 border-dashed border-primary/20 bg-white">
-        <CardContent className="p-8 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="relative">
-              <PartyPopper className="h-16 w-16 text-primary animate-bounce" />
-              <Sparkles className="h-6 w-6 text-amber-500 absolute -top-2 -right-2 animate-pulse" />
-            </div>
-          </div>
-          
-          <h2 className="text-3xl font-bold text-primary mb-2 animate-pulse">
-            🎉 HOORAY, NO LESSONS! 🎉
-          </h2>
-          
-          <p className="text-lg text-muted-foreground mb-4">
-            Time to take a break and enjoy your free time!
+    <div className="flex flex-col items-center justify-center py-12 px-4">
+      <div className="flex flex-col items-center space-y-4 text-center">
+        {message.icon}
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium text-muted-foreground">
+            {message.title}
+          </h3>
+          <p className="text-sm text-muted-foreground/80">
+            {message.subtitle}
           </p>
-          
-          <div className="flex items-center justify-center gap-2 text-orange-600">
-            <Coffee className="h-5 w-5" />
-            <span className="font-medium">Go get a drink! ☕</span>
-            <Coffee className="h-5 w-5" />
-          </div>
-          
-          <div className="mt-6 text-sm text-muted-foreground">
-            <p>• Relax and recharge 🔋</p>
-            <p>• Maybe plan your next lesson 📚</p>
-            <p>• Or just enjoy the moment! ✨</p>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
