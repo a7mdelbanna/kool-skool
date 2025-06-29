@@ -12,7 +12,6 @@ import {
   Check,
   X,
   CalendarClock,
-  ArrowRight,
   RefreshCcw,
   ChevronDown,
   ChevronUp
@@ -192,6 +191,15 @@ const GroupSessionCard: React.FC<GroupSessionCardProps> = ({
                 <X className="h-3.5 w-3.5 mr-1" />
                 Cancel All
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                onClick={() => handleGroupAction('rescheduled')}
+              >
+                <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                Reschedule All
+              </Button>
             </div>
           )}
         </div>
@@ -237,6 +245,7 @@ const GroupSessionCard: React.FC<GroupSessionCardProps> = ({
                             className="border-green-500 text-green-500 hover:bg-green-50 h-7 px-2"
                             onClick={() => handleSessionAction(session.id, 'completed')}
                             disabled={loadingActions.has(session.id)}
+                            title="Mark as Attended"
                           >
                             <Check className="h-3 w-3" />
                           </Button>
@@ -246,8 +255,19 @@ const GroupSessionCard: React.FC<GroupSessionCardProps> = ({
                             className="border-red-500 text-red-500 hover:bg-red-50 h-7 px-2"
                             onClick={() => handleSessionAction(session.id, 'canceled')}
                             disabled={loadingActions.has(session.id)}
+                            title="Cancel Session"
                           >
                             <X className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-orange-500 text-orange-500 hover:bg-orange-50 h-7 px-2"
+                            onClick={() => handleSessionAction(session.id, 'rescheduled')}
+                            disabled={loadingActions.has(session.id)}
+                            title="Reschedule"
+                          >
+                            <CalendarClock className="h-3 w-3" />
                           </Button>
                         </div>
                       )}
@@ -259,6 +279,7 @@ const GroupSessionCard: React.FC<GroupSessionCardProps> = ({
                           className="border-purple-500 text-purple-500 hover:bg-purple-50 h-7 px-2"
                           onClick={() => handleSessionAction(session.id, 'scheduled')}
                           disabled={loadingActions.has(session.id)}
+                          title="Change Status"
                         >
                           <RefreshCcw className="h-3 w-3" />
                         </Button>

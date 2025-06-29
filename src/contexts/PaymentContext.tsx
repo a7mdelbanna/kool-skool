@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUserInfo, getStudentsWithDetails, supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -87,6 +86,7 @@ interface PaymentContextType {
   sessions: Session[];
   loading: boolean;
   refreshSessions: () => Promise<void>;
+  updateSessionStatus: (id: string, status: Session['status']) => Promise<void>;
   // Add back missing properties for compatibility
   payments: Payment[];
   expenses: Expense[];
@@ -99,7 +99,6 @@ interface PaymentContextType {
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   updateExpense: (id: string, expense: Partial<Expense>) => void;
   removeExpense: (id: string) => void;
-  updateSessionStatus: (id: string, status: Session['status']) => void;
   rescheduleSession: (id: string) => void;
 }
 
@@ -216,7 +215,35 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
     await fetchAllSessions();
   };
 
-  // Add back missing functions for compatibility
+  const updateSessionStatus = async (id: string, status: Session['status']) => {
+    try {
+      console.log('🔄 Updating session status:', { id, status });
+      
+      // Update the session status in the database
+      const { error } = await supabase
+        .from('lesson_sessions')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Error updating session status:', error);
+        toast.error('Failed to update session status');
+        return;
+      }
+
+      // Update local state optimistically
+      setSessions(prev => prev.map(session => 
+        session.id === id ? { ...session, status } : session
+      ));
+
+      toast.success(`Session marked as ${status}`);
+      console.log('✅ Session status updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating session:', error);
+      toast.error('Failed to update session');
+    }
+  };
+
   const addPayment = (payment: Omit<Payment, 'id'>) => {
     const newPayment = { ...payment, id: Date.now().toString() };
     setPayments(prev => [...prev, newPayment]);
@@ -247,15 +274,10 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
     setExpenses(prev => prev.filter(expense => expense.id !== id));
   };
 
-  const updateSessionStatus = (id: string, status: Session['status']) => {
-    setSessions(prev => prev.map(session => 
-      session.id === id ? { ...session, status } : session
-    ));
-  };
-
   const rescheduleSession = (id: string) => {
     // This would typically open a reschedule dialog or similar
     console.log('Rescheduling session:', id);
+    toast.info('Reschedule functionality will be implemented soon');
   };
 
   useEffect(() => {
@@ -267,6 +289,7 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
       sessions, 
       loading, 
       refreshSessions,
+      updateSessionStatus,
       payments,
       expenses,
       accounts,
@@ -278,7 +301,6 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
       addExpense,
       updateExpense,
       removeExpense,
-      updateSessionStatus,
       rescheduleSession
     }}>
       {children}

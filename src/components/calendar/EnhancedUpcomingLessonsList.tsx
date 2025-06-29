@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { format, isSameDay, isSameHour, isSameMinute } from 'date-fns';
 import { Session } from '@/contexts/PaymentContext';
+import { usePayments } from '@/contexts/PaymentContext';
 import GroupSessionCard from './GroupSessionCard';
 import IndividualSessionCard from './IndividualSessionCard';
 import FunEmptyState from './FunEmptyState';
@@ -29,6 +30,7 @@ const EnhancedUpcomingLessonsList: React.FC<EnhancedUpcomingLessonsListProps> = 
   subscriptionInfoMap,
   studentInfoMap
 }) => {
+  const { updateSessionStatus } = usePayments();
 
   const processedSessions = useMemo(() => {
     // Group sessions by date, time, and whether they're group sessions
@@ -125,7 +127,7 @@ const EnhancedUpcomingLessonsList: React.FC<EnhancedUpcomingLessonsListProps> = 
 
     const originalStatus = session.status;
     
-    // Optimistic update
+    // Map action to status
     let newStatus: Session['status'];
     switch (action) {
       case 'completed':
@@ -144,11 +146,13 @@ const EnhancedUpcomingLessonsList: React.FC<EnhancedUpcomingLessonsListProps> = 
         return;
     }
 
+    // Optimistic update
     onOptimisticUpdate(sessionId, newStatus);
 
     try {
-      // Here you would make the actual API call
-      // For now, we'll just refresh the sessions
+      // Update the session status via the context
+      await updateSessionStatus(sessionId, newStatus);
+      // Refresh the sessions list
       await onSessionUpdate();
     } catch (error) {
       // Revert on error
