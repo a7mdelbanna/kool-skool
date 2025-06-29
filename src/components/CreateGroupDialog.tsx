@@ -30,7 +30,7 @@ interface ScheduleItem {
 interface Course {
   id: string;
   name: string;
-  course_type: string;
+  lesson_type: string;
   created_at: string;
 }
 
@@ -114,9 +114,9 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       
       const { data, error } = await supabase
         .from('courses')
-        .select('id, name, course_type, created_at')
+        .select('id, name, lesson_type, created_at')
         .eq('school_id', user.schoolId)
-        .eq('course_type', 'Group')
+        .eq('lesson_type', 'group')
         .order('name');
 
       if (error) {
@@ -420,9 +420,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                         <BookOpen className="h-4 w-4 text-blue-600 mt-0.5" />
                         <div>
                           <p className="text-sm font-medium text-blue-900">{selectedCourse.name}</p>
-                          {selectedCourse.description && (
-                            <p className="text-sm text-blue-700 mt-1">{selectedCourse.description}</p>
-                          )}
+                          <p className="text-sm text-blue-700 mt-1">Course Type: {selectedCourse.lesson_type}</p>
                         </div>
                       </div>
                     </div>
