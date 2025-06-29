@@ -8,6 +8,10 @@ interface User {
   last_name?: string;
   role?: string;
   school_id?: string;
+  schoolId?: string; // Add for compatibility
+  name?: string; // Add for UserProfile compatibility
+  avatar?: string; // Add for UserProfile compatibility
+  timezone?: string;
 }
 
 interface AuthContextType {
@@ -39,7 +43,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        // Ensure compatibility between school_id and schoolId
+        if (parsedUser.school_id && !parsedUser.schoolId) {
+          parsedUser.schoolId = parsedUser.school_id;
+        }
+        // Create name from first_name and last_name if not provided
+        if (!parsedUser.name && (parsedUser.first_name || parsedUser.last_name)) {
+          parsedUser.name = `${parsedUser.first_name || ''} ${parsedUser.last_name || ''}`.trim();
+        }
+        setUser(parsedUser);
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
@@ -49,6 +62,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const handleSetUser = (newUser: User | null) => {
+    if (newUser) {
+      // Ensure compatibility between school_id and schoolId
+      if (newUser.school_id && !newUser.schoolId) {
+        newUser.schoolId = newUser.school_id;
+      }
+      // Create name from first_name and last_name if not provided
+      if (!newUser.name && (newUser.first_name || newUser.last_name)) {
+        newUser.name = `${newUser.first_name || ''} ${newUser.last_name || ''}`.trim();
+      }
+    }
+    
     setUser(newUser);
     if (newUser) {
       localStorage.setItem('user', JSON.stringify(newUser));
