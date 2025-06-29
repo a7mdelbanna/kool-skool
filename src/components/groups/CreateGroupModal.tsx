@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -105,7 +104,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
     mutationFn: async () => {
       if (!user?.school_id) throw new Error('No school ID');
       
-      // First create the group
+      // First create the group - cast schedule to Json type
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
         .insert({
@@ -114,7 +113,7 @@ export function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateGroupModa
           description: formData.description,
           teacher_id: formData.teacher_id || null,
           session_count: formData.session_count,
-          schedule: formData.schedule,
+          schedule: formData.schedule as any, // Cast to satisfy Json type
           currency: formData.currency,
           price_mode: formData.price_mode,
           price_per_session: formData.price_mode === 'perSession' ? formData.price_per_session : null,

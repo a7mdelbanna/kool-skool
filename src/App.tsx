@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
@@ -31,66 +31,102 @@ const queryClient = new QueryClient({
   },
 });
 
+// Legacy UserContext for backward compatibility
+interface User {
+  id?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  timezone?: string;
+}
+
+interface UserContextType {
+  user: User | null;
+  setUser: (user: User | null) => void;
+}
+
+export const UserContext = createContext<UserContextType>({
+  user: null,
+  setUser: () => {},
+});
+
 function App() {
+  // Legacy user state for backward compatibility
+  const [legacyUser, setLegacyUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Check for stored user data for legacy components
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setLegacyUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+      }
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <div className="App">
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/student-login" element={<StudentLogin />} />
-              <Route path="/admin-login" element={<SuperAdminLogin />} />
-              
-              {/* Student routes */}
-              <Route
-                path="/student/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={['student']}>
-                    <StudentDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* Super admin routes */}
-              <Route
-                path="/admin/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={['superadmin']}>
-                    <SuperAdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* School management routes */}
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute allowedRoles={['admin', 'teacher']}>
-                    <Layout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="students" element={<StudentsPage />} />
-                <Route path="groups" element={<GroupsPage />} />
-                <Route path="calendar" element={<CalendarPage />} />
-                <Route path="courses" element={<CoursesPage />} />
-                <Route path="transactions" element={<TransactionsPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-                <Route path="goals" element={<GoalsPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-              </Route>
-              
-              {/* Fallback route */}
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-            <Toaster position="top-right" />
-          </div>
-        </Router>
-      </AuthProvider>
+      <UserContext.Provider value={{ user: legacyUser, setUser: setLegacyUser }}>
+        <AuthProvider>
+          <Router>
+            <div className="App">
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/student-login" element={<StudentLogin />} />
+                <Route path="/admin-login" element={<SuperAdminLogin />} />
+                
+                {/* Student routes */}
+                <Route
+                  path="/student/dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <StudentDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Super admin routes */}
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={['superadmin']}>
+                      <SuperAdminDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* School management routes */}
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                      <Layout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="students" element={<StudentsPage />} />
+                  <Route path="groups" element={<GroupsPage />} />
+                  <Route path="calendar" element={<CalendarPage />} />
+                  <Route path="courses" element={<CoursesPage />} />
+                  <Route path="transactions" element={<TransactionsPage />} />
+                  <Route path="reports" element={<ReportsPage />} />
+                  <Route path="goals" element={<GoalsPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                </Route>
+                
+                {/* Fallback route */}
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+              <Toaster position="top-right" />
+            </div>
+          </Router>
+        </AuthProvider>
+      </UserContext.Provider>
     </QueryClientProvider>
   );
 }
