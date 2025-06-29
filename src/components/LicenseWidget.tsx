@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -222,7 +222,9 @@ const LicenseWidget: React.FC = () => {
         ) : (
           <div className="flex flex-col items-center justify-center h-full">
             <Alert variant="destructive" className="w-full bg-red-50 border-red-200">
-              <AlertTitle className="text-red-600">License information unavailable</AlertTitle>
+              <AlertDescription className="text-red-600 font-medium">
+                License information unavailable
+              </AlertDescription>
               <AlertDescription className="text-red-500">
                 There was a problem loading your license details.
               </AlertDescription>
@@ -256,7 +258,9 @@ const LicenseWidget: React.FC = () => {
         </div>
       ) : error ? (
         <Alert variant="destructive" className="bg-red-50 border-red-200">
-          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
+          <AlertDescription className="text-red-600 font-medium">
+            Error loading license information
+          </AlertDescription>
           <AlertDescription className="text-red-500">
             Please refresh the page or contact support if this issue persists.
           </AlertDescription>
@@ -294,7 +298,9 @@ const LicenseWidget: React.FC = () => {
         </div>
       ) : (
         <Alert variant="destructive" className="bg-red-50 border-red-200">
-          <AlertTitle className="text-red-600">Error loading license information</AlertTitle>
+          <AlertDescription className="text-red-600 font-medium">
+            Error loading license information
+          </AlertDescription>
           <AlertDescription className="text-red-500">
             Please refresh the page or contact support if this issue persists.
           </AlertDescription>

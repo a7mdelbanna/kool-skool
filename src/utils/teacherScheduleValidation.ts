@@ -64,20 +64,15 @@ export const validateTeacherScheduleOverlap = async (
         id,
         scheduled_date,
         duration_minutes,
-        students!inner(
-          users!inner(first_name, last_name)
+        students!lesson_sessions_student_id_fkey(
+          users!students_user_id_fkey(first_name, last_name)
         ),
         groups(
           id,
           name
-        ),
-        subscriptions!inner(
-          students!inner(
-            teacher_id
-          )
         )
       `)
-      .eq('subscriptions.students.teacher_id', teacherId)
+      .eq('students.teacher_id', teacherId)
       .gte('scheduled_date', `${date}T00:00:00`)
       .lt('scheduled_date', `${date}T23:59:59`)
       .eq('status', 'scheduled')
