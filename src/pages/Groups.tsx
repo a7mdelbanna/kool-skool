@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { UsersRound, Plus, Eye, Users, Calendar, DollarSign } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -8,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { UserContext } from '@/App';
 import { useContext } from 'react';
+import GroupDetailsDialog from '@/components/GroupDetailsDialog';
 
 interface Group {
   id: string;
@@ -29,6 +29,7 @@ interface Group {
 const Groups = () => {
   const { user } = useContext(UserContext);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [showGroupDetails, setShowGroupDetails] = useState(false);
 
   // Fetch groups data
   const { data: groups, isLoading, error } = useQuery({
@@ -79,6 +80,11 @@ const Groups = () => {
     return schedule.map((item: any) => 
       `${item.day} ${item.time}`
     ).join(', ');
+  };
+
+  const handleViewDetails = (group: Group) => {
+    setSelectedGroup(group);
+    setShowGroupDetails(true);
   };
 
   if (isLoading) {
@@ -217,7 +223,7 @@ const Groups = () => {
                 <Button 
                   variant="outline" 
                   className="w-full flex items-center gap-2"
-                  onClick={() => setSelectedGroup(group)}
+                  onClick={() => handleViewDetails(group)}
                 >
                   <Eye className="h-4 w-4" />
                   View Details
@@ -227,6 +233,13 @@ const Groups = () => {
           ))}
         </div>
       )}
+
+      {/* Group Details Dialog */}
+      <GroupDetailsDialog
+        group={selectedGroup}
+        open={showGroupDetails}
+        onOpenChange={setShowGroupDetails}
+      />
     </div>
   );
 };
