@@ -47,6 +47,11 @@ interface GroupDetailsDialogProps {
   onSuccess?: () => void;
 }
 
+interface RpcResponse {
+  success: boolean;
+  message: string;
+}
+
 const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetailsDialogProps) => {
   const { user } = useContext(UserContext);
   const { toast } = useToast();
@@ -108,7 +113,7 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
     setRemovingStudentId(studentId);
     
     try {
-      const { data: result, error } = await supabase.rpc('remove_student_from_group', {
+      const { data, error } = await supabase.rpc('remove_student_from_group', {
         p_group_id: group.id,
         p_student_id: studentId,
         p_current_user_id: user.id,
@@ -119,6 +124,9 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
         console.error('Error removing student from group:', error);
         throw new Error(`Failed to remove student: ${error.message}`);
       }
+
+      // Type cast the response
+      const result = data as RpcResponse;
 
       if (!result?.success) {
         throw new Error(result?.message || 'Failed to remove student from group');

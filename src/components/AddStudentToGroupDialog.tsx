@@ -44,6 +44,12 @@ interface Account {
   currency_id: string;
 }
 
+interface RpcResponse {
+  success: boolean;
+  message: string;
+  subscription_id?: string;
+}
+
 const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddStudentToGroupDialogProps) => {
   const { user } = useContext(UserContext);
   const { toast } = useToast();
@@ -147,7 +153,6 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
     return selectedCurrency?.symbol || '$';
   };
 
-  // Calculate total amount based on price mode
   const calculateTotalAmount = () => {
     if (!group) return 0;
     if (group.price_mode === 'perSession') {
@@ -188,7 +193,7 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
     setIsSubmitting(true);
     
     try {
-      const { data: result, error } = await supabase.rpc('add_student_to_group', {
+      const { data, error } = await supabase.rpc('add_student_to_group', {
         p_group_id: group.id,
         p_student_id: selectedStudentId,
         p_start_date: startDate,
@@ -205,6 +210,9 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
         console.error('Error adding student to group:', error);
         throw new Error(`Failed to add student to group: ${error.message}`);
       }
+
+      // Type cast the response
+      const result = data as RpcResponse;
 
       if (!result?.success) {
         throw new Error(result?.message || 'Failed to add student to group');
