@@ -119,6 +119,21 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     enabled: !!user?.schoolId && open
   });
 
+  // Calculate total amount based on price mode
+  const calculateTotalAmount = () => {
+    if (groupData.price_mode === 'perSession') {
+      return groupData.price_per_session * groupData.session_count;
+    } else {
+      return groupData.total_price;
+    }
+  };
+
+  // Get selected currency symbol
+  const getSelectedCurrencySymbol = () => {
+    const selectedCurrency = currencies?.find(c => c.code === groupData.currency);
+    return selectedCurrency?.symbol || '$';
+  };
+
   const handleAddSchedule = () => {
     if (newScheduleDay && newScheduleTime) {
       setGroupData(prev => ({
@@ -418,6 +433,26 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                         }
                       }}
                     />
+                  </div>
+                </div>
+
+                {/* Total Amount Display */}
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-semibold">Total Amount</Label>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {groupData.price_mode === 'perSession' 
+                          ? `${groupData.session_count} sessions × ${getSelectedCurrencySymbol()}${groupData.price_per_session}`
+                          : 'Fixed total price'
+                        }
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {getSelectedCurrencySymbol()}{calculateTotalAmount().toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardContent>
