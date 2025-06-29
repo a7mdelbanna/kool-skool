@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUserInfo, getStudentsWithDetails, supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -8,7 +9,7 @@ export interface Session {
   date: Date;
   time: string;
   duration: string;
-  status: "scheduled" | "completed" | "canceled" | "missed";
+  status: "scheduled" | "completed" | "canceled" | "cancelled" | "missed";
   notes?: string;
   sessionNumber?: number;
   totalSessions?: number;
