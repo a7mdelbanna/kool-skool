@@ -8,6 +8,7 @@ import Sidebar from './Sidebar';
 // Import all the pages
 import Index from '@/pages/Index';
 import Students from '@/pages/Students';
+import Groups from '@/pages/Groups';
 import Courses from '@/pages/Courses';
 import Calendar from '@/pages/Calendar';
 import Attendance from '@/pages/Attendance';
@@ -33,6 +34,7 @@ const MainLayout = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/students" element={<Students />} />
+                  <Route path="/groups" element={<Groups />} />
                   <Route path="/courses" element={<Courses />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/attendance" element={<Attendance />} />

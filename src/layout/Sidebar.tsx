@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -16,7 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
-  Shield
+  Shield,
+  UsersRound
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ const Sidebar = () => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Students', href: '/students', icon: Users },
+    { name: 'Groups', href: '/groups', icon: UsersRound },
     { name: 'Courses', href: '/courses', icon: BookOpen },
     { name: 'Calendar', href: '/calendar', icon: Calendar },
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
