@@ -322,23 +322,37 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     try {
       console.log('Creating group...');
       
+      // Prepare the group data with proper price handling
+      const groupInsertData = {
+        school_id: user.schoolId,
+        name: groupData.name,
+        description: groupData.description,
+        course_id: groupData.course_id,
+        teacher_id: groupData.teacher_id,
+        session_count: groupData.session_count,
+        schedule: groupData.schedule as any,
+        currency: groupData.currency,
+        price_mode: groupData.price_mode,
+        status: 'active',
+        // Handle price fields based on price_mode
+        ...(groupData.price_mode === 'perSession' 
+          ? { 
+              price_per_session: groupData.price_per_session,
+              total_price: groupData.price_per_session * groupData.session_count
+            }
+          : { 
+              price_per_session: null, // Set to null for total pricing mode
+              total_price: groupData.total_price
+            }
+        )
+      };
+
+      console.log('Group insert data:', groupInsertData);
+      
       // Create the group first with course_id included
       const { data: groupResult, error: groupError } = await supabase
         .from('groups')
-        .insert({
-          school_id: user.schoolId,
-          name: groupData.name,
-          description: groupData.description,
-          course_id: groupData.course_id, // Now included in the insert
-          teacher_id: groupData.teacher_id,
-          session_count: groupData.session_count,
-          schedule: groupData.schedule as any,
-          currency: groupData.currency,
-          price_mode: groupData.price_mode,
-          price_per_session: groupData.price_per_session,
-          total_price: groupData.total_price,
-          status: 'active'
-        })
+        .insert(groupInsertData)
         .select()
         .single();
 
