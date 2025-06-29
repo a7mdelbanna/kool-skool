@@ -1,15 +1,16 @@
-
 import React, { useState } from 'react';
-import { UsersRound, Plus, Eye, Users, Calendar, DollarSign, Clock, GraduationCap } from 'lucide-react';
+import { UsersRound, Plus, Eye, Users, Calendar, DollarSign, Clock, GraduationCap, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { UserContext } from '@/App';
 import { useContext } from 'react';
 import GroupDetailsDialog from '@/components/GroupDetailsDialog';
 import CreateGroupDialog from '@/components/CreateGroupDialog';
+import { toast } from 'sonner';
 
 interface Group {
   id: string;
@@ -33,6 +34,7 @@ const Groups = () => {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
   // Fetch groups data
   const { data: groups, isLoading, error, refetch } = useQuery({
@@ -55,6 +57,50 @@ const Groups = () => {
     },
     enabled: !!user?.schoolId
   });
+
+  const handleDeleteGroup = async (groupId: string, groupName: string) => {
+    if (!user?.schoolId || !user?.id) {
+      toast.error('Authentication required to delete group');
+      return;
+    }
+
+    setDeletingGroupId(groupId);
+
+    try {
+      const { data, error } = await supabase.rpc('delete_group_with_related_data', {
+        p_group_id: groupId,
+        p_current_user_id: user.id,
+        p_current_school_id: user.schoolId
+      });
+
+      if (error) {
+        console.error('Error deleting group:', error);
+        throw new Error(`Failed to delete group: ${error.message}`);
+      }
+
+      const result = data as { success: boolean; message: string };
+
+      if (!result?.success) {
+        throw new Error(result?.message || 'Failed to delete group');
+      }
+
+      toast.success(`Group "${groupName}" and all related data deleted successfully`);
+
+      // Refresh the groups list
+      refetch();
+      
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      
+      toast.error(
+        error instanceof Error 
+          ? `Error deleting group: ${error.message}` 
+          : 'An unexpected error occurred while deleting the group'
+      );
+    } finally {
+      setDeletingGroupId(null);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -200,9 +246,40 @@ const Groups = () => {
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <CardTitle className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
-                      {group.name}
-                    </CardTitle>
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle className="text-xl font-bold text-gray-900 line-clamp-1">
+                        {group.name}
+                      </CardTitle>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
+                            disabled={deletingGroupId === group.id}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Group</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{group.name}"? This will also delete all subscriptions, sessions, and payments for students in this group. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteGroup(group.id, group.name)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete Group
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                     {group.description && (
                       <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
                         {group.description}
