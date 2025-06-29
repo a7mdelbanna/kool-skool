@@ -394,6 +394,7 @@ export type Database = {
           schedule: Json
           school_id: string
           session_count: number
+          session_duration_minutes: number
           status: string
           teacher_id: string | null
           total_price: number
@@ -411,6 +412,7 @@ export type Database = {
           schedule: Json
           school_id: string
           session_count: number
+          session_duration_minutes?: number
           status?: string
           teacher_id?: string | null
           total_price: number
@@ -428,6 +430,7 @@ export type Database = {
           schedule?: Json
           school_id?: string
           session_count?: number
+          session_duration_minutes?: number
           status?: string
           teacher_id?: string | null
           total_price?: number

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ interface GroupFormData {
   course_id: string;
   teacher_id: string;
   session_count: number;
+  session_duration_minutes: number;
   schedule: ScheduleItem[];
   currency: string;
   price_mode: 'perSession' | 'total';
@@ -94,6 +96,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     course_id: '',
     teacher_id: '',
     session_count: 8,
+    session_duration_minutes: 60,
     schedule: [],
     currency: 'USD',
     price_mode: 'total',
@@ -330,6 +333,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         course_id: groupData.course_id,
         teacher_id: groupData.teacher_id,
         session_count: groupData.session_count,
+        session_duration_minutes: groupData.session_duration_minutes,
         schedule: groupData.schedule as any,
         currency: groupData.currency,
         price_mode: groupData.price_mode,
@@ -406,6 +410,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         course_id: '',
         teacher_id: '',
         session_count: 8,
+        session_duration_minutes: 60,
         schedule: [],
         currency: 'USD',
         price_mode: 'total',
@@ -509,7 +514,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="teacher">Teacher *</Label>
                     <Select value={groupData.teacher_id} onValueChange={(value) => setGroupData(prev => ({ ...prev, teacher_id: value }))}>
@@ -534,6 +539,19 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                       value={groupData.session_count}
                       onChange={(e) => setGroupData(prev => ({ ...prev, session_count: parseInt(e.target.value) || 0 }))}
                       min="1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="session-duration">Session Duration (minutes)</Label>
+                    <Input
+                      id="session-duration"
+                      type="number"
+                      value={groupData.session_duration_minutes}
+                      onChange={(e) => setGroupData(prev => ({ ...prev, session_duration_minutes: parseInt(e.target.value) || 60 }))}
+                      min="15"
+                      max="480"
+                      step="15"
                     />
                   </div>
                 </div>
