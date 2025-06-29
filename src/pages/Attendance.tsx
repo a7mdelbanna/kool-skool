@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import EnhancedUpcomingLessonsList from '@/components/calendar/EnhancedUpcomingLessonsList';
+import UpcomingLessonsList from '@/components/calendar/UpcomingLessonsList';
 import SessionSkeleton from '@/components/calendar/SessionSkeleton';
 import { useAttendanceData } from '@/hooks/useAttendanceData';
 import { UserContext } from '@/App';
@@ -211,7 +211,7 @@ const Attendance = () => {
         ) : loading ? (
           renderSkeletonLoader()
         ) : (
-          <EnhancedUpcomingLessonsList 
+          <UpcomingLessonsList 
             sessions={filteredSessions}
             onSessionUpdate={refreshSessions}
             onOptimisticUpdate={updateSessionOptimistically}

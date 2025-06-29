@@ -1501,14 +1501,6 @@ export type Database = {
         Args: { p_course_id: string }
         Returns: undefined
       }
-      delete_group_with_related_data: {
-        Args: {
-          p_group_id: string
-          p_current_user_id: string
-          p_current_school_id: string
-        }
-        Returns: Json
-      }
       delete_student_payment: {
         Args: {
           p_payment_id: string
