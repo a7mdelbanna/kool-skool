@@ -24,13 +24,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Clock, Globe } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Globe, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { supabase } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import { getSchoolTimezone, convertSchoolTimeToUTC, formatInUserTimezone, getEffectiveTimezone } from '@/utils/timezone';
+import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface NewLessonDialogProps {
   open: boolean;
@@ -71,6 +73,8 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [schoolTimezone, setSchoolTimezone] = useState<string>('');
+  const [validationError, setValidationError] = useState<string>('');
+  const [isValidating, setIsValidating] = useState(false);
   const userTimezone = getEffectiveTimezone(user?.timezone);
 
   // Fetch students and school timezone when dialog opens
@@ -111,8 +115,65 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
     fetchData();
   }, [open, user?.schoolId]);
 
+  // Clear validation error when form fields change
+  useEffect(() => {
+    if (validationError) {
+      setValidationError('');
+    }
+  }, [date, studentId, time, duration]);
+
+  // Validate teacher schedule when all required fields are filled
+  useEffect(() => {
+    const validateSchedule = async () => {
+      if (!date || !studentId || !time || !duration || !students.length) {
+        return;
+      }
+
+      const selectedStudent = students.find(s => s.id === studentId);
+      if (!selectedStudent?.teacher_id) {
+        return;
+      }
+
+      setIsValidating(true);
+      setValidationError('');
+
+      try {
+        const durationMinutes = parseInt(duration.replace(' min', ''));
+        const dateStr = format(date, 'yyyy-MM-dd');
+
+        const result = await validateTeacherScheduleOverlap({
+          teacherId: selectedStudent.teacher_id,
+          date: dateStr,
+          startTime: time,
+          durationMinutes
+        });
+
+        if (result.hasConflict && result.conflictMessage) {
+          setValidationError(result.conflictMessage);
+        }
+      } catch (error) {
+        console.error('Error validating schedule:', error);
+      } finally {
+        setIsValidating(false);
+      }
+    };
+
+    // Debounce validation to avoid too many API calls
+    const timeoutId = setTimeout(validateSchedule, 500);
+    return () => clearTimeout(timeoutId);
+  }, [date, studentId, time, duration, students]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (validationError) {
+      toast({
+        title: "Schedule Conflict",
+        description: validationError,
+        variant: "destructive"
+      });
+      return;
+    }
     
     if (!date || !studentId || !subject || !time || !duration || !user?.schoolId) {
       toast({
@@ -134,6 +195,30 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
     }
 
     try {
+      setLoading(true);
+
+      // Final validation before submission
+      if (selectedStudent.teacher_id) {
+        const durationMinutes = parseInt(duration.replace(' min', ''));
+        const dateStr = format(date, 'yyyy-MM-dd');
+
+        const result = await validateTeacherScheduleOverlap({
+          teacherId: selectedStudent.teacher_id,
+          date: dateStr,
+          startTime: time,
+          durationMinutes
+        });
+
+        if (result.hasConflict && result.conflictMessage) {
+          toast({
+            title: "Schedule Conflict",
+            description: result.conflictMessage,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       // Create datetime in school timezone
       const [hours, minutes] = time.split(':').map(Number);
       const localDateTime = new Date(date);
@@ -177,6 +262,8 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         description: "Failed to create lesson",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -187,6 +274,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
     setTime('');
     setDuration('');
     setCost('');
+    setValidationError('');
   };
 
   // Format the selected date for display in user's timezone
@@ -307,6 +395,26 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Validation Error Alert */}
+          {validationError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {validationError}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Validation Loading */}
+          {isValidating && (
+            <Alert>
+              <Clock className="h-4 w-4" />
+              <AlertDescription>
+                Checking teacher availability...
+              </AlertDescription>
+            </Alert>
+          )}
           
           {/* Cost */}
           <div className="space-y-2">
@@ -325,8 +433,11 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Loading..." : "Create Lesson"}
+            <Button 
+              type="submit" 
+              disabled={loading || isValidating || !!validationError}
+            >
+              {loading ? "Creating..." : isValidating ? "Validating..." : "Create Lesson"}
             </Button>
           </DialogFooter>
         </form>
