@@ -58,7 +58,7 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<string | null>(null);
 
-  // Fetch group students with improved query
+  // Fetch group students with corrected query
   const { data: groupStudents, isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
     queryKey: ['group-students', group?.id],
     queryFn: async () => {
@@ -66,47 +66,71 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
 
       console.log('Fetching students for group:', group.id);
 
-      const { data, error } = await supabase
+      // First, let's try a simpler query to debug
+      const { data: rawData, error } = await supabase
         .from('group_students')
-        .select(`
-          id,
-          student_id,
-          status,
-          start_date,
-          students!inner(
-            id,
-            user_id,
-            users!inner(
-              id,
-              first_name,
-              last_name,
-              email
-            )
-          )
-        `)
+        .select('*')
         .eq('group_id', group.id)
         .eq('status', 'active');
 
       if (error) {
-        console.error('Error fetching group students:', error);
+        console.error('Error fetching group_students:', error);
         throw error;
       }
 
-      console.log('Raw group students data:', data);
+      console.log('Raw group_students data:', rawData);
 
-      const formattedStudents = data?.map((item: any) => {
-        console.log('Processing student item:', item);
+      if (!rawData || rawData.length === 0) {
+        console.log('No active students found for group');
+        return [];
+      }
+
+      // Now fetch the student details for each student_id
+      const studentIds = rawData.map(gs => gs.student_id);
+      console.log('Student IDs to fetch:', studentIds);
+
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select(`
+          id,
+          user_id,
+          users!inner(
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .in('id', studentIds);
+
+      if (studentsError) {
+        console.error('Error fetching students details:', studentsError);
+        throw studentsError;
+      }
+
+      console.log('Students data:', studentsData);
+
+      // Combine the data
+      const formattedStudents = rawData.map((groupStudent: any) => {
+        const studentData = studentsData?.find(s => s.id === groupStudent.student_id);
+        console.log('Matching student data for', groupStudent.student_id, ':', studentData);
+        
+        if (!studentData) {
+          console.warn('No student data found for student_id:', groupStudent.student_id);
+          return null;
+        }
+
         return {
-          id: item.id,
-          student_id: item.student_id,
-          student_name: `${item.students.users.first_name} ${item.students.users.last_name}`,
-          student_email: item.students.users.email,
-          status: item.status,
-          start_date: item.start_date
+          id: groupStudent.id,
+          student_id: groupStudent.student_id,
+          student_name: `${studentData.users.first_name} ${studentData.users.last_name}`,
+          student_email: studentData.users.email,
+          status: groupStudent.status,
+          start_date: groupStudent.start_date
         };
-      }) || [];
+      }).filter(Boolean); // Remove null entries
 
-      console.log('Formatted students:', formattedStudents);
+      console.log('Final formatted students:', formattedStudents);
       return formattedStudents;
     },
     enabled: !!group?.id && open
@@ -301,7 +325,7 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
                     <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No Students Yet</h3>
                     <p className="text-gray-600 mb-4">
-                      This group doesn't have any students yet. Add students to get started.
+                      This group doesn't have any active students yet. Add students to get started.
                     </p>
                     <Button 
                       onClick={() => setShowAddStudent(true)}
