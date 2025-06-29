@@ -211,8 +211,8 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
         throw new Error(`Failed to add student to group: ${error.message}`);
       }
 
-      // Type cast the response
-      const result = data as RpcResponse;
+      // Type cast the response with proper unknown first
+      const result = data as unknown as RpcResponse;
 
       if (!result?.success) {
         throw new Error(result?.message || 'Failed to add student to group');

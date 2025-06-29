@@ -125,8 +125,8 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
         throw new Error(`Failed to remove student: ${error.message}`);
       }
 
-      // Type cast the response
-      const result = data as RpcResponse;
+      // Type cast the response with proper unknown first
+      const result = data as unknown as RpcResponse;
 
       if (!result?.success) {
         throw new Error(result?.message || 'Failed to remove student from group');
