@@ -25,6 +25,7 @@ import {
   CircleCheck
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
+import GroupSessionWidget from './GroupSessionWidget';
 import { handleSessionAction } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -435,181 +436,253 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
     );
   };
 
+  // NEW: Function to render individual session card
+  const renderIndividualSessionCard = (session: Session) => {
+    const sessionDate = new Date(session.date);
+    const dateLabel = isToday(sessionDate) 
+      ? 'Today' 
+      : isSameDay(sessionDate, tomorrow) 
+        ? 'Tomorrow' 
+        : format(sessionDate, 'EEEE, MMMM d');
+    
+    const subjectAndLevel = getLessonSubjectAndLevel(session);
+    const studentName = session.studentName || 'Unknown Student';
+    const isPastSession = isSessionPast(session);
+    const subscriptionInfo = subscriptionInfoMap.get(session.studentId);
+    const sessionNumber = getSessionNumber(session);
+    
+    return (
+      <div 
+        key={session.id} 
+        className={`border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors ${
+          isPastSession 
+            ? 'opacity-60 bg-gray-50/50 border-gray-200' 
+            : 'bg-white border-border'
+        }`}
+        onClick={() => handleLessonClick(session)}
+      >
+        <div className="flex items-start gap-4">
+          {/* Time Section - Left Side */}
+          <div className="flex-shrink-0 text-center min-w-[80px]">
+            <div className={`text-2xl font-bold ${
+              isPastSession ? 'text-gray-400' : 'text-primary'
+            }`}>
+              {session.time.split(':')[0]}
+            </div>
+            <div className={`text-sm ${
+              isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+            }`}>
+              :{session.time.split(':')[1]}
+            </div>
+            <div className={`text-xs mt-1 ${
+              isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+            }`}>
+              {session.duration}
+            </div>
+          </div>
+          
+          {/* Divider */}
+          <div className={`w-px h-16 ${
+            isPastSession ? 'bg-gray-200' : 'bg-border'
+          }`}></div>
+          
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className={`font-semibold text-lg truncate ${
+                  isPastSession ? 'text-gray-500' : 'text-foreground'
+                }`}>
+                  {studentName}
+                </div>
+                <div className={`text-sm mb-3 ${
+                  isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+                }`}>
+                  {subjectAndLevel} Lesson
+                </div>
+                <div className={`flex items-center text-sm mb-4 ${
+                  isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+                }`}>
+                  <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                  {dateLabel}
+                </div>
+                
+                {/* Session Number & Subscription Details */}
+                {subscriptionInfo && (
+                  <div className={`rounded-md border p-3 mb-4 ${
+                    isPastSession 
+                      ? 'bg-gray-100 border-gray-300' 
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <div className="flex flex-wrap gap-2">
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                        isPastSession 
+                          ? 'bg-gray-200 text-gray-600' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        <Hash className="h-3 w-3" />
+                        <span className="font-medium">Session {sessionNumber}</span>
+                      </div>
+                      
+                      {subscriptionInfo.subscriptionName && (
+                        <div className={`px-2 py-1 rounded text-xs ${
+                          isPastSession 
+                            ? 'bg-gray-200 text-gray-600' 
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {subscriptionInfo.subscriptionName}
+                        </div>
+                      )}
+                      
+                      <div className={`px-2 py-1 rounded text-xs ${
+                        isPastSession 
+                          ? 'bg-gray-200 text-gray-600' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {subscriptionInfo.sessionCount} lessons total
+                      </div>
+                      
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                        isPastSession 
+                          ? 'bg-gray-200 text-gray-600' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        <DollarSign className="h-3 w-3" />
+                        <span>${subscriptionInfo.totalPrice} {subscriptionInfo.currency}</span>
+                      </div>
+                      
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                        isPastSession 
+                          ? 'bg-gray-200 text-gray-600' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        <CalendarScheduleIcon className="h-3 w-3" />
+                        <span>
+                          {format(new Date(subscriptionInfo.startDate), 'dd MMM')} – {format(new Date(subscriptionInfo.endDate), 'dd MMM')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show Quick Action Buttons for SCHEDULED sessions, Change Status for others */}
+                {session.status === "scheduled" ? 
+                  renderQuickActionButtons(session) : 
+                  renderChangeStatusButton(session)
+                }
+              </div>
+              
+              {/* Progress Counter - Right Side */}
+              {subscriptionInfo && !isPastSession && (
+                renderProgressCounter(subscriptionInfo)
+              )}
+              
+              {/* Status Badge - fallback when no progress info */}
+              {(!subscriptionInfo || isPastSession) && (
+                <div className="flex-shrink-0">
+                  <Badge 
+                    variant="outline" 
+                    className={
+                      isPastSession 
+                        ? "bg-gray-100 text-gray-500 border-gray-300 opacity-70"
+                        : session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
+                          session.status === "canceled" ? "bg-red-50 text-red-700 border-red-300" :
+                          session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
+                          "bg-blue-50 text-blue-700 border-blue-300"
+                    }
+                  >
+                    <span className="mr-1">{renderStatusIcon(session.status)}</span>
+                    {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // NEW: Function to identify group sessions
+  const identifyGroupSessions = (sessions: Session[]) => {
+    // Group sessions by date, time, and potential group identifiers
+    const groupMap = new Map<string, Session[]>();
+    const individualSessions: Session[] = [];
+    
+    sessions.forEach(session => {
+      // Create a key based on date and time to identify potential group sessions
+      const sessionDate = new Date(session.date);
+      const dateKey = format(sessionDate, 'yyyy-MM-dd');
+      const timeKey = session.time;
+      const groupKey = `${dateKey}-${timeKey}`;
+      
+      // Check if session has group indicators in notes or if multiple sessions exist at same time
+      const hasGroupIndicator = session.notes?.toLowerCase().includes('group') || 
+                               session.notes?.toLowerCase().includes('class');
+      
+      if (hasGroupIndicator || groupMap.has(groupKey)) {
+        if (!groupMap.has(groupKey)) {
+          groupMap.set(groupKey, []);
+        }
+        groupMap.get(groupKey)!.push(session);
+      } else {
+        // Check if we should move existing individual session to group
+        const existingSessionIndex = individualSessions.findIndex(s => {
+          const existingDate = format(new Date(s.date), 'yyyy-MM-dd');
+          return existingDate === dateKey && s.time === timeKey;
+        });
+        
+        if (existingSessionIndex !== -1) {
+          // Move existing session to group and add current session
+          const existingSession = individualSessions.splice(existingSessionIndex, 1)[0];
+          groupMap.set(groupKey, [existingSession, session]);
+        } else {
+          individualSessions.push(session);
+        }
+      }
+    });
+    
+    // Convert groups with only one session back to individual
+    const finalGroups = new Map<string, Session[]>();
+    groupMap.forEach((sessions, key) => {
+      if (sessions.length > 1) {
+        finalGroups.set(key, sessions);
+      } else {
+        individualSessions.push(...sessions);
+      }
+    });
+    
+    return { groups: finalGroups, individual: individualSessions };
+  };
+
   // Render sessions for a specific date group
   const renderSessionGroup = (title: string, sessions: Session[], showDateLabels: boolean = true) => {
     if (sessions.length === 0) return null;
+    
+    // NEW: Identify group and individual sessions
+    const { groups, individual } = identifyGroupSessions(sessions);
     
     return (
       <div className="space-y-3 mb-6">
         <h3 className="text-lg font-medium">{title}</h3>
         <div className="grid gap-3">
-          {sessions.map(session => {
-            const sessionDate = new Date(session.date);
-            const dateLabel = showDateLabels ? (
-              isToday(sessionDate) 
-                ? 'Today' 
-                : isSameDay(sessionDate, tomorrow) 
-                  ? 'Tomorrow' 
-                  : format(sessionDate, 'EEEE, MMMM d')
-            ) : format(sessionDate, 'EEEE, MMMM d');
-            
-            const subjectAndLevel = getLessonSubjectAndLevel(session);
-            const studentName = session.studentName || 'Unknown Student';
-            const isPastSession = isSessionPast(session);
-            const subscriptionInfo = subscriptionInfoMap.get(session.studentId);
-            const sessionNumber = getSessionNumber(session);
-            
-            return (
-              <div 
-                key={session.id} 
-                className={`border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors ${
-                  isPastSession 
-                    ? 'opacity-60 bg-gray-50/50 border-gray-200' 
-                    : 'bg-white border-border'
-                }`}
-                onClick={() => handleLessonClick(session)}
-              >
-                <div className="flex items-start gap-4">
-                  {/* Time Section - Left Side */}
-                  <div className="flex-shrink-0 text-center min-w-[80px]">
-                    <div className={`text-2xl font-bold ${
-                      isPastSession ? 'text-gray-400' : 'text-primary'
-                    }`}>
-                      {session.time.split(':')[0]}
-                    </div>
-                    <div className={`text-sm ${
-                      isPastSession ? 'text-gray-400' : 'text-muted-foreground'
-                    }`}>
-                      :{session.time.split(':')[1]}
-                    </div>
-                    <div className={`text-xs mt-1 ${
-                      isPastSession ? 'text-gray-400' : 'text-muted-foreground'
-                    }`}>
-                      {session.duration}
-                    </div>
-                  </div>
-                  
-                  {/* Divider */}
-                  <div className={`w-px h-16 ${
-                    isPastSession ? 'bg-gray-200' : 'bg-border'
-                  }`}></div>
-                  
-                  {/* Main Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className={`font-semibold text-lg truncate ${
-                          isPastSession ? 'text-gray-500' : 'text-foreground'
-                        }`}>
-                          {studentName}
-                        </div>
-                        <div className={`text-sm mb-3 ${
-                          isPastSession ? 'text-gray-400' : 'text-muted-foreground'
-                        }`}>
-                          {subjectAndLevel} Lesson
-                        </div>
-                        <div className={`flex items-center text-sm mb-4 ${
-                          isPastSession ? 'text-gray-400' : 'text-muted-foreground'
-                        }`}>
-                          <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                          {dateLabel}
-                        </div>
-                        
-                        {/* Session Number & Subscription Details */}
-                        {subscriptionInfo && (
-                          <div className={`rounded-md border p-3 mb-4 ${
-                            isPastSession 
-                              ? 'bg-gray-100 border-gray-300' 
-                              : 'bg-blue-50 border-blue-200'
-                          }`}>
-                            <div className="flex flex-wrap gap-2">
-                              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                                isPastSession 
-                                  ? 'bg-gray-200 text-gray-600' 
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                <Hash className="h-3 w-3" />
-                                <span className="font-medium">Session {sessionNumber}</span>
-                              </div>
-                              
-                              {subscriptionInfo.subscriptionName && (
-                                <div className={`px-2 py-1 rounded text-xs ${
-                                  isPastSession 
-                                    ? 'bg-gray-200 text-gray-600' 
-                                    : 'bg-blue-100 text-blue-700'
-                                }`}>
-                                  {subscriptionInfo.subscriptionName}
-                                </div>
-                              )}
-                              
-                              <div className={`px-2 py-1 rounded text-xs ${
-                                isPastSession 
-                                  ? 'bg-gray-200 text-gray-600' 
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                {subscriptionInfo.sessionCount} lessons total
-                              </div>
-                              
-                              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                                isPastSession 
-                                  ? 'bg-gray-200 text-gray-600' 
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                <DollarSign className="h-3 w-3" />
-                                <span>${subscriptionInfo.totalPrice} {subscriptionInfo.currency}</span>
-                              </div>
-                              
-                              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                                isPastSession 
-                                  ? 'bg-gray-200 text-gray-600' 
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                <CalendarScheduleIcon className="h-3 w-3" />
-                                <span>
-                                  {format(new Date(subscriptionInfo.startDate), 'dd MMM')} – {format(new Date(subscriptionInfo.endDate), 'dd MMM')}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Show Quick Action Buttons for SCHEDULED sessions, Change Status for others */}
-                        {session.status === "scheduled" ? 
-                          renderQuickActionButtons(session) : 
-                          renderChangeStatusButton(session)
-                        }
-                      </div>
-                      
-                      {/* Progress Counter - Right Side */}
-                      {subscriptionInfo && !isPastSession && (
-                        renderProgressCounter(subscriptionInfo)
-                      )}
-                      
-                      {/* Status Badge - fallback when no progress info */}
-                      {(!subscriptionInfo || isPastSession) && (
-                        <div className="flex-shrink-0">
-                          <Badge 
-                            variant="outline" 
-                            className={
-                              isPastSession 
-                                ? "bg-gray-100 text-gray-500 border-gray-300 opacity-70"
-                                : session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
-                                  session.status === "canceled" ? "bg-red-50 text-red-700 border-red-300" :
-                                  session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
-                                  "bg-blue-50 text-blue-700 border-blue-300"
-                            }
-                          >
-                            <span className="mr-1">{renderStatusIcon(session.status)}</span>
-                            {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {/* Render Group Sessions */}
+          {Array.from(groups.entries()).map(([groupKey, groupSessions]) => (
+            <GroupSessionWidget
+              key={groupKey}
+              groupSessions={groupSessions}
+              onLessonClick={onLessonClick}
+              onSessionUpdate={onSessionUpdate}
+              onOptimisticUpdate={onOptimisticUpdate}
+              onRevertUpdate={onRevertUpdate}
+              subscriptionInfoMap={subscriptionInfoMap}
+              studentInfoMap={studentInfoMap}
+              renderSessionCard={renderIndividualSessionCard}
+            />
+          ))}
+          
+          {/* Render Individual Sessions */}
+          {individual.map(session => renderIndividualSessionCard(session))}
         </div>
       </div>
     );
@@ -635,7 +708,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
       
       {/* Fun empty state */}
       {upcomingSessions.length === 0 && pastSessions.length === 0 && (
-        <FunEmptyState />
+        <FunEmptyState viewMode={viewMode} />
       )}
     </div>
   );

@@ -3,7 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { PartyPopper, Coffee, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
-const FunEmptyState: React.FC = () => {
+interface FunEmptyStateProps {
+  viewMode?: 'day' | 'week' | 'month';
+}
+
+const FunEmptyState: React.FC<FunEmptyStateProps> = ({ viewMode = 'week' }) => {
   const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
@@ -11,6 +15,17 @@ const FunEmptyState: React.FC = () => {
     const timer = setTimeout(() => setShowConfetti(false), 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  const getEmptyMessage = () => {
+    switch (viewMode) {
+      case 'day':
+        return 'No lessons today!';
+      case 'month':
+        return 'No lessons this month!';
+      default:
+        return 'No lessons this week!';
+    }
+  };
 
   return (
     <div className="relative">
@@ -49,7 +64,7 @@ const FunEmptyState: React.FC = () => {
           </div>
           
           <h2 className="text-3xl font-bold text-primary mb-2 animate-pulse">
-            🎉 HOORAY, NO LESSONS! 🎉
+            🎉 HOORAY, {getEmptyMessage().toUpperCase()} 🎉
           </h2>
           
           <p className="text-lg text-muted-foreground mb-4">
