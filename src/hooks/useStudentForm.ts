@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Student } from "@/components/StudentCard";
 import { toast } from "sonner";
@@ -187,8 +186,9 @@ export const useStudentForm = (
       } else {
         const userData = getUserData();
         
-        if (!userData || !userData.schoolId || userData.role !== 'admin') {
-          toast.error("Only school admins can create students");
+        // Allow both admin and teacher roles to create students
+        if (!userData || !userData.schoolId || !['admin', 'teacher'].includes(userData.role)) {
+          toast.error("Only school admins and teachers can create students");
           setSaving(false);
           return;
         }
@@ -216,7 +216,7 @@ export const useStudentForm = (
         
         const selectedTeacher = teachers?.find(t => t.id === selectedTeacherId);
         
-        console.log("Creating student with admin credentials:", { 
+        console.log("Creating student with user credentials:", { 
           userId: userData.id,
           schoolId: userData.schoolId,
           role: userData.role

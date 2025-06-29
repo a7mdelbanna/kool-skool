@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -21,7 +20,7 @@ serve(async (req) => {
     console.log("Request method:", req.method);
     console.log("Request headers:", Object.fromEntries(req.headers.entries()));
     
-    // Get request headers for admin validation
+    // Get request headers for validation
     const userId = req.headers.get('x-user-id')
     const schoolId = req.headers.get('x-school-id')
     const userRole = req.headers.get('x-user-role')
@@ -32,13 +31,13 @@ serve(async (req) => {
       userRole
     })
     
-    // Validate admin role
-    if (!userId || !schoolId || userRole !== 'admin') {
-      console.error("Admin validation failed:", { userId, schoolId, userRole })
+    // Allow both admin and teacher roles to create students
+    if (!userId || !schoolId || !['admin', 'teacher'].includes(userRole || '')) {
+      console.error("Role validation failed:", { userId, schoolId, userRole })
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Only school admins can create students",
+          message: "Only school admins and teachers can create students",
           detail: { userId, schoolId, userRole }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
@@ -143,187 +142,59 @@ serve(async (req) => {
       )
     }
     
-    // Check valid roles in the database
-    const { data: roleConstraintData, error: roleConstraintError } = await supabaseClient.rpc(
-      'get_role_constraint_values'
+    // Use the database function to create the student
+    console.log("Calling create_student database function");
+    const { data: result, error: createError } = await supabaseClient.rpc(
+      'create_student',
+      {
+        student_email,
+        student_password,
+        student_first_name: first_name,
+        student_last_name: last_name,
+        teacher_id,
+        course_id,
+        age_group,
+        level,
+        phone,
+        current_user_id: userId
+      }
     );
     
-    if (roleConstraintError) {
-      console.error("Error fetching role constraints:", roleConstraintError);
+    if (createError) {
+      console.error("Error calling create_student function:", createError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Error fetching role constraints" 
+          message: createError.message || "Failed to create student"
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
     
-    console.log("Role constraint data:", roleConstraintData);
+    console.log("Create student function result:", result);
     
-    // Extract valid roles from constraint definition
-    // Example format: CHECK ((role = ANY (ARRAY['admin'::text, 'teacher'::text, 'staff'::text])))
-    const roleMatch = roleConstraintData.match(/ARRAY\[(.*?)\]/);
-    let validRoles = [];
-    
-    if (roleMatch && roleMatch[1]) {
-      validRoles = roleMatch[1].split(', ').map(role => 
-        role.replace(/'/g, '').replace(/::text/g, '')
-      );
-    }
-    
-    console.log("Valid roles:", validRoles);
-    
-    // Check if 'student' is a valid role, otherwise use a valid alternative
-    const roleToUse = validRoles.includes('student') ? 'student' : 
-                      validRoles.includes('user') ? 'user' : validRoles[0];
-    
-    console.log("Using role:", roleToUse);
-    
-    // Verify the teacher belongs to the same school
-    const { data: teacherData, error: teacherError } = await supabaseClient
-      .from('users')
-      .select('school_id')
-      .eq('id', teacher_id)
-      .single()
-    
-    if (teacherError || !teacherData || teacherData.school_id !== schoolId) {
-      console.error("Teacher verification failed:", { teacherError, teacherData })
+    if (!result || !result.success) {
+      console.error("Student creation failed:", result?.message);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Teacher not found or not associated with this school" 
+          message: result?.message || "Failed to create student"
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-    
-    // Verify the course belongs to the same school
-    const { data: courseData, error: courseError } = await supabaseClient
-      .from('courses')
-      .select('school_id')
-      .eq('id', course_id)
-      .single()
-    
-    if (courseError || !courseData || courseData.school_id !== schoolId) {
-      console.error("Course verification failed:", { courseError, courseData })
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "Course not found or not associated with this school" 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-    
-    // First, check if a user with this email already exists
-    const { data: existingUserData, error: existingUserError } = await supabaseClient
-      .from('users')
-      .select('id')
-      .eq('email', student_email)
-      .maybeSingle()
-    
-    if (existingUserData) {
-      console.error("User with this email already exists:", student_email)
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "A user with this email already exists" 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-    
-    // Hash the password
-    const { data: hashResult, error: hashError } = await supabaseClient.rpc(
-      'hash_password',
-      { password: student_password }
-    );
-    
-    if (hashError || !hashResult) {
-      console.error("Error hashing password:", hashError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "Error hashing password: " + (hashError?.message || "Unknown error")
-        }), 
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        }
-      );
-    }
-    
-    // Insert into users table first
-    const { data: userData, error: userError } = await supabaseClient
-      .from('users')
-      .insert([
-        {
-          first_name,
-          last_name,
-          email: student_email,
-          password_hash: hashResult,
-          role: roleToUse,
-          school_id: schoolId,
-          created_by: userId
-        }
-      ])
-      .select('id')
-      .single()
-    
-    if (userError) {
-      console.error("Error creating user record:", userError)
-      return new Response(
-        JSON.stringify({ success: false, message: userError.message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-    
-    const studentUserId = userData.id
-    
-    // Create student record
-    const { data: studentData, error: studentError } = await supabaseClient
-      .from('students')
-      .insert([
-        {
-          school_id: schoolId,
-          user_id: studentUserId,
-          teacher_id,
-          course_id,
-          age_group,
-          level,
-          phone
-        }
-      ])
-      .select('id')
-      .single()
-    
-    if (studentError) {
-      console.error("Error creating student record:", studentError)
-      // Attempt to clean up the user record since student creation failed
-      try {
-        await supabaseClient.from('users').delete().eq('id', studentUserId)
-      } catch (cleanupError) {
-        console.error("Failed to clean up user after student creation error:", cleanupError)
-      }
-      
-      return new Response(
-        JSON.stringify({ success: false, message: studentError.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
     
     console.log("Student created successfully:", { 
-      userId: studentUserId, 
-      studentId: studentData.id 
+      userId: result.user_id, 
+      studentId: result.student_id 
     });
     
-    // Return success response with explicit student_id field
+    // Return success response
     return new Response(
       JSON.stringify({
         success: true,
-        user_id: studentUserId,
-        student_id: studentData.id
+        user_id: result.user_id,
+        student_id: result.student_id
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
