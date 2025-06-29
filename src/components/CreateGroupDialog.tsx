@@ -128,7 +128,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
 
     setIsSubmitting(true);
     try {
-      // Create the group first
+      // Create the group first - convert schedule to JSON format
       const { data: groupResult, error: groupError } = await supabase
         .from('groups')
         .insert({
@@ -137,7 +137,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
           description: groupData.description,
           teacher_id: groupData.teacher_id,
           session_count: groupData.session_count,
-          schedule: groupData.schedule,
+          schedule: groupData.schedule as any, // Cast to any to resolve JSON type issue
           currency: groupData.currency,
           price_mode: groupData.price_mode,
           price_per_session: groupData.price_per_session,
