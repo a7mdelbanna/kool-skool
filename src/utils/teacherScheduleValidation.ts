@@ -46,6 +46,12 @@ const formatTimeForDisplay = (timeStr: string): string => {
   return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 };
 
+// Helper function to get day name from date
+const getDayName = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { weekday: 'long' });
+};
+
 export const validateTeacherScheduleOverlap = async (
   sessionTime: SessionTime
 ): Promise<TeacherOverlapValidationResult> => {
@@ -88,6 +94,7 @@ export const validateTeacherScheduleOverlap = async (
     }
 
     const conflictingSessions: ConflictingSession[] = [];
+    const dayName = getDayName(date);
 
     // Check each existing session for overlap
     for (const session of existingSessions) {
@@ -96,7 +103,10 @@ export const validateTeacherScheduleOverlap = async (
       const existingStartMinutes = timeToMinutes(existingStartTime);
       const existingEndMinutes = existingStartMinutes + (session.duration_minutes || 60);
 
-      // Check for overlap: sessions overlap if one starts before the other ends
+      // Enhanced overlap detection: sessions overlap if one starts before the other ends
+      // New session overlaps with existing if:
+      // - New session starts before existing session ends AND
+      // - New session ends after existing session starts
       const hasOverlap = (
         (newStartMinutes < existingEndMinutes) && 
         (newEndMinutes > existingStartMinutes)
@@ -123,6 +133,7 @@ export const validateTeacherScheduleOverlap = async (
       const newStartDisplay = formatTimeForDisplay(startTime);
       const newEndDisplay = formatTimeForDisplay(minutesToTime(newEndMinutes));
       
+      // Create a more user-friendly conflict message
       const conflictDetails = conflictingSessions
         .map(session => {
           const sessionType = session.isGroup ? `Group: ${session.groupName}` : session.studentName;
@@ -130,7 +141,7 @@ export const validateTeacherScheduleOverlap = async (
         })
         .join(', ');
 
-      const conflictMessage = `This teacher already has another session scheduled between ${newStartDisplay} and ${newEndDisplay}. Conflicting session(s): ${conflictDetails}. Please select a different time.`;
+      const conflictMessage = `This teacher already has a session scheduled from ${conflictingSessions[0].startTime} to ${conflictingSessions[0].endTime} on ${dayName}. The new session (${newStartDisplay} - ${newEndDisplay}) would overlap with: ${conflictDetails}. Please choose a different time.`;
 
       return {
         hasConflict: true,
