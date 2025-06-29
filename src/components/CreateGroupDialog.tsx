@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, getSchoolTeachers, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
@@ -27,9 +27,18 @@ interface ScheduleItem {
   time: string;
 }
 
+interface Course {
+  id: string;
+  name: string;
+  description: string;
+  course_type: string;
+  created_at: string;
+}
+
 interface GroupFormData {
   name: string;
   description: string;
+  course_id: string;
   teacher_id: string;
   session_count: number;
   schedule: ScheduleItem[];
@@ -81,6 +90,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
   const [groupData, setGroupData] = useState<GroupFormData>({
     name: '',
     description: '',
+    course_id: '',
     teacher_id: '',
     session_count: 8,
     schedule: [],
@@ -96,6 +106,32 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
   // Schedule form
   const [newScheduleDay, setNewScheduleDay] = useState('');
   const [newScheduleTime, setNewScheduleTime] = useState('');
+
+  // Fetch Group courses
+  const { data: groupCourses } = useQuery({
+    queryKey: ['group-courses', user?.schoolId],
+    queryFn: async () => {
+      if (!user?.schoolId) return [];
+      
+      const { data, error } = await supabase
+        .from('courses')
+        .select('id, name, description, course_type, created_at')
+        .eq('school_id', user.schoolId)
+        .eq('course_type', 'Group')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching group courses:', error);
+        throw error;
+      }
+
+      return data as Course[];
+    },
+    enabled: !!user?.schoolId && open
+  });
+
+  // Get selected course details
+  const selectedCourse = groupCourses?.find(course => course.id === groupData.course_id);
 
   // Fetch teachers
   const { data: teachers } = useQuery({
@@ -255,6 +291,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
           school_id: user.schoolId,
           name: groupData.name,
           description: groupData.description,
+          course_id: groupData.course_id,
           teacher_id: groupData.teacher_id,
           session_count: groupData.session_count,
           schedule: groupData.schedule as any, // Cast to any to resolve JSON type issue
@@ -296,6 +333,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       setGroupData({
         name: '',
         description: '',
+        course_id: '',
         teacher_id: '',
         session_count: 8,
         schedule: [],
@@ -313,7 +351,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     }
   };
 
-  const isFormValid = groupData.name && groupData.teacher_id && groupData.schedule.length > 0;
+  const isFormValid = groupData.name && groupData.course_id && groupData.teacher_id && groupData.schedule.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -358,6 +396,38 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                     onChange={(e) => setGroupData(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Enter group description"
                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="course">Course *</Label>
+                  <Select value={groupData.course_id} onValueChange={(value) => setGroupData(prev => ({ ...prev, course_id: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a group course" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groupCourses?.map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4" />
+                            {course.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedCourse && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <BookOpen className="h-4 w-4 text-blue-600 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-blue-900">{selectedCourse.name}</p>
+                          {selectedCourse.description && (
+                            <p className="text-sm text-blue-700 mt-1">{selectedCourse.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
