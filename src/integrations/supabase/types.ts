@@ -339,121 +339,12 @@ export type Database = {
           },
         ]
       }
-      group_students: {
-        Row: {
-          created_at: string
-          group_id: string
-          id: string
-          start_date: string
-          status: string
-          student_id: string
-        }
-        Insert: {
-          created_at?: string
-          group_id: string
-          id?: string
-          start_date: string
-          status?: string
-          student_id: string
-        }
-        Update: {
-          created_at?: string
-          group_id?: string
-          id?: string
-          start_date?: string
-          status?: string
-          student_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "group_students_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "group_students_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      groups: {
-        Row: {
-          created_at: string
-          currency: string
-          description: string | null
-          id: string
-          name: string
-          price_mode: string
-          price_per_session: number | null
-          schedule: Json
-          school_id: string
-          session_count: number
-          status: string
-          teacher_id: string | null
-          total_price: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          currency?: string
-          description?: string | null
-          id?: string
-          name: string
-          price_mode: string
-          price_per_session?: number | null
-          schedule: Json
-          school_id: string
-          session_count: number
-          status?: string
-          teacher_id?: string | null
-          total_price: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          currency?: string
-          description?: string | null
-          id?: string
-          name?: string
-          price_mode?: string
-          price_per_session?: number | null
-          schedule?: Json
-          school_id?: string
-          session_count?: number
-          status?: string
-          teacher_id?: string | null
-          total_price?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "groups_school_id_fkey"
-            columns: ["school_id"]
-            isOneToOne: false
-            referencedRelation: "schools"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "groups_teacher_id_fkey"
-            columns: ["teacher_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       lesson_sessions: {
         Row: {
           cost: number
           counts_toward_completion: boolean | null
           created_at: string
           duration_minutes: number | null
-          group_id: string | null
           id: string
           index_in_sub: number | null
           moved_from_session_id: string | null
@@ -471,7 +362,6 @@ export type Database = {
           counts_toward_completion?: boolean | null
           created_at?: string
           duration_minutes?: number | null
-          group_id?: string | null
           id?: string
           index_in_sub?: number | null
           moved_from_session_id?: string | null
@@ -489,7 +379,6 @@ export type Database = {
           counts_toward_completion?: boolean | null
           created_at?: string
           duration_minutes?: number | null
-          group_id?: string | null
           id?: string
           index_in_sub?: number | null
           moved_from_session_id?: string | null
@@ -503,13 +392,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "lesson_sessions_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "lesson_sessions_moved_from_session_id_fkey"
             columns: ["moved_from_session_id"]
@@ -828,7 +710,6 @@ export type Database = {
           duration_months: number
           end_date: string | null
           fixed_price: number | null
-          group_id: string | null
           id: string
           notes: string | null
           price_mode: string
@@ -839,7 +720,6 @@ export type Database = {
           start_date: string
           status: string
           student_id: string
-          subscription_type: string
           total_price: number
           updated_at: string
         }
@@ -849,7 +729,6 @@ export type Database = {
           duration_months: number
           end_date?: string | null
           fixed_price?: number | null
-          group_id?: string | null
           id?: string
           notes?: string | null
           price_mode: string
@@ -860,7 +739,6 @@ export type Database = {
           start_date: string
           status?: string
           student_id: string
-          subscription_type?: string
           total_price: number
           updated_at?: string
         }
@@ -870,7 +748,6 @@ export type Database = {
           duration_months?: number
           end_date?: string | null
           fixed_price?: number | null
-          group_id?: string | null
           id?: string
           notes?: string | null
           price_mode?: string
@@ -881,18 +758,10 @@ export type Database = {
           start_date?: string
           status?: string
           student_id?: string
-          subscription_type?: string
           total_price?: number
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "subscriptions_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "subscriptions_student_id_fkey"
             columns: ["student_id"]
@@ -1390,21 +1259,6 @@ export type Database = {
         Args: { p_school_id: string }
         Returns: undefined
       }
-      create_group_subscription: {
-        Args: {
-          p_group_id: string
-          p_student_ids: string[]
-          p_start_date: string
-          p_current_user_id: string
-          p_current_school_id: string
-          p_initial_payment_amount?: number
-          p_payment_method?: string
-          p_payment_account_id?: string
-          p_payment_notes?: string
-          p_subscription_notes?: string
-        }
-        Returns: Json
-      }
       create_license: {
         Args: {
           p_license_key: string
@@ -1655,25 +1509,6 @@ export type Database = {
           code: string
           exchange_rate: number
           is_default: boolean
-          created_at: string
-        }[]
-      }
-      get_school_groups: {
-        Args: { p_school_id: string }
-        Returns: {
-          id: string
-          name: string
-          description: string
-          teacher_id: string
-          teacher_name: string
-          session_count: number
-          schedule: Json
-          currency: string
-          price_mode: string
-          price_per_session: number
-          total_price: number
-          status: string
-          student_count: number
           created_at: string
         }[]
       }
