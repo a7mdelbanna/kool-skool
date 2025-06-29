@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -197,6 +198,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       });
       setValidationError('');
       setConflictMessage('');
+      setShowConflictDialog(false);
     }
   }, [open, currencies]);
 
@@ -778,21 +780,40 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Conflict Dialog */}
+      {/* Enhanced Conflict Dialog */}
       <AlertDialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
-        <AlertDialogContent className="sm:max-w-[500px]">
+        <AlertDialogContent className="sm:max-w-[600px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
-              Schedule Conflict Detected
+              Teacher Schedule Conflict
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-left whitespace-pre-wrap">
-              {conflictMessage}
+            <AlertDialogDescription className="text-left whitespace-pre-wrap text-gray-700 leading-relaxed">
+              <div className="mb-4">
+                <strong>Unable to create subscription due to a scheduling conflict.</strong>
+              </div>
+              <div className="mb-4">
+                {conflictMessage}
+              </div>
+              <div className="text-sm text-gray-600">
+                <strong>What you can do:</strong>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Choose a different time slot for your session</li>
+                  <li>Select an alternative day from your schedule</li>
+                  <li>Contact the teacher to discuss available time slots</li>
+                </ul>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowConflictDialog(false)}>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel onClick={() => setShowConflictDialog(false)}>
               Choose Different Time
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => setShowConflictDialog(false)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Got It
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
