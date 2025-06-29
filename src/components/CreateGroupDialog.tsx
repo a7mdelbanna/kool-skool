@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { X, Plus, Calendar, DollarSign, Clock, Users } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, getSchoolTeachers, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
@@ -38,10 +39,20 @@ interface GroupFormData {
   total_price: number;
 }
 
+interface StudentPaymentDetails {
+  start_date: string;
+  initial_payment_amount: number;
+  payment_method: string;
+  account_id: string;
+  payment_notes: string;
+}
+
 interface StudentSelection {
   id: string;
   name: string;
   email: string;
+  paymentDetails: StudentPaymentDetails;
+  isExpanded: boolean;
 }
 
 interface Currency {
@@ -52,6 +63,13 @@ interface Currency {
   exchange_rate: number;
   is_default: boolean;
   created_at: string;
+}
+
+interface Account {
+  id: string;
+  name: string;
+  type: string;
+  currency_id: string;
 }
 
 const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogProps) => {
@@ -74,12 +92,6 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
 
   // Students tab data
   const [selectedStudents, setSelectedStudents] = useState<StudentSelection[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [initialPayment, setInitialPayment] = useState({
-    amount: 0,
-    method: 'Cash',
-    notes: ''
-  });
 
   // Schedule form
   const [newScheduleDay, setNewScheduleDay] = useState('');
@@ -117,6 +129,40 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       return data as Currency[];
     },
     enabled: !!user?.schoolId && open
+  });
+
+  // Fetch accounts filtered by group currency
+  const { data: accounts } = useQuery({
+    queryKey: ['accounts', user?.schoolId, groupData.currency],
+    queryFn: async () => {
+      if (!user?.schoolId || !groupData.currency) return [];
+      
+      const { data, error } = await supabase
+        .from('accounts')
+        .select(`
+          id,
+          name,
+          type,
+          currency_id,
+          currencies!inner(code)
+        `)
+        .eq('school_id', user.schoolId)
+        .eq('is_archived', false)
+        .eq('currencies.code', groupData.currency);
+
+      if (error) {
+        console.error('Error fetching accounts:', error);
+        throw error;
+      }
+
+      return data?.map(account => ({
+        id: account.id,
+        name: account.name,
+        type: account.type,
+        currency_id: account.currency_id
+      })) || [];
+    },
+    enabled: !!user?.schoolId && !!groupData.currency && open
   });
 
   // Calculate total amount based on price mode
@@ -158,13 +204,43 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       setSelectedStudents(prev => [...prev, {
         id: student.id,
         name: `${student.first_name} ${student.last_name}`,
-        email: student.email
+        email: student.email,
+        paymentDetails: {
+          start_date: '',
+          initial_payment_amount: 0,
+          payment_method: 'Cash',
+          account_id: '',
+          payment_notes: ''
+        },
+        isExpanded: true
       }]);
     }
   };
 
   const handleRemoveStudent = (studentId: string) => {
     setSelectedStudents(prev => prev.filter(s => s.id !== studentId));
+  };
+
+  const handleToggleStudentExpansion = (studentId: string) => {
+    setSelectedStudents(prev => prev.map(student => 
+      student.id === studentId 
+        ? { ...student, isExpanded: !student.isExpanded }
+        : student
+    ));
+  };
+
+  const handleStudentPaymentChange = (studentId: string, field: keyof StudentPaymentDetails, value: string | number) => {
+    setSelectedStudents(prev => prev.map(student => 
+      student.id === studentId 
+        ? { 
+            ...student, 
+            paymentDetails: { 
+              ...student.paymentDetails, 
+              [field]: value 
+            }
+          }
+        : student
+    ));
   };
 
   const handleSubmit = async () => {
@@ -193,20 +269,24 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
 
       if (groupError) throw groupError;
 
-      // Create group subscriptions for selected students
+      // Create group subscriptions for selected students with individual details
       if (selectedStudents.length > 0 && groupResult) {
-        const { error: subscriptionError } = await supabase.rpc('create_group_subscription', {
-          p_group_id: groupResult.id,
-          p_student_ids: selectedStudents.map(s => s.id),
-          p_start_date: startDate,
-          p_current_user_id: user.id,
-          p_current_school_id: user.schoolId,
-          p_initial_payment_amount: initialPayment.amount,
-          p_payment_method: initialPayment.method,
-          p_payment_notes: initialPayment.notes
-        });
+        for (const student of selectedStudents) {
+          const { error: subscriptionError } = await supabase.rpc('create_group_subscription', {
+            p_group_id: groupResult.id,
+            p_student_ids: [student.id],
+            p_start_date: student.paymentDetails.start_date || new Date().toISOString().split('T')[0],
+            p_current_user_id: user.id,
+            p_current_school_id: user.schoolId,
+            p_initial_payment_amount: student.paymentDetails.initial_payment_amount,
+            p_payment_method: student.paymentDetails.payment_method,
+            p_payment_account_id: student.paymentDetails.account_id || null,
+            p_payment_notes: student.paymentDetails.payment_notes,
+            p_subscription_notes: `Group subscription for ${student.name}`
+          });
 
-        if (subscriptionError) throw subscriptionError;
+          if (subscriptionError) throw subscriptionError;
+        }
       }
 
       onSuccess?.();
@@ -225,8 +305,6 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         total_price: 0
       });
       setSelectedStudents([]);
-      setStartDate('');
-      setInitialPayment({ amount: 0, method: 'Cash', notes: '' });
       setActiveTab('details');
     } catch (error) {
       console.error('Error creating group:', error);
@@ -256,6 +334,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
           </TabsList>
 
           <TabsContent value="details" className="space-y-6">
+            
             <Card>
               <CardHeader>
                 <CardTitle>Basic Information</CardTitle>
@@ -312,6 +391,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
               </CardContent>
             </Card>
 
+            
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -378,6 +458,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
               </CardContent>
             </Card>
 
+            
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -484,86 +565,135 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                 </div>
 
                 {selectedStudents.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <Label>Selected Students ({selectedStudents.length})</Label>
-                    <div className="space-y-2">
+                    <div className="space-y-4">
                       {selectedStudents.map((student) => (
-                        <div key={student.id} className="flex items-center justify-between border rounded-lg p-3">
-                          <div>
-                            <p className="font-medium">{student.name}</p>
-                            <p className="text-sm text-gray-600">{student.email}</p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveStudent(student.id)}
+                        <Card key={student.id} className="border-l-4 border-l-blue-500">
+                          <Collapsible 
+                            open={student.isExpanded} 
+                            onOpenChange={() => handleToggleStudentExpansion(student.id)}
                           >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
+                            <CollapsibleTrigger asChild>
+                              <CardHeader className="cursor-pointer hover:bg-gray-50">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div>
+                                      <CardTitle className="text-lg">{student.name}</CardTitle>
+                                      <p className="text-sm text-gray-600">{student.email}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {student.paymentDetails.initial_payment_amount > 0 && (
+                                      <Badge variant="outline">
+                                        {getSelectedCurrencySymbol()}{student.paymentDetails.initial_payment_amount}
+                                      </Badge>
+                                    )}
+                                    {student.isExpanded ? (
+                                      <ChevronUp className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4" />
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveStudent(student.id);
+                                      }}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <CardContent className="space-y-4 pt-0">
+                                <Separator />
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <Label htmlFor={`start-date-${student.id}`}>Start Date</Label>
+                                    <Input
+                                      id={`start-date-${student.id}`}
+                                      type="date"
+                                      value={student.paymentDetails.start_date}
+                                      onChange={(e) => handleStudentPaymentChange(student.id, 'start_date', e.target.value)}
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label htmlFor={`payment-amount-${student.id}`}>Initial Payment Amount</Label>
+                                    <Input
+                                      id={`payment-amount-${student.id}`}
+                                      type="number"
+                                      step="0.01"
+                                      value={student.paymentDetails.initial_payment_amount}
+                                      onChange={(e) => handleStudentPaymentChange(student.id, 'initial_payment_amount', parseFloat(e.target.value) || 0)}
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <Label htmlFor={`payment-method-${student.id}`}>Payment Method</Label>
+                                    <Select 
+                                      value={student.paymentDetails.payment_method} 
+                                      onValueChange={(value) => handleStudentPaymentChange(student.id, 'payment_method', value)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Cash">Cash</SelectItem>
+                                        <SelectItem value="Card">Card</SelectItem>
+                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                        <SelectItem value="Check">Check</SelectItem>
+                                        <SelectItem value="Online">Online</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  <div>
+                                    <Label htmlFor={`account-${student.id}`}>Account ({groupData.currency})</Label>
+                                    <Select 
+                                      value={student.paymentDetails.account_id} 
+                                      onValueChange={(value) => handleStudentPaymentChange(student.id, 'account_id', value)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select account" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {accounts?.map((account) => (
+                                          <SelectItem key={account.id} value={account.id}>
+                                            {account.name} ({account.type})
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <Label htmlFor={`payment-notes-${student.id}`}>Payment Notes</Label>
+                                  <Textarea
+                                    id={`payment-notes-${student.id}`}
+                                    value={student.paymentDetails.payment_notes}
+                                    onChange={(e) => handleStudentPaymentChange(student.id, 'payment_notes', e.target.value)}
+                                    placeholder="Additional payment notes..."
+                                    rows={2}
+                                  />
+                                </div>
+                              </CardContent>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </Card>
                       ))}
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Group Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="start-date">Start Date</Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-
-                <Separator />
-
-                <div>
-                  <Label className="text-base font-semibold">Initial Payment (Optional)</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                    <div>
-                      <Label htmlFor="payment-amount">Amount</Label>
-                      <Input
-                        id="payment-amount"
-                        type="number"
-                        step="0.01"
-                        value={initialPayment.amount}
-                        onChange={(e) => setInitialPayment(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="payment-method">Payment Method</Label>
-                      <Select value={initialPayment.method} onValueChange={(value) => setInitialPayment(prev => ({ ...prev, method: value }))}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="Card">Card</SelectItem>
-                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="payment-notes">Notes</Label>
-                      <Input
-                        id="payment-notes"
-                        value={initialPayment.notes}
-                        onChange={(e) => setInitialPayment(prev => ({ ...prev, notes: e.target.value }))}
-                        placeholder="Payment notes"
-                      />
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
