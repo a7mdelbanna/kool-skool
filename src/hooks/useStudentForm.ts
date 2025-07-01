@@ -27,7 +27,12 @@ export const useStudentForm = (
     courseName: "",
     level: "beginner",
     paymentStatus: "pending",
-    teacherId: ""
+    teacherId: "",
+    phone: "",
+    birthday: "",
+    whatsapp: "",
+    telegram: "",
+    instagram: ""
   });
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState("defaultPassword123");
@@ -157,7 +162,12 @@ export const useStudentForm = (
         courseName: "",
         level: "beginner",
         paymentStatus: "pending",
-        teacherId: ""
+        teacherId: "",
+        phone: "",
+        birthday: "",
+        whatsapp: "",
+        telegram: "",
+        instagram: ""
       });
       setPassword("defaultPassword123");
       setCreatePassword(true);
@@ -243,7 +253,11 @@ export const useStudentForm = (
           level: studentData.level === 'beginner' ? 'Beginner' : 
             studentData.level === 'intermediate' ? 'Intermediate' : 
             studentData.level === 'advanced' ? 'Advanced' : 'Beginner',
-          phone: studentData.phone
+          phone: studentData.phone,
+          birthday: studentData.birthday,
+          whatsapp: studentData.whatsapp,
+          telegram: studentData.telegram,
+          instagram: studentData.instagram
         });
         
         toast.dismiss();
@@ -271,7 +285,12 @@ export const useStudentForm = (
             paymentStatus: "pending",
             teacherId: selectedTeacherId,
             lessonsCompleted: 0,
-            nextLesson: 'Not scheduled'
+            nextLesson: 'Not scheduled',
+            phone: studentData.phone,
+            birthday: studentData.birthday,
+            whatsapp: studentData.whatsapp,
+            telegram: studentData.telegram,
+            instagram: studentData.instagram
           };
           onStudentAdded(newStudent);
         }
