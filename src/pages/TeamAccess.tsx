@@ -68,20 +68,10 @@ const TeamAccess = () => {
       }
 
       console.log('Fetching team members for school:', userData.schoolId);
-      const response = await getTeamMembers(userData.schoolId);
+      const data = await getTeamMembers(userData.schoolId);
       
-      console.log('Team members response:', response);
-      
-      if (response.success && response.data) {
-        setTeamMembers(response.data);
-      } else {
-        console.error('Failed to fetch team members:', response.message);
-        toast({
-          title: "Error fetching team members",
-          description: response.message || "Please try again later.",
-          variant: "destructive"
-        });
-      }
+      console.log('Team members fetched:', data);
+      setTeamMembers(data);
     } catch (error) {
       console.error('Error fetching team members:', error);
       toast({

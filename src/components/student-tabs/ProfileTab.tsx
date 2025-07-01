@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Student } from "../StudentCard";
 import { Course } from "@/integrations/supabase/client";
-import { Users, Calendar, MessageCircle, Send, Instagram } from "lucide-react";
+import { Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Teacher {
@@ -150,20 +150,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="birthday" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Birthday
-            </Label>
-            <Input
-              id="birthday"
-              type="date"
-              value={studentData.birthday || ""}
-              onChange={(e) => handleInputChange("birthday", e.target.value)}
-              disabled={isViewMode}
-            />
-          </div>
-          
           {isNewStudent && (
             <>
               <div className="flex items-center space-x-2">
@@ -198,51 +184,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           )}
         </div>
         
-        {/* Contact & Course Information */}
+        {/* Course Information */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Contact & Course Information</h3>
-          
-          <div className="space-y-2">
-            <Label htmlFor="whatsapp" className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-green-500" />
-              WhatsApp
-            </Label>
-            <Input
-              id="whatsapp"
-              value={studentData.whatsapp || ""}
-              onChange={(e) => handleInputChange("whatsapp", e.target.value)}
-              placeholder="WhatsApp number"
-              disabled={isViewMode}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="telegram" className="flex items-center gap-2">
-              <Send className="h-4 w-4 text-blue-500" />
-              Telegram
-            </Label>
-            <Input
-              id="telegram"
-              value={studentData.telegram || ""}
-              onChange={(e) => handleInputChange("telegram", e.target.value)}
-              placeholder="Telegram username"
-              disabled={isViewMode}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="instagram" className="flex items-center gap-2">
-              <Instagram className="h-4 w-4 text-pink-500" />
-              Instagram
-            </Label>
-            <Input
-              id="instagram"
-              value={studentData.instagram || ""}
-              onChange={(e) => handleInputChange("instagram", e.target.value)}
-              placeholder="Instagram handle"
-              disabled={isViewMode}
-            />
-          </div>
+          <h3 className="text-lg font-semibold">Course Information</h3>
           
           <div className="space-y-2">
             <Label htmlFor="course">Course*</Label>
