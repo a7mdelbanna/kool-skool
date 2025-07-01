@@ -763,45 +763,57 @@ export type Database = {
       students: {
         Row: {
           age_group: string | null
+          birthday: string | null
           course_id: string | null
           created_at: string
           id: string
+          instagram: string | null
           level: string | null
           next_payment_amount: number | null
           next_payment_date: string | null
           phone: string | null
           school_id: string
           teacher_id: string | null
+          telegram: string | null
           updated_at: string
           user_id: string
+          whatsapp: string | null
         }
         Insert: {
           age_group?: string | null
+          birthday?: string | null
           course_id?: string | null
           created_at?: string
           id?: string
+          instagram?: string | null
           level?: string | null
           next_payment_amount?: number | null
           next_payment_date?: string | null
           phone?: string | null
           school_id: string
           teacher_id?: string | null
+          telegram?: string | null
           updated_at?: string
           user_id: string
+          whatsapp?: string | null
         }
         Update: {
           age_group?: string | null
+          birthday?: string | null
           course_id?: string | null
           created_at?: string
           id?: string
+          instagram?: string | null
           level?: string | null
           next_payment_amount?: number | null
           next_payment_date?: string | null
           phone?: string | null
           school_id?: string
           teacher_id?: string | null
+          telegram?: string | null
           updated_at?: string
           user_id?: string
+          whatsapp?: string | null
         }
         Relationships: [
           {
