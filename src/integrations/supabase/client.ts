@@ -14,6 +14,40 @@ export interface Course {
   updated_at: string;
 }
 
+export interface Subscription {
+  id: string;
+  student_id: string;
+  session_count: number;
+  duration_months: number;
+  start_date: string;
+  end_date: string;
+  total_price: number;
+  currency: string;
+  price_per_session?: number;
+  price_mode?: string;
+  schedule: any;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LessonSession {
+  id: string;
+  subscription_id: string;
+  session_date: string;
+  status: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RpcResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
 export interface CreateStudentResponse {
   success: boolean;
   student_id?: string;
@@ -214,5 +248,229 @@ export const createCourse = async (courseName: string, lessonType: string): Prom
   } catch (error) {
     console.error('Error in createCourse:', error);
     throw error;
+  }
+};
+
+export const getSchoolTeachers = async (schoolId: string) => {
+  try {
+    console.log('Fetching teachers for school:', schoolId);
+    
+    if (!schoolId) {
+      console.warn('No school ID provided for teachers');
+      return [];
+    }
+    
+    const { data, error } = await supabase.rpc('get_school_teachers', {
+      p_school_id: schoolId
+    });
+    
+    if (error) {
+      console.error('Error fetching teachers:', error);
+      throw error;
+    }
+    
+    console.log('Teachers fetched successfully:', data?.length || 0, 'records');
+    return data || [];
+    
+  } catch (error) {
+    console.error('Error in getSchoolTeachers:', error);
+    throw error;
+  }
+};
+
+export const getCurrentUserInfo = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    if (error) throw error;
+    return [data];
+  } catch (error) {
+    console.error('Error getting current user info:', error);
+    return null;
+  }
+};
+
+export const getSchoolTags = async (schoolId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('tags')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_active', true);
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching school tags:', error);
+    return [];
+  }
+};
+
+export const createTransaction = async (transactionData: any) => {
+  try {
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(transactionData)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating transaction:', error);
+    throw error;
+  }
+};
+
+export const getSchoolContactTypes = async (schoolId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('contact_types')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_active', true);
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching contact types:', error);
+    return [];
+  }
+};
+
+export const createContactType = async (schoolId: string, name: string, color: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('contact_types')
+      .insert({
+        school_id: schoolId,
+        name,
+        color,
+        is_active: true
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating contact type:', error);
+    throw error;
+  }
+};
+
+export const updateContactType = async (id: string, name: string, color: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('contact_types')
+      .update({ name, color, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating contact type:', error);
+    throw error;
+  }
+};
+
+export const deleteContactType = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('contact_types')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting contact type:', error);
+    throw error;
+  }
+};
+
+export const getSchoolTransactions = async (schoolId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('transaction_date', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    return [];
+  }
+};
+
+export const handleSessionAction = async (sessionId: string, action: string, notes?: string) => {
+  try {
+    const { data, error } = await supabase.rpc('handle_session_action', {
+      p_session_id: sessionId,
+      p_action: action,
+      p_notes: notes
+    });
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error handling session action:', error);
+    throw error;
+  }
+};
+
+export const getStudentLessonSessions = async (studentId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('lesson_sessions')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('session_date', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching student lesson sessions:', error);
+    return [];
+  }
+};
+
+export const getStudentSubscriptions = async (studentId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching student subscriptions:', error);
+    return [];
+  }
+};
+
+export const deleteStudentSubscriptionEnhanced = async (subscriptionId: string): Promise<RpcResponse> => {
+  try {
+    const { data, error } = await supabase.rpc('delete_student_subscription_enhanced', {
+      p_subscription_id: subscriptionId
+    });
+    
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error deleting subscription:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
