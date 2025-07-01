@@ -24,9 +24,11 @@ export interface Subscription {
   total_price: number;
   currency: string;
   price_per_session?: number;
+  fixed_price?: number;
   price_mode?: string;
   schedule: any;
   status: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
 }
@@ -34,9 +36,15 @@ export interface Subscription {
 export interface LessonSession {
   id: string;
   subscription_id: string;
+  student_id: string;
+  scheduled_date: string;
   session_date: string;
   status: string;
   notes?: string;
+  duration_minutes?: number;
+  index_in_sub?: number;
+  cost?: number;
+  payment_status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +81,7 @@ export interface CreateStudentParams {
 export interface StudentRecord {
   // Core student data
   id: string;
+  user_id: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -88,6 +97,10 @@ export interface StudentRecord {
   age_group: string;
   level: string;
   
+  // Teacher data
+  teacher_first_name?: string;
+  teacher_last_name?: string;
+  
   // Payment and session data
   payment_status: 'paid' | 'pending' | 'overdue';
   teacher_id: string;
@@ -96,6 +109,19 @@ export interface StudentRecord {
   next_payment_date: string | null;
   next_payment_amount: number | null;
   subscription_progress: string;
+}
+
+export interface SchoolSetupResponse {
+  success: boolean;
+  message?: string;
+  user_id?: string;
+  school_id?: string;
+}
+
+export interface TeamMemberResponse {
+  success: boolean;
+  data?: any[];
+  message?: string;
 }
 
 export const createStudent = async (params: CreateStudentParams): Promise<CreateStudentResponse> => {
@@ -251,6 +277,57 @@ export const createCourse = async (courseName: string, lessonType: string): Prom
   }
 };
 
+export const updateCourse = async (courseId: string, courseName: string, lessonType: string): Promise<Course | null> => {
+  try {
+    console.log('Updating course:', { courseId, courseName, lessonType });
+    
+    const { data, error } = await supabase
+      .from('courses')
+      .update({
+        name: courseName,
+        lesson_type: lessonType,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', courseId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating course:', error);
+      throw error;
+    }
+    
+    console.log('Course updated successfully:', data);
+    return data;
+    
+  } catch (error) {
+    console.error('Error in updateCourse:', error);
+    throw error;
+  }
+};
+
+export const deleteCourse = async (courseId: string): Promise<void> => {
+  try {
+    console.log('Deleting course:', courseId);
+    
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', courseId);
+    
+    if (error) {
+      console.error('Error deleting course:', error);
+      throw error;
+    }
+    
+    console.log('Course deleted successfully');
+    
+  } catch (error) {
+    console.error('Error in deleteCourse:', error);
+    throw error;
+  }
+};
+
 export const getSchoolTeachers = async (schoolId: string) => {
   try {
     console.log('Fetching teachers for school:', schoolId);
@@ -275,6 +352,33 @@ export const getSchoolTeachers = async (schoolId: string) => {
   } catch (error) {
     console.error('Error in getSchoolTeachers:', error);
     throw error;
+  }
+};
+
+export const getTeamMembers = async (schoolId: string): Promise<TeamMemberResponse> => {
+  try {
+    console.log('Fetching team members for school:', schoolId);
+    
+    const { data, error } = await supabase.rpc('get_team_members', {
+      p_school_id: schoolId
+    });
+    
+    if (error) {
+      console.error('Error fetching team members:', error);
+      throw error;
+    }
+    
+    return {
+      success: true,
+      data: data || []
+    };
+    
+  } catch (error) {
+    console.error('Error in getTeamMembers:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to fetch team members'
+    };
   }
 };
 
@@ -435,7 +539,7 @@ export const getStudentLessonSessions = async (studentId: string) => {
       .from('lesson_sessions')
       .select('*')
       .eq('student_id', studentId)
-      .order('session_date', { ascending: false });
+      .order('scheduled_date', { ascending: false });
     
     if (error) throw error;
     return data || [];
