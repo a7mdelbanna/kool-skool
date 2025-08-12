@@ -1,0 +1,237 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    function getUserSchoolId() {
+      return request.auth.token.schoolId;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserRole() == 'superadmin';
+    }
+    
+    function isSchoolAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    function isTeacher() {
+      return isAuthenticated() && getUserRole() == 'teacher';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && getUserRole() == 'student';
+    }
+    
+    function belongsToSameSchool(schoolId) {
+      return isAuthenticated() && getUserSchoolId() == schoolId;
+    }
+    
+    function isSchoolStaff() {
+      return isAuthenticated() && (getUserRole() == 'admin' || getUserRole() == 'teacher');
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Schools Collection
+    match /schools/{schoolId} {
+      allow read: if isAuthenticated() && (belongsToSameSchool(schoolId) || isSuperAdmin());
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isSchoolAdmin() && belongsToSameSchool(schoolId));
+      allow delete: if isSuperAdmin();
+    }
+    
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSuperAdmin() || 
+                    (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId));
+      allow create: if isSuperAdmin() || 
+                      (isSchoolAdmin() && request.resource.data.schoolId == getUserSchoolId());
+      allow update: if isOwner(userId) ? 
+                      (request.resource.data.role == resource.data.role &&
+                       request.resource.data.schoolId == resource.data.schoolId) :
+                      (isSuperAdmin() || (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)));
+      allow delete: if isSuperAdmin() || (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId));
+    }
+    
+    // Students Collection
+    match /students/{studentId} {
+      allow read: if (isStudent() && resource.data.userId == request.auth.uid) ||
+                    (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                    isSuperAdmin();
+      allow create: if (isSchoolStaff() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update: if (isStudent() && resource.data.userId == request.auth.uid &&
+                       request.resource.data.schoolId == resource.data.schoolId &&
+                       request.resource.data.userId == resource.data.userId) ||
+                      (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+      allow delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+    }
+    
+    // Courses Collection
+    match /courses/{courseId} {
+      allow read: if belongsToSameSchool(resource.data.schoolId) || isSuperAdmin();
+      allow create: if (isSchoolStaff() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      (isTeacher() && resource.data.teacherId == request.auth.uid) ||
+                      isSuperAdmin();
+      allow delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+    }
+    
+    // Groups Collection
+    match /groups/{groupId} {
+      allow read: if belongsToSameSchool(resource.data.schoolId) || isSuperAdmin();
+      allow create: if (isSchoolStaff() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      (isTeacher() && resource.data.teacherId == request.auth.uid) ||
+                      isSuperAdmin();
+      allow delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+      
+      // Group Students Subcollection
+      match /students/{enrollmentId} {
+        allow read: if belongsToSameSchool(get(/databases/$(database)/documents/groups/$(groupId)).data.schoolId) ||
+                      isSuperAdmin();
+        allow create, update: if isSchoolStaff() &&
+                                belongsToSameSchool(get(/databases/$(database)/documents/groups/$(groupId)).data.schoolId) ||
+                                isSuperAdmin();
+        allow delete: if isSchoolAdmin() &&
+                        belongsToSameSchool(get(/databases/$(database)/documents/groups/$(groupId)).data.schoolId) ||
+                        isSuperAdmin();
+      }
+    }
+    
+    // Subscriptions Collection
+    match /subscriptions/{subscriptionId} {
+      allow read: if (isStudent() && resource.data.studentId == request.auth.uid) ||
+                    (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                    isSuperAdmin();
+      allow create: if (isSchoolStaff() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update: if (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+      allow delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+    }
+    
+    // Sessions Collection
+    match /sessions/{sessionId} {
+      allow read: if (isStudent() && resource.data.studentId == request.auth.uid) ||
+                    (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                    isSuperAdmin();
+      allow create: if (isSchoolStaff() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update: if (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                      (isTeacher() && resource.data.teacherId == request.auth.uid) ||
+                      isSuperAdmin();
+      allow delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+      
+      // Session Attendees Subcollection
+      match /attendees/{studentId} {
+        allow read: if belongsToSameSchool(get(/databases/$(database)/documents/sessions/$(sessionId)).data.schoolId) ||
+                      isSuperAdmin();
+        allow create, update: if isSchoolStaff() &&
+                                belongsToSameSchool(get(/databases/$(database)/documents/sessions/$(sessionId)).data.schoolId) ||
+                                isSuperAdmin();
+        allow delete: if isSchoolAdmin() &&
+                        belongsToSameSchool(get(/databases/$(database)/documents/sessions/$(sessionId)).data.schoolId) ||
+                        isSuperAdmin();
+      }
+    }
+    
+    // Transactions Collection
+    match /transactions/{transactionId} {
+      allow read: if (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                    isSuperAdmin();
+      allow create: if (isSchoolStaff() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update: if (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+      allow delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+      
+      // Transaction Tags Subcollection
+      match /tags/{tagId} {
+        allow read: if isSchoolStaff() &&
+                      belongsToSameSchool(get(/databases/$(database)/documents/transactions/$(transactionId)).data.schoolId) ||
+                      isSuperAdmin();
+        allow create, update, delete: if isSchoolStaff() &&
+                                        belongsToSameSchool(get(/databases/$(database)/documents/transactions/$(transactionId)).data.schoolId) ||
+                                        isSuperAdmin();
+      }
+    }
+    
+    // Accounts Collection
+    match /accounts/{accountId} {
+      allow read: if (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                    isSuperAdmin();
+      allow create: if (isSchoolAdmin() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+      allow delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                      isSuperAdmin();
+    }
+    
+    // Licenses Collection
+    match /licenses/{licenseId} {
+      allow read: if isSuperAdmin() ||
+                    (isSchoolAdmin() && resource.data.schoolId == getUserSchoolId());
+      allow create, update, delete: if isSuperAdmin();
+    }
+    
+    // Transaction Categories Collection
+    match /transactionCategories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSuperAdmin() ||
+                              (isSchoolAdmin() && 
+                               request.resource.data.schoolId == getUserSchoolId() &&
+                               request.resource.data.isSystem == false);
+      allow delete: if isSuperAdmin() ||
+                      (isSchoolAdmin() && 
+                       resource.data.schoolId == getUserSchoolId() &&
+                       resource.data.isSystem == false);
+    }
+    
+    // Contacts Collection
+    match /contacts/{contactId} {
+      allow read: if (isSchoolStaff() && belongsToSameSchool(resource.data.schoolId)) ||
+                    isSuperAdmin();
+      allow create: if (isSchoolStaff() && request.resource.data.schoolId == getUserSchoolId()) ||
+                      isSuperAdmin();
+      allow update, delete: if (isSchoolAdmin() && belongsToSameSchool(resource.data.schoolId)) ||
+                              isSuperAdmin();
+    }
+    
+    // Currencies Collection
+    match /currencies/{currencyCode} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSuperAdmin();
+    }
+    
+    // Student Levels Collection
+    match /studentLevels/{levelId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSuperAdmin() ||
+                              (isSchoolAdmin() && request.resource.data.schoolId == getUserSchoolId());
+      allow delete: if isSuperAdmin() ||
+                      (isSchoolAdmin() && resource.data.schoolId == getUserSchoolId());
+    }
+  }
+}

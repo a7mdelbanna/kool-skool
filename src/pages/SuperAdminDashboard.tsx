@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, Shield, Plus, Search, Key, Calendar, Building2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { format } from 'date-fns';
 import {
   Table,
@@ -75,16 +76,24 @@ const SuperAdminDashboard = () => {
       setLoading(true);
       console.log('=== FETCHING ALL LICENSES ===');
       
-      const { data, error } = await supabase.rpc('get_all_licenses_with_schools');
+      // Fetch all licenses with school data from Firebase
+      const licenses = await databaseService.query('licenses', {});
       
-      if (error) {
-        console.error('Error fetching licenses:', error);
-        toast.error('Failed to load licenses');
-        return;
-      }
+      // Enrich with school data
+      const enrichedLicenses = await Promise.all(licenses.map(async (license: any) => {
+        let schoolData = null;
+        if (license.schoolId) {
+          schoolData = await databaseService.getById('schools', license.schoolId);
+        }
+        return {
+          ...license,
+          school_name: schoolData?.name || null,
+          school_created_at: schoolData?.createdAt || null
+        };
+      }));
       
-      console.log('Licenses data:', data);
-      setLicenses(data || []);
+      console.log('Licenses data:', enrichedLicenses);
+      setLicenses(enrichedLicenses || []);
       
     } catch (error) {
       console.error('Error in fetchLicenses:', error);
@@ -98,16 +107,12 @@ const SuperAdminDashboard = () => {
     try {
       console.log('Toggling license:', licenseId, 'from', currentStatus, 'to', !currentStatus);
       
-      const { data, error } = await supabase.rpc('update_license_status', {
-        p_license_id: licenseId,
-        p_is_active: !currentStatus
+      // Update license status in Firebase
+      await databaseService.update('licenses', licenseId, {
+        status: !currentStatus ? 'active' : 'inactive'
       });
       
-      if (error) {
-        console.error('Error updating license status:', error);
-        toast.error('Failed to update license status');
-        return;
-      }
+      console.log('Successfully updated license status');
       
       console.log('License status update result:', data);
       

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, LogIn, Loader2, Shield, AlertCircle } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/firebase/auth.service";
 import { useNavigate, Link } from 'react-router-dom';
 import { UserContext } from '@/App';
 
@@ -49,41 +49,30 @@ const SuperAdminLogin = () => {
       
       console.log("=== SUPER ADMIN LOGIN ATTEMPT ===");
       console.log("Email:", email);
+      console.log("Using Firebase authentication...");
       
-      // Use the new database function to verify super admin login
-      const { data: loginResults, error: loginError } = await supabase
-        .rpc('verify_superadmin_login', {
-          p_email: email.toLowerCase().trim(),
-          p_password: password
-        });
+      // Sign in with Firebase Auth
+      const userProfile = await authService.signIn(email.toLowerCase().trim(), password);
       
-      if (loginError) {
-        console.error("❌ Super admin login function error:", loginError);
-        throw new Error(`Login failed: ${loginError.message}`);
+      if (!userProfile) {
+        throw new Error('Login failed. Please check your credentials.');
       }
       
-      console.log("Super admin login results:", loginResults);
-      
-      if (!loginResults || loginResults.length === 0) {
-        throw new Error('No response from login function');
-      }
-      
-      const result = loginResults[0];
-      
-      if (!result.success) {
-        console.error("❌ Super admin login failed:", result.message);
-        throw new Error(result.message);
+      // Check if user is a superadmin
+      if (userProfile.role !== 'superadmin') {
+        await authService.signOut();
+        throw new Error('Access denied. This login is for super administrators only.');
       }
       
       console.log("✅ Super admin login successful!");
       
       // Create user session for super admin
       const userData = {
-        id: result.user_id,
-        firstName: result.first_name,
-        lastName: result.last_name,
-        email: result.email,
-        role: result.role,
+        id: userProfile.uid,
+        firstName: userProfile.firstName,
+        lastName: userProfile.lastName,
+        email: userProfile.email,
+        role: userProfile.role,
         schoolId: null // Super admin has no school
       };
       

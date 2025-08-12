@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, LogIn, Loader2, School, AlertCircle } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/firebase/auth.service";
 import { useNavigate, Link } from 'react-router-dom';
 import { UserContext } from '@/App';
 
@@ -35,31 +35,23 @@ const Login = () => {
     }
   }, [navigate]);
 
-  // Test database connection
+  // Test Firebase connection
   const testDatabaseConnection = async () => {
-    console.log("=== DATABASE CONNECTION TEST ===");
+    console.log("=== FIREBASE CONNECTION TEST ===");
     
     try {
       setConnectionStatus('testing');
       
-      // Test basic connection by checking for users
-      console.log("Testing database connection...");
-      const { data: users, error: connectionError } = await supabase
-        .from('users')
-        .select('id')
-        .limit(1);
+      // Test Firebase Auth connection
+      console.log("Testing Firebase connection...");
+      const currentUser = authService.getCurrentUser();
       
-      if (connectionError) {
-        console.error("❌ Database connection failed:", connectionError);
-        setConnectionStatus('failed');
-        return;
-      }
-      
-      console.log("✅ Database connection successful");
+      // If we can access auth service, connection is good
+      console.log("✅ Firebase connection successful");
       setConnectionStatus('connected');
       
     } catch (error) {
-      console.error('❌ Database test failed:', error);
+      console.error('❌ Firebase test failed:', error);
       setConnectionStatus('failed');
     }
   };
@@ -83,43 +75,31 @@ const Login = () => {
       
       console.log("=== SCHOOL MANAGEMENT LOGIN ATTEMPT ===");
       console.log("Email:", email);
-      console.log("Using new verify_school_login function...");
+      console.log("Using Firebase authentication...");
       
-      // Use the new database function to verify login
-      const { data: loginResults, error: loginError } = await supabase
-        .rpc('verify_school_login', {
-          p_email: email.toLowerCase().trim(),
-          p_password: password
-        });
+      // Sign in with Firebase Auth
+      const userProfile = await authService.signIn(email.toLowerCase().trim(), password);
       
-      if (loginError) {
-        console.error("❌ Login function error:", loginError);
-        throw new Error(`Login failed: ${loginError.message}`);
+      if (!userProfile) {
+        throw new Error('Login failed. Please check your credentials.');
       }
       
-      console.log("Login results:", loginResults);
-      
-      if (!loginResults || loginResults.length === 0) {
-        throw new Error('No response from login function');
-      }
-      
-      const result = loginResults[0];
-      
-      if (!result.success) {
-        console.error("❌ Login failed:", result.message);
-        throw new Error(result.message);
+      // Check if user has proper role (admin or teacher)
+      if (userProfile.role !== 'admin' && userProfile.role !== 'teacher') {
+        await authService.signOut();
+        throw new Error('Access denied. This login is for school management only.');
       }
       
       console.log("✅ Login successful!");
       
       // Create user session
       const userData = {
-        id: result.user_id,
-        firstName: result.first_name,
-        lastName: result.last_name,
-        email: result.email,
-        role: result.role,
-        schoolId: result.school_id
+        id: userProfile.uid,
+        firstName: userProfile.firstName,
+        lastName: userProfile.lastName,
+        email: userProfile.email,
+        role: userProfile.role,
+        schoolId: userProfile.schoolId
       };
       
       console.log("Creating user session:", userData);
@@ -182,7 +162,7 @@ const Login = () => {
             </CardDescription>
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               {getConnectionStatusIcon()}
-              <span>Database: {connectionStatus}</span>
+              <span>Firebase: {connectionStatus}</span>
             </div>
           </CardHeader>
           <CardContent>

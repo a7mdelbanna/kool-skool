@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UsersRound, Plus, Eye, Users, Calendar, DollarSign, Clock, GraduationCap, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,16 +45,22 @@ const Groups = () => {
         throw new Error('No school ID found');
       }
 
-      const { data, error } = await supabase.rpc('get_school_groups', {
-        p_school_id: user.schoolId
+      // Fetch groups from Firebase
+      const groups = await databaseService.query('groups', {
+        where: [{ field: 'schoolId', operator: '==', value: user.schoolId }]
       });
 
-      if (error) {
-        console.error('Error fetching groups:', error);
-        throw error;
-      }
+      // Enrich with student count
+      const enrichedGroups = await Promise.all(groups.map(async (group: any) => {
+        const students = await databaseService.query(`groups/${group.id}/students`, {});
+        return {
+          ...group,
+          student_count: students.length,
+          students_count: students.length
+        };
+      }));
 
-      return data as Group[];
+      return enrichedGroups as Group[];
     },
     enabled: !!user?.schoolId
   });
@@ -67,16 +74,17 @@ const Groups = () => {
     setDeletingGroupId(groupId);
 
     try {
-      const { data, error } = await supabase.rpc('delete_group_with_related_data', {
-        p_group_id: groupId,
-        p_current_user_id: user.id,
-        p_current_school_id: user.schoolId
-      });
-
-      if (error) {
-        console.error('Error deleting group:', error);
-        throw new Error(`Failed to delete group: ${error.message}`);
+      // Delete group and related data from Firebase
+      // First, delete all students in the group
+      const groupStudents = await databaseService.query(`groups/${groupId}/students`, {});
+      for (const student of groupStudents) {
+        await databaseService.delete(`groups/${groupId}/students`, student.id);
       }
+      
+      // Then delete the group itself
+      await databaseService.delete('groups', groupId);
+      
+      console.log('Successfully deleted group:', groupName);
 
       const result = data as { success: boolean; message: string };
 

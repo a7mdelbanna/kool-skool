@@ -34,7 +34,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getStudentsWithDetails } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -110,12 +111,12 @@ const FinancesPage = () => {
     queryFn: async () => {
       if (!schoolId) return [];
       
-      const { data, error } = await supabase.rpc('get_school_currencies', {
-        p_school_id: schoolId
+      // Fetch currencies from Firebase
+      const currencies = await databaseService.query('currencies', {
+        where: [{ field: 'schoolId', operator: '==', value: schoolId }]
       });
-
-      if (error) throw error;
-      return data || [];
+      
+      return currencies || [];
     },
     enabled: !!schoolId,
   });
@@ -194,14 +195,11 @@ const FinancesPage = () => {
     queryFn: async () => {
       if (!schoolId) return [];
       
-      const { data, error } = await supabase.rpc('get_students_with_details', {
-        p_school_id: schoolId
-      });
-
-      if (error) throw error;
+      // Fetch students with details from Firebase
+      const students = await getStudentsWithDetails(schoolId);
 
       // Filter students who have next payment information
-      const studentsWithPayments = data?.filter(student => 
+      const studentsWithPayments = students?.filter(student => 
         student.next_payment_date && student.next_payment_amount
       ).map(student => ({
         student_id: student.id,

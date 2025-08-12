@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { School, CheckCircle, KeyRound, User, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, SchoolSetupResponse } from "@/integrations/supabase/client";
+import { authService } from "@/services/firebase/auth.service";
+import { databaseService } from "@/services/firebase/database.service";
 import { useNavigate } from 'react-router-dom';
 import LicenseWidget from '@/components/LicenseWidget';
 
@@ -119,33 +120,52 @@ const SchoolSetup = () => {
     try {
       setIsSubmitting(true);
       
-      const { data, error } = await supabase.rpc('verify_license_and_create_school', {
-        license_key: formData.licenseKey,
-        school_name: formData.schoolName,
-        admin_first_name: formData.adminFirstName,
-        admin_last_name: formData.adminLastName,
-        admin_email: formData.adminEmail,
-        admin_password: formData.adminPassword
+      // First verify the license key
+      const licenses = await databaseService.query('licenses', {
+        where: [{ field: 'key', operator: '==', value: formData.licenseKey }]
       });
       
-      if (error) {
-        throw error;
+      if (!licenses || licenses.length === 0) {
+        throw new Error('Invalid license key');
       }
       
-      // Cast data first to unknown, then to our custom interface
-      const response = (data as unknown) as SchoolSetupResponse;
+      const license = licenses[0];
       
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to verify license');
+      if (license.status !== 'active') {
+        throw new Error('License is not active');
       }
+      
+      if (license.schoolId) {
+        throw new Error('License has already been used');
+      }
+      
+      // Create the school
+      const schoolId = await databaseService.create('schools', {
+        name: formData.schoolName,
+        licenseId: license.id,
+        status: 'active'
+      });
+      
+      // Update license with school ID
+      await databaseService.update('licenses', license.id, {
+        schoolId,
+        status: 'active'
+      });
+      
+      // Create admin user
+      const uid = await authService.createUser({
+        email: formData.adminEmail,
+        password: formData.adminPassword,
+        firstName: formData.adminFirstName,
+        lastName: formData.adminLastName,
+        role: 'admin',
+        schoolId
+      });
 
       // After successful school setup, automatically log in the user
-      const { data: loginData, error: loginError } = await supabase.rpc('user_login', {
-        user_email: formData.adminEmail,
-        user_password: formData.adminPassword
-      });
+      const userProfile = await authService.signIn(formData.adminEmail, formData.adminPassword);
       
-      if (loginError) {
+      if (!userProfile) {
         // Still show success message even if auto-login fails
         toast({
           title: "School setup complete",
@@ -155,14 +175,14 @@ const SchoolSetup = () => {
         return;
       }
       
-      // Store user information in local storage - now including email
+      // Store user information in local storage
       localStorage.setItem('user', JSON.stringify({
-        id: response.user_id,
+        id: uid,
         firstName: formData.adminFirstName,
         lastName: formData.adminLastName,
-        email: formData.adminEmail, // Add the email here
+        email: formData.adminEmail,
         role: 'admin',
-        schoolId: response.school_id
+        schoolId
       }));
       
       toast({
