@@ -38,7 +38,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { supabase, getSchoolContactTypes } from '@/integrations/supabase/client';
+import { getSchoolContactTypes } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
 import ContactDialog from '@/components/ContactDialog';
 import ContactTypeManager from '@/components/ContactTypeManager';
@@ -100,19 +101,30 @@ const Contacts = () => {
     if (!user?.schoolId) return;
 
     try {
-      // Use direct query instead of RPC to bypass RLS issues
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('school_id', user.schoolId)
-        .order('created_at', { ascending: false });
+      // Use Firebase to fetch contacts
+      const data = await databaseService.query('contacts', {
+        where: [{ field: 'schoolId', operator: '==', value: user.schoolId }]
+      });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
+      // Sort by created_at descending
+      const sortedData = data.sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || a.created_at || 0);
+        const dateB = new Date(b.createdAt || b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
       
-      setContacts(data || []);
+      // Map Firebase fields to expected format
+      const mappedContacts = sortedData.map((contact: any) => ({
+        id: contact.id,
+        name: contact.name,
+        type: contact.type,
+        email: contact.email,
+        phone: contact.phone,
+        notes: contact.notes,
+        created_at: contact.createdAt || contact.created_at
+      }));
+      
+      setContacts(mappedContacts);
     } catch (error) {
       console.error('Error fetching contacts:', error);
       toast({
@@ -167,12 +179,8 @@ const Contacts = () => {
     if (!deleteDialog.contact) return;
 
     try {
-      const { error } = await supabase
-        .from('contacts')
-        .delete()
-        .eq('id', deleteDialog.contact.id);
-
-      if (error) throw error;
+      // Use Firebase to delete contact
+      await databaseService.delete('contacts', deleteDialog.contact.id);
 
       toast({
         title: "Success",

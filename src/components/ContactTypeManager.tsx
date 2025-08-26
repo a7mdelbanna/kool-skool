@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { supabase, getSchoolContactTypes, createContactType, updateContactType, deleteContactType } from '@/integrations/supabase/client';
+import { getSchoolContactTypes, createContactType, updateContactType, deleteContactType } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 
 interface ContactType {

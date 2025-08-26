@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { supabase, getSchoolContactTypes } from '@/integrations/supabase/client';
+import { getSchoolContactTypes } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
 
 interface Contact {
@@ -104,37 +105,32 @@ const ContactDialog = ({ open, onOpenChange, contact, mode, onSuccess }: Contact
     setLoading(true);
     try {
       if (mode === 'add') {
-        const { error } = await supabase
-          .from('contacts')
-          .insert({
-            school_id: user.schoolId,
-            name: formData.name,
-            type: formData.type,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            notes: formData.notes || null
-          });
-
-        if (error) throw error;
+        // Use Firebase to create contact with camelCase fields
+        await databaseService.create('contacts', {
+          schoolId: user.schoolId,
+          name: formData.name,
+          type: formData.type,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          notes: formData.notes || null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
 
         toast({
           title: "Success",
           description: "Contact created successfully",
         });
       } else {
-        const { error } = await supabase
-          .from('contacts')
-          .update({
-            name: formData.name,
-            type: formData.type,
-            email: formData.email || null,
-            phone: formData.phone || null,
-            notes: formData.notes || null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', contact?.id);
-
-        if (error) throw error;
+        // Use Firebase to update contact
+        await databaseService.update('contacts', contact!.id, {
+          name: formData.name,
+          type: formData.type,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          notes: formData.notes || null,
+          updatedAt: new Date().toISOString()
+        });
 
         toast({
           title: "Success",
