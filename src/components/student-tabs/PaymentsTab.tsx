@@ -127,19 +127,38 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       return [];
     }
     
-    console.log('🔍 Student payments query:', {
+    console.log('🔍 Student payments query - Checking all transactions:', {
       studentId: studentData.id,
       totalTransactions: allTransactions.length,
-      firstTransaction: allTransactions[0]
+      sampleTransaction: allTransactions[0],
+      allTransactionIds: allTransactions.map(t => ({ 
+        id: t.id, 
+        student_id: t.student_id,
+        type: t.type
+      }))
     });
     
-    // Filter by student_id instead of contact_name for Firebase transactions
-    const filteredTransactions = allTransactions.filter(transaction => 
-      transaction.type === 'income' && 
-      (transaction.student_id === studentData.id || 
-       (transaction.contact_name === `${studentData.firstName} ${studentData.lastName}` && 
-        transaction.contact_type === 'student'))
-    );
+    // Filter by student_id for Firebase transactions
+    const filteredTransactions = allTransactions.filter(transaction => {
+      const isIncomeType = transaction.type === 'income';
+      const matchesStudentId = transaction.student_id === studentData.id;
+      const matchesContactName = transaction.contact_name === `${studentData.firstName} ${studentData.lastName}` && 
+                                 transaction.contact_type === 'student';
+      
+      const shouldInclude = isIncomeType && (matchesStudentId || matchesContactName);
+      
+      if (isIncomeType && transaction.student_id) {
+        console.log('🔎 Checking transaction:', {
+          transactionId: transaction.id,
+          transactionStudentId: transaction.student_id,
+          targetStudentId: studentData.id,
+          matches: matchesStudentId,
+          shouldInclude
+        });
+      }
+      
+      return shouldInclude;
+    });
     
     console.log('💰 Filtered payments for student:', {
       studentId: studentData.id,
@@ -192,7 +211,8 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         p_notes: data.notes || '',
         p_to_account_id: data.account_id,
         p_payment_method: data.method,
-        p_tag_ids: null
+        p_tag_ids: null,
+        p_student_id: studentData.id // Add student_id to link the payment
       });
 
       if (error) throw error;
