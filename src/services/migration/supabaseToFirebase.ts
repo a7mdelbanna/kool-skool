@@ -1033,6 +1033,10 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
       status: session.status || 'scheduled',
       attended: session.attended || false,
       notes: session.notes || '',
+      counts_toward_completion: session.counts_toward_completion === false ? false : true, // Default to true unless explicitly false
+      index_in_sub: session.index_in_sub || null,
+      original_session_index: session.original_session_index || null,
+      moved_from_session_id: session.moved_from_session_id || null,
       created_at: session.created_at,
       updated_at: session.updated_at
     }));
