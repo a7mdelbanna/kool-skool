@@ -475,24 +475,24 @@ async function handleCreateUser(params: any) {
 
 async function handleAddSubscription(params: any) {
   try {
-    // Map the p_ prefixed params to actual field names
+    // Map the p_ prefixed params to Firebase camelCase field names
     const subscriptionData = {
-      student_id: params.p_student_id,
-      session_count: params.p_session_count,
-      duration_months: params.p_duration_months,
-      start_date: params.p_start_date,
+      studentId: params.p_student_id,  // Use camelCase for Firebase
+      sessionCount: params.p_session_count,
+      durationMonths: params.p_duration_months,
+      startDate: params.p_start_date,
       schedule: params.p_schedule,
-      price_mode: params.p_price_mode,
-      price_per_session: params.p_price_per_session,
-      fixed_price: params.p_fixed_price,
-      total_price: params.p_total_price,
+      priceMode: params.p_price_mode,
+      pricePerSession: params.p_price_per_session,
+      fixedPrice: params.p_fixed_price,
+      totalPrice: params.p_total_price,
       currency: params.p_currency,
       notes: params.p_notes || '',
       status: params.p_status || 'active',
-      school_id: params.p_current_school_id,
-      created_by: params.p_current_user_id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      schoolId: params.p_current_school_id,
+      createdBy: params.p_current_user_id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     const subscriptionId = await databaseService.create('subscriptions', subscriptionData);
@@ -528,19 +528,19 @@ async function handleAddSubscription(params: any) {
       // Create sessions on the scheduled day of each week
       for (let sessionNumber = 1; sessionNumber <= params.p_session_count; sessionNumber++) {
         const sessionData = {
-          subscription_id: subscriptionId,
-          student_id: params.p_student_id,
-          school_id: params.p_current_school_id,
-          teacher_id: params.p_teacher_id || null,
-          session_number: sessionNumber,
-          scheduled_date: currentDate.toISOString().split('T')[0],
-          scheduled_time: scheduledTime || '00:00',
-          duration_minutes: 60, // Default duration
+          subscriptionId: subscriptionId,  // Use camelCase for Firebase
+          studentId: params.p_student_id,
+          schoolId: params.p_current_school_id,
+          teacherId: params.p_teacher_id || null,
+          sessionNumber: sessionNumber,
+          scheduledDate: currentDate.toISOString().split('T')[0],
+          scheduledTime: scheduledTime || '00:00',
+          durationMinutes: 60, // Default duration
           status: 'scheduled',
-          counts_toward_completion: true, // New sessions count toward completion
-          index_in_sub: sessionNumber, // Track session index in subscription
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          countsTowardCompletion: true, // New sessions count toward completion
+          indexInSub: sessionNumber, // Track session index in subscription
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
         
         const sessionId = await databaseService.create('sessions', sessionData);
