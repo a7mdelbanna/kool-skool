@@ -579,7 +579,19 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       
       {session.notes && (
         <div className="mt-2 text-sm text-muted-foreground">
-          {session.notes}
+          {/* Parse and format the original date if it exists in notes */}
+          {(() => {
+            const match = session.notes.match(/\[(?:Moved|Rescheduled) from (\d{4}-\d{2}-\d{2})\]/);
+            if (match && match[1]) {
+              try {
+                const originalDate = new Date(match[1]);
+                return `[${session.status === 'rescheduled' && session.moved_from_session_id ? 'Moved' : 'Rescheduled'} from ${format(originalDate, "EEEE, MMMM d, yyyy")}]`;
+              } catch {
+                return session.notes;
+              }
+            }
+            return session.notes;
+          })()}
         </div>
       )}
 

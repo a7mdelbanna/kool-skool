@@ -1149,11 +1149,16 @@ async function handleSessionActionRPC(params: any) {
         break;
       case 'rescheduled':
         if (p_new_datetime) {
+          // Get the original session to store its date
+          const originalSession = await databaseService.getById('sessions', p_session_id);
+          const originalDate = originalSession?.scheduled_date || 'unknown date';
+          
           updates.scheduled_date = p_new_datetime.split('T')[0];
           updates.scheduled_time = p_new_datetime.split('T')[1]?.split('.')[0] || '00:00';
           updates.status = 'scheduled'; // Keep as scheduled, not rescheduled
           updates.counts_toward_completion = true; // Still counts
-          updates.notes = (updates.notes || '') + ` [Rescheduled from original date]`;
+          updates.original_date = originalDate; // Store original date
+          updates.notes = (originalSession?.notes || '') + ` [Rescheduled from ${originalDate}]`;
         }
         break;
       case 'moved':
@@ -1166,7 +1171,8 @@ async function handleSessionActionRPC(params: any) {
         // Mark original session as moved (doesn't count toward completion)
         updates.status = 'rescheduled';
         updates.counts_toward_completion = false;
-        updates.notes = (session.notes || '') + ' [Moved to another date]';
+        updates.original_date = session.scheduled_date; // Store for display
+        updates.notes = (session.notes || '') + ` [Moved to another date]`;
         
         // Update the original session
         await databaseService.update('sessions', p_session_id, updates);
@@ -1217,7 +1223,8 @@ async function handleSessionActionRPC(params: any) {
             status: 'scheduled',
             counts_toward_completion: true,
             moved_from_session_id: p_session_id,
-            notes: `Moved from ${session.scheduled_date}`,
+            notes: `[Moved from ${session.scheduled_date}]`,
+            original_date: session.scheduled_date,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
