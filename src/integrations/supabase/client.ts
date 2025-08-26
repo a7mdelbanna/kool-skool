@@ -713,10 +713,20 @@ export const getSchoolTransactions = async (schoolId: string | undefined) => {
   }
 
   try {
-    return await databaseService.query('transactions', {
-      where: [{ field: 'schoolId', operator: '==', value: schoolId }],
-      orderBy: [{ field: 'transactionDate', direction: 'desc' }]
+    // First get all transactions for the school without ordering
+    // Firebase requires an index for compound queries with orderBy on multiple fields
+    const transactions = await databaseService.query('transactions', {
+      where: [{ field: 'school_id', operator: '==', value: schoolId }]
     });
+    
+    // Sort in memory to avoid Firebase index requirement
+    const sortedTransactions = transactions.sort((a: any, b: any) => {
+      const dateA = new Date(a.transaction_date || a.transactionDate || a.created_at);
+      const dateB = new Date(b.transaction_date || b.transactionDate || b.created_at);
+      return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+    
+    return sortedTransactions;
   } catch (error) {
     console.error('Error fetching school transactions:', error);
     throw error;
@@ -726,25 +736,27 @@ export const getSchoolTransactions = async (schoolId: string | undefined) => {
 export const createTransaction = async (transactionData: any) => {
   try {
     const transactionId = await databaseService.create('transactions', {
-      schoolId: transactionData.school_id,
+      school_id: transactionData.school_id,
       type: transactionData.type,
       amount: transactionData.amount,
       currency: transactionData.currency,
-      transactionDate: transactionData.transaction_date,
+      transaction_date: transactionData.transaction_date,
       description: transactionData.description,
       notes: transactionData.notes,
-      contactId: transactionData.contact_id,
-      categoryId: transactionData.category_id,
-      fromAccountId: transactionData.from_account_id,
-      toAccountId: transactionData.to_account_id,
-      paymentMethod: transactionData.payment_method,
-      receiptNumber: transactionData.receipt_number,
-      receiptUrl: transactionData.receipt_url,
-      taxAmount: transactionData.tax_amount || 0,
-      taxRate: transactionData.tax_rate || 0,
-      isRecurring: transactionData.is_recurring || false,
-      recurringFrequency: transactionData.recurring_frequency,
-      recurringEndDate: transactionData.recurring_end_date
+      contact_id: transactionData.contact_id,
+      category_id: transactionData.category_id,
+      from_account_id: transactionData.from_account_id,
+      to_account_id: transactionData.to_account_id,
+      payment_method: transactionData.payment_method,
+      receipt_number: transactionData.receipt_number,
+      receipt_url: transactionData.receipt_url,
+      tax_amount: transactionData.tax_amount || 0,
+      tax_rate: transactionData.tax_rate || 0,
+      is_recurring: transactionData.is_recurring || false,
+      recurring_frequency: transactionData.recurring_frequency,
+      recurring_end_date: transactionData.recurring_end_date,
+      subscription_id: transactionData.subscription_id || null,
+      student_id: transactionData.student_id || null
     });
 
     // Handle tags if provided

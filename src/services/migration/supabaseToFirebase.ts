@@ -494,19 +494,44 @@ async function handleAddSubscription(params: any) {
     const subscriptionId = await databaseService.create('subscriptions', subscriptionData);
     
     // Also generate the lesson sessions for this subscription
-    if (params.p_schedule && params.p_schedule.length > 0) {
+    if (params.p_schedule && params.p_schedule.length > 0 && params.p_session_count > 0) {
+      console.log('Creating sessions for subscription:', subscriptionId);
+      console.log('Schedule:', params.p_schedule);
+      console.log('Session count:', params.p_session_count);
+      
       // Generate sessions based on schedule
       const sessions = [];
       const startDate = new Date(params.p_start_date);
-      const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       
-      // Create sessions based on schedule for the duration
+      // Get the schedule details
+      const schedule = params.p_schedule[0]; // For now, use first schedule item
+      const scheduledDay = schedule.day;
+      const scheduledTime = schedule.time;
+      
+      // Find the day index for the scheduled day
+      const dayIndex = daysOfWeek.findIndex(day => day.toLowerCase() === scheduledDay.toLowerCase());
+      
+      // Calculate actual session dates based on schedule
+      let currentDate = new Date(startDate);
+      let sessionsCreated = 0;
+      
+      // Find the first occurrence of the scheduled day
+      while (currentDate.getDay() !== dayIndex && sessionsCreated < 100) { // Safety limit
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      // Create sessions on the scheduled day of each week
       for (let sessionNumber = 1; sessionNumber <= params.p_session_count; sessionNumber++) {
         const sessionData = {
           subscription_id: subscriptionId,
           student_id: params.p_student_id,
           school_id: params.p_current_school_id,
+          teacher_id: params.p_teacher_id || null,
           session_number: sessionNumber,
+          scheduled_date: currentDate.toISOString().split('T')[0],
+          scheduled_time: scheduledTime || '00:00',
+          duration_minutes: 60, // Default duration
           status: 'scheduled',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -514,7 +539,15 @@ async function handleAddSubscription(params: any) {
         
         const sessionId = await databaseService.create('sessions', sessionData);
         sessions.push({ id: sessionId, ...sessionData });
+        
+        // Move to next week for the next session
+        currentDate.setDate(currentDate.getDate() + 7);
+        sessionsCreated++;
       }
+      
+      console.log('Created sessions:', sessions.length);
+    } else {
+      console.log('No schedule or session count provided, skipping session creation');
     }
     
     // Return in the format expected by the frontend (array with subscription as first element)
@@ -968,16 +1001,34 @@ async function handleCreateDefaultCategories(params: any) {
 // Handle get_lesson_sessions RPC function
 async function handleGetLessonSessions(params: { p_student_id: string }) {
   try {
-    // For now, return empty sessions until we implement the full subscription/session system
-    // This prevents errors while we focus on other functionality
     console.log('Getting lesson sessions for student:', params.p_student_id);
     
-    // TODO: Implement full session fetching from Firebase
-    // This would query the sessions collection filtered by student_id
-    // and join with subscription data
+    // Query sessions from Firebase
+    const sessions = await databaseService.query('sessions', {
+      where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
+    });
+    
+    // Map sessions to the expected format
+    const mappedSessions = sessions.map((session: any) => ({
+      id: session.id,
+      subscription_id: session.subscription_id,
+      student_id: session.student_id,
+      teacher_id: session.teacher_id || null,
+      session_number: session.session_number,
+      scheduled_date: session.scheduled_date,
+      scheduled_time: session.scheduled_time,
+      duration_minutes: session.duration_minutes || 60,
+      status: session.status || 'scheduled',
+      attended: session.attended || false,
+      notes: session.notes || '',
+      created_at: session.created_at,
+      updated_at: session.updated_at
+    }));
+    
+    console.log(`Found ${mappedSessions.length} sessions for student ${params.p_student_id}`);
     
     return { 
-      data: [], // Return empty array for now
+      data: mappedSessions,
       error: null 
     };
   } catch (error) {
