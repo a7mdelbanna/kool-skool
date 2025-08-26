@@ -148,6 +148,8 @@ export const supabase = {
         return handleGetSchoolCategories(params);
       case 'create_default_categories':
         return handleCreateDefaultCategories(params);
+      case 'get_lesson_sessions':
+        return handleGetLessonSessions(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -823,6 +825,27 @@ async function handleCreateDefaultCategories(params: any) {
     return { data: { success: true }, error: null };
   } catch (error) {
     console.error('Error creating default categories:', error);
+    return { data: null, error };
+  }
+}
+
+// Handle get_lesson_sessions RPC function
+async function handleGetLessonSessions(params: { p_student_id: string }) {
+  try {
+    // For now, return empty sessions until we implement the full subscription/session system
+    // This prevents errors while we focus on other functionality
+    console.log('Getting lesson sessions for student:', params.p_student_id);
+    
+    // TODO: Implement full session fetching from Firebase
+    // This would query the sessions collection filtered by student_id
+    // and join with subscription data
+    
+    return { 
+      data: [], // Return empty array for now
+      error: null 
+    };
+  } catch (error) {
+    console.error('Error getting lesson sessions:', error);
     return { data: null, error };
   }
 }
