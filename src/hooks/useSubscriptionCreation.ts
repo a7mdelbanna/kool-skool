@@ -99,21 +99,21 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
 
       // Validate that account currency matches subscription currency
       if (formData.initialPayment.accountId && formData.initialPayment.amount > 0) {
-        const { data: accountData, error: accountError } = await supabase
-          .from('accounts')
-          .select(`
-            *,
-            currencies (
-              code,
-              symbol
-            )
-          `)
-          .eq('id', formData.initialPayment.accountId)
-          .single();
+        // Use RPC function to get accounts with proper currency info
+        const { data: allAccounts, error: accountError } = await supabase.rpc('get_school_accounts', {
+          p_school_id: schoolId
+        });
 
         if (accountError) throw accountError;
 
-        const accountCurrency = accountData.currencies?.code;
+        // Find the specific account
+        const accountData = allAccounts?.find((acc: any) => acc.id === formData.initialPayment.accountId);
+        
+        if (!accountData) {
+          throw new Error('Selected account not found');
+        }
+
+        const accountCurrency = accountData.currency_code;
         if (accountCurrency !== formData.currency) {
           throw new Error(`Account currency (${accountCurrency}) must match subscription currency (${formData.currency})`);
         }
