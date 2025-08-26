@@ -99,10 +99,17 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     queryFn: async () => {
       if (!schoolId) return [];
       try {
-        const data = await databaseService.query('transactionCategories', {
-          where: [{ field: 'schoolId', operator: '==', value: schoolId }]
+        console.log('Fetching categories for school:', schoolId);
+        
+        // Use the correct collection name and field name
+        const data = await databaseService.query('transaction_categories', {
+          where: [{ field: 'school_id', operator: '==', value: schoolId }]
         });
-        return data || [];
+        
+        // Filter active categories
+        const activeCategories = (data || []).filter((cat: any) => cat.is_active !== false);
+        console.log('Active categories found:', activeCategories.length, activeCategories);
+        return activeCategories;
       } catch (error) {
         console.error('Error fetching categories:', error);
         return [];
@@ -135,9 +142,22 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     queryFn: async () => {
       if (!schoolId) return [];
       try {
-        const data = await databaseService.query('currencies', {
+        console.log('Fetching currencies for school:', schoolId);
+        
+        // Try both field names for compatibility
+        let data = await databaseService.query('currencies', {
           where: [{ field: 'schoolId', operator: '==', value: schoolId }]
         });
+        
+        // If no results, try with snake_case field name
+        if (!data || data.length === 0) {
+          console.log('No currencies found with schoolId, trying school_id...');
+          data = await databaseService.query('currencies', {
+            where: [{ field: 'school_id', operator: '==', value: schoolId }]
+          });
+        }
+        
+        console.log('Currencies found:', data?.length || 0, data);
         return data || [];
       } catch (error) {
         console.error('Error fetching currencies:', error);
@@ -151,6 +171,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   useEffect(() => {
     if (currencies.length > 0 && formData.currency === 'USD') {
       const defaultCurrency = currencies.find(c => c.is_default || c.isDefault);
+      console.log('Setting default currency:', defaultCurrency);
       setFormData(prev => ({
         ...prev,
         currency: defaultCurrency?.code || currencies[0].code || 'USD'
@@ -196,6 +217,18 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
 
   // Handle account selection and currency locking
   const handleAccountSelection = (accountId: string, accountType: 'from' | 'to') => {
+    // If empty selection, unlock currency
+    if (!accountId) {
+      if (accountType === 'from') {
+        setFormData(prev => ({ ...prev, fromAccountId: '' }));
+      } else {
+        setFormData(prev => ({ ...prev, toAccountId: '' }));
+      }
+      setLockedCurrency(null);
+      console.log('🔓 Currency unlocked');
+      return;
+    }
+
     const selectedAccount = accounts.find(acc => acc.id === accountId);
     if (!selectedAccount) return;
 
@@ -205,12 +238,13 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
       setFormData(prev => ({ ...prev, toAccountId: accountId }));
     }
 
-    // Lock currency based on the selected account
-    const newCurrency = selectedAccount.currency_code;
-    setFormData(prev => ({ ...prev, currency: newCurrency }));
-    setLockedCurrency(newCurrency);
-
-    console.log(`🔒 Currency locked to ${newCurrency} based on account ${selectedAccount.name}`);
+    // Lock currency based on the selected account if it has a currency
+    if (selectedAccount.currency_code) {
+      const newCurrency = selectedAccount.currency_code;
+      setFormData(prev => ({ ...prev, currency: newCurrency }));
+      setLockedCurrency(newCurrency);
+      console.log(`🔒 Currency locked to ${newCurrency} based on account ${selectedAccount.name}`);
+    }
   };
 
   const handleInputChange = (field: string, value: any) => {
@@ -262,20 +296,20 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
         currency: formData.currency,
         transaction_date: format(formData.transactionDate, 'yyyy-MM-dd'),
         description: formData.description,
-        notes: formData.notes || undefined,
-        contact_id: formData.contactId || undefined,
-        category_id: formData.categoryId || undefined,
-        from_account_id: formData.fromAccountId || undefined,
-        to_account_id: formData.toAccountId || undefined,
-        payment_method: formData.paymentMethod || undefined,
-        receipt_number: formData.receiptNumber || undefined,
-        receipt_url: formData.receiptUrl || undefined,
+        notes: formData.notes || null,
+        contact_id: formData.contactId || null,
+        category_id: formData.categoryId || null,
+        from_account_id: formData.fromAccountId || null,
+        to_account_id: formData.toAccountId || null,
+        payment_method: formData.paymentMethod || null,
+        receipt_number: formData.receiptNumber || null,
+        receipt_url: formData.receiptUrl || null,
         tax_amount: formData.taxAmount ? parseFloat(formData.taxAmount) : 0,
         tax_rate: formData.taxRate ? parseFloat(formData.taxRate) : 0,
         is_recurring: formData.isRecurring,
-        recurring_frequency: formData.recurringFrequency || undefined,
-        recurring_end_date: formData.recurringEndDate ? format(formData.recurringEndDate, 'yyyy-MM-dd') : undefined,
-        tag_ids: selectedTags.length > 0 ? selectedTags : undefined,
+        recurring_frequency: formData.recurringFrequency || null,
+        recurring_end_date: formData.recurringEndDate ? format(formData.recurringEndDate, 'yyyy-MM-dd') : null,
+        tag_ids: selectedTags.length > 0 ? selectedTags : null,
       };
 
       await createTransaction(transactionData);
@@ -330,19 +364,36 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                   <div className="relative">
                     <Select 
                       value={formData.currency} 
-                      onValueChange={(value) => handleInputChange('currency', value)}
+                      onValueChange={(value) => {
+                        if (!lockedCurrency) {
+                          handleInputChange('currency', value);
+                        }
+                      }}
                       disabled={!!lockedCurrency}
                     >
-                      <SelectTrigger className={cn("w-24", lockedCurrency && "opacity-75")}>
-                        <SelectValue />
+                      <SelectTrigger className={cn("w-32", lockedCurrency && "opacity-75")}>
+                        <SelectValue>
+                          {formData.currency && currencies.length > 0 ? (
+                            (() => {
+                              const current = currencies.find(c => c.code === formData.currency);
+                              return current ? `${current.symbol || '$'} ${current.code}` : formData.currency;
+                            })()
+                          ) : (
+                            formData.currency || 'Select'
+                          )}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {currencies.length > 0 ? (
-                          currencies.map(currency => (
-                            <SelectItem key={currency.id} value={currency.code}>
-                              {currency.symbol} {currency.code}
-                            </SelectItem>
-                          ))
+                        {currencies && currencies.length > 0 ? (
+                          currencies.map(currency => {
+                            const symbol = currency.symbol || '$';
+                            const code = currency.code || 'USD';
+                            return (
+                              <SelectItem key={currency.id || code} value={code}>
+                                {symbol} {code} {currency.is_default || currency.isDefault ? '(Default)' : ''}
+                              </SelectItem>
+                            );
+                          })
                         ) : (
                           <SelectItem value="USD">$ USD</SelectItem>
                         )}
@@ -618,17 +669,23 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredCategories.map(category => (
-                      <SelectItem key={category.id} value={category.id}>
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: category.color }}
-                          />
-                          {category.full_path || category.name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {filteredCategories.length > 0 ? (
+                      filteredCategories.map(category => (
+                        <SelectItem key={category.id} value={category.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            {category.full_path || category.name}
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        No categories available. Please add categories in Settings.
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

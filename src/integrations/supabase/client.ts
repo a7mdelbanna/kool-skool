@@ -757,29 +757,41 @@ export const getSchoolTransactions = async (schoolId: string | undefined) => {
 
 export const createTransaction = async (transactionData: any) => {
   try {
-    const transactionId = await databaseService.create('transactions', {
+    // Clean up the data - convert undefined to null for Firebase
+    const cleanData: any = {
       school_id: transactionData.school_id,
       type: transactionData.type,
       amount: transactionData.amount,
       currency: transactionData.currency,
       transaction_date: transactionData.transaction_date,
-      description: transactionData.description,
-      notes: transactionData.notes,
-      contact_id: transactionData.contact_id,
-      category_id: transactionData.category_id,
-      from_account_id: transactionData.from_account_id,
-      to_account_id: transactionData.to_account_id,
-      payment_method: transactionData.payment_method,
-      receipt_number: transactionData.receipt_number,
-      receipt_url: transactionData.receipt_url,
+      description: transactionData.description || '',
+      notes: transactionData.notes || null,
+      contact_id: transactionData.contact_id || null,
+      category_id: transactionData.category_id || null,
+      from_account_id: transactionData.from_account_id || null,
+      to_account_id: transactionData.to_account_id || null,
+      payment_method: transactionData.payment_method || null,
+      receipt_number: transactionData.receipt_number || null,
+      receipt_url: transactionData.receipt_url || null,
       tax_amount: transactionData.tax_amount || 0,
       tax_rate: transactionData.tax_rate || 0,
       is_recurring: transactionData.is_recurring || false,
-      recurring_frequency: transactionData.recurring_frequency,
-      recurring_end_date: transactionData.recurring_end_date,
+      recurring_frequency: transactionData.recurring_frequency || null,
+      recurring_end_date: transactionData.recurring_end_date || null,
       subscription_id: transactionData.subscription_id || null,
-      student_id: transactionData.student_id || null
+      student_id: transactionData.student_id || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Remove any fields that are still undefined
+    Object.keys(cleanData).forEach(key => {
+      if (cleanData[key] === undefined) {
+        delete cleanData[key];
+      }
     });
+
+    const transactionId = await databaseService.create('transactions', cleanData);
 
     // Handle tags if provided
     if (transactionData.tag_ids && transactionData.tag_ids.length > 0) {

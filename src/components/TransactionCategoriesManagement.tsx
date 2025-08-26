@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import CategoryDialog from '@/components/CategoryDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 
 interface Category {
   id: string;
@@ -40,7 +41,7 @@ const TransactionCategoriesManagement = () => {
 
   const schoolId = getSchoolId();
 
-  // Fetch categories directly from the database
+  // Fetch categories directly from Firebase
   const { data: categories = [], isLoading, error } = useQuery({
     queryKey: ['school-categories', schoolId],
     queryFn: async () => {
@@ -52,38 +53,21 @@ const TransactionCategoriesManagement = () => {
       console.log('Fetching categories for school:', schoolId);
       
       try {
-        // Try using the RPC function first
-        const { data, error } = await supabase.rpc('get_school_categories', {
-          p_school_id: schoolId
+        // Fetch from Firebase
+        const data = await databaseService.query('transaction_categories', {
+          where: [{ field: 'school_id', operator: '==', value: schoolId }]
         });
         
-        if (error) {
-          console.error('RPC error, trying direct query:', error);
-          // Fallback: direct query
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('transaction_categories')
-            .select('*')
-            .eq('school_id', schoolId)
-            .eq('is_active', true)
-            .order('name');
-          
-          if (fallbackError) {
-            console.error('Direct query also failed:', fallbackError);
-            throw fallbackError;
-          }
-          
-          console.log('Direct query categories:', fallbackData);
-          
-          // Transform fallback data to match expected format
-          return (fallbackData || []).map((cat: any) => ({
+        console.log('Firebase categories fetched:', data);
+        
+        // Filter active categories and transform data to match expected format
+        return (data || [])
+          .filter((cat: any) => cat.is_active !== false)
+          .map((cat: any) => ({
             ...cat,
             full_path: cat.name,
             level: cat.parent_id ? 1 : 0
           }));
-        }
-        
-        console.log('RPC categories fetched:', data);
-        return data as Category[];
       } catch (err) {
         console.error('Failed to fetch categories:', err);
         throw err;
@@ -97,11 +81,37 @@ const TransactionCategoriesManagement = () => {
     mutationFn: async () => {
       if (!schoolId) throw new Error('No school ID');
       
-      const { error } = await supabase.rpc('create_default_categories', {
-        p_school_id: schoolId
-      });
+      const defaultCategories = [
+        // Income categories
+        { name: 'Course Sales', type: 'income', color: '#10B981', parent_id: null },
+        { name: 'Consulting', type: 'income', color: '#06B6D4', parent_id: null },
+        { name: 'Subscriptions', type: 'income', color: '#8B5CF6', parent_id: null },
+        { name: 'Other Income', type: 'income', color: '#059669', parent_id: null },
+        
+        // Expense categories
+        { name: 'Operating Expenses', type: 'expense', color: '#EF4444', parent_id: null },
+        { name: 'Marketing', type: 'expense', color: '#F59E0B', parent_id: null },
+        { name: 'Salaries', type: 'expense', color: '#EC4899', parent_id: null },
+        { name: 'Software & Tools', type: 'expense', color: '#3B82F6', parent_id: null },
+        { name: 'Office Supplies', type: 'expense', color: '#F97316', parent_id: null },
+        { name: 'Other Expenses', type: 'expense', color: '#DC2626', parent_id: null },
+        
+        // Transfer category
+        { name: 'Internal Transfer', type: 'transfer', color: '#6B7280', parent_id: null }
+      ];
       
-      if (error) throw error;
+      // Create all default categories in Firebase
+      await Promise.all(
+        defaultCategories.map(cat =>
+          databaseService.create('transaction_categories', {
+            ...cat,
+            school_id: schoolId,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        )
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-categories'] });
@@ -115,12 +125,11 @@ const TransactionCategoriesManagement = () => {
   // Delete category mutation
   const deleteCategory = useMutation({
     mutationFn: async (categoryId: string) => {
-      const { error } = await supabase
-        .from('transaction_categories')
-        .update({ is_active: false })
-        .eq('id', categoryId);
-      
-      if (error) throw error;
+      // Soft delete by updating is_active to false in Firebase
+      await databaseService.update('transaction_categories', categoryId, {
+        is_active: false,
+        updated_at: new Date().toISOString()
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-categories'] });

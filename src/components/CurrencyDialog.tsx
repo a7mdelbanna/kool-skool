@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { currencyApiService } from '@/services/currencyApi.service';
+import { databaseService } from '@/services/firebase/database.service';
 
 interface Currency {
   id: string;
@@ -144,45 +145,48 @@ const CurrencyDialog = ({ open, onOpenChange, currency, mode, schoolId, onSucces
       }
 
       if (mode === 'add') {
-        const { error } = await supabase
-          .from('currencies')
-          .insert([{
-            school_id: schoolId,
-            name: formData.name,
-            symbol: formData.symbol,
-            code: formData.code.toUpperCase(),
-            exchange_rate: formData.exchange_rate,
-            is_default: formData.is_default
-          }]);
-
-        if (error) throw error;
+        // Save to Firebase instead of Supabase
+        await databaseService.create('currencies', {
+          school_id: schoolId,
+          name: formData.name,
+          symbol: formData.symbol,
+          code: formData.code.toUpperCase(),
+          exchange_rate: formData.exchange_rate,
+          is_default: formData.is_default,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
 
         toast({
           title: "Success",
           description: "Currency added successfully",
         });
       } else if (currency) {
-        const { error } = await supabase
-          .from('currencies')
-          .update({
-            name: formData.name,
-            symbol: formData.symbol,
-            code: formData.code.toUpperCase(),
-            exchange_rate: formData.exchange_rate,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currency.id);
-
-        if (error) throw error;
+        // Update in Firebase instead of Supabase
+        await databaseService.update('currencies', currency.id, {
+          name: formData.name,
+          symbol: formData.symbol,
+          code: formData.code.toUpperCase(),
+          exchange_rate: formData.exchange_rate,
+          updated_at: new Date().toISOString()
+        });
 
         // Handle default currency setting separately
         if (formData.is_default && !currency.is_default) {
-          const { error: defaultError } = await supabase.rpc('set_default_currency', {
-            p_currency_id: currency.id,
-            p_school_id: schoolId
+          // Update all currencies to set is_default to false
+          const allCurrencies = await databaseService.query('currencies', {
+            where: [{ field: 'school_id', operator: '==', value: schoolId }]
           });
-
-          if (defaultError) throw defaultError;
+          
+          // Update all to not default
+          await Promise.all(
+            allCurrencies.map(curr => 
+              databaseService.update('currencies', curr.id, { is_default: false })
+            )
+          );
+          
+          // Set this one as default
+          await databaseService.update('currencies', currency.id, { is_default: true });
         }
 
         toast({

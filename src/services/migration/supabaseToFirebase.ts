@@ -1364,15 +1364,18 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
       }
     }
     
-    // Get student and contact names for transactions
+    // Get student, contact, and category IDs for transactions
     const studentIds = new Set<string>();
     const contactIds = new Set<string>();
+    const categoryIds = new Set<string>();
     
     transactions.forEach((t: any) => {
       if (t.studentId) studentIds.add(t.studentId);
       if (t.student_id) studentIds.add(t.student_id);
       if (t.contactId) contactIds.add(t.contactId);
       if (t.contact_id) contactIds.add(t.contact_id);
+      if (t.categoryId) categoryIds.add(t.categoryId);
+      if (t.category_id) categoryIds.add(t.category_id);
     });
     
     // Fetch students and their user data
@@ -1412,10 +1415,25 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
       });
     }
     
-    // Enrich transactions with account and contact/student names
+    // Fetch categories
+    const categoryMap = new Map<string, string>();
+    if (categoryIds.size > 0) {
+      const categories = await databaseService.query('transaction_categories', {
+        where: [{ field: 'school_id', operator: '==', value: params.p_school_id }]
+      });
+      
+      categories.forEach((category: any) => {
+        if (categoryIds.has(category.id)) {
+          categoryMap.set(category.id, category.name || 'Unknown Category');
+        }
+      });
+    }
+    
+    // Enrich transactions with account, contact/student, and category names
     const enrichedTransactions = transactions.map((transaction: any) => {
       const studentId = transaction.studentId || transaction.student_id;
       const contactId = transaction.contactId || transaction.contact_id;
+      const categoryId = transaction.categoryId || transaction.category_id;
       
       let contactName = null;
       
@@ -1430,13 +1448,15 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
         to_account_name: transaction.to_account_id ? accountMap.get(transaction.to_account_id)?.name : null,
         from_account_name: transaction.from_account_id ? accountMap.get(transaction.from_account_id)?.name : null,
         contact_name: contactName,
+        category_name: categoryId ? categoryMap.get(categoryId) : null,
         // Ensure consistent field names
         amount: transaction.amount || 0,
         currency: transaction.currency || 'USD',
         status: transaction.status || 'completed',
         // Include the IDs for debugging
         student_id: studentId,
-        contact_id: contactId
+        contact_id: contactId,
+        category_id: categoryId
       };
     });
     

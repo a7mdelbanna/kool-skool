@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 
 interface Category {
   id: string;
@@ -82,7 +83,7 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
 
     try {
       if (mode === 'add') {
-        console.log('Creating category with direct insert:', {
+        console.log('Creating category in Firebase:', {
           school_id: schoolId,
           name: name.trim(),
           type,
@@ -90,52 +91,37 @@ const CategoryDialog = ({ open, onOpenChange, category, parentCategory, mode, on
           parent_id: parentCategory?.id || null
         });
 
-        // Use direct insert instead of RPC function
-        const { data, error } = await supabase
-          .from('transaction_categories')
-          .insert({
-            school_id: schoolId,
-            name: name.trim(),
-            type,
-            color,
-            parent_id: parentCategory?.id || null,
-            is_active: true
-          })
-          .select()
-          .single();
+        // Save to Firebase instead of Supabase
+        await databaseService.create('transaction_categories', {
+          school_id: schoolId,
+          name: name.trim(),
+          type,
+          color,
+          parent_id: parentCategory?.id || null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
 
-        if (error) {
-          console.error('Error creating category:', error);
-          throw error;
-        }
-
-        console.log('Category created successfully:', data);
+        console.log('Category created successfully in Firebase');
         toast.success('Category created successfully');
       } else {
-        console.log('Updating category with direct update:', {
+        console.log('Updating category in Firebase:', {
           id: category?.id,
           name: name.trim(),
           type,
           color
         });
 
-        // Use direct update instead of RPC function
-        const { error } = await supabase
-          .from('transaction_categories')
-          .update({
-            name: name.trim(),
-            type,
-            color,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', category?.id);
+        // Update in Firebase instead of Supabase
+        await databaseService.update('transaction_categories', category?.id, {
+          name: name.trim(),
+          type,
+          color,
+          updated_at: new Date().toISOString()
+        });
 
-        if (error) {
-          console.error('Error updating category:', error);
-          throw error;
-        }
-
-        console.log('Category updated successfully');
+        console.log('Category updated successfully in Firebase');
         toast.success('Category updated successfully');
       }
 

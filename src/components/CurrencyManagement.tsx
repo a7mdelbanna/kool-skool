@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import CurrencyDialog from './CurrencyDialog';
+import { databaseService } from '@/services/firebase/database.service';
 import CurrencyCalculator from './CurrencyCalculator';
 
 interface Currency {
@@ -40,12 +41,19 @@ const CurrencyManagement = () => {
     if (!user?.schoolId) return;
 
     try {
-      const { data, error } = await supabase.rpc('get_school_currencies', {
-        p_school_id: user.schoolId
+      // Fetch from Firebase instead of Supabase
+      const data = await databaseService.query('currencies', {
+        where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
       });
 
-      if (error) throw error;
-      setCurrencies(data || []);
+      // Sort by created_at
+      const sortedData = (data || []).sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      setCurrencies(sortedData);
     } catch (error: any) {
       console.error('Error fetching currencies:', error);
       toast({
@@ -78,12 +86,23 @@ const CurrencyManagement = () => {
     if (!user?.schoolId) return;
 
     try {
-      const { data, error } = await supabase.rpc('set_default_currency', {
-        p_currency_id: currencyId,
-        p_school_id: user.schoolId
+      // Update all currencies to set is_default to false
+      const allCurrencies = await databaseService.query('currencies', {
+        where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
       });
-
-      if (error) throw error;
+      
+      // Update all to not default
+      await Promise.all(
+        allCurrencies.map((curr: any) => 
+          databaseService.update('currencies', curr.id, { is_default: false })
+        )
+      );
+      
+      // Set this one as default
+      await databaseService.update('currencies', currencyId, { 
+        is_default: true,
+        updated_at: new Date().toISOString()
+      });
 
       toast({
         title: "Success",
@@ -114,12 +133,8 @@ const CurrencyManagement = () => {
     if (!confirm('Are you sure you want to delete this currency?')) return;
 
     try {
-      const { error } = await supabase
-        .from('currencies')
-        .delete()
-        .eq('id', currencyId);
-
-      if (error) throw error;
+      // Delete from Firebase instead of Supabase
+      await databaseService.delete('currencies', currencyId);
 
       toast({
         title: "Success",
