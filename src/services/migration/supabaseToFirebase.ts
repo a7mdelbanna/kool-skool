@@ -154,6 +154,8 @@ export const supabase = {
         return handleGetStudentSubscriptions(params);
       case 'set_default_currency':
         return handleSetDefaultCurrency(params);
+      case 'handle_session_action':
+        return handleSessionActionRPC(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -533,6 +535,8 @@ async function handleAddSubscription(params: any) {
           scheduled_time: scheduledTime || '00:00',
           duration_minutes: 60, // Default duration
           status: 'scheduled',
+          counts_toward_completion: true, // New sessions count toward completion
+          index_in_sub: sessionNumber, // Track session index in subscription
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -1094,6 +1098,69 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
   } catch (error) {
     console.error('Error getting student subscriptions:', error);
     return { data: null, error };
+  }
+}
+
+// Handle session action RPC function
+async function handleSessionActionRPC(params: any) {
+  try {
+    console.log('🎯 Handling session action:', params);
+    
+    const { p_session_id, p_action, p_new_datetime } = params;
+    
+    if (!p_session_id || !p_action) {
+      throw new Error('Session ID and action are required');
+    }
+    
+    const updates: any = {};
+    
+    switch (p_action) {
+      case 'attended':
+      case 'complete':
+        updates.status = 'completed';
+        updates.attended = true;
+        updates.counts_toward_completion = true;
+        break;
+      case 'cancelled':
+        updates.status = 'cancelled';
+        updates.attended = false;
+        updates.counts_toward_completion = false;
+        break;
+      case 'rescheduled':
+        if (p_new_datetime) {
+          updates.scheduled_date = p_new_datetime.split('T')[0];
+          updates.scheduled_time = p_new_datetime.split('T')[1]?.split('.')[0] || '00:00';
+          updates.status = 'rescheduled';
+        }
+        break;
+      case 'moved':
+        updates.status = 'rescheduled';
+        updates.moved_from_session_id = p_session_id;
+        break;
+      default:
+        throw new Error(`Unknown action: ${p_action}`);
+    }
+    
+    updates.updated_at = new Date().toISOString();
+    
+    // Update the session in Firebase
+    await databaseService.update('sessions', p_session_id, updates);
+    
+    console.log('✅ Session updated successfully:', p_session_id, updates);
+    
+    return { 
+      data: { 
+        success: true, 
+        message: `Session ${p_action} successfully` 
+      }, 
+      error: null 
+    };
+  } catch (error) {
+    console.error('❌ Error handling session action:', error);
+    return { 
+      data: null, 
+      error 
+    };
   }
 }
 

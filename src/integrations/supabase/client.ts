@@ -569,25 +569,19 @@ export const getStudentLessonSessions = async (studentId: string): Promise<Lesso
 
 export const handleSessionAction = async (sessionId: string, action: string, newDatetime?: string) => {
   try {
-    const updates: any = {};
+    // Use the RPC function to handle session actions properly
+    const { data, error } = await supabase.rpc('handle_session_action', {
+      p_session_id: sessionId,
+      p_action: action,
+      p_new_datetime: newDatetime
+    });
     
-    switch (action) {
-      case 'complete':
-        updates.status = 'completed';
-        break;
-      case 'cancel':
-        updates.status = 'cancelled';
-        break;
-      case 'reschedule':
-        if (newDatetime) {
-          updates.scheduledDate = newDatetime;
-          updates.status = 'rescheduled';
-        }
-        break;
+    if (error) {
+      console.error('Error handling session action:', error);
+      throw error;
     }
     
-    await databaseService.update('sessions', sessionId, updates);
-    return { success: true };
+    return data || { success: true, message: `Session ${action} successfully` };
   } catch (error) {
     console.error('Error handling session action:', error);
     throw error;
