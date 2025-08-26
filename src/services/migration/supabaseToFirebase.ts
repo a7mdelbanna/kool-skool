@@ -156,6 +156,8 @@ export const supabase = {
         return handleSetDefaultCurrency(params);
       case 'handle_session_action':
         return handleSessionActionRPC(params);
+      case 'get_school_transactions':
+        return handleGetSchoolTransactions(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -1281,6 +1283,59 @@ async function handleSessionActionRPC(params: any) {
       data: null, 
       error 
     };
+  }
+}
+
+// Handle get_school_transactions RPC function
+async function handleGetSchoolTransactions(params: { p_school_id: string }) {
+  try {
+    console.log('Getting transactions for school:', params.p_school_id);
+    
+    // Query all transactions for the school
+    const transactions = await databaseService.query('transactions', {
+      where: [{ field: 'school_id', operator: '==', value: params.p_school_id }]
+    });
+    
+    // Get account names for the transactions
+    const accountIds = new Set<string>();
+    transactions.forEach((t: any) => {
+      if (t.to_account_id) accountIds.add(t.to_account_id);
+      if (t.from_account_id) accountIds.add(t.from_account_id);
+    });
+    
+    // Fetch account details
+    const accountMap = new Map<string, any>();
+    for (const accountId of accountIds) {
+      try {
+        const account = await databaseService.getById('accounts', accountId);
+        if (account) {
+          accountMap.set(accountId, account);
+        }
+      } catch (error) {
+        console.warn('Could not fetch account:', accountId);
+      }
+    }
+    
+    // Enrich transactions with account names
+    const enrichedTransactions = transactions.map((transaction: any) => ({
+      ...transaction,
+      to_account_name: transaction.to_account_id ? accountMap.get(transaction.to_account_id)?.name : null,
+      from_account_name: transaction.from_account_id ? accountMap.get(transaction.from_account_id)?.name : null,
+      // Ensure consistent field names
+      amount: transaction.amount || 0,
+      currency: transaction.currency || 'USD',
+      status: transaction.status || 'completed'
+    }));
+    
+    console.log(`Found ${enrichedTransactions.length} transactions for school`);
+    
+    return { 
+      data: enrichedTransactions,
+      error: null 
+    };
+  } catch (error) {
+    console.error('Error getting school transactions:', error);
+    return { data: null, error };
   }
 }
 
