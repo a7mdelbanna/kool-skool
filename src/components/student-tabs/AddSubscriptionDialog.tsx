@@ -682,10 +682,10 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                       </SelectTrigger>
                       <SelectContent>
                         {accounts
-                          .filter(account => account.currencies?.code === formData.currency)
+                          .filter(account => account.currency_code === formData.currency)
                           .map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name} ({account.currencies?.symbol})
+                              {account.name} ({account.currency_symbol})
                             </SelectItem>
                           ))}
                       </SelectContent>
