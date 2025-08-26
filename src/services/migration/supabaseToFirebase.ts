@@ -150,6 +150,8 @@ export const supabase = {
         return handleCreateDefaultCategories(params);
       case 'get_lesson_sessions':
         return handleGetLessonSessions(params);
+      case 'get_student_subscriptions':
+        return handleGetStudentSubscriptions(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -846,6 +848,29 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
     };
   } catch (error) {
     console.error('Error getting lesson sessions:', error);
+    return { data: null, error };
+  }
+}
+
+// Handle get_student_subscriptions RPC function
+async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
+  try {
+    // For now, return empty subscriptions until we implement the full subscription system
+    console.log('Getting subscriptions for student:', params.p_student_id);
+    
+    // TODO: Implement full subscription fetching from Firebase
+    // This would query the subscriptions collection filtered by student_id
+    // The expected return structure includes:
+    // - id, student_id, session_count, duration_months
+    // - start_date, schedule, price_mode, price_per_session
+    // - sessions_taken, sessions_scheduled, status, created_at, updated_at
+    
+    return { 
+      data: [], // Return empty array for now
+      error: null 
+    };
+  } catch (error) {
+    console.error('Error getting student subscriptions:', error);
     return { data: null, error };
   }
 }
