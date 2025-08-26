@@ -1067,9 +1067,10 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
       });
       
       // Count sessions by status WITH counts_toward_completion logic (matching Supabase RPC)
+      // IMPORTANT: Cancelled sessions ALWAYS count toward completion regardless of the flag
       const sessionsCompleted = sessions.filter((s: any) => 
-        (s.status === 'completed' || s.status === 'cancelled') && 
-        s.counts_toward_completion === true
+        (s.status === 'completed' && s.counts_toward_completion === true) || 
+        s.status === 'cancelled' // Cancelled always counts
       ).length;
       
       const sessionsAttended = sessions.filter((s: any) => 
@@ -1078,8 +1079,7 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
       ).length;
       
       const sessionsCancelled = sessions.filter((s: any) => 
-        s.status === 'cancelled' && 
-        s.counts_toward_completion === true
+        s.status === 'cancelled' // Count ALL cancelled sessions
       ).length;
       
       const sessionsScheduled = sessions.filter((s: any) => 

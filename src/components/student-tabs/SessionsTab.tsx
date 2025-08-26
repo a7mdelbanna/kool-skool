@@ -495,7 +495,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       <Badge variant="outline" className={`flex items-center gap-1 ${badgeContent.className}`}>
         {badgeContent.icon}
         {badgeContent.text}
-        {!session.counts_toward_completion && (
+        {!session.counts_toward_completion && session.status !== 'cancelled' && (
           <span className="text-xs opacity-70">(replaced)</span>
         )}
       </Badge>
