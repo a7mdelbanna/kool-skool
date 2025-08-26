@@ -30,6 +30,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { getCurrentUserInfo, getSchoolTags, createTransaction, supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 
 interface AddTransactionDialogProps {
   open: boolean;
@@ -42,7 +43,7 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
   const [formData, setFormData] = useState({
     type: 'income',
     amount: '',
-    currency: 'USD',
+    currency: 'USD', // Will be updated when currencies load
     transactionDate: new Date(),
     description: '',
     notes: '',
@@ -92,41 +93,79 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
     enabled: !!schoolId,
   });
 
-  // Fetch categories
+  // Fetch categories from Firebase
   const { data: categories = [] } = useQuery({
     queryKey: ['school-categories', schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
-      const { data, error } = await supabase.rpc('get_school_categories', {
-        p_school_id: schoolId
-      });
-      if (error) throw error;
-      return data || [];
+      try {
+        const data = await databaseService.query('transactionCategories', {
+          where: [{ field: 'schoolId', operator: '==', value: schoolId }]
+        });
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        return [];
+      }
     },
     enabled: !!schoolId,
   });
 
-  // Fetch contacts
+  // Fetch contacts from Firebase
   const { data: contacts = [] } = useQuery({
     queryKey: ['school-contacts', schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
-      const { data, error } = await supabase.rpc('get_school_contacts', {
-        p_school_id: schoolId
-      });
-      if (error) throw error;
-      return data || [];
+      try {
+        const data = await databaseService.query('contacts', {
+          where: [{ field: 'schoolId', operator: '==', value: schoolId }]
+        });
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching contacts:', error);
+        return [];
+      }
     },
     enabled: !!schoolId,
   });
 
+  // Fetch currencies from Firebase
+  const { data: currencies = [] } = useQuery({
+    queryKey: ['school-currencies', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      try {
+        const data = await databaseService.query('currencies', {
+          where: [{ field: 'schoolId', operator: '==', value: schoolId }]
+        });
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching currencies:', error);
+        return [];
+      }
+    },
+    enabled: !!schoolId,
+  });
+
+  // Set default currency when currencies are loaded
+  useEffect(() => {
+    if (currencies.length > 0 && formData.currency === 'USD') {
+      const defaultCurrency = currencies.find(c => c.is_default || c.isDefault);
+      setFormData(prev => ({
+        ...prev,
+        currency: defaultCurrency?.code || currencies[0].code || 'USD'
+      }));
+    }
+  }, [currencies]);
+
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (!open) {
+      const defaultCurrency = currencies.find(c => c.is_default || c.isDefault);
       setFormData({
         type: 'income',
         amount: '',
-        currency: 'USD',
+        currency: defaultCurrency?.code || currencies[0]?.code || 'USD',
         transactionDate: new Date(),
         description: '',
         notes: '',
@@ -298,9 +337,15 @@ const AddTransactionDialog = ({ open, onOpenChange, onSuccess }: AddTransactionD
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={formData.currency}>
-                          {formData.currency}
-                        </SelectItem>
+                        {currencies.length > 0 ? (
+                          currencies.map(currency => (
+                            <SelectItem key={currency.id} value={currency.code}>
+                              {currency.symbol} {currency.code}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="USD">$ USD</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     {lockedCurrency && (
