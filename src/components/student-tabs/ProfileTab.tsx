@@ -52,11 +52,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   teachers = [],
   isLoading = false
 }) => {
-  console.log('=== ProfileTab RENDER DEBUG ===');
-  console.log('ProfileTab render - teachers prop:', teachers);
-  console.log('ProfileTab render - teachers length:', teachers?.length);
-  console.log('ProfileTab render - courses length:', courses?.length);
-  console.log('ProfileTab render - isLoading:', isLoading);
   
   // Get current user's school ID for fetching levels
   const userData = localStorage.getItem('user');
@@ -80,7 +75,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         return [];
       }
       
-      console.log('Fetched student levels:', data);
       return data || [];
     },
     enabled: !!schoolId,

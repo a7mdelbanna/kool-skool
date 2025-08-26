@@ -42,63 +42,10 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     isLoading
   } = useStudentForm(student, isEditMode, open, onStudentAdded, onClose);
 
-  // Debug student data
-  useEffect(() => {
-    console.log('🔍 STUDENT DEBUG INFO:');
-    console.log('Student prop:', student);
-    console.log('Student ID:', student?.id);
-    console.log('Dialog open:', open);
-    console.log('Active tab:', activeTab);
-  }, [student, open, activeTab]);
 
-  // Detailed course data debugging with clear section markers
+  // Show error toast if courses should exist but don't
   useEffect(() => {
-    console.log('===== COURSES DATA DEBUG (StudentDialogContent) =====');
-    
-    // Step 1: Check if coursesData object exists
-    console.log('1. coursesData object:', coursesData);
-    
-    // Step 2: Check if data property exists and has items
-    if (coursesData?.data) {
-      console.log('2. Courses data array length:', coursesData.data.length);
-      
-      // Step 3: Log each course with detailed information if we have courses
-      if (coursesData.data.length > 0) {
-        console.log('3. First 3 courses detail:');
-        coursesData.data.slice(0, 3).forEach((course, index) => {
-          console.log(`  Course ${index + 1}:`, {
-            id: course.id,
-            name: course.name,
-            lesson_type: course.lesson_type,
-            school_id: course.school_id
-          });
-        });
-      } else {
-        console.log('3. No courses in the array despite data property existing');
-      }
-    } else {
-      console.log('2. No courses data available - data property missing or null');
-    }
-    
-    console.log('===== END COURSES DEBUG =====');
-    
-    // Only show error toast if we're certain courses should exist
     if (open && (!coursesData?.data || coursesData.data.length === 0)) {
-      console.log('No courses found, adding a small delay and checking localStorage');
-      
-      // Check user data directly
-      try {
-        const userData = localStorage.getItem('user');
-        console.log('User data from localStorage for debugging courses issue:', userData);
-        
-        if (userData) {
-          const parsedUserData = JSON.parse(userData);
-          console.log('School ID from userData:', parsedUserData.schoolId);
-        }
-      } catch (error) {
-        console.error('Error accessing localStorage:', error);
-      }
-      
       // If still no courses after a moment, show an error
       const timer = setTimeout(() => {
         if (!coursesData?.data || coursesData.data.length === 0) {
@@ -110,34 +57,9 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
     }
   }, [open, coursesData]);
   
-  // Teacher data debugging
-  useEffect(() => {
-    console.log('===== TEACHERS DATA DEBUG (StudentDialogContent) =====');
-    
-    if (teachersData?.data) {
-      console.log('Teachers data array length:', teachersData.data.length);
-      
-      if (teachersData.data.length > 0) {
-        console.log('First 3 teachers detail:');
-        teachersData.data.slice(0, 3).forEach((teacher, index) => {
-          console.log(`  Teacher ${index + 1}:`, {
-            id: teacher.id,
-            displayName: teacher.display_name,
-            firstName: teacher.first_name,
-            lastName: teacher.last_name
-          });
-        });
-      }
-    } else {
-      console.log('No teachers data available');
-    }
-    
-    console.log('===== END TEACHERS DEBUG =====');
-  }, [teachersData]);
 
-  // Handle tab changes with detailed logging
+  // Handle tab changes
   const handleTabChange = (value: string) => {
-    console.log('🔄 Tab changed to:', value);
     setActiveTab(value);
   };
 

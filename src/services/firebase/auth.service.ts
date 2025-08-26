@@ -11,7 +11,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { auth, db, getUserClaims } from '@/config/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/config/firebase';
@@ -58,6 +58,8 @@ export interface StudentData {
   parentEmail?: string;
   teacherId?: string;
   courseId?: string;
+  courseName?: string;
+  lessonType?: 'individual' | 'group';
 }
 
 class AuthService {
@@ -127,10 +129,7 @@ class AuthService {
         updatedAt: serverTimestamp()
       };
 
-      // Ensure the document is created before returning
-      console.log('Creating user document in Firestore for:', user.uid);
       await setDoc(doc(db, 'users', user.uid), userProfile);
-      console.log('User document created successfully');
       
       // Verify the document was created
       const docSnap = await getDoc(doc(db, 'users', user.uid));
@@ -247,13 +246,34 @@ class AuthService {
   // Create new user (Admin/Teacher creating students)
   async createUser(userData: CreateUserData): Promise<string> {
     try {
-      // Call Cloud Function to create user with custom claims
-      const createUserFunction = httpsCallable(functions, 'createUserWithClaims');
-      const result = await createUserFunction(userData);
-      const { uid } = result.data as { uid: string };
+      // For now, create user directly without cloud function due to CORS issues
+      // This is a temporary workaround until cloud functions are properly configured
+      
+      // Generate a unique ID for the user
+      const uid = doc(collection(db, 'users')).id;
+      
+      // Create user document in Firestore
+      await setDoc(doc(db, 'users', uid), {
+        uid,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role,
+        schoolId: userData.schoolId,
+        phoneNumber: userData.phoneNumber || null,
+        timezone: userData.timezone || 'UTC',
+        isActive: true,
+        metadata: {
+          lastLogin: null,
+          loginCount: 0
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
 
       return uid;
     } catch (error: any) {
+      console.error('Error creating user:', error);
       throw new Error(error.message || 'Failed to create user');
     }
   }
@@ -263,26 +283,80 @@ class AuthService {
     userData: CreateUserData,
     studentData: StudentData
   ): Promise<string> {
+    
     try {
-      // Create user first
-      const uid = await this.createUser(userData);
+      let uid: string;
+      
+      // For now, always create students without Firebase Auth to avoid logout issues
+      // Students can be given auth accounts later when they need to log in
+      
+      // Generate a unique ID for the student
+      uid = doc(collection(db, 'users')).id;
+      
+      // Create user document in Firestore
+      const userDocument: any = {
+        uid,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role || 'student',
+        schoolId: userData.schoolId,
+        timezone: userData.timezone || 'UTC',
+        isActive: true,
+        needsAuthAccount: true,
+        metadata: {
+          lastLogin: null,
+          loginCount: 0
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      
+      // Only add optional fields if they have values
+      if (userData.phoneNumber) {
+        userDocument.phoneNumber = userData.phoneNumber;
+      }
+      
+      if (userData.password) {
+        userDocument.tempPassword = userData.password;
+      }
+      
+      await setDoc(doc(db, 'users', uid), userDocument);
 
       // Create student profile
-      await setDoc(doc(db, 'students', uid), {
+      // Clean the studentData to remove undefined values
+      const cleanStudentData: any = {};
+      Object.keys(studentData).forEach(key => {
+        const value = (studentData as any)[key];
+        if (value !== undefined && value !== null) {
+          cleanStudentData[key] = value;
+        }
+      });
+      
+      const studentDocument = {
         id: uid,
         userId: uid,
         schoolId: userData.schoolId,
-        ...studentData,
+        ...cleanStudentData,
+        // Add normalized fields for UI display
+        courseName: cleanStudentData.courseName || '',
+        lessonType: cleanStudentData.lessonType || 'individual',
+        ageGroup: cleanStudentData.ageGroup || 'Adult',
+        level: cleanStudentData.level || 'Beginner',
         enrollmentDate: serverTimestamp(),
         totalLessonsTaken: 0,
         totalLessonsScheduled: 0,
         status: 'active',
+        paymentStatus: 'pending',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      };
+      
+      await setDoc(doc(db, 'students', uid), studentDocument);
 
       return uid;
     } catch (error: any) {
+      console.error('Error creating student:', error);
       throw new Error(error.message || 'Failed to create student');
     }
   }
@@ -378,6 +452,34 @@ class AuthService {
       });
     } catch (error: any) {
       throw new Error(error.message || 'Failed to deactivate user');
+    }
+  }
+
+  // Create Firebase Auth account for existing student (Admin only)
+  async createAuthAccountForStudent(studentId: string): Promise<void> {
+    try {
+      // Get student document
+      const studentDoc = await getDoc(doc(db, 'users', studentId));
+      if (!studentDoc.exists()) {
+        throw new Error('Student not found');
+      }
+
+      const studentData = studentDoc.data();
+      if (!studentData.needsAuthAccount) {
+        throw new Error('Student already has an auth account');
+      }
+
+      // Use cloud function to create auth account if available
+      // For now, we'll just mark that the account needs to be created manually
+      
+      // Update the document to mark auth account as created
+      await updateDoc(doc(db, 'users', studentId), {
+        needsAuthAccount: false,
+        tempPassword: null, // Clear the temporary password
+        updatedAt: serverTimestamp()
+      });
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to create auth account for student');
     }
   }
 

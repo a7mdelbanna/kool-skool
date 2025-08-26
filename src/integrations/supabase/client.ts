@@ -176,7 +176,6 @@ export interface RpcResponse {
 
 export const getStudentsWithDetails = async (schoolId: string | undefined) => {
   if (!schoolId) {
-    console.warn('No school ID provided to getStudentsWithDetails');
     return [];
   }
 
@@ -188,17 +187,31 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
     // Enrich with user data
     const enrichedStudents = await Promise.all(students.map(async (student: any) => {
       const user = await databaseService.getById('users', student.userId);
+      
+      // Map the fields correctly for the UI
       return {
         ...student,
-        first_name: user?.firstName,
-        last_name: user?.lastName,
-        email: user?.email
+        first_name: user?.firstName || '',
+        last_name: user?.lastName || '',
+        email: user?.email || '',
+        phone: student.phone || user?.phoneNumber || '',
+        course_name: student.courseName || '',
+        lesson_type: student.lessonType || 'individual',
+        age_group: student.ageGroup || 'adult',
+        level: student.level || 'beginner',
+        teacher_id: student.teacherId || '',
+        payment_status: student.paymentStatus || 'pending',
+        lessons_count: student.totalLessonsTaken || 0,
+        next_session_date: student.nextSessionDate || null,
+        next_payment_date: student.nextPaymentDate || null,
+        next_payment_amount: student.nextPaymentAmount || null,
+        subscription_progress: student.subscriptionProgress || '0/0'
       };
     }));
     
     return enrichedStudents;
   } catch (error) {
-    console.error('Error fetching students with details:', error);
+    console.error('Error fetching students:', error);
     throw error;
   }
 };
@@ -210,11 +223,27 @@ export const createStudent = async (studentData: {
   last_name: string;
   teacher_id: string;
   course_id: string;
+  course_name?: string;
   age_group: string;
   level: string;
+  lesson_type?: string;
   phone?: string;
 }): Promise<CreateStudentResponse> => {
+  
   try {
+    // Get schoolId from the user object, not from a separate localStorage item
+    const userData = localStorage.getItem('user');
+    const user = userData ? JSON.parse(userData) : null;
+    const schoolId = user?.schoolId || '';
+    
+    if (!schoolId) {
+      console.error('No schoolId found in user object');
+      return {
+        success: false,
+        message: 'School ID not found. Please log in again.'
+      };
+    }
+    
     const uid = await authService.createStudent(
       {
         email: studentData.student_email,
@@ -222,14 +251,16 @@ export const createStudent = async (studentData: {
         firstName: studentData.first_name,
         lastName: studentData.last_name,
         role: 'student',
-        schoolId: localStorage.getItem('schoolId') || ''
+        schoolId: schoolId
       },
       {
         teacherId: studentData.teacher_id,
         courseId: studentData.course_id,
+        courseName: studentData.course_name,
+        lessonType: studentData.lesson_type || 'individual',
         ageGroup: studentData.age_group as any,
         level: studentData.level as any,
-        phone: studentData.phone
+        ...(studentData.phone && { phone: studentData.phone })
       }
     );
 
@@ -303,7 +334,7 @@ export const getSchoolTeachers = async (schoolId: string) => {
       last_name: teacher.lastName
     }));
   } catch (error) {
-    console.error('Exception in getSchoolTeachers:', error);
+    console.error('Error fetching school teachers:', error);
     throw error;
   }
 };
@@ -336,7 +367,6 @@ export const createCourse = async (name: string, type: 'individual' | 'group') =
   const user = userData ? JSON.parse(userData) : null;
 
   if (!user || !user.schoolId) {
-    console.error('User not authenticated or school ID not found.');
     throw new Error('Authentication required to create a course.');
   }
 
@@ -413,7 +443,6 @@ export const deletePayment = async (id: string) => {
 export const getCurrentUserInfo = async () => {
   const userData = localStorage.getItem('user');
   if (!userData) {
-    console.log('No user data found in localStorage');
     return [];
   }
 
@@ -422,7 +451,6 @@ export const getCurrentUserInfo = async () => {
   const role = user.role;
 
   if (!schoolId) {
-    console.log('No school ID found in user data');
     return [];
   }
 

@@ -43,8 +43,6 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
   };
 
   const handleStudentAdded = (student: Student) => {
-    console.log("Student added in dialog:", student);
-    
     // Force refresh student data
     queryClient.invalidateQueries({ queryKey: ['students'] });
     

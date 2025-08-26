@@ -87,14 +87,12 @@ const Students = () => {
   
   useEffect(() => {
     if (schoolId) {
-      console.log('Component mounted, forcing refetch of students data');
       refetchStudents();
     }
   }, [schoolId, refetchStudents]);
   
   // Update the mapping function to work with the actual data structure
   const mapStudentDataToStudent = (data: any): Student => {
-    console.log('Mapping student data to UI model:', data);
     
     // Format next session date for display
     const formatNextSession = (dateStr: string | null): string => {
@@ -133,33 +131,15 @@ const Students = () => {
       subscriptionProgress: data.subscription_progress || '0/0'
     };
     
-    console.log('Mapped student with subscription progress:', mappedStudent.subscriptionProgress);
     return mappedStudent;
   };
   
-  useEffect(() => {
-    console.log('Current students data:', studentsData);
-    if (studentsData && studentsData.length > 0) {
-      console.log('Students found in data:', studentsData.length);
-    } else if (studentsData) {
-      console.log('Students data array is empty');
-    } else {
-      console.log('No students data available');
-    }
-  }, [studentsData]);
   
   const students: Student[] = USE_MOCK_DATA 
     ? getMockStudents() 
     : (studentsData ? 
       studentsData.map(mapStudentDataToStudent) : 
       []);
-  
-  console.log('Mapped students for UI:', students);
-  console.log('Payment status breakdown:', {
-    paid: students.filter(s => s.paymentStatus === 'paid').length,
-    pending: students.filter(s => s.paymentStatus === 'pending').length,
-    overdue: students.filter(s => s.paymentStatus === 'overdue').length
-  });
   
   const courses = Array.from(new Set(students.map(s => s.courseName)));
   const lessonTypes = Array.from(new Set(students.map(s => s.lessonType)));
@@ -389,7 +369,6 @@ const Students = () => {
   };
   
   const filteredStudents = filterStudents();
-  console.log('Filtered students for display:', filteredStudents);
   
   return (
     <div className="space-y-6 pt-6 sm:pt-8">

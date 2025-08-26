@@ -10,31 +10,18 @@ interface Teacher {
 }
 
 export const useTeachers = (schoolId: string | null, enabled: boolean = true) => {
-  console.log('=== useTeachers HOOK START ===');
-  console.log('useTeachers - schoolId:', schoolId);
-  console.log('useTeachers - enabled:', enabled);
-  console.log('useTeachers - query will be enabled:', !!schoolId && enabled);
   
   const { data: teachers, isLoading, error, refetch } = useQuery({
     queryKey: ['teachers', schoolId],
     queryFn: async (): Promise<Teacher[]> => {
-      console.log('=== useTeachers QUERY FUNCTION START ===');
-      console.log('Fetching teachers for schoolId:', schoolId);
-      
       if (!schoolId) {
-        console.warn('No schoolId provided to useTeachers query function');
         return [];
       }
       
       try {
-        console.log('Calling getSchoolTeachers with:', schoolId);
         const result = await getSchoolTeachers(schoolId);
-        console.log('useTeachers - Raw result from getSchoolTeachers:', result);
-        console.log('useTeachers - Result type:', typeof result);
-        console.log('useTeachers - Is result array?:', Array.isArray(result));
         
         if (!result || !Array.isArray(result)) {
-          console.warn('useTeachers - Invalid result format:', result);
           return [];
         }
         
@@ -45,15 +32,10 @@ export const useTeachers = (schoolId: string | null, enabled: boolean = true) =>
           display_name: teacher.display_name || `${teacher.first_name} ${teacher.last_name}`
         }));
         
-        console.log('useTeachers - Mapped teachers:', mappedTeachers);
-        console.log('useTeachers - Teachers count:', mappedTeachers.length);
-        
         return mappedTeachers;
       } catch (error) {
         console.error('useTeachers - Error fetching teachers:', error);
         throw error;
-      } finally {
-        console.log('=== useTeachers QUERY FUNCTION END ===');
       }
     },
     enabled: !!schoolId && enabled,
@@ -61,15 +43,6 @@ export const useTeachers = (schoolId: string | null, enabled: boolean = true) =>
     retry: 3,
     retryDelay: 1000,
   });
-  
-  console.log('=== useTeachers HOOK RESULT ===');
-  console.log('useTeachers - teachers:', teachers);
-  console.log('useTeachers - teachers type:', typeof teachers);
-  console.log('useTeachers - teachers is array?:', Array.isArray(teachers));
-  console.log('useTeachers - teachers length:', teachers?.length);
-  console.log('useTeachers - isLoading:', isLoading);
-  console.log('useTeachers - error:', error);
-  console.log('=== useTeachers HOOK END ===');
   
   return {
     teachers: teachers || [],
