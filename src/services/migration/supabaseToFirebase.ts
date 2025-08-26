@@ -590,11 +590,54 @@ async function handleGetSchoolCurrencies(params: any) {
 
 async function handleGetSchoolAccounts(params: any) {
   try {
+    // Query accounts with the correct field name 'school_id'
     const accounts = await databaseService.query('accounts', {
-      where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
+      where: [{ field: 'school_id', operator: '==', value: params.p_school_id }]
     });
-    return { data: accounts, error: null };
+    
+    // Map the field names to match what the UI expects and enrich with currency information
+    const mappedAccounts = await Promise.all(accounts.map(async (account: any) => {
+      // Fetch currency information for each account
+      let currencyInfo = {
+        currency_name: null,
+        currency_symbol: null,
+        currency_code: null
+      };
+      
+      if (account.currency_id) {
+        try {
+          const currency = await databaseService.getById('currencies', account.currency_id);
+          if (currency) {
+            currencyInfo = {
+              currency_name: currency.name,
+              currency_symbol: currency.symbol,
+              currency_code: currency.code
+            };
+          }
+        } catch (error) {
+          console.warn('Error fetching currency info for account:', account.id, error);
+        }
+      }
+      
+      return {
+        id: account.id,
+        name: account.name,
+        type: account.type,
+        account_number: account.account_number,
+        color: account.color,
+        exclude_from_stats: account.exclude_from_stats || false,
+        is_archived: account.is_archived || false,
+        created_at: account.created_at || account.createdAt,
+        currency_id: account.currency_id,
+        ...currencyInfo,
+        school_id: account.school_id || account.schoolId
+      };
+    }));
+    
+    console.log('Fetched accounts for school:', params.p_school_id, 'Count:', mappedAccounts.length);
+    return { data: mappedAccounts, error: null };
   } catch (error) {
+    console.error('Error fetching school accounts:', error);
     return { data: null, error };
   }
 }
