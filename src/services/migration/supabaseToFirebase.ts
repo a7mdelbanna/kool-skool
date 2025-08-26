@@ -1017,30 +1017,32 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
   try {
     console.log('Getting lesson sessions for student:', params.p_student_id);
     
-    // Query sessions from Firebase
+    // Query sessions from Firebase (using camelCase field names)
     const sessions = await databaseService.query('sessions', {
-      where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
+      where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
     });
     
-    // Map sessions to the expected format
+    // Map sessions to the expected format (Firebase uses camelCase, return snake_case)
     const mappedSessions = sessions.map((session: any) => ({
       id: session.id,
-      subscription_id: session.subscription_id,
-      student_id: session.student_id,
-      teacher_id: session.teacher_id || null,
-      session_number: session.session_number,
-      scheduled_date: session.scheduled_date,
-      scheduled_time: session.scheduled_time,
-      duration_minutes: session.duration_minutes || 60,
+      subscription_id: session.subscriptionId || session.subscription_id,
+      student_id: session.studentId || session.student_id,
+      teacher_id: session.teacherId || session.teacher_id || null,
+      session_number: session.sessionNumber || session.session_number,
+      scheduled_date: session.scheduledDate || session.scheduled_date,
+      scheduled_time: session.scheduledTime || session.scheduled_time,
+      duration_minutes: session.durationMinutes || session.duration_minutes || 60,
       status: session.status || 'scheduled',
       attended: session.attended || false,
       notes: session.notes || '',
-      counts_toward_completion: session.counts_toward_completion === false ? false : true, // Default to true unless explicitly false
-      index_in_sub: session.index_in_sub || null,
-      original_session_index: session.original_session_index || null,
-      moved_from_session_id: session.moved_from_session_id || null,
-      created_at: session.created_at,
-      updated_at: session.updated_at
+      counts_toward_completion: session.countsTowardCompletion !== false ? true : false,
+      index_in_sub: session.indexInSub || session.index_in_sub || null,
+      original_session_index: session.originalSessionIndex || session.original_session_index || null,
+      moved_from_session_id: session.movedFromSessionId || session.moved_from_session_id || null,
+      created_at: session.createdAt || session.created_at,
+      updated_at: session.updatedAt || session.updated_at,
+      cost: session.cost || null,
+      payment_status: session.paymentStatus || session.payment_status || null
     }));
     
     console.log(`Found ${mappedSessions.length} sessions for student ${params.p_student_id}`);
@@ -1060,16 +1062,16 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
   try {
     console.log('Getting subscriptions for student:', params.p_student_id);
     
-    // Query subscriptions from Firebase
+    // Query subscriptions from Firebase (using camelCase field names)
     const subscriptions = await databaseService.query('subscriptions', {
-      where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
+      where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
     });
     
     // For each subscription, calculate sessions taken and scheduled
     const enrichedSubscriptions = await Promise.all(subscriptions.map(async (subscription: any) => {
-      // Get sessions for this subscription
+      // Get sessions for this subscription (using camelCase field names)
       const sessions = await databaseService.query('sessions', {
-        where: [{ field: 'subscription_id', operator: '==', value: subscription.id }]
+        where: [{ field: 'subscriptionId', operator: '==', value: subscription.id }]
       });
       
       // Count sessions by status WITH counts_toward_completion logic (matching Supabase RPC)
@@ -1094,15 +1096,15 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
       
       return {
         id: subscription.id,
-        student_id: subscription.student_id,
-        session_count: subscription.session_count,
-        duration_months: subscription.duration_months,
-        start_date: subscription.start_date,
+        student_id: subscription.studentId || subscription.student_id,
+        session_count: subscription.sessionCount || subscription.session_count,
+        duration_months: subscription.durationMonths || subscription.duration_months,
+        start_date: subscription.startDate || subscription.start_date,
         schedule: subscription.schedule,
-        price_mode: subscription.price_mode,
-        price_per_session: subscription.price_per_session,
-        fixed_price: subscription.fixed_price,
-        total_price: subscription.total_price,
+        price_mode: subscription.priceMode || subscription.price_mode,
+        price_per_session: subscription.pricePerSession || subscription.price_per_session,
+        fixed_price: subscription.fixedPrice || subscription.fixed_price,
+        total_price: subscription.totalPrice || subscription.total_price,
         currency: subscription.currency,
         notes: subscription.notes,
         status: subscription.status,
@@ -1113,8 +1115,8 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
         sessions_scheduled: sessionsScheduled,
         // Keep legacy fields for compatibility
         sessions_taken: sessionsCompleted,
-        created_at: subscription.created_at,
-        updated_at: subscription.updated_at
+        created_at: subscription.createdAt || subscription.created_at,
+        updated_at: subscription.updatedAt || subscription.updated_at
       };
     }));
     

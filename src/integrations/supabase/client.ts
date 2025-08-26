@@ -557,13 +557,22 @@ export const deleteContactType = async (id: string) => {
 
 export const getStudentLessonSessions = async (studentId: string): Promise<LessonSession[]> => {
   try {
-    // Query without orderBy to avoid Firebase index requirement
-    const sessions = await databaseService.query('sessions', {
-      where: [{ field: 'student_id', operator: '==', value: studentId }] // Use student_id (Firebase field name)
+    console.log('Fetching lesson sessions for student:', studentId);
+    
+    // Use Supabase RPC call to get sessions from migration layer
+    const { data, error } = await supabase.rpc('get_lesson_sessions', {
+      p_student_id: studentId
     });
     
+    if (error) {
+      console.error('Error fetching lesson sessions:', error);
+      throw error;
+    }
+    
+    console.log(`Found ${data?.length || 0} sessions for student ${studentId}`);
+    
     // Sort in memory by scheduled_date descending
-    return sessions.sort((a: any, b: any) => {
+    return (data || []).sort((a: any, b: any) => {
       const dateA = new Date(a.scheduled_date || a.scheduledDate || a.created_at);
       const dateB = new Date(b.scheduled_date || b.scheduledDate || b.created_at);
       return dateB.getTime() - dateA.getTime(); // Descending order
@@ -597,9 +606,21 @@ export const handleSessionAction = async (sessionId: string, action: string, new
 
 export const getStudentSubscriptions = async (studentId: string): Promise<Subscription[]> => {
   try {
-    return await databaseService.query('subscriptions', {
-      where: [{ field: 'studentId', operator: '==', value: studentId }]
+    console.log('Fetching subscriptions for student:', studentId);
+    
+    // Use Supabase RPC call to get subscriptions from migration layer
+    const { data, error } = await supabase.rpc('get_student_subscriptions', {
+      p_student_id: studentId
     });
+    
+    if (error) {
+      console.error('Error fetching subscriptions:', error);
+      throw error;
+    }
+    
+    console.log(`Found ${data?.length || 0} subscriptions for student ${studentId}`);
+    
+    return data || [];
   } catch (error) {
     console.error('Error fetching subscriptions:', error);
     throw error;

@@ -120,7 +120,20 @@ export const formatInUserTimezone = (
   formatString: string = 'yyyy-MM-dd HH:mm'
 ): string => {
   try {
+    // Check if date is null, undefined, or empty
+    if (!date) {
+      console.warn('formatInUserTimezone - No date provided');
+      return '';
+    }
+    
     const utcDate = typeof date === 'string' ? parseISO(date) : date;
+    
+    // Check if the parsed date is valid
+    if (!utcDate || isNaN(utcDate.getTime())) {
+      console.warn('formatInUserTimezone - Invalid date provided:', date);
+      return '';
+    }
+    
     console.log('formatInUserTimezone - Input date:', utcDate);
     console.log('formatInUserTimezone - User timezone:', userTimezone);
     console.log('formatInUserTimezone - Format string:', formatString);
@@ -136,9 +149,7 @@ export const formatInUserTimezone = (
     return result;
   } catch (error) {
     console.error('formatInUserTimezone - Error:', error);
-    // Fallback to basic formatting
-    const fallbackDate = typeof date === 'string' ? parseISO(date) : date;
-    return format(fallbackDate, formatString, { timeZone: userTimezone });
+    return '';
   }
 };
 
