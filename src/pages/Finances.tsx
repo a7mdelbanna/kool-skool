@@ -218,6 +218,8 @@ const FinancesPage = () => {
         .rpc('get_school_transactions', { p_school_id: schoolId });
 
       if (error) throw error;
+      
+      // The RPC now returns contact_name directly
       return data || [];
     },
     enabled: !!schoolId,

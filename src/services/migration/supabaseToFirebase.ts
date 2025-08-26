@@ -1316,16 +1316,81 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
       }
     }
     
-    // Enrich transactions with account names
-    const enrichedTransactions = transactions.map((transaction: any) => ({
-      ...transaction,
-      to_account_name: transaction.to_account_id ? accountMap.get(transaction.to_account_id)?.name : null,
-      from_account_name: transaction.from_account_id ? accountMap.get(transaction.from_account_id)?.name : null,
-      // Ensure consistent field names
-      amount: transaction.amount || 0,
-      currency: transaction.currency || 'USD',
-      status: transaction.status || 'completed'
-    }));
+    // Get student and contact names for transactions
+    const studentIds = new Set<string>();
+    const contactIds = new Set<string>();
+    
+    transactions.forEach((t: any) => {
+      if (t.studentId) studentIds.add(t.studentId);
+      if (t.student_id) studentIds.add(t.student_id);
+      if (t.contactId) contactIds.add(t.contactId);
+      if (t.contact_id) contactIds.add(t.contact_id);
+    });
+    
+    // Fetch students and their user data
+    const studentMap = new Map<string, string>();
+    if (studentIds.size > 0) {
+      const students = await databaseService.query('students', {
+        where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
+      });
+      
+      // Get user data for students
+      for (const student of students) {
+        if (studentIds.has(student.id)) {
+          try {
+            const user = await databaseService.getById('users', student.userId);
+            if (user) {
+              const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+              studentMap.set(student.id, fullName || 'Unknown Student');
+            }
+          } catch (error) {
+            console.warn('Could not fetch user for student:', student.id);
+          }
+        }
+      }
+    }
+    
+    // Fetch contacts
+    const contactMap = new Map<string, string>();
+    if (contactIds.size > 0) {
+      const contacts = await databaseService.query('contacts', {
+        where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
+      });
+      
+      contacts.forEach((contact: any) => {
+        if (contactIds.has(contact.id)) {
+          contactMap.set(contact.id, contact.name || 'Unknown Contact');
+        }
+      });
+    }
+    
+    // Enrich transactions with account and contact/student names
+    const enrichedTransactions = transactions.map((transaction: any) => {
+      const studentId = transaction.studentId || transaction.student_id;
+      const contactId = transaction.contactId || transaction.contact_id;
+      
+      let contactName = null;
+      
+      if (studentId && studentMap.has(studentId)) {
+        contactName = studentMap.get(studentId);
+      } else if (contactId && contactMap.has(contactId)) {
+        contactName = contactMap.get(contactId);
+      }
+      
+      return {
+        ...transaction,
+        to_account_name: transaction.to_account_id ? accountMap.get(transaction.to_account_id)?.name : null,
+        from_account_name: transaction.from_account_id ? accountMap.get(transaction.from_account_id)?.name : null,
+        contact_name: contactName,
+        // Ensure consistent field names
+        amount: transaction.amount || 0,
+        currency: transaction.currency || 'USD',
+        status: transaction.status || 'completed',
+        // Include the IDs for debugging
+        student_id: studentId,
+        contact_id: contactId
+      };
+    });
     
     console.log(`Found ${enrichedTransactions.length} transactions for school`);
     
