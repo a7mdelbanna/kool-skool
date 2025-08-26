@@ -75,7 +75,8 @@ const StudentLevelsManagement = () => {
         .insert([{
           ...levelData,
           school_id: schoolId,
-          sort_order: maxSortOrder + 1
+          sort_order: maxSortOrder + 1,
+          is_active: true
         }])
         .select()
         .single();

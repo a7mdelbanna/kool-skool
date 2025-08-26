@@ -348,7 +348,7 @@ const Courses = () => {
                     {course.lesson_type === 'individual' ? 'Individual' : 'Group'}
                   </Badge>
                   <div className="text-xs text-muted-foreground">
-                    Created: {new Date(course.created_at).toLocaleDateString()}
+                    Created: {course.created_at ? new Date(course.created_at).toLocaleDateString() : 'Recently'}
                   </div>
                 </div>
               )}

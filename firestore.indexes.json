@@ -111,6 +111,15 @@
       ]
     },
     {
+      "collectionGroup": "studentLevels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_active", "order": "ASCENDING" },
+        { "fieldPath": "school_id", "order": "ASCENDING" },
+        { "fieldPath": "sort_order", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "transactionCategories",
       "queryScope": "COLLECTION",
       "fields": [

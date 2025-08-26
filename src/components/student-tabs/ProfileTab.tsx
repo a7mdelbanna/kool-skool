@@ -73,7 +73,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         .from('student_levels')
         .select('*')
         .eq('school_id', schoolId)
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       if (error) {

@@ -144,6 +144,10 @@ export const supabase = {
         return handleGetStudentsWithDetails(params);
       case 'verify_license_and_create_school':
         return handleVerifyLicenseAndCreateSchool(params);
+      case 'get_school_categories':
+        return handleGetSchoolCategories(params);
+      case 'create_default_categories':
+        return handleCreateDefaultCategories(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -736,6 +740,90 @@ async function handleVerifyLicenseAndCreateSchool(params: any) {
     };
   } catch (error) {
     return { data: { success: false, message: error.message }, error };
+  }
+}
+
+async function handleGetSchoolCategories(params: any) {
+  try {
+    const categories = await databaseService.query('transactionCategories', {
+      where: [
+        { field: 'school_id', operator: '==', value: params.p_school_id },
+        { field: 'is_active', operator: '==', value: true }
+      ],
+      orderBy: [{ field: 'name', direction: 'asc' }]
+    });
+    
+    // Build hierarchical structure with full paths and levels
+    const categoriesWithHierarchy = categories.map((cat: any) => {
+      let fullPath = cat.name;
+      let level = 0;
+      
+      if (cat.parent_id) {
+        const parent = categories.find((p: any) => p.id === cat.parent_id);
+        if (parent) {
+          fullPath = `${parent.name} > ${cat.name}`;
+          level = 1;
+          
+          // Check for grandparent
+          if (parent.parent_id) {
+            const grandparent = categories.find((gp: any) => gp.id === parent.parent_id);
+            if (grandparent) {
+              fullPath = `${grandparent.name} > ${parent.name} > ${cat.name}`;
+              level = 2;
+            }
+          }
+        }
+      }
+      
+      return {
+        ...cat,
+        full_path: fullPath,
+        level: level
+      };
+    });
+    
+    return { data: categoriesWithHierarchy, error: null };
+  } catch (error) {
+    console.error('Error fetching school categories:', error);
+    return { data: null, error };
+  }
+}
+
+async function handleCreateDefaultCategories(params: any) {
+  try {
+    const defaultCategories = [
+      // Income categories
+      { name: 'Course Fees', type: 'income', color: '#10B981', parent_id: null },
+      { name: 'Registration', type: 'income', color: '#059669', parent_id: null },
+      { name: 'Material Sales', type: 'income', color: '#047857', parent_id: null },
+      { name: 'Other Income', type: 'income', color: '#065F46', parent_id: null },
+      
+      // Expense categories
+      { name: 'Salaries', type: 'expense', color: '#EF4444', parent_id: null },
+      { name: 'Rent', type: 'expense', color: '#DC2626', parent_id: null },
+      { name: 'Utilities', type: 'expense', color: '#B91C1C', parent_id: null },
+      { name: 'Materials', type: 'expense', color: '#991B1B', parent_id: null },
+      { name: 'Marketing', type: 'expense', color: '#7F1D1D', parent_id: null },
+      { name: 'Other Expenses', type: 'expense', color: '#450A0A', parent_id: null },
+      
+      // Transfer categories
+      { name: 'Bank Transfer', type: 'transfer', color: '#3B82F6', parent_id: null },
+      { name: 'Cash Transfer', type: 'transfer', color: '#2563EB', parent_id: null }
+    ];
+    
+    // Create categories in batch
+    for (const category of defaultCategories) {
+      await databaseService.create('transactionCategories', {
+        ...category,
+        school_id: params.p_school_id,
+        is_active: true
+      });
+    }
+    
+    return { data: { success: true }, error: null };
+  } catch (error) {
+    console.error('Error creating default categories:', error);
+    return { data: null, error };
   }
 }
 
