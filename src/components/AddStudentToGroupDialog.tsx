@@ -113,36 +113,35 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
     enabled: !!user?.schoolId && open
   });
 
-  // Fetch accounts filtered by group currency
+  // Fetch accounts filtered by group currency using RPC function
   const { data: accounts } = useQuery({
     queryKey: ['accounts', user?.schoolId, group?.currency],
     queryFn: async () => {
       if (!user?.schoolId || !group?.currency) return [];
       
-      const { data, error } = await supabase
-        .from('accounts')
-        .select(`
-          id,
-          name,
-          type,
-          currency_id,
-          currencies!inner(code)
-        `)
-        .eq('school_id', user.schoolId)
-        .eq('is_archived', false)
-        .eq('currencies.code', group.currency);
+      const { data, error } = await supabase.rpc('get_school_accounts', {
+        p_school_id: user.schoolId
+      });
 
       if (error) {
         console.error('Error fetching accounts:', error);
         throw error;
       }
 
-      return data?.map(account => ({
-        id: account.id,
-        name: account.name,
-        type: account.type,
-        currency_id: account.currency_id
-      })) || [];
+      // Filter accounts by currency code and archived status
+      const filteredAccounts = (data || [])
+        .filter((account: any) => 
+          !account.is_archived && 
+          account.currency_code === group.currency
+        )
+        .map((account: any) => ({
+          id: account.id,
+          name: account.name,
+          type: account.type,
+          currency_id: account.currency_id
+        }));
+
+      return filteredAccounts;
     },
     enabled: !!user?.schoolId && !!group?.currency && open
   });

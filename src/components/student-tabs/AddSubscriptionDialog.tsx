@@ -119,25 +119,17 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     enabled: !!schoolId,
   });
 
-  // Fetch school accounts
+  // Fetch school accounts using RPC function
   const { data: accounts = [] } = useQuery({
     queryKey: ['school-accounts', schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
-      const { data, error } = await supabase
-        .from('accounts')
-        .select(`
-          *,
-          currencies (
-            code,
-            symbol
-          )
-        `)
-        .eq('school_id', schoolId)
-        .eq('is_archived', false)
-        .order('name');
+      const { data, error } = await supabase.rpc('get_school_accounts', {
+        p_school_id: schoolId
+      });
       if (error) throw error;
-      return data;
+      // Filter out archived accounts
+      return (data || []).filter((account: any) => !account.is_archived);
     },
     enabled: !!schoolId,
   });
