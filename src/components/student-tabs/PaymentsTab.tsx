@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, CreditCard, DollarSign, Euro, Plus, Receipt, Trash, Wallet } from "lucide-react";
+import { CalendarIcon, CreditCard, Plus, Receipt, Trash, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
@@ -49,20 +49,13 @@ const paymentSchema = z.object({
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
-const currencies = [
-  { symbol: "$", code: "USD", name: "US Dollar", icon: DollarSign },
-  { symbol: "€", code: "EUR", name: "Euro", icon: Euro },
-  { symbol: "₽", code: "RUB", name: "Russian Ruble", icon: ({ className }: { className?: string }) => (
-    <span className={cn("font-bold text-sm", className)}>₽</span>
-  )},
-];
 
 const PaymentsTab: React.FC<PaymentsTabProps> = ({ 
   studentData, 
   setStudentData, 
   isViewMode = false 
 }) => {
-  const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]);
+  const [selectedCurrency, setSelectedCurrency] = useState<any>(null);
   const queryClient = useQueryClient();
   
   const form = useForm<PaymentFormValues>({
@@ -86,6 +79,20 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   };
 
   const schoolId = getSchoolId();
+
+  // Fetch currencies from school settings
+  const { data: currencies = [], isLoading: currenciesLoading } = useQuery({
+    queryKey: ['school-currencies', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase.rpc('get_school_currencies', {
+        p_school_id: schoolId
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: ['school-accounts', schoolId],
@@ -241,7 +248,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         account_id: "",
         subscription_id: "none",
       });
-      setSelectedCurrency(currencies[0]);
+      setSelectedCurrency(currencies[0] || null);
     },
     onError: (error: any) => {
       console.error("Error adding payment:", error);
@@ -285,12 +292,21 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   };
 
   const handleCurrencyChange = (currencyCode: string) => {
-    const currency = currencies.find(c => c.code === currencyCode) || currencies[0];
+    const currency = currencies.find(c => (c.code || c.currency_code) === currencyCode) || currencies[0];
     setSelectedCurrency(currency);
     form.setValue("currency", currencyCode);
     
     form.setValue("account_id", "");
   };
+
+  // Set initial selected currency when currencies are loaded
+  React.useEffect(() => {
+    if (currencies.length > 0 && !selectedCurrency) {
+      const defaultCurrency = currencies[0];
+      setSelectedCurrency(defaultCurrency);
+      form.setValue("currency", defaultCurrency.code || defaultCurrency.currency_code);
+    }
+  }, [currencies, selectedCurrency, form]);
 
   const compatibleAccounts = accounts.filter(account => 
     account.currency_code === form.watch("currency")
@@ -360,7 +376,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     };
   };
 
-  if (paymentsLoading || accountsLoading || subscriptionsLoading) {
+  if (paymentsLoading || accountsLoading || subscriptionsLoading || currenciesLoading) {
     return (
       <div className="space-y-6">
         <div className="text-center py-8">
@@ -473,10 +489,10 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                         </FormControl>
                         <SelectContent>
                           {currencies.map((currency) => (
-                            <SelectItem key={currency.code} value={currency.code}>
+                            <SelectItem key={currency.code || currency.currency_code} value={currency.code || currency.currency_code}>
                               <div className="flex items-center gap-2">
-                                <currency.icon className="h-4 w-4" />
-                                <span>{currency.code}</span>
+                                <span className="font-medium">{currency.symbol || currency.currency_symbol}</span>
+                                <span>{currency.code || currency.currency_code}</span>
                               </div>
                             </SelectItem>
                           ))}
@@ -492,11 +508,11 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Amount ({selectedCurrency.symbol})</FormLabel>
+                      <FormLabel>Amount ({selectedCurrency ? (selectedCurrency.symbol || selectedCurrency.currency_symbol) : ''})</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                            {selectedCurrency.symbol}
+                            {selectedCurrency ? (selectedCurrency.symbol || selectedCurrency.currency_symbol) : ''}
                           </span>
                           <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
                         </div>
