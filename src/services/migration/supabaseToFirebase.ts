@@ -471,9 +471,62 @@ async function handleCreateUser(params: any) {
 
 async function handleAddSubscription(params: any) {
   try {
-    const subscriptionId = await databaseService.create('subscriptions', params);
-    return { data: { id: subscriptionId }, error: null };
+    // Map the p_ prefixed params to actual field names
+    const subscriptionData = {
+      student_id: params.p_student_id,
+      session_count: params.p_session_count,
+      duration_months: params.p_duration_months,
+      start_date: params.p_start_date,
+      schedule: params.p_schedule,
+      price_mode: params.p_price_mode,
+      price_per_session: params.p_price_per_session,
+      fixed_price: params.p_fixed_price,
+      total_price: params.p_total_price,
+      currency: params.p_currency,
+      notes: params.p_notes || '',
+      status: params.p_status || 'active',
+      school_id: params.p_current_school_id,
+      created_by: params.p_current_user_id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const subscriptionId = await databaseService.create('subscriptions', subscriptionData);
+    
+    // Also generate the lesson sessions for this subscription
+    if (params.p_schedule && params.p_schedule.length > 0) {
+      // Generate sessions based on schedule
+      const sessions = [];
+      const startDate = new Date(params.p_start_date);
+      const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      
+      // Create sessions based on schedule for the duration
+      for (let sessionNumber = 1; sessionNumber <= params.p_session_count; sessionNumber++) {
+        const sessionData = {
+          subscription_id: subscriptionId,
+          student_id: params.p_student_id,
+          school_id: params.p_current_school_id,
+          session_number: sessionNumber,
+          status: 'scheduled',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        const sessionId = await databaseService.create('sessions', sessionData);
+        sessions.push({ id: sessionId, ...sessionData });
+      }
+    }
+    
+    // Return in the format expected by the frontend (array with subscription as first element)
+    return { 
+      data: [{ 
+        id: subscriptionId,
+        ...subscriptionData
+      }], 
+      error: null 
+    };
   } catch (error) {
+    console.error('Error creating subscription:', error);
     return { data: null, error };
   }
 }
@@ -506,9 +559,29 @@ async function handleScheduleConflicts(params: any) {
 
 async function handleCreateTransaction(params: any) {
   try {
-    const transactionId = await databaseService.create('transactions', params);
-    return { data: { id: transactionId }, error: null };
+    // Map the p_ prefixed params to actual field names
+    const transactionData = {
+      school_id: params.p_school_id,
+      type: params.p_type,
+      amount: params.p_amount,
+      currency: params.p_currency,
+      transaction_date: params.p_transaction_date,
+      description: params.p_description,
+      notes: params.p_notes,
+      to_account_id: params.p_to_account_id,
+      from_account_id: params.p_from_account_id || null,
+      payment_method: params.p_payment_method,
+      tag_ids: params.p_tag_ids || [],
+      subscription_id: params.p_subscription_id || null,
+      student_id: params.p_student_id || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const transactionId = await databaseService.create('transactions', transactionData);
+    return { data: transactionId, error: null }; // Return just the ID, not wrapped in object
   } catch (error) {
+    console.error('Error creating transaction:', error);
     return { data: null, error };
   }
 }
@@ -916,18 +989,47 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
 // Handle get_student_subscriptions RPC function
 async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
   try {
-    // For now, return empty subscriptions until we implement the full subscription system
     console.log('Getting subscriptions for student:', params.p_student_id);
     
-    // TODO: Implement full subscription fetching from Firebase
-    // This would query the subscriptions collection filtered by student_id
-    // The expected return structure includes:
-    // - id, student_id, session_count, duration_months
-    // - start_date, schedule, price_mode, price_per_session
-    // - sessions_taken, sessions_scheduled, status, created_at, updated_at
+    // Query subscriptions from Firebase
+    const subscriptions = await databaseService.query('subscriptions', {
+      where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
+    });
+    
+    // For each subscription, calculate sessions taken and scheduled
+    const enrichedSubscriptions = await Promise.all(subscriptions.map(async (subscription: any) => {
+      // Get sessions for this subscription
+      const sessions = await databaseService.query('sessions', {
+        where: [{ field: 'subscription_id', operator: '==', value: subscription.id }]
+      });
+      
+      // Count sessions by status
+      const sessionsTaken = sessions.filter((s: any) => s.status === 'completed').length;
+      const sessionsScheduled = sessions.filter((s: any) => s.status === 'scheduled').length;
+      
+      return {
+        id: subscription.id,
+        student_id: subscription.student_id,
+        session_count: subscription.session_count,
+        duration_months: subscription.duration_months,
+        start_date: subscription.start_date,
+        schedule: subscription.schedule,
+        price_mode: subscription.price_mode,
+        price_per_session: subscription.price_per_session,
+        fixed_price: subscription.fixed_price,
+        total_price: subscription.total_price,
+        currency: subscription.currency,
+        notes: subscription.notes,
+        status: subscription.status,
+        sessions_taken: sessionsTaken,
+        sessions_scheduled: sessionsScheduled,
+        created_at: subscription.created_at,
+        updated_at: subscription.updated_at
+      };
+    }));
     
     return { 
-      data: [], // Return empty array for now
+      data: enrichedSubscriptions,
       error: null 
     };
   } catch (error) {

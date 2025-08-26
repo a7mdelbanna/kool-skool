@@ -169,23 +169,14 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
           p_notes: formData.initialPayment.notes || 'Initial subscription payment',
           p_to_account_id: formData.initialPayment.accountId,
           p_payment_method: formData.initialPayment.method,
-          p_tag_ids: null
+          p_tag_ids: null,
+          p_subscription_id: subscriptionId, // Link to subscription directly
+          p_student_id: studentId // Also link to student for easier tracking
         });
 
         if (transactionError) {
           console.error('❌ Transaction creation error:', transactionError);
           throw transactionError;
-        }
-
-        // Link the transaction to the subscription
-        const { error: linkError } = await supabase
-          .from('transactions')
-          .update({ subscription_id: subscriptionId })
-          .eq('id', transactionId);
-
-        if (linkError) {
-          console.error('❌ Transaction linking error:', linkError);
-          throw linkError;
         }
 
         console.log('✅ Initial payment transaction created and linked:', transactionId);
