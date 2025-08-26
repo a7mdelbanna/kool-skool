@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Create Student in Firebase</title>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        button { padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Test Create Student Directly in Firebase</h1>
+    
+    <div class="section">
+        <h2>Create Test Student</h2>
+        <p class="info">This will create a test student with your schoolId: <strong>sET8oQzDBtk9uREAw2Js</strong></p>
+        <button onclick="createTestStudent()">Create Test Student</button>
+        <div id="result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Query Students for Your School</h2>
+        <button onclick="queryStudents()">Query Students</button>
+        <div id="students"></div>
+    </div>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9Hk_uJgSOHRjQ8v5VrJwxRaLjQQ7c71k",
+            authDomain: "kool-skool-7e858.firebaseapp.com",
+            projectId: "kool-skool-7e858",
+            storageBucket: "kool-skool-7e858.appspot.com",
+            messagingSenderId: "732695735471",
+            appId: "1:732695735471:web:36dd887c69b9bb49e31e44",
+            measurementId: "G-4LVGHH0C8R"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // Your actual schoolId from localStorage
+        const YOUR_SCHOOL_ID = 'sET8oQzDBtk9uREAw2Js';
+        
+        async function createTestStudent() {
+            const result = document.getElementById('result');
+            result.innerHTML = '<p>Creating test student...</p>';
+            
+            try {
+                // Generate a unique ID
+                const studentId = 'test_' + Date.now();
+                const userId = 'user_' + Date.now();
+                
+                // Create user document first
+                await db.collection('users').doc(userId).set({
+                    uid: userId,
+                    email: `test${Date.now()}@example.com`,
+                    firstName: 'Test',
+                    lastName: 'Student',
+                    role: 'student',
+                    schoolId: YOUR_SCHOOL_ID,
+                    isActive: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Create student document
+                await db.collection('students').doc(studentId).set({
+                    id: studentId,
+                    userId: userId,
+                    schoolId: YOUR_SCHOOL_ID,
+                    courseName: 'Test Course',
+                    lessonType: 'individual',
+                    ageGroup: 'Adult',
+                    level: 'Beginner',
+                    status: 'active',
+                    paymentStatus: 'pending',
+                    totalLessonsTaken: 0,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                result.innerHTML = `<p class="success">✅ Test student created successfully!</p>
+                                   <p>Student ID: ${studentId}</p>
+                                   <p>User ID: ${userId}</p>
+                                   <p>School ID: ${YOUR_SCHOOL_ID}</p>
+                                   <p class="info">Now refresh your Students page to see if it appears.</p>`;
+            } catch (error) {
+                result.innerHTML = `<p class="error">Error creating student: ${error.message}</p>
+                                   <p class="info">Note: This error is expected if you're not authenticated in this test page.</p>
+                                   <p class="info">The important thing is that we know the correct schoolId format.</p>`;
+            }
+        }
+        
+        async function queryStudents() {
+            const output = document.getElementById('students');
+            output.innerHTML = '<p>Querying students...</p>';
+            
+            try {
+                const snapshot = await db.collection('students')
+                    .where('schoolId', '==', YOUR_SCHOOL_ID)
+                    .get();
+                
+                let html = `<h3>Students with schoolId "${YOUR_SCHOOL_ID}": ${snapshot.size}</h3>`;
+                
+                if (snapshot.empty) {
+                    html += '<p class="error">No students found with this schoolId!</p>';
+                } else {
+                    html += '<ul>';
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        html += `<li>
+                            <strong>${doc.id}</strong> - 
+                            Course: ${data.courseName}, 
+                            Level: ${data.level}
+                        </li>`;
+                    });
+                    html += '</ul>';
+                }
+                
+                output.innerHTML = html;
+            } catch (error) {
+                output.innerHTML = `<p class="error">Error: ${error.message}</p>
+                                   <p class="info">This is expected due to authentication requirements.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

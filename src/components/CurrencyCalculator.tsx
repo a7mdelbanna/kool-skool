@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useContext } from 'react';
-import { Calculator, ArrowRight } from 'lucide-react';
+import { Calculator, ArrowRight, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
+import { currencyApiService } from '@/services/currencyApi.service';
+import { useToast } from '@/hooks/use-toast';
 
 interface Currency {
   id: string;
@@ -20,12 +22,16 @@ interface Currency {
 
 const CurrencyCalculator = () => {
   const { user } = useContext(UserContext);
+  const { toast } = useToast();
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [fromCurrency, setFromCurrency] = useState<string>('');
   const [toCurrency, setToCurrency] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [useApiRates, setUseApiRates] = useState(false);
+  const [fetchingRate, setFetchingRate] = useState(false);
+  const [liveRate, setLiveRate] = useState<number | null>(null);
 
   const fetchCurrencies = async () => {
     if (!user?.schoolId) return;
@@ -54,7 +60,7 @@ const CurrencyCalculator = () => {
     fetchCurrencies();
   }, [user?.schoolId]);
 
-  const calculateConversion = () => {
+  const calculateConversion = async () => {
     if (!amount || !fromCurrency || !toCurrency || currencies.length === 0) {
       setResult('');
       return;
@@ -74,28 +80,74 @@ const CurrencyCalculator = () => {
       return;
     }
 
-    // Convert to base currency (default currency rate = 1), then to target currency
     let convertedAmount: number;
     
-    if (fromCurrencyData.is_default) {
-      // From default currency to another
-      convertedAmount = numAmount * toCurrencyData.exchange_rate;
-    } else if (toCurrencyData.is_default) {
-      // From another currency to default
-      convertedAmount = numAmount / fromCurrencyData.exchange_rate;
+    // Use live API rate if enabled and available
+    if (useApiRates && liveRate !== null) {
+      convertedAmount = numAmount * liveRate;
     } else {
-      // Between two non-default currencies
-      // First convert to default currency, then to target currency
-      const inDefaultCurrency = numAmount / fromCurrencyData.exchange_rate;
-      convertedAmount = inDefaultCurrency * toCurrencyData.exchange_rate;
+      // Use stored rates
+      if (fromCurrencyData.is_default) {
+        // From default currency to another
+        convertedAmount = numAmount * toCurrencyData.exchange_rate;
+      } else if (toCurrencyData.is_default) {
+        // From another currency to default
+        convertedAmount = numAmount / fromCurrencyData.exchange_rate;
+      } else {
+        // Between two non-default currencies
+        // First convert to default currency, then to target currency
+        const inDefaultCurrency = numAmount / fromCurrencyData.exchange_rate;
+        convertedAmount = inDefaultCurrency * toCurrencyData.exchange_rate;
+      }
     }
 
     setResult(`${toCurrencyData.symbol}${convertedAmount.toFixed(2)}`);
   };
 
+  // Fetch live exchange rate from API
+  const fetchLiveRate = async () => {
+    if (!fromCurrency || !toCurrency) return;
+
+    const fromCurrencyData = currencies.find(c => c.id === fromCurrency);
+    const toCurrencyData = currencies.find(c => c.id === toCurrency);
+
+    if (!fromCurrencyData || !toCurrencyData) return;
+
+    setFetchingRate(true);
+    try {
+      const rate = await currencyApiService.getExchangeRate(
+        fromCurrencyData.code,
+        toCurrencyData.code
+      );
+      setLiveRate(rate);
+      setUseApiRates(true);
+      toast({
+        title: "Live rate fetched",
+        description: `Using real-time exchange rate: 1 ${fromCurrencyData.code} = ${rate.toFixed(6)} ${toCurrencyData.code}`,
+      });
+    } catch (error) {
+      console.error('Error fetching live rate:', error);
+      toast({
+        title: "Warning",
+        description: "Could not fetch live rate. Using stored rates.",
+        variant: "destructive",
+      });
+      setUseApiRates(false);
+      setLiveRate(null);
+    } finally {
+      setFetchingRate(false);
+    }
+  };
+
   useEffect(() => {
     calculateConversion();
-  }, [amount, fromCurrency, toCurrency, currencies]);
+  }, [amount, fromCurrency, toCurrency, currencies, useApiRates, liveRate]);
+
+  // Reset live rate when currencies change
+  useEffect(() => {
+    setUseApiRates(false);
+    setLiveRate(null);
+  }, [fromCurrency, toCurrency]);
 
   if (loading) {
     return (
@@ -234,29 +286,57 @@ const CurrencyCalculator = () => {
 
         {/* Exchange Rate Info */}
         {fromCurrency && toCurrency && fromCurrency !== toCurrency && (
-          <div className="text-sm text-muted-foreground text-center">
-            Exchange rate: 1 {currencies.find(c => c.id === fromCurrency)?.code} = 
-            {(() => {
-              const fromCurrencyData = currencies.find(c => c.id === fromCurrency);
-              const toCurrencyData = currencies.find(c => c.id === toCurrency);
-              if (!fromCurrencyData || !toCurrencyData) return ' N/A';
-              
-              let rate: number;
-              if (fromCurrencyData.is_default) {
-                rate = toCurrencyData.exchange_rate;
-              } else if (toCurrencyData.is_default) {
-                rate = 1 / fromCurrencyData.exchange_rate;
-              } else {
-                rate = toCurrencyData.exchange_rate / fromCurrencyData.exchange_rate;
-              }
-              
-              return ` ${rate.toFixed(6)} ${toCurrencyData.code}`;
-            })()}
+          <div className="space-y-2">
+            <div className="text-sm text-muted-foreground text-center">
+              {useApiRates && liveRate !== null ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                    Live Rate
+                  </span>
+                  1 {currencies.find(c => c.id === fromCurrency)?.code} = {liveRate.toFixed(6)} {currencies.find(c => c.id === toCurrency)?.code}
+                </span>
+              ) : (
+                <span>Stored rate: 1 {currencies.find(c => c.id === fromCurrency)?.code} = 
+                {(() => {
+                  const fromCurrencyData = currencies.find(c => c.id === fromCurrency);
+                  const toCurrencyData = currencies.find(c => c.id === toCurrency);
+                  if (!fromCurrencyData || !toCurrencyData) return ' N/A';
+                  
+                  let rate: number;
+                  if (fromCurrencyData.is_default) {
+                    rate = toCurrencyData.exchange_rate;
+                  } else if (toCurrencyData.is_default) {
+                    rate = 1 / fromCurrencyData.exchange_rate;
+                  } else {
+                    rate = toCurrencyData.exchange_rate / fromCurrencyData.exchange_rate;
+                  }
+                  
+                  return ` ${rate.toFixed(6)} ${toCurrencyData.code}`;
+                })()}
+                </span>
+              )}
+            </div>
+            
+            {/* Fetch Live Rate Button */}
+            {!useApiRates && (
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchLiveRate}
+                  disabled={!fromCurrency || !toCurrency || fetchingRate || fromCurrency === toCurrency}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${fetchingRate ? 'animate-spin' : ''}`} />
+                  {fetchingRate ? 'Fetching...' : 'Get Live Rate'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Quick Test Button */}
-        <div className="flex justify-center">
+        {/* Quick Test Buttons */}
+        <div className="flex justify-center gap-2">
           <Button
             variant="outline"
             onClick={() => setAmount('100')}
@@ -264,6 +344,21 @@ const CurrencyCalculator = () => {
           >
             Quick Test with 100
           </Button>
+          {useApiRates && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUseApiRates(false);
+                setLiveRate(null);
+                toast({
+                  title: "Switched to stored rates",
+                  description: "Now using the exchange rates stored in your database",
+                });
+              }}
+            >
+              Use Stored Rates
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

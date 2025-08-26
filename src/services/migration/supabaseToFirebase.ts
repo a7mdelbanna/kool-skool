@@ -152,6 +152,8 @@ export const supabase = {
         return handleGetLessonSessions(params);
       case 'get_student_subscriptions':
         return handleGetStudentSubscriptions(params);
+      case 'set_default_currency':
+        return handleSetDefaultCurrency(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -561,11 +563,27 @@ async function handleRemovePaymentTag(params: any) {
 
 async function handleGetSchoolCurrencies(params: any) {
   try {
+    // Query currencies with the correct field name 'school_id'
     const currencies = await databaseService.query('currencies', {
-      where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
+      where: [{ field: 'school_id', operator: '==', value: params.p_school_id }]
     });
-    return { data: currencies, error: null };
+    
+    // Map the field names to match what the UI expects
+    const mappedCurrencies = currencies.map((currency: any) => ({
+      id: currency.id,
+      name: currency.name,
+      symbol: currency.symbol,
+      code: currency.code,
+      exchange_rate: currency.exchange_rate || 1,
+      is_default: currency.is_default || false,
+      created_at: currency.created_at || currency.createdAt,
+      school_id: currency.school_id || currency.schoolId
+    }));
+    
+    console.log('Fetched currencies for school:', params.p_school_id, 'Count:', mappedCurrencies.length);
+    return { data: mappedCurrencies, error: null };
   } catch (error) {
+    console.error('Error fetching school currencies:', error);
     return { data: null, error };
   }
 }
@@ -871,6 +889,37 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
     };
   } catch (error) {
     console.error('Error getting student subscriptions:', error);
+    return { data: null, error };
+  }
+}
+
+// Handle set_default_currency RPC function
+async function handleSetDefaultCurrency(params: { p_currency_id: string, p_school_id: string }) {
+  try {
+    // First, unset all other currencies as default
+    const currencies = await databaseService.query('currencies', {
+      where: [{ field: 'school_id', operator: '==', value: params.p_school_id }]
+    });
+    
+    // Update all currencies to not be default
+    for (const currency of currencies) {
+      if (currency.is_default) {
+        await databaseService.update('currencies', currency.id, {
+          is_default: false,
+          updated_at: new Date().toISOString()
+        });
+      }
+    }
+    
+    // Set the specified currency as default
+    await databaseService.update('currencies', params.p_currency_id, {
+      is_default: true,
+      updated_at: new Date().toISOString()
+    });
+    
+    return { data: { success: true }, error: null };
+  } catch (error) {
+    console.error('Error setting default currency:', error);
     return { data: null, error };
   }
 }

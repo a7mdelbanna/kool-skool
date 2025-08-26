@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fix Student SchoolID</title>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        button { padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer; margin: 5px; }
+        button:hover { background: #45a049; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; }
+        .info { color: blue; }
+        .warning { color: orange; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Fix Student SchoolID in Firebase</h1>
+    
+    <div class="section">
+        <h2>Step 1: Sign In First</h2>
+        <p>You need to be authenticated to update Firebase documents.</p>
+        <input type="email" id="email" placeholder="ahmed@englishoshka.com" value="ahmed@englishoshka.com" style="width: 250px;">
+        <input type="password" id="password" placeholder="Password" style="width: 200px;">
+        <button onclick="signIn()">Sign In</button>
+        <div id="authStatus"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: Fix Student with Empty SchoolID</h2>
+        <p>Student ID: <code>0sgx782UNIWlU5ZtLU0AGrxHQMC2</code></p>
+        <p>Will set schoolId to: <code>sET8oQzDBtk9uREAw2Js</code></p>
+        <button onclick="fixStudent()" id="fixBtn" disabled>Fix Student SchoolID</button>
+        <div id="fixResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Verify the Fix</h2>
+        <button onclick="verifyFix()" id="verifyBtn" disabled>Query Students with Correct SchoolID</button>
+        <div id="verifyResult"></div>
+    </div>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9Hk_uJgSOHRjQ8v5VrJwxRaLjQQ7c71k",
+            authDomain: "kool-skool-7e858.firebaseapp.com",
+            projectId: "kool-skool-7e858",
+            storageBucket: "kool-skool-7e858.appspot.com",
+            messagingSenderId: "732695735471",
+            appId: "1:732695735471:web:36dd887c69b9bb49e31e44",
+            measurementId: "G-4LVGHH0C8R"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        const YOUR_SCHOOL_ID = 'sET8oQzDBtk9uREAw2Js';
+        const STUDENT_ID = '0sgx782UNIWlU5ZtLU0AGrxHQMC2';
+        
+        async function signIn() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const status = document.getElementById('authStatus');
+            
+            if (!email || !password) {
+                status.innerHTML = '<p class="error">Please enter email and password</p>';
+                return;
+            }
+            
+            status.innerHTML = '<p>Signing in...</p>';
+            
+            try {
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                status.innerHTML = `<p class="success">✅ Signed in as: ${userCredential.user.email}</p>`;
+                
+                // Enable buttons
+                document.getElementById('fixBtn').disabled = false;
+                document.getElementById('verifyBtn').disabled = false;
+            } catch (error) {
+                status.innerHTML = `<p class="error">Sign in failed: ${error.message}</p>`;
+            }
+        }
+        
+        async function fixStudent() {
+            const result = document.getElementById('fixResult');
+            result.innerHTML = '<p>Updating student document...</p>';
+            
+            try {
+                // First, get the current document
+                const studentDoc = await db.collection('students').doc(STUDENT_ID).get();
+                
+                if (!studentDoc.exists) {
+                    result.innerHTML = '<p class="error">Student document not found!</p>';
+                    return;
+                }
+                
+                const currentData = studentDoc.data();
+                result.innerHTML += `<p class="info">Current schoolId: "${currentData.schoolId}"</p>`;
+                
+                // Update the document with the correct schoolId
+                await db.collection('students').doc(STUDENT_ID).update({
+                    schoolId: YOUR_SCHOOL_ID,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                result.innerHTML += `<p class="success">✅ Student updated with schoolId: ${YOUR_SCHOOL_ID}</p>`;
+                result.innerHTML += '<p class="warning">⚠️ Now refresh your Students page to see the student!</p>';
+                
+                // Also check if the user document needs updating
+                if (currentData.userId) {
+                    try {
+                        const userDoc = await db.collection('users').doc(currentData.userId).get();
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            if (!userData.schoolId || userData.schoolId === '') {
+                                await db.collection('users').doc(currentData.userId).update({
+                                    schoolId: YOUR_SCHOOL_ID,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                result.innerHTML += `<p class="success">✅ Also updated user document with schoolId</p>`;
+                            }
+                        }
+                    } catch (error) {
+                        console.log('User document update error:', error);
+                    }
+                }
+                
+            } catch (error) {
+                result.innerHTML = `<p class="error">Error updating student: ${error.message}</p>`;
+            }
+        }
+        
+        async function verifyFix() {
+            const result = document.getElementById('verifyResult');
+            result.innerHTML = '<p>Querying students with your schoolId...</p>';
+            
+            try {
+                const snapshot = await db.collection('students')
+                    .where('schoolId', '==', YOUR_SCHOOL_ID)
+                    .get();
+                
+                result.innerHTML = `<h3 class="success">Found ${snapshot.size} student(s) with schoolId: ${YOUR_SCHOOL_ID}</h3>`;
+                
+                if (!snapshot.empty) {
+                    let html = '<ul>';
+                    for (const doc of snapshot.docs) {
+                        const data = doc.data();
+                        
+                        // Get user data for display
+                        let userName = 'Unknown';
+                        if (data.userId) {
+                            try {
+                                const userDoc = await db.collection('users').doc(data.userId).get();
+                                if (userDoc.exists) {
+                                    const userData = userDoc.data();
+                                    userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email;
+                                }
+                            } catch (error) {
+                                console.log('Error fetching user:', error);
+                            }
+                        }
+                        
+                        html += `<li>
+                            <strong>Student:</strong> ${userName}<br>
+                            <strong>ID:</strong> ${doc.id}<br>
+                            <strong>Course:</strong> ${data.courseName || 'N/A'}<br>
+                            <strong>Level:</strong> ${data.level || 'N/A'}<br>
+                            <strong>SchoolID:</strong> ${data.schoolId}
+                        </li>`;
+                    }
+                    html += '</ul>';
+                    result.innerHTML += html;
+                    result.innerHTML += '<p class="success">🎉 Students are now correctly linked to your school!</p>';
+                } else {
+                    result.innerHTML += '<p class="error">No students found. Try the fix button first.</p>';
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">Error querying: ${error.message}</p>`;
+            }
+        }
+        
+        // Check auth state
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById('authStatus').innerHTML = `<p class="success">Already signed in as: ${user.email}</p>`;
+                document.getElementById('fixBtn').disabled = false;
+                document.getElementById('verifyBtn').disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

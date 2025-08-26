@@ -24,13 +24,13 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 
 // Firebase configuration for kool-skool project
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "YOUR_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "kool-skool.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "kool-skool",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "kool-skool.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "YOUR_SENDER_ID",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "YOUR_APP_ID",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "YOUR_MEASUREMENT_ID"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA9wv23oSmC9bG-Bx9hA2KG2pAZBjHTO-A",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "kool-skool-7e858.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "kool-skool-7e858",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "kool-skool-7e858.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "207433730842",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:207433730842:web:a49b3934d80f71aa18faa3",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-5E4L5ST9FB"
 };
 
 // Initialize Firebase

@@ -9,7 +9,9 @@ const auth = admin.auth();
 // USER MANAGEMENT FUNCTIONS
 // ============================================
 // Create user with custom claims
-exports.createUserWithClaims = functions.https.onCall(async (data, context) => {
+exports.createUserWithClaims = functions
+    .runWith({ cors: true })
+    .https.onCall(async (data, context) => {
     // Verify caller is admin or superadmin
     if (!context.auth || !['admin', 'superadmin'].includes(context.auth.token.role)) {
         throw new functions.https.HttpsError('permission-denied', 'Only administrators can create users');

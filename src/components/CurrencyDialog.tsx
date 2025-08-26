@@ -12,8 +12,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { currencyApiService } from '@/services/currencyApi.service';
 
 interface Currency {
   id: string;
@@ -36,6 +38,9 @@ interface CurrencyDialogProps {
 const CurrencyDialog = ({ open, onOpenChange, currency, mode, schoolId, onSuccess }: CurrencyDialogProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [fetchingRate, setFetchingRate] = useState(false);
+  const [supportedCurrencies] = useState(currencyApiService.getSupportedCurrencies());
+  const [defaultCurrency, setDefaultCurrency] = useState<Currency | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     symbol: '',
@@ -63,6 +68,66 @@ const CurrencyDialog = ({ open, onOpenChange, currency, mode, schoolId, onSucces
       });
     }
   }, [currency, mode, open]);
+
+  // Fetch default currency when dialog opens
+  useEffect(() => {
+    if (open && schoolId) {
+      fetchDefaultCurrency();
+    }
+  }, [open, schoolId]);
+
+  const fetchDefaultCurrency = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_school_currencies', {
+        p_school_id: schoolId
+      });
+      
+      if (data && !error) {
+        const defaultCurr = data.find((c: Currency) => c.is_default);
+        setDefaultCurrency(defaultCurr || null);
+      }
+    } catch (error) {
+      console.error('Error fetching default currency:', error);
+    }
+  };
+
+  // Handle currency code selection
+  const handleCurrencyCodeChange = async (code: string) => {
+    const selectedCurrency = supportedCurrencies.find(c => c.code === code);
+    if (!selectedCurrency) return;
+
+    setFormData(prev => ({
+      ...prev,
+      code: selectedCurrency.code,
+      name: selectedCurrency.name,
+      symbol: selectedCurrency.symbol
+    }));
+
+    // Fetch exchange rate if not setting as default and have a default currency
+    if (!formData.is_default && defaultCurrency && mode === 'add') {
+      setFetchingRate(true);
+      try {
+        const rate = await currencyApiService.getExchangeRate(defaultCurrency.code, code);
+        setFormData(prev => ({
+          ...prev,
+          exchange_rate: rate
+        }));
+        toast({
+          title: "Exchange rate fetched",
+          description: `Current rate: 1 ${defaultCurrency.code} = ${rate.toFixed(6)} ${code}`,
+        });
+      } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+        toast({
+          title: "Warning",
+          description: "Could not fetch exchange rate. Using default rate of 1.0",
+          variant: "destructive",
+        });
+      } finally {
+        setFetchingRate(false);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,62 +220,71 @@ const CurrencyDialog = ({ open, onOpenChange, currency, mode, schoolId, onSucces
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name *
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="col-span-3"
-                placeholder="US Dollar"
-                required
-              />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="symbol" className="text-right">
-                Symbol *
-              </Label>
-              <Input
-                id="symbol"
-                value={formData.symbol}
-                onChange={(e) => setFormData(prev => ({ ...prev, symbol: e.target.value }))}
-                className="col-span-3"
-                placeholder="$"
-                required
-              />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="code" className="text-right">
-                Code *
+                Currency *
               </Label>
-              <Input
-                id="code"
-                value={formData.code}
-                onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                className="col-span-3"
-                placeholder="USD"
-                maxLength={3}
-                required
-              />
+              <Select 
+                value={formData.code} 
+                onValueChange={handleCurrencyCodeChange}
+                disabled={mode === 'edit'}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a currency" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {supportedCurrencies.map((curr) => (
+                    <SelectItem key={curr.code} value={curr.code}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{curr.code} - {curr.name}</span>
+                        <span className="ml-2 text-muted-foreground">{curr.symbol}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            
+            {formData.code && (
+              <>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Name</Label>
+                  <div className="col-span-3 p-2 bg-muted rounded">
+                    {formData.name}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Symbol</Label>
+                  <div className="col-span-3 p-2 bg-muted rounded">
+                    {formData.symbol}
+                  </div>
+                </div>
+              </>
+            )}
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="exchange_rate" className="text-right">
                 Exchange Rate
               </Label>
-              <Input
-                id="exchange_rate"
-                type="number"
-                step="0.000001"
-                min="0.000001"
-                value={formData.exchange_rate}
-                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1.0 }))}
-                className="col-span-3"
-                placeholder="1.0"
-              />
+              <div className="col-span-3 flex items-center gap-2">
+                <Input
+                  id="exchange_rate"
+                  type="number"
+                  step="0.000001"
+                  min="0.000001"
+                  value={formData.exchange_rate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1.0 }))}
+                  placeholder="1.0"
+                  disabled={formData.is_default || fetchingRate}
+                  className="flex-1"
+                />
+                {fetchingRate && <span className="text-sm text-muted-foreground">Fetching...</span>}
+                {!formData.is_default && defaultCurrency && (
+                  <span className="text-sm text-muted-foreground">
+                    1 {defaultCurrency.code} = {formData.exchange_rate.toFixed(6)} {formData.code}
+                  </span>
+                )}
+              </div>
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">

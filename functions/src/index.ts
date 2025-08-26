@@ -12,7 +12,9 @@ const auth = admin.auth();
 // ============================================
 
 // Create user with custom claims
-exports.createUserWithClaims = functions.https.onCall(async (data: any, context: any) => {
+exports.createUserWithClaims = functions
+  .runWith({ cors: true })
+  .https.onCall(async (data: any, context: any) => {
   // Verify caller is admin or superadmin
   if (!context.auth || !['admin', 'superadmin'].includes(context.auth.token.role)) {
     throw new functions.https.HttpsError(
