@@ -84,13 +84,27 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                 paymentsCount: studentPayments?.length || 0
               });
 
-              // Get transaction payments for this subscription
-              const { data: transactionPayments, error: transactionError } = await supabase
-                .from('transactions')
-                .select('amount')
-                .eq('subscription_id', subscription.id)
-                .eq('type', 'income')
-                .eq('status', 'completed');
+              // Get transaction payments for this subscription using Firebase
+              let transactionPayments = [];
+              let transactionError = null;
+              
+              try {
+                // Import databaseService if not already imported
+                const { databaseService } = await import('@/services/firebase/database.service');
+                
+                // Query transactions linked to this subscription
+                const transactions = await databaseService.query('transactions', {
+                  where: [
+                    { field: 'subscription_id', operator: '==', value: subscription.id },
+                    { field: 'type', operator: '==', value: 'income' }
+                  ]
+                });
+                
+                transactionPayments = transactions.map((t: any) => ({ amount: t.amount }));
+              } catch (error) {
+                console.error('Error fetching transaction payments:', error);
+                transactionError = error;
+              }
 
               console.log(`💰 Transaction payments query result:`, {
                 payments: transactionPayments,

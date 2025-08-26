@@ -592,10 +592,12 @@ async function handleScheduleConflicts(params: any) {
 
 async function handleCreateTransaction(params: any) {
   try {
+    console.log('💳 Creating transaction with params:', params);
+    
     // Map the p_ prefixed params to actual field names
     const transactionData = {
       school_id: params.p_school_id,
-      type: params.p_type,
+      type: params.p_type || 'income',
       amount: params.p_amount,
       currency: params.p_currency,
       transaction_date: params.p_transaction_date,
@@ -603,18 +605,24 @@ async function handleCreateTransaction(params: any) {
       notes: params.p_notes,
       to_account_id: params.p_to_account_id,
       from_account_id: params.p_from_account_id || null,
-      payment_method: params.p_payment_method,
+      payment_method: params.p_payment_method || 'Cash',
       tag_ids: params.p_tag_ids || [],
       subscription_id: params.p_subscription_id || null,
       student_id: params.p_student_id || null,
+      status: 'completed', // Add status field as completed by default
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
     
+    console.log('💳 Transaction data to save:', transactionData);
+    
     const transactionId = await databaseService.create('transactions', transactionData);
+    
+    console.log('✅ Transaction created with ID:', transactionId);
+    
     return { data: transactionId, error: null }; // Return just the ID, not wrapped in object
   } catch (error) {
-    console.error('Error creating transaction:', error);
+    console.error('❌ Error creating transaction:', error);
     return { data: null, error };
   }
 }
