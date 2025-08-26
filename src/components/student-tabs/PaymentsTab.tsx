@@ -122,28 +122,43 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
 
   // Filter transactions to show only payments for this student
   const payments = React.useMemo(() => {
-    if (!studentData.firstName || !studentData.lastName || !allTransactions.length) {
+    if (!studentData.id || !allTransactions.length) {
+      console.log('No student ID or transactions:', { studentId: studentData.id, transactionsCount: allTransactions.length });
       return [];
     }
     
-    const studentName = `${studentData.firstName} ${studentData.lastName}`;
+    console.log('🔍 Student payments query:', {
+      studentId: studentData.id,
+      totalTransactions: allTransactions.length,
+      firstTransaction: allTransactions[0]
+    });
     
-    return allTransactions.filter(transaction => 
+    // Filter by student_id instead of contact_name for Firebase transactions
+    const filteredTransactions = allTransactions.filter(transaction => 
       transaction.type === 'income' && 
-      transaction.contact_name === studentName &&
-      transaction.contact_type === 'student'
-    ).map(transaction => ({
+      (transaction.student_id === studentData.id || 
+       (transaction.contact_name === `${studentData.firstName} ${studentData.lastName}` && 
+        transaction.contact_type === 'student'))
+    );
+    
+    console.log('💰 Filtered payments for student:', {
+      studentId: studentData.id,
+      paymentsFound: filteredTransactions.length,
+      payments: filteredTransactions
+    });
+    
+    return filteredTransactions.map(transaction => ({
       id: transaction.id,
       amount: transaction.amount,
       currency: transaction.currency,
-      payment_date: transaction.transaction_date,
-      payment_method: transaction.payment_method || 'Unknown',
-      status: transaction.status,
+      payment_date: transaction.transaction_date || transaction.transactionDate || transaction.created_at,
+      payment_method: transaction.payment_method || transaction.paymentMethod || 'Cash',
+      status: transaction.status || 'completed',
       notes: transaction.notes || '',
       created_at: transaction.created_at,
       subscription_id: transaction.subscription_id,
     }));
-  }, [allTransactions, studentData.firstName, studentData.lastName]);
+  }, [allTransactions, studentData.id, studentData.firstName, studentData.lastName]);
 
   React.useEffect(() => {
     if (paymentsError) {
