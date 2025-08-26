@@ -34,7 +34,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
-import { supabase, getStudentsWithDetails } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -112,11 +112,42 @@ const FinancesPage = () => {
       if (!schoolId) return [];
       
       // Fetch currencies from Firebase
-      const currencies = await databaseService.query('currencies', {
-        where: [{ field: 'schoolId', operator: '==', value: schoolId }]
+      const currenciesList = await databaseService.query('currencies', {
+        where: [{ field: 'school_id', operator: '==', value: schoolId }]
       });
       
-      return currencies || [];
+      // Map Firebase currency format to expected format
+      if (currenciesList && currenciesList.length > 0) {
+        return currenciesList.map((currency: any) => ({
+          id: currency.id,
+          code: currency.code || currency.id.toUpperCase(),
+          symbol: currency.symbol || '$',
+          exchange_rate: currency.exchangeRate || currency.exchange_rate || 1,
+          is_default: currency.isDefault || currency.is_default || false,
+          name: currency.name || currency.code || currency.id
+        }));
+      }
+      
+      // If no currencies in database, check localStorage for saved currencies
+      const savedCurrencies = localStorage.getItem('savedCurrencies');
+      if (savedCurrencies) {
+        try {
+          const parsed = JSON.parse(savedCurrencies);
+          return parsed.map((currency: any) => ({
+            id: currency.id || currency.code?.toLowerCase(),
+            code: currency.code,
+            symbol: currency.symbol,
+            exchange_rate: currency.exchangeRate || currency.exchange_rate || 1,
+            is_default: currency.isDefault || currency.is_default || false,
+            name: currency.name || currency.code
+          }));
+        } catch (e) {
+          console.error('Error parsing saved currencies:', e);
+        }
+      }
+      
+      // Return empty array if no currencies found
+      return [];
     },
     enabled: !!schoolId,
   });
@@ -127,6 +158,9 @@ const FinancesPage = () => {
       const defaultCurrency = currencies.find(c => c.is_default);
       if (defaultCurrency) {
         setSelectedCurrency(defaultCurrency.id);
+      } else {
+        // Set first currency as default if no default is set
+        setSelectedCurrency(currencies[0].id);
       }
     }
   }, [currencies, selectedCurrency]);
@@ -195,19 +229,36 @@ const FinancesPage = () => {
     queryFn: async () => {
       if (!schoolId) return [];
       
-      // Fetch students with details from Firebase
-      const students = await getStudentsWithDetails(schoolId);
+      // Fetch students from Firebase
+      const students = await databaseService.query('students', {
+        where: [{ field: 'schoolId', operator: '==', value: schoolId }]
+      });
+
+      // Fetch users to get full names
+      const userIds = students.map((s: any) => s.userId).filter(Boolean);
+      const users = await Promise.all(
+        userIds.map((userId: string) => databaseService.getById('users', userId))
+      );
 
       // Filter students who have next payment information
-      const studentsWithPayments = students?.filter(student => 
-        student.next_payment_date && student.next_payment_amount
-      ).map(student => ({
-        student_id: student.id,
-        student_name: `${student.first_name} ${student.last_name}`,
-        next_payment_date: student.next_payment_date,
-        next_payment_amount: student.next_payment_amount,
-        currency: 'USD' // Default currency for expected payments
-      })) || [];
+      const studentsWithPayments = students
+        .filter((student: any) => 
+          student.nextPaymentDate && student.nextPaymentAmount
+        )
+        .map((student: any) => {
+          const user = users.find((u: any) => u?.id === student.userId);
+          const studentName = user ? 
+            `${user.firstName || ''} ${user.lastName || ''}`.trim() : 
+            'Unknown Student';
+          
+          return {
+            student_id: student.id,
+            student_name: studentName,
+            next_payment_date: student.nextPaymentDate,
+            next_payment_amount: student.nextPaymentAmount,
+            currency: student.currency || 'RUB' // Use student's currency or default to RUB
+          };
+        });
 
       return studentsWithPayments;
     },
@@ -216,12 +267,22 @@ const FinancesPage = () => {
 
   // Convert amount to selected currency
   const convertAmount = (amount: number, fromCurrency: string, toCurrencyId: string) => {
-    if (!currencies.length || !selectedCurrency) return amount;
+    if (!currencies.length || !toCurrencyId) return amount;
     
-    const fromCurrencyData = currencies.find(c => c.code === fromCurrency);
+    // Handle case where fromCurrency might be currency code or ID
+    const fromCurrencyData = currencies.find(c => 
+      c.code === fromCurrency || 
+      c.id === fromCurrency || 
+      c.code === fromCurrency?.toUpperCase()
+    );
     const toCurrencyData = currencies.find(c => c.id === toCurrencyId);
     
-    if (!fromCurrencyData || !toCurrencyData) return amount;
+    if (!fromCurrencyData || !toCurrencyData) {
+      return amount;
+    }
+    
+    // If same currency, no conversion needed
+    if (fromCurrencyData.id === toCurrencyData.id) return amount;
     
     // Convert to base currency first (default currency), then to target currency
     const baseAmount = fromCurrencyData.is_default ? amount : amount / fromCurrencyData.exchange_rate;
@@ -247,12 +308,16 @@ const FinancesPage = () => {
     );
     
     const totalRevenue = filteredPayments.reduce((sum, payment) => {
-      const convertedAmount = convertAmount(Number(payment.amount), payment.currency, selectedCurrency);
+      const convertedAmount = selectedCurrency ? 
+        convertAmount(Number(payment.amount), payment.currency, selectedCurrency) : 
+        Number(payment.amount);
       return sum + convertedAmount;
     }, 0);
     
     const pendingAmount = filteredPendingPayments.reduce((sum, payment) => {
-      const convertedAmount = convertAmount(Number(payment.amount), payment.currency, selectedCurrency);
+      const convertedAmount = selectedCurrency ? 
+        convertAmount(Number(payment.amount), payment.currency, selectedCurrency) : 
+        Number(payment.amount);
       return sum + convertedAmount;
     }, 0);
     
@@ -265,12 +330,16 @@ const FinancesPage = () => {
     );
     
     const totalTransactionIncome = filteredIncomeTransactions.reduce((sum, t) => {
-      const convertedAmount = convertAmount(Number(t.amount), t.currency, selectedCurrency);
+      const convertedAmount = selectedCurrency ? 
+        convertAmount(Number(t.amount), t.currency, selectedCurrency) : 
+        Number(t.amount);
       return sum + convertedAmount;
     }, 0);
     
     const totalExpenses = filteredExpenseTransactions.reduce((sum, t) => {
-      const convertedAmount = convertAmount(Number(t.amount), t.currency, selectedCurrency);
+      const convertedAmount = selectedCurrency ? 
+        convertAmount(Number(t.amount), t.currency, selectedCurrency) : 
+        Number(t.amount);
       return sum + convertedAmount;
     }, 0);
     
@@ -280,7 +349,9 @@ const FinancesPage = () => {
     );
     
     const totalExpectedPayments = filteredExpectedPayments.reduce((sum, payment) => {
-      const convertedAmount = convertAmount(Number(payment.next_payment_amount), payment.currency, selectedCurrency);
+      const convertedAmount = selectedCurrency ? 
+        convertAmount(Number(payment.next_payment_amount), payment.currency, selectedCurrency) : 
+        Number(payment.next_payment_amount);
       return sum + convertedAmount;
     }, 0);
     
@@ -420,15 +491,21 @@ const FinancesPage = () => {
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Currency:</span>
             <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Select currency" />
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Select..." />
               </SelectTrigger>
               <SelectContent>
-                {currencies.map((currency) => (
-                  <SelectItem key={currency.id} value={currency.id}>
-                    {currency.symbol} {currency.code}
-                  </SelectItem>
-                ))}
+                {currencies.length > 0 ? (
+                  currencies.map((currency) => (
+                    <SelectItem key={currency.id} value={currency.id}>
+                      {currency.symbol} {currency.code} {currency.is_default ? '(Default)' : ''}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No currencies available
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -619,8 +696,36 @@ const FinancesPage = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className={transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'}>
-                      {transaction.type === 'expense' ? '-' : ''}
-                      {getCurrencySymbol()}{convertAmount(Number(transaction.amount), transaction.currency, selectedCurrency).toFixed(2)}
+                      {(() => {
+                        // Get the original currency info
+                        const originalCurrency = currencies.find(c => 
+                          c.code === transaction.currency || 
+                          c.id === transaction.currency?.toLowerCase()
+                        );
+                        const originalSymbol = originalCurrency?.symbol || '$';
+                        
+                        // If showing in original currency
+                        if (!selectedCurrency || selectedCurrency === originalCurrency?.id) {
+                          return (
+                            <>
+                              {transaction.type === 'expense' ? '-' : ''}
+                              {originalSymbol}{Number(transaction.amount).toFixed(2)}
+                            </>
+                          );
+                        }
+                        
+                        // Show converted amount with original in parentheses
+                        const convertedAmount = convertAmount(Number(transaction.amount), transaction.currency, selectedCurrency);
+                        return (
+                          <>
+                            {transaction.type === 'expense' ? '-' : ''}
+                            {getCurrencySymbol()}{convertedAmount.toFixed(2)}
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({originalSymbol}{Number(transaction.amount).toFixed(2)})
+                            </span>
+                          </>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>{format(new Date(transaction.date), 'MMM dd, yyyy')}</TableCell>
                     <TableCell>{transaction.method || '-'}</TableCell>

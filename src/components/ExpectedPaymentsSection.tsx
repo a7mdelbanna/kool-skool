@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { format, addDays, addWeeks, addMonths, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 interface ExpectedPayment {
@@ -27,6 +27,7 @@ interface ExpectedPayment {
   student_name: string;
   next_payment_date: string;
   next_payment_amount: number;
+  currency?: string;
 }
 
 interface ExpectedPaymentsSectionProps {
@@ -36,27 +37,42 @@ interface ExpectedPaymentsSectionProps {
 const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoolId }) => {
   const [filterPeriod, setFilterPeriod] = useState<'day' | 'week' | 'month'>('week');
 
-  // Fetch students with expected payments
+  // Fetch students with expected payments from Firebase
   const { data: expectedPayments = [], isLoading } = useQuery({
     queryKey: ['expected-payments', schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
       
-      const { data, error } = await supabase.rpc('get_students_with_details', {
-        p_school_id: schoolId
+      // Fetch students from Firebase
+      const students = await databaseService.query('students', {
+        where: [{ field: 'schoolId', operator: '==', value: schoolId }]
       });
 
-      if (error) throw error;
+      // Fetch users to get full names
+      const userIds = students.map((s: any) => s.userId).filter(Boolean);
+      const users = await Promise.all(
+        userIds.map((userId: string) => databaseService.getById('users', userId))
+      );
 
       // Filter students who have next payment information
-      const studentsWithPayments = data?.filter(student => 
-        student.next_payment_date && student.next_payment_amount
-      ).map(student => ({
-        student_id: student.id,
-        student_name: `${student.first_name} ${student.last_name}`,
-        next_payment_date: student.next_payment_date,
-        next_payment_amount: student.next_payment_amount
-      })) || [];
+      const studentsWithPayments = students
+        .filter((student: any) => 
+          student.nextPaymentDate && student.nextPaymentAmount
+        )
+        .map((student: any) => {
+          const user = users.find((u: any) => u?.id === student.userId);
+          const studentName = user ? 
+            `${user.firstName || ''} ${user.lastName || ''}`.trim() : 
+            'Unknown Student';
+          
+          return {
+            student_id: student.id,
+            student_name: studentName,
+            next_payment_date: student.nextPaymentDate,
+            next_payment_amount: student.nextPaymentAmount,
+            currency: student.currency || 'RUB'
+          };
+        });
 
       console.log('📅 Expected payments data:', studentsWithPayments);
       return studentsWithPayments as ExpectedPayment[];
@@ -175,7 +191,9 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                   </span>
                 </div>
                 <span className="text-2xl font-bold text-blue-600">
-                  ${totalExpected.toFixed(2)}
+                  {filteredPayments.length > 0 && filteredPayments[0].currency === 'RUB' ? '₽' : 
+                   filteredPayments.length > 0 && filteredPayments[0].currency === 'EUR' ? '€' : '$'}
+                  {totalExpected.toFixed(2)}
                 </span>
               </div>
               <p className="text-sm text-blue-700 mt-1">
@@ -219,7 +237,8 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                         </TableCell>
                         <TableCell>
                           <span className="font-semibold text-green-600">
-                            ${Number(payment.next_payment_amount).toFixed(2)}
+                            {payment.currency === 'RUB' ? '₽' : payment.currency === 'EUR' ? '€' : '$'}
+                            {Number(payment.next_payment_amount).toFixed(2)}
                           </span>
                         </TableCell>
                         <TableCell>
