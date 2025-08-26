@@ -1017,10 +1017,29 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
   try {
     console.log('Getting lesson sessions for student:', params.p_student_id);
     
-    // Query sessions from Firebase (using camelCase field names)
-    const sessions = await databaseService.query('sessions', {
+    // First, let's check if there are ANY sessions in the database
+    const allSessions = await databaseService.query('sessions', {});
+    console.log(`Total sessions in database: ${allSessions.length}`);
+    if (allSessions.length > 0) {
+      console.log('Sample session fields:', Object.keys(allSessions[0]));
+      console.log('Sample session:', allSessions[0]);
+    }
+    
+    // Query sessions from Firebase - try both camelCase and snake_case field names
+    // First try camelCase (new format)
+    let sessions = await databaseService.query('sessions', {
       where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
     });
+    console.log(`Found ${sessions.length} sessions with studentId field`);
+    
+    // If no results, try snake_case (old format)
+    if (!sessions || sessions.length === 0) {
+      console.log('No sessions found with studentId, trying student_id...');
+      sessions = await databaseService.query('sessions', {
+        where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
+      });
+      console.log(`Found ${sessions.length} sessions with student_id field`);
+    }
     
     // Map sessions to the expected format (Firebase uses camelCase, return snake_case)
     const mappedSessions = sessions.map((session: any) => ({
@@ -1062,29 +1081,56 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
   try {
     console.log('Getting subscriptions for student:', params.p_student_id);
     
-    // Query subscriptions from Firebase (using camelCase field names)
-    const subscriptions = await databaseService.query('subscriptions', {
+    // First, let's check if there are ANY subscriptions in the database
+    const allSubscriptions = await databaseService.query('subscriptions', {});
+    console.log(`Total subscriptions in database: ${allSubscriptions.length}`);
+    if (allSubscriptions.length > 0) {
+      console.log('Sample subscription fields:', Object.keys(allSubscriptions[0]));
+      console.log('Sample subscription:', allSubscriptions[0]);
+    }
+    
+    // Query subscriptions from Firebase - try both camelCase and snake_case field names
+    // First try camelCase (new format)
+    let subscriptions = await databaseService.query('subscriptions', {
       where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
     });
+    console.log(`Found ${subscriptions.length} subscriptions with studentId field`);
+    
+    // If no results, try snake_case (old format)
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log('No subscriptions found with studentId, trying student_id...');
+      subscriptions = await databaseService.query('subscriptions', {
+        where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
+      });
+      console.log(`Found ${subscriptions.length} subscriptions with student_id field`);
+    }
     
     // For each subscription, calculate sessions taken and scheduled
     const enrichedSubscriptions = await Promise.all(subscriptions.map(async (subscription: any) => {
-      // Get sessions for this subscription (using camelCase field names)
-      const sessions = await databaseService.query('sessions', {
+      // Get sessions for this subscription - try both camelCase and snake_case
+      let sessions = await databaseService.query('sessions', {
         where: [{ field: 'subscriptionId', operator: '==', value: subscription.id }]
       });
       
+      // If no results, try snake_case (old format)
+      if (!sessions || sessions.length === 0) {
+        sessions = await databaseService.query('sessions', {
+          where: [{ field: 'subscription_id', operator: '==', value: subscription.id }]
+        });
+      }
+      
       // Count sessions by status WITH counts_toward_completion logic (matching Supabase RPC)
       // IMPORTANT: Cancelled sessions ALWAYS count toward completion regardless of the flag
-      const sessionsCompleted = sessions.filter((s: any) => 
-        (s.status === 'completed' && s.counts_toward_completion === true) || 
-        s.status === 'cancelled' // Cancelled always counts
-      ).length;
+      const sessionsCompleted = sessions.filter((s: any) => {
+        const countsToward = s.countsTowardCompletion ?? s.counts_toward_completion ?? true;
+        return (s.status === 'completed' && countsToward === true) || 
+               s.status === 'cancelled'; // Cancelled always counts
+      }).length;
       
-      const sessionsAttended = sessions.filter((s: any) => 
-        s.status === 'completed' && 
-        s.counts_toward_completion === true
-      ).length;
+      const sessionsAttended = sessions.filter((s: any) => {
+        const countsToward = s.countsTowardCompletion ?? s.counts_toward_completion ?? true;
+        return s.status === 'completed' && countsToward === true;
+      }).length;
       
       const sessionsCancelled = sessions.filter((s: any) => 
         s.status === 'cancelled' // Count ALL cancelled sessions
