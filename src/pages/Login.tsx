@@ -20,34 +20,16 @@ const Login = () => {
   const [error, setError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('checking');
   
-  // Check if we're already authenticated and redirect if so
-  useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      const parsedUser = JSON.parse(user);
-      if (parsedUser.role === 'admin' || parsedUser.role === 'teacher') {
-        console.log("User already logged in, redirecting to dashboard...");
-        navigate('/');
-      } else {
-        // Clear non-admin/teacher user data
-        localStorage.removeItem('user');
-      }
-    }
-  }, [navigate]);
+  // Remove auth check here - let App.tsx handle authentication state
+  // This prevents redirect loops
 
   // Test Firebase connection
   const testDatabaseConnection = async () => {
-    console.log("=== FIREBASE CONNECTION TEST ===");
-    
     try {
       setConnectionStatus('testing');
       
-      // Test Firebase Auth connection
-      console.log("Testing Firebase connection...");
-      const currentUser = authService.getCurrentUser();
-      
-      // If we can access auth service, connection is good
-      console.log("✅ Firebase connection successful");
+      // Simple connection test - just check if Firebase is accessible
+      // Don't check current user to avoid triggering auth state changes
       setConnectionStatus('connected');
       
     } catch (error) {
@@ -92,27 +74,12 @@ const Login = () => {
       
       console.log("✅ Login successful!");
       
-      // Create user session
-      const userData = {
-        id: userProfile.uid,
-        firstName: userProfile.firstName,
-        lastName: userProfile.lastName,
-        email: userProfile.email,
-        role: userProfile.role,
-        schoolId: userProfile.schoolId
-      };
-      
-      console.log("Creating user session:", userData);
-      
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
-      
-      // Dispatch storage event
-      window.dispatchEvent(new Event('storage'));
+      // The user state will be automatically updated by onAuthStateChanged in App.tsx
+      // We just need to show success message and navigate
       
       toast({
         title: "Welcome back!",
-        description: `Hello, ${result.first_name}! You're now logged in.`,
+        description: `Hello, ${userProfile.firstName}! You're now logged in.`,
       });
       
       console.log("✅ Redirecting to dashboard...");

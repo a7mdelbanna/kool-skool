@@ -98,7 +98,7 @@ class AuthService {
     password: string, 
     firstName: string, 
     lastName: string,
-    role: 'student' = 'student',
+    role: 'admin' | 'teacher' | 'student' = 'student',
     schoolId?: string
   ): Promise<User> {
     try {
@@ -112,12 +112,11 @@ class AuthService {
       });
 
       // Create user profile in Firestore
-      const userProfile: UserProfile = {
-        uid: user.uid,
+      const userProfile: Omit<UserProfile, 'uid'> = {
         email,
         firstName,
         lastName,
-        role,
+        role: role as UserProfile['role'],
         schoolId: schoolId || '',
         isActive: true,
         metadata: {
@@ -128,10 +127,20 @@ class AuthService {
         updatedAt: serverTimestamp()
       };
 
+      // Ensure the document is created before returning
+      console.log('Creating user document in Firestore for:', user.uid);
       await setDoc(doc(db, 'users', user.uid), userProfile);
+      console.log('User document created successfully');
+      
+      // Verify the document was created
+      const docSnap = await getDoc(doc(db, 'users', user.uid));
+      if (!docSnap.exists()) {
+        throw new Error('Failed to create user document in Firestore');
+      }
 
       return user;
     } catch (error: any) {
+      console.error('Error in signUp:', error);
       throw new Error(error.message || 'Failed to create account');
     }
   }

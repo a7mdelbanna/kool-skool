@@ -122,7 +122,7 @@ const SchoolSetup = () => {
       
       // First verify the license key
       const licenses = await databaseService.query('licenses', {
-        where: [{ field: 'key', operator: '==', value: formData.licenseKey }]
+        where: [{ field: 'licenseKey', operator: '==', value: formData.licenseKey }]
       });
       
       if (!licenses || licenses.length === 0) {
@@ -152,46 +152,28 @@ const SchoolSetup = () => {
         status: 'active'
       });
       
-      // Create admin user
-      const uid = await authService.createUser({
-        email: formData.adminEmail,
-        password: formData.adminPassword,
-        firstName: formData.adminFirstName,
-        lastName: formData.adminLastName,
-        role: 'admin',
+      // Create admin user - this will automatically sign them in
+      const user = await authService.signUp(
+        formData.adminEmail,
+        formData.adminPassword,
+        formData.adminFirstName,
+        formData.adminLastName,
+        'admin',
         schoolId
-      });
-
-      // After successful school setup, automatically log in the user
-      const userProfile = await authService.signIn(formData.adminEmail, formData.adminPassword);
+      );
       
-      if (!userProfile) {
-        // Still show success message even if auto-login fails
-        toast({
-          title: "School setup complete",
-          description: `${formData.schoolName} has been successfully set up! Please log in.`,
-        });
-        navigate('/login');
-        return;
-      }
-      
-      // Store user information in local storage
-      localStorage.setItem('user', JSON.stringify({
-        id: uid,
-        firstName: formData.adminFirstName,
-        lastName: formData.adminLastName,
-        email: formData.adminEmail,
-        role: 'admin',
-        schoolId
-      }));
+      // The user is now signed in and App.tsx will handle the auth state change
+      // No need to manually sign in or set localStorage
       
       toast({
         title: "School setup complete",
         description: `${formData.schoolName} has been successfully set up!`,
       });
       
-      // Redirect to dashboard
-      navigate('/');
+      // Wait a moment for auth state to propagate, then redirect
+      setTimeout(() => {
+        navigate('/');
+      }, 100);
       
     } catch (error) {
       console.error('Error during school setup:', error);
