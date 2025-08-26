@@ -1145,7 +1145,7 @@ async function handleSessionActionRPC(params: any) {
       case 'cancelled':
         updates.status = 'cancelled';
         updates.attended = false;
-        updates.counts_toward_completion = false;
+        updates.counts_toward_completion = true; // Cancelled sessions DO count toward completion
         break;
       case 'rescheduled':
         if (p_new_datetime) {
