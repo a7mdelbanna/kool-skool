@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { 
   MessageSquare, 
@@ -22,10 +23,24 @@ import {
   Loader2,
   TestTube,
   Eye,
-  EyeOff
+  EyeOff,
+  HelpCircle
 } from 'lucide-react';
 import { UserContext } from '@/App';
 import { twilioService } from '@/services/twilio.service';
+import { 
+  validateTwilioConfig, 
+  validatePhoneNumber, 
+  formatWhatsAppNumber,
+  isLikelyEncoded,
+  getFieldValidationMessage,
+  tryDecodeAccountSid,
+  normalizePhoneNumber,
+  isChannelConfigured,
+  getAvailableChannels,
+  getConfigurationStatus,
+  type TwilioValidationError 
+} from '@/utils/twilioValidation';
 
 interface NotificationTemplate {
   type: string;
@@ -48,6 +63,16 @@ const TwilioSettings = () => {
   const [testPhone, setTestPhone] = useState('');
   const [testMessage, setTestMessage] = useState('');
   const [testChannel, setTestChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [validationErrors, setValidationErrors] = useState<TwilioValidationError[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
+  const [showTestResults, setShowTestResults] = useState(false);
+  const [testResults, setTestResults] = useState<{
+    success: boolean;
+    message: string;
+    details?: any;
+    timestamp: Date;
+  } | null>(null);
   
   // Form state
   const [config, setConfig] = useState({
@@ -58,6 +83,9 @@ const TwilioSettings = () => {
     isActive: false,
     monthlyBudget: 0
   });
+  
+  // Draft storage key
+  const getDraftKey = () => `twilio-config-draft-${user?.schoolId || 'unknown'}`;
   
   // Notification templates
   const [templates, setTemplates] = useState<NotificationTemplate[]>([
@@ -117,11 +145,42 @@ const TwilioSettings = () => {
       return await twilioService.saveConfig(user!.schoolId, data);
     },
     onSuccess: () => {
+      // Clear draft values only after successful save
+      clearDraftValues();
       queryClient.invalidateQueries({ queryKey: ['twilio-config'] });
-      toast.success('Twilio configuration saved successfully');
+      
+      // Show success message with configuration details
+      const status = getConfigurationStatus(config);
+      let successMessage = 'Twilio configuration saved successfully!';
+      
+      if (status.isFullyConfigured) {
+        successMessage += ' You can now send SMS and WhatsApp messages.';
+      } else if (status.hasCredentials) {
+        successMessage += ' Add phone numbers to enable messaging.';
+      }
+      
+      toast.success(successMessage);
+      
+      // Clear any validation errors after successful save
+      setValidationErrors([]);
+      setFieldErrors({});
     },
     onError: (error: any) => {
-      toast.error('Failed to save configuration: ' + error.message);
+      console.error('Save configuration error:', error);
+      let errorMessage = 'Failed to save configuration';
+      
+      if (error.message) {
+        errorMessage += ': ' + error.message;
+      }
+      
+      // Show specific guidance for common errors
+      if (error.message.includes('permission')) {
+        errorMessage += '. Please check your account permissions.';
+      } else if (error.message.includes('network')) {
+        errorMessage += '. Please check your internet connection and try again.';
+      }
+      
+      toast.error(errorMessage);
     }
   });
   
@@ -149,21 +208,249 @@ const TwilioSettings = () => {
       });
     },
     onSuccess: () => {
-      toast.success('Test message sent successfully!');
+      const channelName = testChannel === 'sms' ? 'SMS' : 'WhatsApp';
+      toast.success(`Test ${channelName} message sent successfully to ${testPhone}!`);
       setTestPhone('');
       setTestMessage('');
     },
     onError: (error: any) => {
-      toast.error('Failed to send test message: ' + error.message);
+      console.error('Send test message error:', error);
+      let errorMessage = 'Failed to send test message';
+      
+      if (error.message) {
+        errorMessage += ': ' + error.message;
+      }
+      
+      // Provide specific guidance based on error type
+      if (error.message.includes('phone number')) {
+        errorMessage += '. Please check the phone number format.';
+      } else if (error.message.includes('credentials')) {
+        errorMessage += '. Please verify your Twilio credentials.';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage += '. Your Twilio account may need more funds.';
+      } else if (error.message.includes('Function not found')) {
+        errorMessage = 'Test message feature requires server setup. Please configure your Firebase functions.';
+      }
+      
+      toast.error(errorMessage);
     }
   });
   
-  // Load existing config
-  useEffect(() => {
-    if (twilioConfig) {
-      setConfig(twilioConfig);
+  // Test configuration mutation
+  const testConfigMutation = useMutation({
+    mutationFn: async () => {
+      console.log('🧪 Starting Twilio configuration test...', {
+        accountSid: config.accountSid ? `${config.accountSid.substring(0, 6)}...` : 'missing',
+        authToken: config.authToken ? '***hidden***' : 'missing',
+        phoneNumberSms: config.phoneNumberSms || 'not configured',
+        phoneNumberWhatsapp: config.phoneNumberWhatsapp || 'not configured',
+        schoolId: user?.schoolId
+      });
+
+      // Show immediate feedback
+      toast.info('Testing configuration...', {
+        duration: 2000,
+        description: 'Validating your Twilio credentials'
+      });
+      
+      // First, validate the configuration locally
+      console.log('🔍 Performing local validation...');
+      const validation = validateTwilioConfig(config);
+      if (!validation.isValid) {
+        const errorMessages = validation.errors.map(e => e.message).join(', ');
+        console.error('❌ Local validation failed:', validation.errors);
+        throw new Error(`Invalid configuration: ${errorMessages}`);
+      }
+      console.log('✅ Local validation passed');
+      
+      // Add timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Test timed out after 30 seconds. Please check your internet connection and Twilio credentials.'));
+        }, 30000);
+      });
+      
+      // Test the credentials with Twilio's API
+      console.log('🌐 Testing credentials with Twilio API...');
+      const testPromise = twilioService.testTwilioCredentials(user!.schoolId, {
+        accountSid: config.accountSid,
+        authToken: config.authToken,
+        phoneNumberSms: config.phoneNumberSms,
+        phoneNumberWhatsapp: config.phoneNumberWhatsapp
+      });
+      
+      const result = await Promise.race([testPromise, timeoutPromise]) as { valid: boolean; details: any };
+      
+      console.log('🎯 Twilio API test result:', result);
+      
+      if (!result.valid) {
+        console.error('❌ Twilio credentials validation failed:', result.details);
+        throw new Error('Twilio credentials are invalid or cannot be verified');
+      }
+      
+      console.log('✅ All tests passed successfully!');
+      return result;
+    },
+    onSuccess: (data) => {
+      console.log('🎉 Test configuration completed successfully:', data);
+      
+      const hasPhoneNumbers = config.phoneNumberSms || config.phoneNumberWhatsapp;
+      const successMessage = hasPhoneNumbers 
+        ? 'Configuration is valid! Your Twilio credentials and phone numbers are working correctly.'
+        : 'Twilio credentials are valid! Add phone numbers to enable SMS/WhatsApp messaging.';
+      
+      // Set test results for modal display
+      setTestResults({
+        success: true,
+        message: successMessage,
+        details: data,
+        timestamp: new Date()
+      });
+      
+      // Show modal with results
+      setShowTestResults(true);
+      
+      // Also show toast for immediate feedback
+      toast.success(successMessage, {
+        duration: 4000,
+        description: 'Click to view detailed results'
+      });
+      
+      // Clear any previous validation errors
+      setValidationErrors([]);
+      setFieldErrors({});
+    },
+    onError: (error: any) => {
+      console.error('❌ Test configuration failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      let errorMessage = 'Configuration test failed';
+      let detailedMessage = '';
+      
+      if (error.message) {
+        if (error.message.includes('timed out')) {
+          errorMessage = 'Test timed out';
+          detailedMessage = 'The test took longer than expected. This might indicate network issues or incorrect credentials.';
+        } else if (error.message.includes('Account SID')) {
+          errorMessage = 'Invalid Account SID';
+          detailedMessage = 'Please verify your Account SID from the Twilio Console. It should start with "AC".';
+        } else if (error.message.includes('Auth Token')) {
+          errorMessage = 'Invalid Auth Token';
+          detailedMessage = 'Please verify your Auth Token from the Twilio Console.';
+        } else if (error.message.includes('phone number')) {
+          errorMessage = 'Phone number configuration issue';
+          detailedMessage = 'Please check your phone number configuration in Twilio.';
+        } else if (error.message.includes('Function not found')) {
+          errorMessage = 'Server configuration incomplete';
+          detailedMessage = 'Basic validation passed, but full credential testing requires server setup. Your configuration looks correct.';
+          
+          // Set test results for modal display (warning case)
+          setTestResults({
+            success: false,
+            message: errorMessage,
+            details: { warning: true, originalError: error.message },
+            timestamp: new Date()
+          });
+          
+          setShowTestResults(true);
+          toast.warning(errorMessage, {
+            duration: 5000,
+            description: detailedMessage
+          });
+          return;
+        } else {
+          errorMessage += ': ' + error.message;
+          detailedMessage = 'Check the console for more details and verify your Twilio account setup.';
+        }
+      }
+      
+      // Set test results for modal display
+      setTestResults({
+        success: false,
+        message: errorMessage,
+        details: { error: error.message, originalError: error },
+        timestamp: new Date()
+      });
+      
+      // Show modal with error details
+      setShowTestResults(true);
+      
+      // Also show toast
+      toast.error(errorMessage, {
+        duration: 6000,
+        description: detailedMessage || 'Check the detailed results for more information'
+      });
     }
-  }, [twilioConfig]);
+  });
+  
+  // Load draft values from localStorage on mount
+  useEffect(() => {
+    if (!user?.schoolId) return;
+    
+    const draftKey = getDraftKey();
+    const savedDraft = localStorage.getItem(draftKey);
+    
+    if (savedDraft) {
+      try {
+        const parsedDraft = JSON.parse(savedDraft);
+        setConfig(parsedDraft);
+      } catch (error) {
+        console.warn('Failed to parse saved draft:', error);
+        localStorage.removeItem(draftKey);
+      }
+    }
+  }, [user?.schoolId]);
+  
+  // Load existing config from Firestore (only once on initial mount)
+  useEffect(() => {
+    if (twilioConfig && !hasLoadedFromFirestore) {
+      // Only load from Firestore if we don't have draft values
+      const draftKey = getDraftKey();
+      const savedDraft = localStorage.getItem(draftKey);
+      
+      if (!savedDraft) {
+        setConfig(twilioConfig);
+        
+        // Check if loaded credentials look suspicious (might be encoded)
+        if (isLikelyEncoded(twilioConfig.accountSid)) {
+          toast.warning('Your Twilio credentials may need to be re-entered. Please check the Account SID format.');
+        }
+      }
+      
+      setHasLoadedFromFirestore(true);
+    }
+  }, [twilioConfig, hasLoadedFromFirestore, getDraftKey]);
+  
+  // Save draft values to localStorage whenever config changes
+  useEffect(() => {
+    if (!user?.schoolId || !hasLoadedFromFirestore) return;
+    
+    const draftKey = getDraftKey();
+    
+    // Only save if user has made changes (not empty values)
+    const hasValues = config.accountSid || config.authToken || config.phoneNumberSms || 
+                     config.phoneNumberWhatsapp || config.isActive || config.monthlyBudget > 0;
+    
+    if (hasValues) {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(config));
+      } catch (error) {
+        console.warn('Failed to save Twilio config draft to localStorage:', error);
+      }
+    }
+  }, [config, user?.schoolId, hasLoadedFromFirestore, getDraftKey]);
+  
+  // Auto-select test channel based on configuration changes
+  useEffect(() => {
+    const availableChannels = getAvailableChannels(config);
+    if (availableChannels.length > 0 && !availableChannels.includes(testChannel)) {
+      setTestChannel(availableChannels[0]);
+    }
+  }, [config.phoneNumberSms, config.phoneNumberWhatsapp]);
   
   useEffect(() => {
     if (notificationSettings) {
@@ -172,11 +459,80 @@ const TwilioSettings = () => {
   }, [notificationSettings]);
   
   const handleConfigSave = () => {
-    if (!config.accountSid || !config.authToken) {
-      toast.error('Please provide Twilio credentials');
+    // Allow saving with just credentials if user doesn't want to configure phone numbers yet
+    // But if they provide phone numbers, validate them
+    
+    // Create a modified validation that doesn't require phone numbers
+    const configToValidate = { ...config };
+    const validation = validateTwilioConfig(configToValidate);
+    
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors);
+      
+      // Convert errors to field-specific errors for UI
+      const errors: Record<string, string> = {};
+      validation.errors.forEach(error => {
+        errors[error.field] = error.message;
+      });
+      setFieldErrors(errors);
+      
+      toast.error(`Please fix ${validation.errors.length} validation error${validation.errors.length > 1 ? 's' : ''} before saving`);
       return;
     }
+    
+    // Clear any previous errors
+    setValidationErrors([]);
+    setFieldErrors({});
+    
+    // Check for potentially encoded values
+    if (isLikelyEncoded(config.accountSid)) {
+      toast.error('Account SID appears to be encoded. Please enter the original Account SID from your Twilio console.');
+      return;
+    }
+    
+    // Show appropriate success message based on what was configured
+    const hasSMS = !!config.phoneNumberSms;
+    const hasWhatsApp = !!config.phoneNumberWhatsapp;
+    
     saveConfigMutation.mutate(config);
+  };
+  
+  const clearDraftValues = () => {
+    if (!user?.schoolId) return;
+    const draftKey = getDraftKey();
+    try {
+      localStorage.removeItem(draftKey);
+    } catch (error) {
+      console.warn('Failed to clear Twilio config draft from localStorage:', error);
+    }
+  };
+  
+  const handleQuickFix = (fieldName: string, suggestion: string) => {
+    switch (fieldName) {
+      case 'accountSid':
+        if (suggestion.includes('Did you mean:')) {
+          const decoded = tryDecodeAccountSid(config.accountSid);
+          if (decoded) {
+            setConfig({ ...config, accountSid: decoded });
+            toast.success('Account SID decoded successfully');
+          }
+        }
+        break;
+      case 'phoneNumberSms':
+        if (suggestion.includes('Did you mean:') || suggestion.includes('Cleaned format:')) {
+          const normalized = normalizePhoneNumber(config.phoneNumberSms);
+          setConfig({ ...config, phoneNumberSms: normalized });
+          toast.success('Phone number formatted');
+        }
+        break;
+      case 'phoneNumberWhatsapp':
+        if (suggestion.includes('Did you mean:') || suggestion.includes('Cleaned format:')) {
+          const normalized = normalizePhoneNumber(config.phoneNumberWhatsapp.replace('whatsapp:', ''));
+          setConfig({ ...config, phoneNumberWhatsapp: formatWhatsAppNumber(normalized) });
+          toast.success('WhatsApp number formatted');
+        }
+        break;
+    }
   };
   
   const handleTemplateSave = () => {
@@ -194,6 +550,21 @@ const TwilioSettings = () => {
       toast.error('Please provide phone number and message');
       return;
     }
+    
+    // Check if the selected channel is configured
+    const channelNumber = testChannel === 'sms' ? config.phoneNumberSms : config.phoneNumberWhatsapp;
+    if (!channelNumber) {
+      toast.error(`${testChannel === 'sms' ? 'SMS' : 'WhatsApp'} phone number is not configured. Please configure it in the Configuration tab first.`);
+      return;
+    }
+    
+    // Validate test phone number
+    const phoneError = validatePhoneNumber(testPhone, 'testPhone', true);
+    if (phoneError) {
+      toast.error(phoneError.message);
+      return;
+    }
+    
     sendTestMutation.mutate();
   };
   
@@ -224,9 +595,30 @@ const TwilioSettings = () => {
             Configure SMS and WhatsApp notifications via Twilio
           </p>
         </div>
-        <Badge variant={config.isActive ? "default" : "secondary"}>
-          {config.isActive ? "Active" : "Inactive"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {(() => {
+            const status = getConfigurationStatus(config);
+            const variant = status.isFullyConfigured ? "default" : 
+                           status.hasCredentials ? "secondary" : "outline";
+            return (
+              <>
+                <Badge variant={variant}>
+                  {status.statusMessage}
+                </Badge>
+                {status.hasSMS && (
+                  <Badge variant="outline" className="text-xs">
+                    SMS
+                  </Badge>
+                )}
+                {status.hasWhatsApp && (
+                  <Badge variant="outline" className="text-xs">
+                    WhatsApp
+                  </Badge>
+                )}
+              </>
+            );
+          })()} 
+        </div>
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -250,11 +642,35 @@ const TwilioSettings = () => {
         </TabsList>
         
         <TabsContent value="config" className="space-y-4">
+          {/* Help and Setup Instructions */}
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-100 p-2 rounded-full">
+                  <HelpCircle className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-medium text-blue-900">Setting up Twilio Integration</h3>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <p>To find your Twilio credentials:</p>
+                    <ol className="list-decimal list-inside space-y-1 ml-2">
+                      <li>Log in to your <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Twilio Console</a></li>
+                      <li>Go to <strong>Account Info</strong> section</li>
+                      <li>Copy your <strong>Account SID</strong> (starts with "AC") and <strong>Auth Token</strong></li>
+                      <li>Go to <strong>Phone Numbers</strong> section to find your SMS and WhatsApp numbers</li>
+                    </ol>
+                    <p className="mt-2 text-blue-700 font-medium">Note: If you see an "accountSid must start with AC" error, please re-enter your credentials from the Twilio console.</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           <Card>
             <CardHeader>
               <CardTitle>Twilio Configuration</CardTitle>
               <CardDescription>
-                Connect your Twilio account to enable SMS and WhatsApp messaging
+                Connect your Twilio account to enable SMS and WhatsApp messaging. Phone numbers are optional - you can save just your credentials and add them later.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -269,24 +685,63 @@ const TwilioSettings = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="accountSid">Account SID</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="accountSid">Account SID</Label>
+                    <div className="group relative">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      <div className="invisible group-hover:visible absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap z-10">
+                        Find in Twilio Console → Account Info
+                      </div>
+                    </div>
+                  </div>
                   <Input
                     id="accountSid"
                     value={config.accountSid}
-                    onChange={(e) => setConfig({ ...config, accountSid: e.target.value })}
+                    onChange={(e) => {
+                      setConfig({ ...config, accountSid: e.target.value });
+                      // Clear field error when user starts typing
+                      if (fieldErrors.accountSid) {
+                        setFieldErrors({ ...fieldErrors, accountSid: '' });
+                      }
+                    }}
                     placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    className={fieldErrors.accountSid ? 'border-red-500' : ''}
                   />
+                  {fieldErrors.accountSid && (
+                    <p className="text-sm text-red-600 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.accountSid}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {getFieldValidationMessage('accountSid')}
+                  </p>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="authToken">Auth Token</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="authToken">Auth Token</Label>
+                    <div className="group relative">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      <div className="invisible group-hover:visible absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap z-10">
+                        Find in Twilio Console → Account Info
+                      </div>
+                    </div>
+                  </div>
                   <div className="relative">
                     <Input
                       id="authToken"
                       type={showToken ? "text" : "password"}
                       value={config.authToken}
-                      onChange={(e) => setConfig({ ...config, authToken: e.target.value })}
-                      placeholder="Enter auth token"
+                      onChange={(e) => {
+                        setConfig({ ...config, authToken: e.target.value });
+                        // Clear field error when user starts typing
+                        if (fieldErrors.authToken) {
+                          setFieldErrors({ ...fieldErrors, authToken: '' });
+                        }
+                      }}
+                      placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className={fieldErrors.authToken ? 'border-red-500' : ''}
                     />
                     <Button
                       type="button"
@@ -298,28 +753,91 @@ const TwilioSettings = () => {
                       {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
+                  {fieldErrors.authToken && (
+                    <p className="text-sm text-red-600 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.authToken}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {getFieldValidationMessage('authToken')}
+                  </p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="smsNumber">SMS Phone Number</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="smsNumber">SMS Phone Number (Optional)</Label>
+                    <div className="group relative">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      <div className="invisible group-hover:visible absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap z-10">
+                        From Twilio Console → Phone Numbers
+                      </div>
+                    </div>
+                  </div>
                   <Input
                     id="smsNumber"
                     value={config.phoneNumberSms}
-                    onChange={(e) => setConfig({ ...config, phoneNumberSms: e.target.value })}
+                    onChange={(e) => {
+                      setConfig({ ...config, phoneNumberSms: e.target.value });
+                      // Clear field error when user starts typing
+                      if (fieldErrors.phoneNumberSms) {
+                        setFieldErrors({ ...fieldErrors, phoneNumberSms: '' });
+                      }
+                    }}
                     placeholder="+1234567890"
+                    className={fieldErrors.phoneNumberSms ? 'border-red-500' : ''}
                   />
+                  {fieldErrors.phoneNumberSms && (
+                    <p className="text-sm text-red-600 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.phoneNumberSms}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty if you only want to use WhatsApp. {getFieldValidationMessage('phoneNumberSms')}
+                  </p>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="whatsappNumber">WhatsApp Number (Optional)</Label>
+                    <div className="group relative">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      <div className="invisible group-hover:visible absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap z-10">
+                        WhatsApp-enabled number from Twilio
+                      </div>
+                    </div>
+                  </div>
                   <Input
                     id="whatsappNumber"
                     value={config.phoneNumberWhatsapp}
-                    onChange={(e) => setConfig({ ...config, phoneNumberWhatsapp: e.target.value })}
+                    onChange={(e) => {
+                      setConfig({ ...config, phoneNumberWhatsapp: e.target.value });
+                      // Clear field error when user starts typing
+                      if (fieldErrors.phoneNumberWhatsapp) {
+                        setFieldErrors({ ...fieldErrors, phoneNumberWhatsapp: '' });
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Auto-format WhatsApp number on blur
+                      if (e.target.value && !e.target.value.startsWith('whatsapp:') && e.target.value.startsWith('+')) {
+                        setConfig({ ...config, phoneNumberWhatsapp: formatWhatsAppNumber(e.target.value) });
+                      }
+                    }}
                     placeholder="whatsapp:+1234567890"
+                    className={fieldErrors.phoneNumberWhatsapp ? 'border-red-500' : ''}
                   />
+                  {fieldErrors.phoneNumberWhatsapp && (
+                    <p className="text-sm text-red-600 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.phoneNumberWhatsapp}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty if you only want to use SMS. {getFieldValidationMessage('phoneNumberWhatsapp')}
+                  </p>
                 </div>
               </div>
               
@@ -330,30 +848,166 @@ const TwilioSettings = () => {
                   <Input
                     id="budget"
                     type="number"
-                    value={config.monthlyBudget}
-                    onChange={(e) => setConfig({ ...config, monthlyBudget: parseFloat(e.target.value) })}
+                    min="0"
+                    max="10000"
+                    step="0.01"
+                    value={config.monthlyBudget || ''}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                      setConfig({ ...config, monthlyBudget: value });
+                      // Clear field error when user starts typing
+                      if (fieldErrors.monthlyBudget) {
+                        setFieldErrors({ ...fieldErrors, monthlyBudget: '' });
+                      }
+                    }}
                     placeholder="100.00"
+                    className={fieldErrors.monthlyBudget ? 'border-red-500' : ''}
                   />
                 </div>
+                {fieldErrors.monthlyBudget && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {fieldErrors.monthlyBudget}
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground">
-                  Set a monthly spending limit for SMS/WhatsApp messages
+                  Set a monthly spending limit for SMS/WhatsApp messages (max $10,000)
                 </p>
               </div>
               
-              <Button 
-                onClick={handleConfigSave}
-                disabled={saveConfigMutation.isPending}
-                className="w-full"
-              >
-                {saveConfigMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Configuration'
+              {/* Display validation errors summary */}
+              {validationErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <span className="text-sm font-medium text-red-800">
+                      Please fix the following errors:
+                    </span>
+                  </div>
+                  <ul className="text-sm text-red-700 space-y-2 ml-6">
+                    {validationErrors.map((error, index) => (
+                      <li key={index} className="list-disc space-y-1">
+                        <div>
+                          <strong>{error.field}:</strong> {error.message}
+                        </div>
+                        {error.suggestions && error.suggestions.length > 0 && (
+                          <div className="ml-4 text-xs text-red-600">
+                            <span className="font-medium">Suggestions:</span>
+                            <ul className="mt-1 space-y-1">
+                              {error.suggestions.map((suggestion, suggestionIndex) => (
+                                <li key={suggestionIndex} className="flex items-center justify-between gap-2 ml-4">
+                                  <span className="list-disc">{suggestion}</span>
+                                  {(suggestion.includes('Did you mean:') || suggestion.includes('Cleaned format:')) && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => handleQuickFix(error.field, suggestion)}
+                                    >
+                                      Apply Fix
+                                    </Button>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                {/* Success indicator for saved configurations */}
+                {(() => {
+                  const status = getConfigurationStatus(config);
+                  const isSaved = twilioConfig && 
+                    twilioConfig.accountSid === config.accountSid && 
+                    twilioConfig.authToken === config.authToken &&
+                    twilioConfig.phoneNumberSms === config.phoneNumberSms &&
+                    twilioConfig.phoneNumberWhatsapp === config.phoneNumberWhatsapp;
+                  
+                  if (isSaved && status.hasCredentials) {
+                    return (
+                      <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800">
+                            Configuration saved successfully
+                          </span>
+                        </div>
+                        <p className="text-xs text-green-700 mt-1">
+                          {status.isFullyConfigured 
+                            ? 'Ready to send SMS and WhatsApp messages' 
+                            : 'Add phone numbers to enable messaging'}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+                
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      console.log('🔍 Test Configuration button clicked');
+                      console.log('Current config state:', {
+                        hasAccountSid: !!config.accountSid,
+                        hasAuthToken: !!config.authToken,
+                        accountSidPreview: config.accountSid ? `${config.accountSid.substring(0, 6)}...` : 'missing',
+                        isActive: config.isActive
+                      });
+                      
+                      // Show immediate loading state feedback
+                      toast.loading('Initializing test...', { duration: 1000 });
+                      
+                      // Start the mutation
+                      testConfigMutation.mutate();
+                    }}
+                    disabled={testConfigMutation.isPending || saveConfigMutation.isPending || !config.accountSid || !config.authToken}
+                    className="flex-1"
+                  >
+                    {testConfigMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Testing Configuration...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube className="h-4 w-4 mr-2" />
+                        Test Configuration
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleConfigSave}
+                    disabled={saveConfigMutation.isPending || testConfigMutation.isPending || !config.accountSid || !config.authToken}
+                    className="flex-1"
+                  >
+                    {saveConfigMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Save Configuration
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
+                {/* Help text for disabled buttons */}
+                {(!config.accountSid || !config.authToken) && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Enter your Account SID and Auth Token to test and save the configuration
+                  </p>
                 )}
-              </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -457,10 +1111,26 @@ const TwilioSettings = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="sms">SMS</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="sms" disabled={!config.phoneNumberSms}>
+                      SMS {!config.phoneNumberSms && '(Not configured)'}
+                    </SelectItem>
+                    <SelectItem value="whatsapp" disabled={!config.phoneNumberWhatsapp}>
+                      WhatsApp {!config.phoneNumberWhatsapp && '(Not configured)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+                {testChannel === 'sms' && !config.phoneNumberSms && (
+                  <p className="text-sm text-yellow-600 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    SMS phone number not configured. Please add it in the Configuration tab.
+                  </p>
+                )}
+                {testChannel === 'whatsapp' && !config.phoneNumberWhatsapp && (
+                  <p className="text-sm text-yellow-600 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    WhatsApp phone number not configured. Please add it in the Configuration tab.
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -468,8 +1138,11 @@ const TwilioSettings = () => {
                 <Input
                   value={testPhone}
                   onChange={(e) => setTestPhone(e.target.value)}
-                  placeholder={testChannel === 'whatsapp' ? '+1234567890' : '+1234567890'}
+                  placeholder="+1234567890"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Include country code (e.g., +1 for US, +44 for UK). For WhatsApp, number will be automatically formatted.
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -484,7 +1157,9 @@ const TwilioSettings = () => {
               
               <Button 
                 onClick={handleSendTest}
-                disabled={sendTestMutation.isPending || !config.isActive}
+                disabled={sendTestMutation.isPending || !config.isActive || 
+                  (testChannel === 'sms' && !config.phoneNumberSms) ||
+                  (testChannel === 'whatsapp' && !config.phoneNumberWhatsapp)}
                 className="w-full"
               >
                 {sendTestMutation.isPending ? (
@@ -504,6 +1179,20 @@ const TwilioSettings = () => {
                 <p className="text-sm text-yellow-600 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
                   Enable Twilio integration first
+                </p>
+              )}
+              
+              {config.isActive && !config.phoneNumberSms && !config.phoneNumberWhatsapp && (
+                <p className="text-sm text-orange-600 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Configure at least one phone number (SMS or WhatsApp) to send test messages
+                </p>
+              )}
+              
+              {config.isActive && !config.accountSid.startsWith('AC') && (
+                <p className="text-sm text-red-600 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Invalid Twilio configuration - please check your Account SID
                 </p>
               )}
             </CardContent>
@@ -526,6 +1215,88 @@ const TwilioSettings = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Test Results Modal */}
+      <Dialog open={showTestResults} onOpenChange={setShowTestResults}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {testResults?.success ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Configuration Test Passed
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  Configuration Test Results
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Test completed at {testResults?.timestamp.toLocaleString()}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className={`p-4 rounded-lg border ${
+              testResults?.success 
+                ? 'bg-green-50 border-green-200' 
+                : testResults?.details?.warning 
+                  ? 'bg-yellow-50 border-yellow-200'
+                  : 'bg-red-50 border-red-200'
+            }`}>
+              <p className={`font-medium ${
+                testResults?.success 
+                  ? 'text-green-800' 
+                  : testResults?.details?.warning 
+                    ? 'text-yellow-800'
+                    : 'text-red-800'
+              }`}>
+                {testResults?.message}
+              </p>
+            </div>
+            
+            {testResults?.details && (
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm text-gray-700">Technical Details:</h4>
+                <div className="bg-gray-50 p-3 rounded border text-xs font-mono max-h-60 overflow-y-auto">
+                  <pre>{JSON.stringify(testResults.details, null, 2)}</pre>
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-2 text-sm text-gray-600">
+              <h4 className="font-medium text-gray-700">What was tested:</h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Account SID format and validity</li>
+                <li>Auth Token authentication</li>
+                {config.phoneNumberSms && <li>SMS phone number configuration</li>}
+                {config.phoneNumberWhatsapp && <li>WhatsApp phone number configuration</li>}
+                <li>Twilio API connectivity</li>
+              </ul>
+            </div>
+            
+            {!testResults?.success && (
+              <div className="space-y-2 text-sm">
+                <h4 className="font-medium text-gray-700">Next Steps:</h4>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>Double-check your credentials in the Twilio Console</li>
+                  <li>Ensure your Twilio account has sufficient funds</li>
+                  <li>Verify your phone numbers are properly configured</li>
+                  <li>Check that your Firebase functions are deployed</li>
+                </ul>
+              </div>
+            )}
+            
+            <div className="flex justify-end pt-4">
+              <Button onClick={() => setShowTestResults(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

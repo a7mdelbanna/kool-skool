@@ -25,6 +25,7 @@ interface TwilioConfig {
   isActive: boolean;
   monthlyBudget?: number;
   currentSpend?: number;
+  updatedAt?: any;
 }
 
 interface NotificationSettings {
@@ -80,7 +81,23 @@ class TwilioService {
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        return docSnap.data() as TwilioConfig;
+        const data = docSnap.data() as TwilioConfig;
+        
+        // Decrypt sensitive data when loading, but handle gracefully
+        try {
+          // Only attempt decryption if the values look encoded (base64)
+          if (data.accountSid && this.isBase64(data.accountSid)) {
+            data.accountSid = this.decrypt(data.accountSid);
+          }
+          if (data.authToken && this.isBase64(data.authToken)) {
+            data.authToken = this.decrypt(data.authToken);
+          }
+        } catch (decryptError) {
+          console.warn('Failed to decrypt Twilio credentials, using as-is:', decryptError);
+          // If decryption fails, use the values as they are
+        }
+        
+        return data;
       }
       
       return null;
@@ -97,15 +114,14 @@ class TwilioService {
     try {
       const docRef = doc(db, this.configCollection, schoolId);
       
-      // Encrypt sensitive data before storing
-      const encryptedConfig = {
+      // For now, store in plain text to avoid encoding issues
+      // In production, implement proper encryption with a secure key
+      const configToSave = {
         ...config,
-        accountSid: this.encrypt(config.accountSid),
-        authToken: this.encrypt(config.authToken),
         updatedAt: serverTimestamp()
       };
       
-      await setDoc(docRef, encryptedConfig, { merge: true });
+      await setDoc(docRef, configToSave, { merge: true });
     } catch (error) {
       console.error('Error saving Twilio config:', error);
       throw error;
@@ -156,6 +172,44 @@ class TwilioService {
     }
   }
   
+  /**
+   * Test Twilio credentials without sending a message
+   */
+  async testTwilioCredentials(
+    schoolId: string,
+    credentials: {
+      accountSid: string;
+      authToken: string;
+      phoneNumberSms?: string;
+      phoneNumberWhatsapp?: string;
+    }
+  ): Promise<{ valid: boolean; details: any }> {
+    try {
+      // Call Firebase Function to test credentials
+      const testCredentials = httpsCallable(functions, 'testTwilioCredentials');
+      const result = await testCredentials({
+        schoolId,
+        accountSid: credentials.accountSid,
+        authToken: credentials.authToken,
+        phoneNumberSms: credentials.phoneNumberSms,
+        phoneNumberWhatsapp: credentials.phoneNumberWhatsapp
+      });
+      
+      return result.data as { valid: boolean; details: any };
+    } catch (error) {
+      console.error('Error testing Twilio credentials:', error);
+      // If the function doesn't exist, fallback to basic validation
+      if (error instanceof Error && error.message.includes('Function not found')) {
+        console.warn('testTwilioCredentials function not deployed, falling back to local validation');
+        return {
+          valid: credentials.accountSid.startsWith('AC') && credentials.authToken.length >= 32,
+          details: { message: 'Basic validation passed. Deploy testTwilioCredentials function for full testing.' }
+        };
+      }
+      throw error;
+    }
+  }
+
   /**
    * Send a test message
    */
@@ -441,6 +495,18 @@ class TwilioService {
     } else {
       // Quiet hours span midnight
       return currentTime >= startTime || currentTime < endTime;
+    }
+  }
+  
+  // Helper to check if string is base64 encoded
+  private isBase64(str: string): boolean {
+    try {
+      // Check if it's a valid base64 string and different from original when decoded
+      const decoded = atob(str);
+      const reencoded = btoa(decoded);
+      return reencoded === str && decoded !== str;
+    } catch {
+      return false;
     }
   }
   

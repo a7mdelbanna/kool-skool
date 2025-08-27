@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = void 0;
+exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = exports.testTwilioCredentials = void 0;
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 // Initialize Admin SDK
@@ -466,6 +466,7 @@ exports.updatePaymentStatuses = functions.pubsub
 // ============================================
 // Export Twilio functions
 var sendMessage_1 = require("./twilio/sendMessage");
+Object.defineProperty(exports, "testTwilioCredentials", { enumerable: true, get: function () { return sendMessage_1.testTwilioCredentials; } });
 Object.defineProperty(exports, "sendTwilioMessage", { enumerable: true, get: function () { return sendMessage_1.sendTwilioMessage; } });
 Object.defineProperty(exports, "scheduleLessonReminders", { enumerable: true, get: function () { return sendMessage_1.scheduleLessonReminders; } });
 Object.defineProperty(exports, "schedulePaymentReminders", { enumerable: true, get: function () { return sendMessage_1.schedulePaymentReminders; } });

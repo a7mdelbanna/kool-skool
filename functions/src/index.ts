@@ -605,6 +605,7 @@ exports.updatePaymentStatuses = functions.pubsub
 
 // Export Twilio functions
 export { 
+  testTwilioCredentials,
   sendTwilioMessage, 
   scheduleLessonReminders, 
   schedulePaymentReminders 

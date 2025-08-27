@@ -33,10 +33,105 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = void 0;
+exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = exports.testTwilioCredentials = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const twilio = require('twilio');
+/**
+ * Test Twilio credentials without sending a message
+ */
+exports.testTwilioCredentials = functions.https.onCall(async (data, context) => {
+    // Verify authentication
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    const { accountSid, authToken, phoneNumberSms, phoneNumberWhatsapp } = data;
+    try {
+        // Basic validation
+        if (!accountSid || !authToken) {
+            throw new functions.https.HttpsError('invalid-argument', 'Account SID and Auth Token are required');
+        }
+        if (!accountSid.startsWith('AC')) {
+            throw new functions.https.HttpsError('invalid-argument', 'Invalid Account SID format. Must start with "AC"');
+        }
+        if (authToken.length < 32) {
+            throw new functions.https.HttpsError('invalid-argument', 'Invalid Auth Token format. Must be at least 32 characters');
+        }
+        // Initialize Twilio client to test credentials
+        const client = twilio(accountSid, authToken);
+        // Test the credentials by fetching account info
+        let accountInfo;
+        try {
+            accountInfo = await client.api.accounts(accountSid).fetch();
+        }
+        catch (error) {
+            console.error('Twilio credentials test failed:', error);
+            if (error.code === 20003) {
+                throw new functions.https.HttpsError('permission-denied', 'Invalid Twilio credentials. Please check your Account SID and Auth Token.');
+            }
+            throw new functions.https.HttpsError('internal', `Twilio API error: ${error.message}`);
+        }
+        // Validate phone numbers if provided
+        const phoneValidation = {
+            sms: null,
+            whatsapp: null
+        };
+        if (phoneNumberSms) {
+            try {
+                const phoneNumber = await client.incomingPhoneNumbers.list({ phoneNumber: phoneNumberSms });
+                phoneValidation.sms = {
+                    valid: phoneNumber.length > 0,
+                    message: phoneNumber.length > 0
+                        ? 'SMS phone number is valid and configured'
+                        : 'SMS phone number not found in your Twilio account'
+                };
+            }
+            catch (error) {
+                phoneValidation.sms = {
+                    valid: false,
+                    message: 'Error validating SMS phone number'
+                };
+            }
+        }
+        if (phoneNumberWhatsapp) {
+            try {
+                const cleanNumber = phoneNumberWhatsapp.replace('whatsapp:', '');
+                const phoneNumber = await client.incomingPhoneNumbers.list({ phoneNumber: cleanNumber });
+                phoneValidation.whatsapp = {
+                    valid: phoneNumber.length > 0,
+                    message: phoneNumber.length > 0
+                        ? 'WhatsApp phone number is valid and configured'
+                        : 'WhatsApp phone number not found in your Twilio account'
+                };
+            }
+            catch (error) {
+                phoneValidation.whatsapp = {
+                    valid: false,
+                    message: 'Error validating WhatsApp phone number'
+                };
+            }
+        }
+        return {
+            valid: true,
+            details: {
+                accountSid: accountInfo.sid,
+                accountStatus: accountInfo.status,
+                accountType: accountInfo.type,
+                friendlyName: accountInfo.friendlyName,
+                phoneNumbers: phoneValidation,
+                message: 'Twilio credentials are valid and working correctly'
+            }
+        };
+    }
+    catch (error) {
+        console.error('Error testing Twilio credentials:', error);
+        // Re-throw HttpsError as-is
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', `Credential test failed: ${error.message}`);
+    }
+});
 /**
  * Send SMS or WhatsApp message via Twilio
  */
@@ -59,18 +154,42 @@ exports.sendTwilioMessage = functions.https.onCall(async (data, context) => {
         if (!(config === null || config === void 0 ? void 0 : config.isActive)) {
             throw new functions.https.HttpsError('failed-precondition', 'Twilio integration is not active');
         }
-        // Decrypt credentials (in production, use KMS)
-        const accountSid = Buffer.from(config.accountSid, 'base64').toString();
-        const authToken = Buffer.from(config.authToken, 'base64').toString();
+        // Handle credentials (they might be encoded or plain text)
+        let decodedAccountSid = config.accountSid;
+        let decodedAuthToken = config.authToken;
+        // Try to decode if they appear to be base64 encoded
+        try {
+            if (isBase64(config.accountSid)) {
+                decodedAccountSid = Buffer.from(config.accountSid, 'base64').toString();
+            }
+            if (isBase64(config.authToken)) {
+                decodedAuthToken = Buffer.from(config.authToken, 'base64').toString();
+            }
+        }
+        catch (error) {
+            console.warn('Using credentials as plain text (decoding failed)');
+        }
         // Initialize Twilio client
-        const client = twilio(accountSid, authToken);
-        // Prepare phone numbers
-        const from = channel === 'whatsapp'
+        const client = twilio(decodedAccountSid, decodedAuthToken);
+        // Prepare phone numbers with proper WhatsApp formatting
+        let from = channel === 'whatsapp'
             ? config.phoneNumberWhatsapp
             : config.phoneNumberSms;
-        const to = channel === 'whatsapp' && !phone.startsWith('whatsapp:')
-            ? `whatsapp:${phone}`
-            : phone;
+        // Ensure WhatsApp from number has proper whatsapp: prefix
+        if (channel === 'whatsapp' && from && !from.startsWith('whatsapp:')) {
+            from = `whatsapp:${from}`;
+        }
+        let to = phone;
+        // Ensure WhatsApp to number has proper whatsapp: prefix
+        if (channel === 'whatsapp' && !phone.startsWith('whatsapp:')) {
+            to = `whatsapp:${phone}`;
+        }
+        // Log the formatted numbers for debugging
+        console.log(`📱 Sending ${channel} message:`, {
+            from: from,
+            to: to,
+            channel: channel
+        });
         // Send message
         const messageResponse = await client.messages.create({
             body: message,
@@ -303,15 +422,38 @@ async function sendNotificationToStudent(schoolId, studentId, type, variables, s
             if (configDoc.exists) {
                 const config = configDoc.data();
                 if (config === null || config === void 0 ? void 0 : config.isActive) {
-                    const accountSid = Buffer.from(config.accountSid, 'base64').toString();
-                    const authToken = Buffer.from(config.authToken, 'base64').toString();
-                    const client = twilio(accountSid, authToken);
-                    const from = channel.type === 'whatsapp'
+                    let decodedAccountSid = config.accountSid;
+                    let decodedAuthToken = config.authToken;
+                    try {
+                        if (isBase64(config.accountSid)) {
+                            decodedAccountSid = Buffer.from(config.accountSid, 'base64').toString();
+                        }
+                        if (isBase64(config.authToken)) {
+                            decodedAuthToken = Buffer.from(config.authToken, 'base64').toString();
+                        }
+                    }
+                    catch (error) {
+                        console.warn('Using credentials as plain text');
+                    }
+                    const client = twilio(decodedAccountSid, decodedAuthToken);
+                    let from = channel.type === 'whatsapp'
                         ? config.phoneNumberWhatsapp
                         : config.phoneNumberSms;
-                    const to = channel.type === 'whatsapp' && !channel.phone.startsWith('whatsapp:')
-                        ? `whatsapp:${channel.phone}`
-                        : channel.phone;
+                    // Ensure WhatsApp from number has proper whatsapp: prefix
+                    if (channel.type === 'whatsapp' && from && !from.startsWith('whatsapp:')) {
+                        from = `whatsapp:${from}`;
+                    }
+                    let to = channel.phone;
+                    // Ensure WhatsApp to number has proper whatsapp: prefix
+                    if (channel.type === 'whatsapp' && !channel.phone.startsWith('whatsapp:')) {
+                        to = `whatsapp:${channel.phone}`;
+                    }
+                    // Log the formatted numbers for debugging
+                    console.log(`📱 Sending automated ${channel.type} message:`, {
+                        from: from,
+                        to: to,
+                        channel: channel.type
+                    });
                     await client.messages.create({
                         body: message,
                         from: from,
@@ -379,5 +521,16 @@ function formatCurrency(amount, currency) {
         RUB: '₽'
     };
     return `${symbols[currency] || currency} ${amount.toFixed(2)}`;
+}
+function isBase64(str) {
+    try {
+        // Check if it's a valid base64 string and different from original when decoded
+        const decoded = Buffer.from(str, 'base64').toString();
+        const reencoded = Buffer.from(decoded).toString('base64');
+        return reencoded === str && decoded !== str;
+    }
+    catch (_a) {
+        return false;
+    }
 }
 //# sourceMappingURL=sendMessage.js.map
