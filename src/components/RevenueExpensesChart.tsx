@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -32,47 +32,47 @@ import {
   YAxis
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { dashboardService, ChartData } from '@/services/dashboard.service';
+import { UserContext } from '@/App';
 
 type TimeRange = 'daily' | 'weekly' | 'monthly';
 
-// Sample data for demonstration
-const generateData = (range: TimeRange) => {
-  const now = new Date();
-  const data = [];
-  
-  const periods = range === 'daily' ? 30 : range === 'weekly' ? 12 : 6;
-  const interval = range === 'daily' ? 1 : range === 'weekly' ? 7 : 30;
-  
-  for (let i = periods - 1; i >= 0; i--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i * interval);
-    
-    const revenue = Math.floor(Math.random() * 800) + 200;
-    const expenses = Math.floor(Math.random() * 500) + 100;
-    
-    data.push({
-      date: range === 'daily' 
-        ? format(date, 'MMM d') 
-        : range === 'weekly' 
-          ? `Week ${periods - i}` 
-          : format(date, 'MMM yyyy'),
-      revenue,
-      expenses,
-      profit: revenue - expenses
-    });
-  }
-  
-  return data;
-};
-
 const RevenueExpensesChart = ({ className }: { className?: string }) => {
+  const { user } = useContext(UserContext);
   const [timeRange, setTimeRange] = useState<TimeRange>('weekly');
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [chartData, setChartData] = useState(() => generateData(timeRange));
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState('USD');
+
+  useEffect(() => {
+    const fetchChartData = async () => {
+      if (user?.schoolId) {
+        setLoading(true);
+        try {
+          console.log('🔍 [RevenueComponent] Fetching data for user:', user, 'timeRange:', timeRange);
+          const data = await dashboardService.getRevenueExpensesChartData(user.schoolId, timeRange);
+          console.log('🔍 [RevenueComponent] Received chart data:', data);
+          setChartData(data);
+          
+          // Get currency from first transaction or default
+          const currencies = await dashboardService.getDashboardMetrics(user.schoolId);
+          console.log('🔍 [RevenueComponent] Currency info:', currencies.currency);
+          setCurrency(currencies.currency || 'USD');
+        } catch (error) {
+          console.error('Error fetching chart data:', error);
+          setChartData([]);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchChartData();
+  }, [user?.schoolId, timeRange]);
   
   const handleRangeChange = (range: TimeRange) => {
     setTimeRange(range);
-    setChartData(generateData(range));
   };
   
   const chartConfig = {
@@ -136,8 +136,17 @@ const RevenueExpensesChart = ({ className }: { className?: string }) => {
       <Separator />
       <CardContent className="p-0">
         <div className="h-[300px] w-full py-4">
+          {loading ? (
+            <div className="h-full w-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+              <p>No data available for this period</p>
+            </div>
+          ) : (
           <ChartContainer config={chartConfig} className="h-full w-full">
-            <ComposedChart>
+            <ComposedChart data={chartData}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.8}/>
@@ -156,17 +165,26 @@ const RevenueExpensesChart = ({ className }: { className?: string }) => {
                 orientation="left"
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `$${value}`}
+                tickFormatter={(value) => {
+                  const symbol = currency === 'RUB' ? '₽' : currency === 'EUR' ? '€' : '$';
+                  return `${symbol}${value}`;
+                }}
               />
               <YAxis 
                 yAxisId="right"
                 orientation="right"
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `$${value}`}
+                tickFormatter={(value) => {
+                  const symbol = currency === 'RUB' ? '₽' : currency === 'EUR' ? '€' : '$';
+                  return `${symbol}${value}`;
+                }}
               />
               <ChartTooltip 
-                content={<ChartTooltipContent formatter={(value: number) => `$${value}`} />} 
+                content={<ChartTooltipContent formatter={(value: number) => {
+                  const symbol = currency === 'RUB' ? '₽' : currency === 'EUR' ? '€' : '$';
+                  return `${symbol}${value}`;
+                }} />} 
               />
               <Area 
                 type="monotone" 
@@ -190,6 +208,7 @@ const RevenueExpensesChart = ({ className }: { className?: string }) => {
               />
             </ComposedChart>
           </ChartContainer>
+          )}
         </div>
       </CardContent>
     </Card>

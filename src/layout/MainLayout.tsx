@@ -20,6 +20,12 @@ import Settings from '@/pages/Settings';
 import TeamAccess from '@/pages/TeamAccess';
 import StudentAccess from '@/pages/StudentAccess';
 import LicenseManagement from '@/pages/LicenseManagement';
+import TwilioSettings from '@/pages/TwilioSettings';
+import PersonalSettings from '@/pages/PersonalSettings';
+import SchoolSettings from '@/pages/SchoolSettings';
+import AcademicSettings from '@/pages/AcademicSettings';
+import FinancialSettings from '@/pages/FinancialSettings';
+import NotificationSettings from '@/pages/NotificationSettings';
 
 const MainLayout = () => {
   return (
@@ -46,6 +52,12 @@ const MainLayout = () => {
                   <Route path="/team-access" element={<TeamAccess />} />
                   <Route path="/student-access" element={<StudentAccess />} />
                   <Route path="/license-management" element={<LicenseManagement />} />
+                  <Route path="/settings/communications" element={<TwilioSettings />} />
+                  <Route path="/settings/personal" element={<PersonalSettings />} />
+                  <Route path="/settings/school" element={<SchoolSettings />} />
+                  <Route path="/settings/academic" element={<AcademicSettings />} />
+                  <Route path="/settings/financial" element={<FinancialSettings />} />
+                  <Route path="/settings/notifications" element={<NotificationSettings />} />
                 </Routes>
               </div>
             </div>

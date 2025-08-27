@@ -16,7 +16,15 @@ import {
   ChevronRight,
   DollarSign,
   Shield,
-  UsersRound
+  UsersRound,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  User,
+  Briefcase,
+  GraduationCap,
+  Wallet,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,6 +40,9 @@ const Sidebar = () => {
   const { setUser } = useContext(UserContext);
   const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(
+    location.pathname.startsWith('/settings')
+  );
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -46,8 +57,24 @@ const Sidebar = () => {
     { name: 'Reports', href: '/states-reports', icon: BarChart3 },
   ];
 
+  const settingsSubItems = [
+    { name: 'Personal', href: '/settings/personal', icon: User },
+    { name: 'School', href: '/settings/school', icon: Briefcase },
+    { name: 'Academic', href: '/settings/academic', icon: GraduationCap },
+    { name: 'Financial', href: '/settings/financial', icon: Wallet },
+    { name: 'Notifications', href: '/settings/notifications', icon: Bell },
+    { name: 'Communications', href: '/settings/communications', icon: MessageSquare },
+  ];
+
   const adminNavigation = [
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { 
+      name: 'Settings', 
+      href: '/settings', 
+      icon: Settings,
+      hasSubItems: true,
+      subItems: settingsSubItems,
+      expanded: settingsExpanded
+    },
     { name: 'Team Access', href: '/team-access', icon: UserCog },
     { name: 'Student Access', href: '/student-access', icon: Shield },
     { name: 'License', href: '/license-management', icon: Key },
@@ -151,23 +178,85 @@ const Sidebar = () => {
             </p>
           )}
           {adminNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
+            const isActive = item.hasSubItems 
+              ? item.subItems?.some(subItem => location.pathname === subItem.href)
+              : location.pathname === item.href;
+            const isSettingsItem = item.name === 'Settings';
+            
             return (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "bg-blue-500 text-white shadow-sm"
-                    : "text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200",
-                  isCollapsed && "justify-center"
+              <div key={item.name}>
+                {/* Main Navigation Item */}
+                {item.hasSubItems ? (
+                  <button
+                    onClick={() => {
+                      if (isCollapsed) {
+                        navigate('/settings/personal');
+                      } else {
+                        setSettingsExpanded(!settingsExpanded);
+                      }
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                      isActive
+                        ? "bg-blue-500 text-white shadow-sm"
+                        : "text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200",
+                      isCollapsed && "justify-center"
+                    )}
+                    title={isCollapsed ? item.name : undefined}
+                  >
+                    <item.icon className={cn("h-5 w-5 flex-shrink-0")} />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{item.name}</span>
+                        {settingsExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <NavLink
+                    to={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                      isActive
+                        ? "bg-blue-500 text-white shadow-sm"
+                        : "text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200",
+                      isCollapsed && "justify-center"
+                    )}
+                    title={isCollapsed ? item.name : undefined}
+                  >
+                    <item.icon className={cn("h-5 w-5 flex-shrink-0")} />
+                    {!isCollapsed && <span>{item.name}</span>}
+                  </NavLink>
                 )}
-                title={isCollapsed ? item.name : undefined}
-              >
-                <item.icon className={cn("h-5 w-5 flex-shrink-0")} />
-                {!isCollapsed && <span>{item.name}</span>}
-              </NavLink>
+                
+                {/* Sub Items */}
+                {item.hasSubItems && settingsExpanded && !isCollapsed && (
+                  <div className="ml-6 mt-1 space-y-1">
+                    {item.subItems?.map((subItem) => {
+                      const isSubActive = location.pathname === subItem.href;
+                      return (
+                        <NavLink
+                          key={subItem.name}
+                          to={subItem.href}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                            isSubActive
+                              ? "bg-blue-100 text-blue-700 border border-blue-200"
+                              : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                          )}
+                        >
+                          <subItem.icon className="h-4 w-4 flex-shrink-0" />
+                          <span>{subItem.name}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { PlusCircle, Calendar, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +14,9 @@ import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
 import AddStudentDialog from '@/components/AddStudentDialog';
 import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
+import { UserContext } from '@/App';
+import { dashboardService, RecentStudent, UpcomingLesson } from '@/services/dashboard.service';
+import { useNavigate } from 'react-router-dom';
 
 // Sample data for demonstration
 const sampleStudents: Student[] = [
@@ -166,9 +169,72 @@ const samplePayments: Payment[] = [
 ];
 
 const Index = () => {
+  const { user } = useContext(UserContext);
+  const navigate = useNavigate();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<'standard' | 'enhanced'>('enhanced');
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [recentStudents, setRecentStudents] = useState<Student[]>([]);
+  const [upcomingLessons, setUpcomingLessons] = useState<Lesson[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [loadingLessons, setLoadingLessons] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (user?.schoolId) {
+        // Fetch recent students
+        setLoadingStudents(true);
+        try {
+          const students = await dashboardService.getRecentStudents(user.schoolId, 4);
+          // Convert to StudentCard format
+          const formattedStudents: Student[] = students.map(s => ({
+            id: s.id,
+            firstName: s.firstName,
+            lastName: s.lastName,
+            email: s.email,
+            courseName: s.courseName,
+            lessonType: s.lessonType,
+            ageGroup: s.ageGroup,
+            level: s.level,
+            lessonsCompleted: s.lessonsCompleted,
+            nextLesson: s.nextLesson,
+            paymentStatus: s.paymentStatus as any,
+            nextPaymentDate: s.nextPaymentDate
+          }));
+          setRecentStudents(formattedStudents);
+        } catch (error) {
+          console.error('Error fetching recent students:', error);
+          setRecentStudents([]);
+        } finally {
+          setLoadingStudents(false);
+        }
+
+        // Fetch upcoming lessons
+        setLoadingLessons(true);
+        try {
+          const lessons = await dashboardService.getUpcomingLessons(user.schoolId, 5);
+          // Convert to UpcomingLessons format
+          const formattedLessons: Lesson[] = lessons.map(l => ({
+            id: l.id,
+            studentName: l.studentName,
+            subject: l.subject,
+            date: l.date,
+            time: l.time,
+            duration: l.duration,
+            status: l.status
+          }));
+          setUpcomingLessons(formattedLessons);
+        } catch (error) {
+          console.error('Error fetching upcoming lessons:', error);
+          setUpcomingLessons([]);
+        } finally {
+          setLoadingLessons(false);
+        }
+      }
+    };
+
+    fetchDashboardData();
+  }, [user?.schoolId]);
   
   return (
     <div className="space-y-8">
@@ -241,18 +307,28 @@ const Index = () => {
         <div className="lg:col-span-2">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Recent Students</h2>
-            <Button variant="link" className="text-primary">View All</Button>
+            <Button variant="link" className="text-primary" onClick={() => navigate('/students')}>View All</Button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 element-transition">
-            {sampleStudents.map(student => (
-              <StudentCard key={student.id} student={student} className="glass glass-hover" />
-            ))}
+            {loadingStudents ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="glass animate-pulse h-[150px] rounded-lg"></div>
+              ))
+            ) : recentStudents.length > 0 ? (
+              recentStudents.map(student => (
+                <StudentCard key={student.id} student={student} className="glass glass-hover" />
+              ))
+            ) : (
+              <div className="col-span-2 text-center py-8 text-muted-foreground">
+                No students found. <Button variant="link" onClick={() => navigate('/students')}>Add your first student</Button>
+              </div>
+            )}
           </div>
         </div>
         
         <div className="space-y-6">
-          <UpcomingLessons lessons={sampleLessons} className="glass glass-hover" />
+          <UpcomingLessons lessons={loadingLessons ? [] : upcomingLessons} className="glass glass-hover" />
           <UpcomingPayments payments={samplePayments} className="glass glass-hover" />
         </div>
       </div>

@@ -158,6 +158,14 @@ export const supabase = {
         return handleSessionActionRPC(params);
       case 'get_school_transactions':
         return handleGetSchoolTransactions(params);
+      case 'get_students_password_info':
+        return handleGetStudentsPasswordInfo(params);
+      case 'get_user_password_hash':
+        return handleGetUserPasswordHash(params);
+      case 'update_student_password':
+        return handleUpdateStudentPassword(params);
+      case 'verify_password_update':
+        return handleVerifyPasswordUpdate(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -1532,6 +1540,143 @@ async function handleSetDefaultCurrency(params: { p_currency_id: string, p_schoo
   } catch (error) {
     console.error('Error setting default currency:', error);
     return { data: null, error };
+  }
+}
+
+// Handle get_students_password_info RPC function
+async function handleGetStudentsPasswordInfo(params: { p_school_id: string }) {
+  try {
+    console.log('Getting students password info for school:', params.p_school_id);
+    
+    // Get all students for the school
+    const students = await databaseService.query('students', {
+      where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
+    });
+    
+    console.log(`Found ${students.length} students`);
+    
+    // For each student, get their user data to check for password
+    const passwordInfo = await Promise.all(students.map(async (student: any) => {
+      try {
+        const user = await databaseService.getById('users', student.userId);
+        
+        // Check if user has password (temp password or has auth account)
+        const hasPassword = !!(user?.tempPassword || (user?.needsAuthAccount === false));
+        
+        return {
+          user_id: student.userId,
+          has_password: hasPassword,
+          password_length: hasPassword ? (user?.tempPassword?.length || 8) : 0
+        };
+      } catch (error) {
+        console.warn('Could not fetch user for student:', student.id);
+        return {
+          user_id: student.userId,
+          has_password: false,
+          password_length: 0
+        };
+      }
+    }));
+    
+    console.log(`Returning password info for ${passwordInfo.length} students`);
+    
+    return { data: passwordInfo, error: null };
+  } catch (error) {
+    console.error('Error getting students password info:', error);
+    return { data: null, error };
+  }
+}
+
+// Handle get_user_password_hash RPC function (returns plain text password)
+async function handleGetUserPasswordHash(params: { p_user_id: string }) {
+  try {
+    console.log('Getting password for user:', params.p_user_id);
+    
+    const user = await databaseService.getById('users', params.p_user_id);
+    
+    if (!user) {
+      console.log('User not found:', params.p_user_id);
+      return { data: null, error: null };
+    }
+    
+    // Return the temp password if it exists
+    if (user.tempPassword) {
+      return { 
+        data: [{
+          user_id: params.p_user_id,
+          password_hash: user.tempPassword, // This is actually plain text
+          email: user.email,
+          first_name: user.firstName,
+          last_name: user.lastName
+        }], 
+        error: null 
+      };
+    }
+    
+    console.log('No password set for user:', params.p_user_id);
+    return { data: [], error: null };
+  } catch (error) {
+    console.error('Error getting user password:', error);
+    return { data: null, error };
+  }
+}
+
+// Handle update_student_password RPC function
+async function handleUpdateStudentPassword(params: { p_user_id: string, p_password: string }) {
+  try {
+    console.log('Updating password for user:', params.p_user_id);
+    
+    // Update the user document with the new temporary password
+    await databaseService.update('users', params.p_user_id, {
+      tempPassword: params.p_password,
+      needsAuthAccount: true, // Mark that they need an auth account
+      updatedAt: new Date().toISOString()
+    });
+    
+    console.log('Password updated successfully for user:', params.p_user_id);
+    
+    return { 
+      data: { 
+        success: true, 
+        message: 'Password updated successfully' 
+      }, 
+      error: null 
+    };
+  } catch (error) {
+    console.error('Error updating student password:', error);
+    return { 
+      data: { 
+        success: false, 
+        message: error.message 
+      }, 
+      error 
+    };
+  }
+}
+
+// Handle verify_password_update RPC function
+async function handleVerifyPasswordUpdate(params: { p_user_id: string }) {
+  try {
+    console.log('Verifying password update for user:', params.p_user_id);
+    
+    const user = await databaseService.getById('users', params.p_user_id);
+    
+    if (!user) {
+      return { data: [], error: null };
+    }
+    
+    const hasPassword = !!(user.tempPassword);
+    
+    return { 
+      data: [{
+        has_password: hasPassword,
+        password_hash_length: hasPassword ? user.tempPassword.length : 0
+      }], 
+      error: null 
+    };
+  } catch (error) {
+    console.error('Error verifying password update:', error);
+    return { data: [], error };
   }
 }
 

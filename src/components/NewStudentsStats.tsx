@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -26,43 +26,10 @@ import {
   YAxis
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { dashboardService } from '@/services/dashboard.service';
+import { UserContext } from '@/App';
 
 type TimeRange = 'weekly' | 'monthly' | 'quarterly';
-
-// Sample data for demonstration
-const generateData = (range: TimeRange) => {
-  const data = [];
-  const now = new Date();
-  
-  const periods = range === 'weekly' ? 12 : range === 'monthly' ? 6 : 4;
-  
-  for (let i = periods - 1; i >= 0; i--) {
-    const date = new Date();
-    let label = '';
-    
-    if (range === 'weekly') {
-      date.setDate(date.getDate() - i * 7);
-      label = `Week ${periods - i}`;
-    } else if (range === 'monthly') {
-      date.setMonth(date.getMonth() - i);
-      label = format(date, 'MMM');
-    } else { // quarterly
-      date.setMonth(date.getMonth() - i * 3);
-      const quarter = Math.floor(date.getMonth() / 3) + 1;
-      label = `Q${quarter}`;
-    }
-    
-    // Generate random student count with an upward trend
-    const students = Math.floor(Math.random() * 5) + 1 + (periods - i);
-    
-    data.push({
-      period: label,
-      students,
-    });
-  }
-  
-  return data;
-};
 
 // Calculate growth percentage
 const calculateGrowth = (data: any[]) => {
@@ -73,19 +40,57 @@ const calculateGrowth = (data: any[]) => {
   
   return previousValue !== 0 
     ? Math.round(((currentValue - previousValue) / previousValue) * 100) 
-    : 100;
+    : currentValue > 0 ? 100 : 0;
 };
 
 const NewStudentsStats = ({ className }: { className?: string }) => {
+  const { user } = useContext(UserContext);
   const [timeRange, setTimeRange] = useState<TimeRange>('monthly');
-  const [chartData, setChartData] = useState(() => generateData(timeRange));
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalNewStudents, setTotalNewStudents] = useState(0);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (user?.schoolId) {
+        setLoading(true);
+        try {
+          console.log('🔍 [NewStudentsComponent] Fetching data for user:', user);
+          const monthlyData = await dashboardService.getNewStudentsChartData(user.schoolId);
+          console.log('🔍 [NewStudentsComponent] Received monthly data:', monthlyData);
+          const now = new Date();
+          
+          // Format data based on selected time range
+          const formattedData = monthlyData.map((count, index) => {
+            const monthDate = subMonths(now, 5 - index);
+            return {
+              period: format(monthDate, 'MMM'),
+              students: count
+            };
+          });
+          
+          console.log('🔍 [NewStudentsComponent] Formatted data:', formattedData);
+          const total = formattedData.reduce((sum, item) => sum + item.students, 0);
+          console.log('🔍 [NewStudentsComponent] Total students:', total);
+          
+          setChartData(formattedData);
+          setTotalNewStudents(total);
+        } catch (error) {
+          console.error('Error fetching new students data:', error);
+          setChartData([]);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+  }, [user?.schoolId, timeRange]);
+
   const growthPercentage = calculateGrowth(chartData);
-  
-  const totalNewStudents = chartData.reduce((sum, item) => sum + item.students, 0);
   
   const handleRangeChange = (range: TimeRange) => {
     setTimeRange(range);
-    setChartData(generateData(range));
   };
   
   const chartConfig = {
@@ -145,6 +150,11 @@ const NewStudentsStats = ({ className }: { className?: string }) => {
         </div>
         
         <div className="h-[200px] w-full">
+          {loading ? (
+            <div className="h-full w-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            </div>
+          ) : (
           <ChartContainer config={chartConfig} className="h-full w-full">
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -168,6 +178,7 @@ const NewStudentsStats = ({ className }: { className?: string }) => {
               />
             </BarChart>
           </ChartContainer>
+          )}
         </div>
       </CardContent>
     </Card>

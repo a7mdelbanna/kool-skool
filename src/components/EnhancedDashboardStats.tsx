@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { 
   Users, 
   Calendar, 
@@ -12,6 +12,9 @@ import {
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { dashboardService, DashboardMetrics } from '@/services/dashboard.service';
+import { UserContext } from '@/App';
+import { useNavigate } from 'react-router-dom';
 
 type StatCardProps = {
   title: string;
@@ -83,68 +86,133 @@ const StatCard = ({
 };
 
 const EnhancedDashboardStats = () => {
+  const { user } = useContext(UserContext);
+  const navigate = useNavigate();
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    totalRevenue: 0,
+    totalExpenses: 0,
+    netProfit: 0,
+    studentCount: 0,
+    newStudentsThisMonth: 0,
+    weeklyLessonCount: 0,
+    lessonCompletionRate: 0,
+    avgLessonPrice: 0,
+    avgStudentLoad: 0,
+    revenueChange: 0,
+    expensesChange: 0,
+    profitChange: 0,
+    studentChange: 0,
+    lessonChange: 0,
+    currency: 'USD'
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      if (user?.schoolId) {
+        setLoading(true);
+        try {
+          const data = await dashboardService.getDashboardMetrics(user.schoolId);
+          setMetrics(data);
+        } catch (error) {
+          console.error('Error fetching dashboard metrics:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchMetrics();
+  }, [user?.schoolId]);
+
+  const formatCurrency = (amount: number) => {
+    const symbol = metrics.currency === 'RUB' ? '₽' : 
+                   metrics.currency === 'EUR' ? '€' : '$';
+    return `${symbol}${amount.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 element-transition">
+        {[...Array(8)].map((_, i) => (
+          <Card key={i} className="glass animate-pulse">
+            <CardContent className="p-6">
+              <div className="h-20"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 element-transition">
       <StatCard
         title="Total Revenue"
-        value="$8,945"
+        value={formatCurrency(metrics.totalRevenue)}
         icon={<DollarSign className="h-5 w-5 text-primary" />}
-        trend={15}
+        trend={metrics.revenueChange}
         className="glass glass-hover"
         linkText="View details"
+        onClick={() => navigate('/finances')}
       />
       <StatCard
         title="Total Expenses"
-        value="$3,240"
+        value={formatCurrency(metrics.totalExpenses)}
         icon={<CreditCard className="h-5 w-5 text-primary" />}
-        trend={-5}
+        trend={metrics.expensesChange}
         className="glass glass-hover"
         linkText="View details"
+        onClick={() => navigate('/finances')}
       />
       <StatCard
         title="Net Profit"
-        value="$5,705"
+        value={formatCurrency(metrics.netProfit)}
         icon={<DollarSign className="h-5 w-5 text-primary" />}
-        trend={22}
+        trend={metrics.profitChange}
         className="glass glass-hover"
         linkText="View breakdown"
+        onClick={() => navigate('/finances')}
       />
       <StatCard
         title="Students"
-        value="24"
+        value={metrics.studentCount.toString()}
         icon={<Users className="h-5 w-5 text-primary" />}
-        description="5 new this month"
-        trend={12}
+        description={`${metrics.newStudentsThisMonth} new this month`}
+        trend={metrics.studentChange}
         className="glass glass-hover"
         linkText="View students"
+        onClick={() => navigate('/students')}
       />
       <StatCard
         title="Weekly Lessons"
-        value="36"
+        value={metrics.weeklyLessonCount.toString()}
         icon={<Calendar className="h-5 w-5 text-primary" />}
-        trend={5}
+        trend={metrics.lessonChange}
         className="glass glass-hover"
         linkText="View schedule"
+        onClick={() => navigate('/calendar')}
       />
       <StatCard
         title="Lesson Completion"
-        value="94%"
+        value={`${metrics.lessonCompletionRate}%`}
         icon={<Clock className="h-5 w-5 text-primary" />}
         description="Rate this month"
         trend={2}
         className="glass glass-hover"
         linkText="View details"
+        onClick={() => navigate('/attendance')}
       />
       <StatCard
         title="Avg. Lesson Price"
-        value="$45"
+        value={formatCurrency(metrics.avgLessonPrice)}
         icon={<DollarSign className="h-5 w-5 text-primary" />}
         trend={0}
         className="glass glass-hover"
       />
       <StatCard
         title="Avg. Student Load"
-        value="6h/week"
+        value={`${metrics.avgStudentLoad}h/week`}
         icon={<Clock className="h-5 w-5 text-primary" />}
         description="Per tutor"
         trend={8}

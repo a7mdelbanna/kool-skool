@@ -1,0 +1,273 @@
+{
+  "version": "1.0.0",
+  "project": "TutorFlow Assistant",
+  "agents": {
+    "project-orchestrator": {
+      "name": "Project Orchestrator",
+      "role": "master",
+      "description": "Master coordinator for all development agents",
+      "permissions": ["all"],
+      "context": ["full-project"],
+      "capabilities": [
+        "coordinate",
+        "review",
+        "approve",
+        "delegate",
+        "conflict-resolution"
+      ],
+      "triggers": [
+        "new-feature",
+        "bug-fix",
+        "refactor",
+        "optimization"
+      ]
+    },
+    "prd-agent": {
+      "name": "PRD Agent",
+      "role": "product-requirements",
+      "description": "Handles product requirements and specifications",
+      "focus": [
+        "user-stories",
+        "acceptance-criteria",
+        "feature-specs",
+        "business-logic"
+      ],
+      "outputs": [
+        "requirements.md",
+        "user-flows.md",
+        "acceptance-tests.md"
+      ],
+      "context": [
+        "business-rules",
+        "user-roles",
+        "existing-features"
+      ]
+    },
+    "architecture-agent": {
+      "name": "Architecture Agent",
+      "role": "system-design",
+      "description": "Manages system architecture and technical decisions",
+      "focus": [
+        "firebase-structure",
+        "data-models",
+        "api-design",
+        "performance",
+        "scalability"
+      ],
+      "tech-stack": {
+        "frontend": ["React", "TypeScript", "TanStack Query"],
+        "backend": ["Firebase", "Firestore", "Cloud Functions"],
+        "ui": ["Tailwind CSS", "shadcn/ui"],
+        "state": ["React Context", "TanStack Query"]
+      }
+    },
+    "ui-ux-agent": {
+      "name": "UI/UX Agent",
+      "role": "design",
+      "description": "Handles UI/UX design and user experience",
+      "focus": [
+        "component-design",
+        "user-flows",
+        "accessibility",
+        "responsive-design",
+        "design-consistency"
+      ],
+      "design-system": {
+        "framework": "shadcn/ui",
+        "styling": "Tailwind CSS",
+        "icons": "Lucide React",
+        "animations": "Tailwind Animate"
+      }
+    },
+    "frontend-agent": {
+      "name": "Frontend Development Agent",
+      "role": "frontend-development",
+      "description": "Implements React components and frontend logic",
+      "tech": [
+        "React 18",
+        "TypeScript",
+        "React Router",
+        "TanStack Query",
+        "React Hook Form"
+      ],
+      "patterns": [
+        "functional-components",
+        "custom-hooks",
+        "error-boundaries",
+        "lazy-loading",
+        "code-splitting"
+      ],
+      "file-patterns": {
+        "components": "src/components/**/*.tsx",
+        "pages": "src/pages/**/*.tsx",
+        "hooks": "src/hooks/**/*.ts",
+        "utils": "src/utils/**/*.ts"
+      }
+    },
+    "backend-agent": {
+      "name": "Backend Development Agent",
+      "role": "backend-development",
+      "description": "Manages Firebase services and backend logic",
+      "tech": [
+        "Firebase Auth",
+        "Firestore",
+        "Cloud Functions",
+        "Firebase Storage",
+        "Security Rules"
+      ],
+      "patterns": [
+        "service-layer",
+        "data-validation",
+        "error-handling",
+        "transactions",
+        "batch-operations"
+      ],
+      "file-patterns": {
+        "services": "src/services/**/*.ts",
+        "firebase": "src/config/firebase.ts",
+        "functions": "functions/src/**/*.ts"
+      }
+    },
+    "integration-agent": {
+      "name": "Integration Agent",
+      "role": "api-integration",
+      "description": "Handles API integrations and data flow",
+      "focus": [
+        "api-contracts",
+        "data-transformation",
+        "error-handling",
+        "retry-logic",
+        "caching"
+      ],
+      "integrations": [
+        "Firebase-React",
+        "Authentication-Flow",
+        "Real-time-Updates",
+        "File-Uploads"
+      ]
+    },
+    "testing-agent": {
+      "name": "Testing Agent",
+      "role": "quality-assurance",
+      "description": "Creates and maintains tests",
+      "testing-types": [
+        "unit-tests",
+        "integration-tests",
+        "component-tests",
+        "e2e-tests"
+      ],
+      "frameworks": [
+        "Jest",
+        "React Testing Library",
+        "Cypress"
+      ],
+      "coverage-targets": {
+        "unit": 80,
+        "integration": 70,
+        "e2e": 60
+      }
+    },
+    "security-agent": {
+      "name": "Security Agent",
+      "role": "security-audit",
+      "description": "Ensures security best practices",
+      "focus": [
+        "authentication",
+        "authorization",
+        "data-privacy",
+        "input-validation",
+        "security-rules"
+      ],
+      "security-layers": [
+        "Firebase Security Rules",
+        "Role-Based Access Control",
+        "Data Encryption",
+        "Input Sanitization"
+      ]
+    },
+    "performance-agent": {
+      "name": "Performance Agent",
+      "role": "optimization",
+      "description": "Optimizes application performance",
+      "focus": [
+        "load-time",
+        "bundle-size",
+        "render-performance",
+        "database-queries",
+        "caching-strategies"
+      ],
+      "tools": [
+        "React DevTools",
+        "Lighthouse",
+        "Bundle Analyzer",
+        "Firebase Performance"
+      ]
+    },
+    "documentation-agent": {
+      "name": "Documentation Agent",
+      "role": "documentation",
+      "description": "Maintains project documentation",
+      "outputs": [
+        "API documentation",
+        "Component documentation",
+        "Setup guides",
+        "User guides",
+        "Architecture docs"
+      ],
+      "standards": [
+        "JSDoc",
+        "Markdown",
+        "Code comments",
+        "README files"
+      ]
+    }
+  },
+  "workflows": {
+    "new-feature": {
+      "sequence": [
+        "prd-agent",
+        "architecture-agent",
+        "ui-ux-agent"
+      ],
+      "parallel": [
+        ["frontend-agent", "backend-agent"],
+        ["integration-agent"],
+        ["testing-agent", "security-agent"]
+      ],
+      "final": "documentation-agent"
+    },
+    "bug-fix": {
+      "sequence": [
+        "testing-agent",
+        "frontend-agent OR backend-agent",
+        "integration-agent"
+      ],
+      "final": "security-agent"
+    },
+    "refactor": {
+      "sequence": [
+        "architecture-agent",
+        "frontend-agent OR backend-agent",
+        "testing-agent"
+      ],
+      "parallel": [
+        ["performance-agent", "security-agent"]
+      ]
+    }
+  },
+  "shared-context": {
+    "project-overview": "context/project-overview.md",
+    "architecture": "context/architecture.md",
+    "business-rules": "context/business-rules.md",
+    "code-patterns": "context/code-patterns.md",
+    "testing-standards": "context/testing-standards.md"
+  },
+  "templates": {
+    "component": "templates/component.template.tsx",
+    "page": "templates/page.template.tsx",
+    "service": "templates/service.template.ts",
+    "hook": "templates/hook.template.ts",
+    "test": "templates/test.template.spec.ts",
+    "firebase-function": "templates/function.template.ts"
+  }
+}

@@ -598,3 +598,14 @@ exports.updatePaymentStatuses = functions.pubsub
     
     return null;
   });
+
+// ============================================
+// TWILIO FUNCTIONS
+// ============================================
+
+// Export Twilio functions
+export { 
+  sendTwilioMessage, 
+  scheduleLessonReminders, 
+  schedulePaymentReminders 
+} from './twilio/sendMessage';

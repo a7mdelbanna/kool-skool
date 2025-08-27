@@ -188,6 +188,17 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
     const enrichedStudents = await Promise.all(students.map(async (student: any) => {
       const user = await databaseService.getById('users', student.userId);
       
+      // Fetch teacher data if teacherId exists
+      let teacherFirstName = '';
+      let teacherLastName = '';
+      if (student.teacherId) {
+        const teacher = await databaseService.getById('users', student.teacherId);
+        if (teacher) {
+          teacherFirstName = teacher.firstName || '';
+          teacherLastName = teacher.lastName || '';
+        }
+      }
+      
       // Map the fields correctly for the UI
       return {
         ...student,
@@ -200,12 +211,15 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         age_group: student.ageGroup || 'adult',
         level: student.level || 'beginner',
         teacher_id: student.teacherId || '',
+        teacher_first_name: teacherFirstName,
+        teacher_last_name: teacherLastName,
         payment_status: student.paymentStatus || 'pending',
         lessons_count: student.totalLessonsTaken || 0,
         next_session_date: student.nextSessionDate || null,
         next_payment_date: student.nextPaymentDate || null,
         next_payment_amount: student.nextPaymentAmount || null,
-        subscription_progress: student.subscriptionProgress || '0/0'
+        subscription_progress: student.subscriptionProgress || '0/0',
+        user_id: student.userId || ''
       };
     }));
     
@@ -719,9 +733,27 @@ export const updateStudentSubscriptionEnhanced = async (
 
 export const getTeamMembers = async (schoolId: string) => {
   try {
-    return await databaseService.query('users', {
+    // Fetch all users with the schoolId
+    const allUsers = await databaseService.query('users', {
       where: [{ field: 'schoolId', operator: '==', value: schoolId }]
     });
+    
+    // Filter out students - only return teachers, admins, managers, etc.
+    const teamMembers = allUsers.filter((user: any) => {
+      return user.role && user.role !== 'student';
+    });
+    
+    // Map fields to match UI expectations
+    const mappedTeamMembers = teamMembers.map((member: any) => ({
+      id: member.id || member.uid,
+      first_name: member.firstName || member.first_name,
+      last_name: member.lastName || member.last_name,
+      email: member.email,
+      role: member.role,
+      created_at: member.createdAt || member.created_at
+    }));
+    
+    return mappedTeamMembers;
   } catch (error) {
     console.error('Error fetching team members:', error);
     throw error;

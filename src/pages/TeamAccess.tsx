@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Users, UserPlus, Mail, Key, User, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase, TeamMemberResponse, getTeamMembers } from "@/integrations/supabase/client";
+import { getTeamMembers } from "@/integrations/supabase/client";
+import { authService } from "@/services/firebase/auth.service";
+import { toast } from 'sonner';
 
 interface TeamMember {
   id: string;
@@ -159,35 +161,19 @@ const TeamAccess = () => {
         throw new Error('No school ID available');
       }
       
-      // Use the create_user Edge function instead of the RPC function
-      const response = await fetch(`https://clacmtyxfdtfgjkozmqf.supabase.co/functions/v1/create_user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYWNtdHl4ZmR0Zmdqa296bXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4OTEzMzgsImV4cCI6MjA2NjQ2NzMzOH0.HKKmBmDpQdZ7-hcpj7wM8IJPFVD52T-IfThF9jpjdvY`,
-          'x-user-id': userData.id,
-          'x-school-id': userData.schoolId,
-          'x-user-role': userData.role,
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          role: formData.role,
-          school_id: userData.schoolId
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
+      console.log('Creating team member with Firebase Auth...');
       
-      if (!result.success) {
-        throw new Error(result.message || "Failed to add team member");
-      }
+      // Create user with Firebase Auth service
+      const uid = await authService.createUser({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        role: formData.role as any,
+        schoolId: userData.schoolId
+      });
+      
+      console.log('Team member created successfully with ID:', uid);
       
       setFormData({
         firstName: '',
@@ -198,21 +184,14 @@ const TeamAccess = () => {
         confirmPassword: ''
       });
       
-      toast({
-        title: "Team member added",
-        description: `${formData.firstName} ${formData.lastName} has been added successfully.`,
-      });
+      toast.success(`${formData.firstName} ${formData.lastName} has been added successfully.`);
       
       // Refresh the team members list
       fetchTeamMembers();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding team member:', error);
-      toast({
-        title: "Error adding team member",
-        description: error.message || "Please try again.",
-        variant: "destructive"
-      });
+      toast.error(error.message || "Failed to add team member. Please try again.");
     } finally {
       setFormLoading(false);
     }
