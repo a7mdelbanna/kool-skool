@@ -50,11 +50,39 @@ const Groups = () => {
         where: [{ field: 'schoolId', operator: '==', value: user.schoolId }]
       });
 
-      // Enrich with student count
+      // Get unique teacher IDs
+      const teacherIds = [...new Set(groups.map((g: any) => g.teacher_id).filter(Boolean))];
+      
+      // Fetch teacher details
+      const teachers = await Promise.all(
+        teacherIds.map(async (teacherId) => {
+          try {
+            const teacher = await databaseService.getById('users', teacherId);
+            return teacher;
+          } catch (error) {
+            console.error(`Error fetching teacher ${teacherId}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Create teacher map for quick lookup
+      const teacherMap = new Map();
+      teachers.forEach(teacher => {
+        if (teacher) {
+          const teacherName = `${teacher.firstName || teacher.first_name || ''} ${teacher.lastName || teacher.last_name || ''}`.trim() || 'Unknown Teacher';
+          teacherMap.set(teacher.id, teacherName);
+        }
+      });
+
+      // Enrich groups with student count and teacher names
       const enrichedGroups = await Promise.all(groups.map(async (group: any) => {
         const students = await databaseService.query(`groups/${group.id}/students`, {});
+        const teacherName = group.teacher_id ? teacherMap.get(group.teacher_id) || 'Unknown Teacher' : 'No Teacher Assigned';
+        
         return {
           ...group,
+          teacher_name: teacherName,
           student_count: students.length,
           students_count: students.length
         };
@@ -85,12 +113,6 @@ const Groups = () => {
       await databaseService.delete('groups', groupId);
       
       console.log('Successfully deleted group:', groupName);
-
-      const result = data as { success: boolean; message: string };
-
-      if (!result?.success) {
-        throw new Error(result?.message || 'Failed to delete group');
-      }
 
       toast.success(`Group "${groupName}" and all related data deleted successfully`);
 

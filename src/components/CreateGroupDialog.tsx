@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, getSchoolTeachers, getStudentsWithDetails } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
 import { useContext } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -98,7 +99,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     session_count: 8,
     session_duration_minutes: 60,
     schedule: [],
-    currency: 'USD',
+    currency: 'RUB', // Default to RUB for now
     price_mode: 'total',
     price_per_session: 0,
     total_price: 0
@@ -111,25 +112,49 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
   const [newScheduleDay, setNewScheduleDay] = useState('');
   const [newScheduleTime, setNewScheduleTime] = useState('');
 
-  // Fetch Group courses
+  // Fetch Group courses from Firebase
   const { data: groupCourses } = useQuery({
     queryKey: ['group-courses', user?.schoolId],
     queryFn: async () => {
       if (!user?.schoolId) return [];
       
-      const { data, error } = await supabase
-        .from('courses')
-        .select('id, name, lesson_type, created_at')
-        .eq('school_id', user.schoolId)
-        .eq('lesson_type', 'group')
-        .order('name');
+      try {
+        console.log('Fetching all courses for school:', user.schoolId);
+        
+        // First, fetch all courses for the school
+        let allCourses = await databaseService.query('courses', {
+          where: [{ field: 'schoolId', operator: '==', value: user.schoolId }]
+        });
+        
+        // If no courses with camelCase, try snake_case
+        if (!allCourses || allCourses.length === 0) {
+          allCourses = await databaseService.query('courses', {
+            where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
+          });
+        }
+        
+        console.log('All courses fetched:', allCourses);
+        
+        // Filter for group courses - check multiple field variations
+        const groupCourses = allCourses.filter((course: any) => {
+          const lessonType = course.lesson_type || course.lessonType || course.type;
+          console.log(`Course ${course.name} has lesson_type:`, lessonType);
+          return lessonType === 'group' || lessonType === 'Group';
+        });
+        
+        console.log('Filtered group courses:', groupCourses);
 
-      if (error) {
+        // Map to expected format
+        return groupCourses.map((course: any) => ({
+          id: course.id,
+          name: course.name,
+          lesson_type: course.lesson_type || course.lessonType || course.type || 'group',
+          created_at: course.created_at || course.createdAt || course.created_at
+        })) as Course[];
+      } catch (error) {
         console.error('Error fetching group courses:', error);
-        throw error;
+        return [];
       }
-
-      return data as Course[];
     },
     enabled: !!user?.schoolId && open
   });
@@ -151,57 +176,99 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     enabled: !!user?.schoolId && open
   });
 
-  // Fetch school currencies
+  // Fetch school currencies from Firebase
   const { data: currencies } = useQuery({
     queryKey: ['currencies', user?.schoolId],
     queryFn: async () => {
       if (!user?.schoolId) return [];
       
-      const { data, error } = await supabase.rpc('get_school_currencies', {
-        p_school_id: user.schoolId
-      });
-
-      if (error) {
+      try {
+        const data = await databaseService.query('currencies', {
+          where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
+        });
+        
+        return data || [];
+      } catch (error) {
         console.error('Error fetching currencies:', error);
-        throw error;
+        return [];
       }
-
-      return data as Currency[];
     },
     enabled: !!user?.schoolId && open
   });
 
-  // Fetch accounts filtered by group currency using RPC function
+  // Fetch accounts filtered by group currency from Firebase
   const { data: accounts } = useQuery({
     queryKey: ['accounts', user?.schoolId, groupData.currency],
     queryFn: async () => {
-      if (!user?.schoolId || !groupData.currency) return [];
+      if (!user?.schoolId) return [];
       
-      const { data, error } = await supabase.rpc('get_school_accounts', {
-        p_school_id: user.schoolId
-      });
+      try {
+        console.log('Fetching accounts for currency:', groupData.currency);
+        
+        // First get all accounts from Firebase - try both field formats
+        let accountsData = await databaseService.query('accounts', {
+          where: [
+            { field: 'school_id', operator: '==', value: user.schoolId }
+          ]
+        });
+        
+        console.log('Raw accounts data:', accountsData);
+        
+        // Get all currencies to match currency_id with code
+        const currenciesData = await databaseService.query('currencies', {
+          where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
+        });
+        
+        console.log('Available currencies:', currenciesData);
+        
+        // Find the currency that matches the selected code
+        const selectedCurrency = currenciesData?.find((c: any) => 
+          c.code === groupData.currency || c.code === 'RUB' // Fallback to RUB for testing
+        );
+        
+        console.log('Selected currency:', selectedCurrency);
+        
+        if (!selectedCurrency) {
+          console.log('No matching currency found for code:', groupData.currency);
+          // If no currency match, return all active accounts as fallback
+          return (accountsData || [])
+            .filter((account: any) => 
+              account.is_active !== false && !account.is_archived
+            )
+            .map((account: any) => ({
+              id: account.id,
+              name: account.name,
+              type: account.type,
+              currency_id: account.currency_id
+            }));
+        }
 
-      if (error) {
+        // Filter accounts by currency_id matching the selected currency
+        const filteredAccounts = (accountsData || [])
+          .filter((account: any) => {
+            const isActive = account.is_active !== false;
+            const notArchived = !account.is_archived;
+            const matchesCurrency = account.currency_id === selectedCurrency.id;
+            
+            console.log(`Account ${account.name}: active=${isActive}, archived=${notArchived}, currency match=${matchesCurrency}`);
+            
+            return isActive && notArchived && matchesCurrency;
+          })
+          .map((account: any) => ({
+            id: account.id,
+            name: account.name,
+            type: account.type,
+            currency_id: account.currency_id
+          }));
+
+        console.log('Filtered accounts:', filteredAccounts);
+        return filteredAccounts;
+      } catch (error) {
         console.error('Error fetching accounts:', error);
-        throw error;
+        return [];
       }
-
-      // Filter accounts by currency code and archived status
-      const filteredAccounts = (data || [])
-        .filter((account: any) => 
-          !account.is_archived && 
-          account.currency_code === groupData.currency
-        )
-        .map((account: any) => ({
-          id: account.id,
-          name: account.name,
-          type: account.type,
-          currency_id: account.currency_id
-        }));
-
-      return filteredAccounts;
     },
-    enabled: !!user?.schoolId && !!groupData.currency && open
+    enabled: !!user?.schoolId && open
   });
 
   // Calculate total amount based on price mode
@@ -352,46 +419,132 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
 
       console.log('Group insert data:', groupInsertData);
       
-      // Create the group first with course_id included
-      const { data: groupResult, error: groupError } = await supabase
-        .from('groups')
-        .insert(groupInsertData)
-        .select()
-        .single();
+      // Create the group in Firebase
+      const groupId = await databaseService.create('groups', {
+        ...groupInsertData,
+        schoolId: user.schoolId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
 
-      if (groupError) {
-        console.error('Group creation error:', groupError);
-        throw new Error(`Failed to create group: ${groupError.message}`);
+      if (!groupId) {
+        throw new Error('Failed to create group');
       }
 
-      console.log('Group created successfully:', groupResult);
+      console.log('Group created successfully with ID:', groupId);
+      const groupResult = { id: groupId, ...groupInsertData };
 
       // Create group subscriptions for selected students
       if (selectedStudents.length > 0 && groupResult) {
-        console.log('Creating subscriptions for students...');
+        console.log('Creating subscriptions and sessions for students...');
+        
+        // Get teacher name for subscription
+        const selectedTeacher = teachers?.find(t => t.id === groupData.teacher_id);
         
         for (const student of selectedStudents) {
           console.log(`Processing student: ${student.name} (${student.id})`);
           
-          const { data: subscriptionResult, error: subscriptionError } = await supabase.rpc('create_group_subscription', {
-            p_group_id: groupResult.id,
-            p_student_ids: [student.id],
-            p_start_date: student.paymentDetails.start_date || new Date().toISOString().split('T')[0],
-            p_current_user_id: user.id,
-            p_current_school_id: user.schoolId,
-            p_initial_payment_amount: student.paymentDetails.initial_payment_amount || 0,
-            p_payment_method: student.paymentDetails.payment_method || 'Cash',
-            p_payment_account_id: student.paymentDetails.account_id || null,
-            p_payment_notes: student.paymentDetails.payment_notes || '',
-            p_subscription_notes: `Group subscription for ${student.name}`
+          // Create group subscription in Firebase subcollection
+          await databaseService.create(`groups/${groupResult.id}/students`, {
+            studentId: student.id,
+            studentName: student.name,
+            startDate: student.paymentDetails.start_date || new Date().toISOString().split('T')[0],
+            status: 'active',
+            createdAt: new Date().toISOString()
           });
-
-          if (subscriptionError) {
-            console.error(`Subscription creation error for student ${student.name}:`, subscriptionError);
-            throw new Error(`Failed to create subscription for ${student.name}: ${subscriptionError.message}`);
+          
+          // Create actual subscription in main subscriptions collection
+          const subscriptionData = {
+            school_id: user.schoolId,
+            student_id: student.id,
+            teacher_id: groupData.teacher_id,
+            teacher_name: selectedTeacher?.display_name || 'Unknown',
+            course_id: groupData.course_id,
+            course_name: selectedCourse?.name || 'Unknown',
+            group_id: groupResult.id,
+            group_name: groupData.name,
+            session_count: groupData.session_count,
+            session_duration: groupData.session_duration_minutes,
+            schedule: groupData.schedule,
+            price_mode: groupData.price_mode,
+            price_per_session: groupData.price_mode === 'perSession' ? groupData.price_per_session : null,
+            total_price: groupData.price_mode === 'total' ? groupData.total_price : groupData.price_per_session * groupData.session_count,
+            status: 'active',
+            start_date: student.paymentDetails.start_date || new Date().toISOString().split('T')[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          const subscriptionId = await databaseService.create('subscriptions', subscriptionData);
+          console.log('Created subscription:', subscriptionId);
+          
+          // Generate sessions based on schedule
+          if (groupData.schedule.length > 0 && groupData.session_count > 0) {
+            console.log('Generating sessions for subscription:', subscriptionId);
+            
+            const startDate = new Date(student.paymentDetails.start_date || new Date());
+            const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            
+            for (const scheduleItem of groupData.schedule) {
+              const dayIndex = daysOfWeek.indexOf(scheduleItem.day);
+              if (dayIndex === -1) continue;
+              
+              let currentDate = new Date(startDate);
+              let sessionsCreated = 0;
+              
+              // Find the first occurrence of the scheduled day
+              while (currentDate.getDay() !== dayIndex && sessionsCreated < 100) {
+                currentDate.setDate(currentDate.getDate() + 1);
+              }
+              
+              // Create sessions on the scheduled day of each week
+              for (let sessionNumber = 1; sessionNumber <= groupData.session_count; sessionNumber++) {
+                const sessionData = {
+                  subscription_id: subscriptionId,
+                  student_id: student.id,
+                  school_id: user.schoolId,
+                  teacher_id: groupData.teacher_id,
+                  course_id: groupData.course_id,
+                  group_id: groupResult.id,
+                  scheduled_date: currentDate.toISOString().split('T')[0],
+                  scheduled_time: scheduleItem.time,
+                  duration_minutes: groupData.session_duration_minutes,
+                  status: 'scheduled',
+                  index_in_sub: sessionNumber,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+                
+                await databaseService.create('sessions', sessionData);
+                
+                // Move to next week for the next session
+                currentDate.setDate(currentDate.getDate() + 7);
+                sessionsCreated++;
+              }
+              
+              console.log(`Created ${sessionsCreated} sessions for ${student.name}`);
+            }
+          }
+          
+          // Create initial payment if amount provided
+          if (student.paymentDetails.initial_payment_amount > 0) {
+            await databaseService.create('payments', {
+              school_id: user.schoolId,
+              student_id: student.id,
+              group_id: groupResult.id,
+              subscription_id: subscriptionId,
+              amount: student.paymentDetails.initial_payment_amount,
+              currency: groupData.currency,
+              payment_date: new Date().toISOString().split('T')[0],
+              payment_method: student.paymentDetails.payment_method || 'Cash',
+              account_id: student.paymentDetails.account_id || null,
+              notes: student.paymentDetails.payment_notes || `Initial payment for group ${groupData.name}`,
+              status: 'paid',
+              created_at: new Date().toISOString()
+            });
           }
 
-          console.log(`Subscription created for ${student.name}:`, subscriptionResult);
+          console.log(`Subscription and sessions created for ${student.name} in group ${groupResult.id}`);
         }
       }
 
@@ -594,14 +747,19 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                   </div>
 
                   <div className="flex items-end">
-                    <Button onClick={handleAddSchedule} className="w-full">
+                    <Button 
+                      type="button"
+                      onClick={handleAddSchedule} 
+                      className="w-full"
+                      disabled={!newScheduleDay || !newScheduleTime}
+                    >
                       <Plus className="h-4 w-4 mr-2" />
-                      Add
+                      Add to Schedule
                     </Button>
                   </div>
                 </div>
 
-                {groupData.schedule.length > 0 && (
+                {groupData.schedule.length > 0 ? (
                   <div className="space-y-2">
                     <Label>Current Schedule</Label>
                     <div className="space-y-2">
@@ -611,6 +769,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                           <Button
                             variant="ghost"
                             size="sm"
+                            type="button"
                             onClick={() => handleRemoveSchedule(index)}
                           >
                             <X className="h-4 w-4" />
@@ -618,6 +777,10 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                         </div>
                       ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    ⚠️ Please add at least one schedule item by clicking "Add to Schedule" button above
                   </div>
                 )}
               </CardContent>
@@ -884,26 +1047,30 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         </Tabs>
 
         <div className="flex justify-between">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <div className="flex gap-2">
             {activeTab === 'details' && (
               <Button 
+                type="button"
                 onClick={() => setActiveTab('students')}
                 disabled={!isFormValid}
+                title={!isFormValid ? 'Please fill all required fields and add at least one schedule' : ''}
               >
                 Next: Add Students
               </Button>
             )}
             {activeTab === 'students' && (
               <>
-                <Button variant="outline" onClick={() => setActiveTab('details')}>
+                <Button type="button" variant="outline" onClick={() => setActiveTab('details')}>
                   Back to Details
                 </Button>
                 <Button 
+                  type="button"
                   onClick={handleSubmit}
                   disabled={!isFormValid || isSubmitting || selectedStudents.length === 0}
+                  title={!isFormValid ? 'Please ensure all required fields are filled and schedule is added' : selectedStudents.length === 0 ? 'Please add at least one student' : ''}
                 >
                   {isSubmitting ? 'Creating...' : 'Create Group'}
                 </Button>

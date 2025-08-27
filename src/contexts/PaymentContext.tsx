@@ -172,26 +172,33 @@ export const PaymentProvider = ({ children }: { children: React.ReactNode }) => 
           }
 
           if (studentSessions) {
-            const formattedSessions = studentSessions.map((session: any) => {
-              const sessionDate = new Date(session.scheduled_date);
-              
-              return {
-                id: session.id,
-                date: sessionDate,
-                time: format(sessionDate, 'HH:mm'),
-                duration: `${session.duration_minutes || 60} min`,
-                status: session.status === 'completed' ? 'completed' : 
-                       session.status === 'cancelled' ? 'canceled' : 
-                       session.status === 'missed' ? 'missed' : 'scheduled',
-                notes: session.notes || `Session with ${student.first_name} ${student.last_name}`,
-                sessionNumber: session.index_in_sub,
-                totalSessions: undefined, // We'd need subscription info for this
-                studentId: session.student_id,
-                studentName: `${student.first_name} ${student.last_name}`,
-                cost: Number(session.cost) || 0,
-                paymentStatus: session.payment_status || 'pending'
-              } as Session;
-            });
+            const formattedSessions = studentSessions
+              .filter((session: any) => {
+                // Filter out sessions with invalid dates
+                if (!session.scheduled_date) return false;
+                const testDate = new Date(session.scheduled_date);
+                return !isNaN(testDate.getTime());
+              })
+              .map((session: any) => {
+                const sessionDate = new Date(session.scheduled_date);
+                
+                return {
+                  id: session.id,
+                  date: sessionDate,
+                  time: isNaN(sessionDate.getTime()) ? '00:00' : format(sessionDate, 'HH:mm'),
+                  duration: `${session.duration_minutes || 60} min`,
+                  status: session.status === 'completed' ? 'completed' : 
+                         session.status === 'cancelled' ? 'canceled' : 
+                         session.status === 'missed' ? 'missed' : 'scheduled',
+                  notes: session.notes || `Session with ${student.first_name} ${student.last_name}`,
+                  sessionNumber: session.index_in_sub,
+                  totalSessions: undefined, // We'd need subscription info for this
+                  studentId: session.student_id,
+                  studentName: `${student.first_name} ${student.last_name}`,
+                  cost: Number(session.cost) || 0,
+                  paymentStatus: session.payment_status || 'pending'
+                } as Session;
+              });
 
             allSessions.push(...formattedSessions);
           }

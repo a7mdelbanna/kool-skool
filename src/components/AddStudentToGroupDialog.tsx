@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, DollarSign } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, getStudentsWithDetails } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
 import { useToast } from '@/hooks/use-toast';
 
@@ -99,16 +100,16 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
     queryFn: async () => {
       if (!user?.schoolId) return [];
       
-      const { data, error } = await supabase.rpc('get_school_currencies', {
-        p_school_id: user.schoolId
-      });
-
-      if (error) {
+      try {
+        const data = await databaseService.query('currencies', {
+          where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
+        });
+        
+        return (data || []) as Currency[];
+      } catch (error) {
         console.error('Error fetching currencies:', error);
-        throw error;
+        return [];
       }
-
-      return data as Currency[];
     },
     enabled: !!user?.schoolId && open
   });
@@ -119,17 +120,16 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
     queryFn: async () => {
       if (!user?.schoolId || !group?.currency) return [];
       
-      const { data, error } = await supabase.rpc('get_school_accounts', {
-        p_school_id: user.schoolId
-      });
+      try {
+        const data = await databaseService.query('accounts', {
+          where: [
+            { field: 'school_id', operator: '==', value: user.schoolId },
+            { field: 'is_active', operator: '==', value: true }
+          ]
+        });
 
-      if (error) {
-        console.error('Error fetching accounts:', error);
-        throw error;
-      }
-
-      // Filter accounts by currency code and archived status
-      const filteredAccounts = (data || [])
+        // Filter accounts by currency code and archived status
+        const filteredAccounts = (data || [])
         .filter((account: any) => 
           !account.is_archived && 
           account.currency_code === group.currency
@@ -141,7 +141,11 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
           currency_id: account.currency_id
         }));
 
-      return filteredAccounts;
+        return filteredAccounts;
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
+        return [];
+      }
     },
     enabled: !!user?.schoolId && !!group?.currency && open
   });
@@ -192,29 +196,32 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
     setIsSubmitting(true);
     
     try {
-      const { data, error } = await supabase.rpc('add_student_to_group', {
-        p_group_id: group.id,
-        p_student_id: selectedStudentId,
-        p_start_date: startDate,
-        p_current_user_id: user.id,
-        p_current_school_id: user.schoolId,
-        p_initial_payment_amount: initialPaymentAmount,
-        p_payment_method: paymentMethod,
-        p_payment_account_id: accountId || null,
-        p_payment_notes: paymentNotes,
-        p_subscription_notes: subscriptionNotes
+      // Add student to group in Firebase
+      const selectedStudent = availableStudents?.find(s => s.id === selectedStudentId);
+      
+      await databaseService.create(`groups/${group.id}/students`, {
+        studentId: selectedStudentId,
+        studentName: selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : 'Unknown',
+        startDate: startDate || new Date().toISOString().split('T')[0],
+        status: 'active',
+        createdAt: new Date().toISOString()
       });
-
-      if (error) {
-        console.error('Error adding student to group:', error);
-        throw new Error(`Failed to add student to group: ${error.message}`);
-      }
-
-      // Type cast the response with proper unknown first
-      const result = data as unknown as RpcResponse;
-
-      if (!result?.success) {
-        throw new Error(result?.message || 'Failed to add student to group');
+      
+      // Create initial payment if amount provided
+      if (initialPaymentAmount > 0) {
+        await databaseService.create('payments', {
+          school_id: user.schoolId,
+          student_id: selectedStudentId,
+          group_id: group.id,
+          amount: initialPaymentAmount,
+          currency: group.currency,
+          payment_date: new Date().toISOString().split('T')[0],
+          payment_method: paymentMethod,
+          account_id: accountId || null,
+          notes: paymentNotes || `Initial payment for group ${group.name}`,
+          status: 'paid',
+          createdAt: new Date().toISOString()
+        });
       }
 
       toast({

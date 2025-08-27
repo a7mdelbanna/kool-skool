@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { DollarSign, Search, Filter as FilterIcon, Calendar, Clock } from 'lucide-react';
+import { DollarSign, Search, Filter as FilterIcon, Calendar, Clock, Plus } from 'lucide-react';
 import ExpectedPaymentsSection from '@/components/ExpectedPaymentsSection';
 import AccountsBalanceSection from '@/components/AccountsBalanceSection';
+import AddTransactionDialog from '@/components/AddTransactionDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,7 @@ const FinancesPage = () => {
     from: Date | undefined;
     to: Date | undefined;
   }>({ from: undefined, to: undefined });
+  const [addTransactionDialogOpen, setAddTransactionDialogOpen] = useState(false);
 
   // Get school ID from localStorage
   const getSchoolId = () => {
@@ -647,6 +649,14 @@ const FinancesPage = () => {
                   <FilterIcon className="h-4 w-4 mr-2" />
                   Filter
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setAddTransactionDialogOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Transaction
+                </Button>
               </div>
             </div>
 
@@ -747,6 +757,16 @@ const FinancesPage = () => {
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+
+      {/* Add Transaction Dialog */}
+      <AddTransactionDialog
+        open={addTransactionDialogOpen}
+        onOpenChange={setAddTransactionDialogOpen}
+        onSuccess={() => {
+          // Refetch data when a transaction is added
+          window.location.reload();
+        }}
+      />
     </div>
   );
 };

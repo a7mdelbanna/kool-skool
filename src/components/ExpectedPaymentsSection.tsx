@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Calendar, DollarSign, User } from 'lucide-react';
+import { Calendar, DollarSign, User, CalendarRange, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,90 +18,253 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
 import { databaseService } from '@/services/firebase/database.service';
-import { format, addDays, addWeeks, addMonths, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 interface ExpectedPayment {
   student_id: string;
   student_name: string;
+  subscription_id: string;
   next_payment_date: string;
   next_payment_amount: number;
   currency?: string;
+  subscription_name?: string;
+  last_session_date?: string;
 }
 
 interface ExpectedPaymentsSectionProps {
   schoolId: string;
 }
 
-const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoolId }) => {
-  const [filterPeriod, setFilterPeriod] = useState<'day' | 'week' | 'month'>('week');
+type FilterPeriod = 'today' | 'week' | 'month' | 'thisMonth' | 'nextMonth' | 'custom' | 'all';
 
-  // Fetch students with expected payments from Firebase
-  const { data: expectedPayments = [], isLoading } = useQuery({
+const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoolId }) => {
+  const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>('thisMonth');
+  const [customDateRange, setCustomDateRange] = useState<{ start: Date; end: Date }>({
+    start: new Date(),
+    end: addMonths(new Date(), 1),
+  });
+
+  // Fetch expected payments based on subscription completion
+  const { data: expectedPayments = [], isLoading, error } = useQuery({
     queryKey: ['expected-payments', schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
       
-      // Fetch students from Firebase
-      const students = await databaseService.query('students', {
-        where: [{ field: 'schoolId', operator: '==', value: schoolId }]
-      });
-
-      // Fetch users to get full names
-      const userIds = students.map((s: any) => s.userId).filter(Boolean);
-      const users = await Promise.all(
-        userIds.map((userId: string) => databaseService.getById('users', userId))
-      );
-
-      // Filter students who have next payment information
-      const studentsWithPayments = students
-        .filter((student: any) => 
-          student.nextPaymentDate && student.nextPaymentAmount
-        )
-        .map((student: any) => {
-          const user = users.find((u: any) => u?.id === student.userId);
-          const studentName = user ? 
-            `${user.firstName || ''} ${user.lastName || ''}`.trim() : 
-            'Unknown Student';
-          
-          return {
-            student_id: student.id,
-            student_name: studentName,
-            next_payment_date: student.nextPaymentDate,
-            next_payment_amount: student.nextPaymentAmount,
-            currency: student.currency || 'RUB'
-          };
+      console.log('🔄 Fetching expected payments for school:', schoolId);
+      
+      try {
+        // Fetch active subscriptions
+        const subscriptions = await databaseService.query('subscriptions', {
+          where: [
+            { field: 'school_id', operator: '==', value: schoolId },
+            { field: 'status', operator: '==', value: 'active' }
+          ]
         });
 
-      console.log('📅 Expected payments data:', studentsWithPayments);
-      return studentsWithPayments as ExpectedPayment[];
+        console.log('📋 Found subscriptions:', subscriptions?.length || 0);
+
+        if (!subscriptions || subscriptions.length === 0) {
+          console.log('No active subscriptions found');
+          return [];
+        }
+
+      // Fetch all students and users for name mapping
+      const studentIds = [...new Set(subscriptions.map((s: any) => s.student_id).filter(Boolean))];
+      const students = await Promise.all(
+        studentIds.map(async (id) => {
+          try {
+            return await databaseService.getById('students', id);
+          } catch (error) {
+            return null;
+          }
+        })
+      );
+
+      const userIds = students.filter(s => s).map(s => s.userId || s.user_id).filter(Boolean);
+      const users = await Promise.all(
+        userIds.map(async (userId: string) => {
+          try {
+            return await databaseService.getById('users', userId);
+          } catch (error) {
+            return null;
+          }
+        })
+      );
+
+      // Batch fetch all sessions for all subscriptions
+      console.log('⏳ Fetching sessions for', subscriptions.length, 'subscriptions...');
+      
+      const sessionsBySubscription = await Promise.all(
+        subscriptions.map(async (subscription: any) => {
+          try {
+            // Fetch all sessions for this subscription
+            const allSessions = await databaseService.query('sessions', {
+              where: [
+                { field: 'subscription_id', operator: '==', value: subscription.id }
+              ]
+            });
+            
+            // Filter out cancelled sessions client-side
+            const sessions = allSessions ? allSessions.filter((s: any) => s.status !== 'cancelled') : [];
+            
+            return { subscription, sessions };
+          } catch (error) {
+            console.error('Error fetching sessions for subscription:', subscription.id, error);
+            return { subscription, sessions: [] };
+          }
+        })
+      );
+      
+      console.log('✅ Sessions fetched for all subscriptions');
+      
+      // Calculate expected payments for each subscription
+      const expectedPaymentsData: ExpectedPayment[] = [];
+      
+      for (const { subscription, sessions } of sessionsBySubscription) {
+        if (!sessions || sessions.length === 0) {
+          continue;
+        }
+
+        // Filter out sessions with invalid dates
+        const validSessions = sessions.filter((session: any) => {
+          if (!session.scheduled_date) return false;
+          const date = new Date(session.scheduled_date);
+          return !isNaN(date.getTime());
+        });
+        
+        if (validSessions.length === 0) continue;
+        
+        // Find the last scheduled session
+        const sortedSessions = validSessions.sort((a: any, b: any) => {
+          const dateA = new Date(a.scheduled_date);
+          const dateB = new Date(b.scheduled_date);
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        const lastSession = sortedSessions[0];
+        const lastSessionDate = new Date(lastSession.scheduled_date);
+        
+        // Validate the date
+        if (isNaN(lastSessionDate.getTime())) continue;
+
+        // Get subscription schedule to determine payment day
+        const schedule = subscription.schedule;
+        
+        if (!schedule || (Array.isArray(schedule) && schedule.length === 0)) {
+          continue;
+        }
+
+        // Calculate next payment date (next occurrence of scheduled day after last session)
+        const firstSchedule = Array.isArray(schedule) ? schedule[0] : schedule;
+        const scheduledDay = firstSchedule.day; // e.g., "Monday", "Tuesday"
+        
+        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
+        
+        if (targetDayIndex === -1) {
+          continue;
+        }
+
+        // Start from the day after the last session
+        let nextPaymentDate = new Date(lastSessionDate);
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+
+        // Find the next occurrence of the target day
+        while (nextPaymentDate.getDay() !== targetDayIndex) {
+          nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+        }
+
+        // Get student and user info for name
+        const student = students.find(s => s?.id === subscription.student_id);
+        const user = student ? users.find(u => u?.id === (student.userId || student.user_id)) : null;
+        const studentName = user ? 
+          `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 
+          'Unknown Student';
+
+        // Calculate payment amount (full subscription price or remaining balance)
+        const paymentAmount = subscription.total_price || 0;
+
+        expectedPaymentsData.push({
+          student_id: subscription.student_id,
+          student_name: studentName,
+          subscription_id: subscription.id,
+          next_payment_date: nextPaymentDate.toISOString().split('T')[0],
+          next_payment_amount: paymentAmount,
+          currency: subscription.currency || 'RUB',
+          subscription_name: subscription.course_name || 'Subscription',
+          last_session_date: lastSessionDate.toISOString().split('T')[0]
+        });
+      }
+
+      console.log('📅 Calculated expected payments:', expectedPaymentsData.length);
+      return expectedPaymentsData;
+    } catch (error) {
+      console.error('❌ Error fetching expected payments:', error);
+      return [];
+    }
     },
     enabled: !!schoolId,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: 1,
   });
 
   // Calculate date range based on selected filter
   const dateRange = useMemo(() => {
     const now = new Date();
-    const start = startOfDay(now);
+    let start: Date;
     let end: Date;
 
     switch (filterPeriod) {
-      case 'day':
+      case 'today':
+        start = startOfDay(now);
         end = endOfDay(now);
         break;
       case 'week':
+        start = startOfDay(now);
         end = endOfDay(addWeeks(now, 1));
         break;
       case 'month':
+        start = startOfDay(now);
         end = endOfDay(addMonths(now, 1));
         break;
+      case 'thisMonth':
+        start = startOfMonth(now);
+        end = endOfMonth(now);
+        break;
+      case 'nextMonth':
+        const nextMonth = addMonths(now, 1);
+        start = startOfMonth(nextMonth);
+        end = endOfMonth(nextMonth);
+        break;
+      case 'custom':
+        start = startOfDay(customDateRange.start);
+        end = endOfDay(customDateRange.end);
+        break;
+      case 'all':
+        start = new Date(2020, 0, 1); // Start from 2020
+        end = new Date(2030, 11, 31); // Until 2030
+        break;
       default:
-        end = endOfDay(addWeeks(now, 1));
+        start = startOfMonth(now);
+        end = endOfMonth(now);
     }
 
     return { start, end };
-  }, [filterPeriod]);
+  }, [filterPeriod, customDateRange]);
 
   // Filter payments based on selected period
   const filteredPayments = useMemo(() => {
@@ -118,10 +281,15 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
 
   const getFilterLabel = () => {
     switch (filterPeriod) {
-      case 'day': return 'Today';
+      case 'today': return 'Today';
       case 'week': return 'Next 7 Days';
       case 'month': return 'Next 30 Days';
-      default: return 'Next 7 Days';
+      case 'thisMonth': return format(new Date(), 'MMMM yyyy');
+      case 'nextMonth': return format(addMonths(new Date(), 1), 'MMMM yyyy');
+      case 'custom': 
+        return `${format(customDateRange.start, 'MMM dd')} - ${format(customDateRange.end, 'MMM dd, yyyy')}`;
+      case 'all': return 'All Time';
+      default: return format(new Date(), 'MMMM yyyy');
     }
   };
 
@@ -135,7 +303,26 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Loading expected payments...</p>
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Loading expected payments...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Expected Payments
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-red-500">Error loading expected payments. Please try again later.</p>
         </CardContent>
       </Card>
     );
@@ -154,28 +341,21 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
               Upcoming student payments based on subscription schedules
             </CardDescription>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant={filterPeriod === 'day' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterPeriod('day')}
-            >
-              Today
-            </Button>
-            <Button
-              variant={filterPeriod === 'week' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterPeriod('week')}
-            >
-              Week
-            </Button>
-            <Button
-              variant={filterPeriod === 'month' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterPeriod('month')}
-            >
-              Month
-            </Button>
+          <div className="flex items-center gap-2">
+            <Select value={filterPeriod} onValueChange={(value: FilterPeriod) => setFilterPeriod(value)}>
+              <SelectTrigger className="w-[180px]">
+                <CalendarRange className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">Next 7 Days</SelectItem>
+                <SelectItem value="month">Next 30 Days</SelectItem>
+                <SelectItem value="thisMonth">This Month</SelectItem>
+                <SelectItem value="nextMonth">Next Month</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
@@ -187,7 +367,7 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-blue-600" />
                   <span className="font-medium text-blue-900">
-                    Total Expected ({getFilterLabel()})
+                    Total Expected
                   </span>
                 </div>
                 <span className="text-2xl font-bold text-blue-600">
@@ -196,16 +376,23 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                   {totalExpected.toFixed(2)}
                 </span>
               </div>
-              <p className="text-sm text-blue-700 mt-1">
-                {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''} expected
-              </p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-sm text-blue-700">
+                  {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''} expected
+                </p>
+                <p className="text-xs text-blue-600">
+                  {getFilterLabel()}
+                </p>
+              </div>
             </div>
 
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
-                  <TableHead>Expected Date</TableHead>
+                  <TableHead>Subscription</TableHead>
+                  <TableHead>Last Session</TableHead>
+                  <TableHead>Expected Payment</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Days Until</TableHead>
                 </TableRow>
@@ -218,7 +405,7 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                     const daysUntil = Math.ceil((paymentDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                     
                     return (
-                      <TableRow key={payment.student_id}>
+                      <TableRow key={`${payment.subscription_id}-${payment.student_id}`}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-600">
@@ -226,6 +413,14 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                             </div>
                             <span className="font-medium">{payment.student_name}</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{payment.subscription_name}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {payment.last_session_date ? format(new Date(payment.last_session_date), 'MMM dd') : 'N/A'}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
@@ -258,10 +453,12 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
           <div className="text-center py-8">
             <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground text-lg font-medium">
-              No expected payments for {getFilterLabel().toLowerCase()}
+              No expected payments
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Students with upcoming payments will appear here
+              {filterPeriod === 'all' 
+                ? 'No subscription-based payments are expected' 
+                : `No payments expected for ${getFilterLabel().toLowerCase()}`}
             </p>
           </div>
         )}

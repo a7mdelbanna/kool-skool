@@ -184,9 +184,15 @@ export const useAttendanceData = (userTimezone?: string) => {
           const activeSubscription = subscriptions.find(sub => sub.status === 'active');
           
           if (activeSubscription) {
-            const completedSessions = (activeSubscription as any).sessions_completed ?? 0;
+            // Get session counts from subscription or calculate from sessions
             const attendedSessions = (activeSubscription as any).sessions_attended ?? 0;
             const cancelledSessions = (activeSubscription as any).sessions_cancelled ?? 0;
+            
+            // For progress tracking, both completed AND cancelled sessions count as "done"
+            // This matches the behavior in student subscriptions where cancelled sessions count toward progress
+            const completedSessionsFromDB = (activeSubscription as any).sessions_completed ?? 0;
+            const completedSessions = attendedSessions + cancelledSessions; // Use the sum for progress
+            
             const scheduledSessions = (activeSubscription as any).sessions_scheduled ?? 0;
             
             let endDate = (activeSubscription as any).end_date;
@@ -201,7 +207,7 @@ export const useAttendanceData = (userTimezone?: string) => {
               id: activeSubscription.id,
               studentId: studentId,
               sessionCount: activeSubscription.session_count,
-              completedSessions: completedSessions,
+              completedSessions: completedSessions, // Now includes cancelled sessions
               attendedSessions: attendedSessions,
               cancelledSessions: cancelledSessions,
               scheduledSessions: scheduledSessions,

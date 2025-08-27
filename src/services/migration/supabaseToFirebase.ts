@@ -1316,6 +1316,38 @@ async function handleSessionActionRPC(params: any) {
       await databaseService.update('sessions', p_session_id, updates);
       
       console.log('✅ Session updated successfully:', p_session_id, updates);
+      
+      // Update subscription session counts
+      const session = await databaseService.getById('sessions', p_session_id);
+      if (session && session.subscription_id) {
+        // Get all sessions for this subscription to recalculate counts
+        const allSessions = await databaseService.query('sessions', {
+          where: [{ field: 'subscription_id', operator: '==', value: session.subscription_id }]
+        });
+        
+        // Calculate new counts
+        const sessionsAttended = allSessions.filter((s: any) => s.status === 'completed' && s.counts_toward_completion).length;
+        const sessionsCancelled = allSessions.filter((s: any) => s.status === 'cancelled' && s.counts_toward_completion).length;
+        const sessionsCompleted = sessionsAttended + sessionsCancelled; // Both count as completed for progress
+        const sessionsScheduled = allSessions.filter((s: any) => s.status === 'scheduled').length;
+        
+        // Update subscription with new counts
+        await databaseService.update('subscriptions', session.subscription_id, {
+          sessions_attended: sessionsAttended,
+          sessions_cancelled: sessionsCancelled,
+          sessions_completed: sessionsCompleted,
+          sessions_scheduled: sessionsScheduled,
+          updated_at: new Date().toISOString()
+        });
+        
+        console.log('✅ Updated subscription counts:', {
+          subscription_id: session.subscription_id,
+          attended: sessionsAttended,
+          cancelled: sessionsCancelled,
+          completed: sessionsCompleted,
+          scheduled: sessionsScheduled
+        });
+      }
     }
     
     return { 

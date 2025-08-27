@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Users, Calendar, DollarSign, Clock, Plus, User, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
 import { useContext } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -58,7 +59,7 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<string | null>(null);
 
-  // Fetch group students with explicit table joins
+  // Fetch group students from Firebase
   const { data: groupStudents, isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
     queryKey: ['group-students', group?.id],
     queryFn: async () => {
@@ -66,37 +67,39 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
 
       console.log('Fetching students for group:', group.id);
 
-      // First, get the group_students records
-      const { data: groupStudentsData, error: groupStudentsError } = await supabase
-        .from('group_students')
-        .select('id, student_id, status, start_date')
-        .eq('group_id', group.id)
-        .eq('status', 'active');
+      try {
+        // Get the group students from Firebase subcollection
+        const groupStudentsData = await databaseService.query(`groups/${group.id}/students`, {});
+        
+        console.log('Group students data:', groupStudentsData);
 
-      if (groupStudentsError) {
-        console.error('Error fetching group_students:', groupStudentsError);
-        throw groupStudentsError;
+        if (!groupStudentsData || groupStudentsData.length === 0) {
+          console.log('No active students found for group');
+          return [];
+        }
+
+        // Get student details
+        const enrichedStudents = await Promise.all(
+          groupStudentsData.map(async (gs: any) => {
+            const studentData = await databaseService.getById('students', gs.studentId);
+            const userData = studentData ? await databaseService.getById('users', studentData.user_id || studentData.userId) : null;
+            
+            return {
+              id: gs.id,
+              student_id: gs.studentId,
+              student_name: userData?.name || gs.studentName || 'Unknown Student',
+              student_email: userData?.email || '',
+              status: gs.status || 'active',
+              start_date: gs.startDate || gs.start_date
+            };
+          })
+        );
+
+        return enrichedStudents as GroupStudent[];
+      } catch (error) {
+        console.error('Error fetching group students:', error);
+        throw error;
       }
-
-      console.log('Group students data:', groupStudentsData);
-
-      if (!groupStudentsData || groupStudentsData.length === 0) {
-        console.log('No active students found for group');
-        return [];
-      }
-
-      // Get student IDs
-      const studentIds = groupStudentsData.map(gs => gs.student_id);
-      console.log('Student IDs to fetch:', studentIds);
-
-      // Fetch students with their user data
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('students')
-        .select(`
-          id,
-          user_id
-        `)
-        .in('id', studentIds);
 
       if (studentsError) {
         console.error('Error fetching students:', studentsError);
@@ -171,23 +174,16 @@ const GroupDetailsDialog = ({ group, open, onOpenChange, onSuccess }: GroupDetai
     setRemovingStudentId(studentId);
     
     try {
-      const { data, error } = await supabase.rpc('remove_student_from_group', {
-        p_group_id: group.id,
-        p_student_id: studentId,
-        p_current_user_id: user.id,
-        p_current_school_id: user.schoolId
+      // Find and remove the student from the group in Firebase
+      const groupStudents = await databaseService.query(`groups/${group.id}/students`, {
+        where: [{ field: 'studentId', operator: '==', value: studentId }]
       });
-
-      if (error) {
-        console.error('Error removing student from group:', error);
-        throw new Error(`Failed to remove student: ${error.message}`);
-      }
-
-      // Type cast the response with proper unknown first
-      const result = data as unknown as RpcResponse;
-
-      if (!result?.success) {
-        throw new Error(result?.message || 'Failed to remove student from group');
+      
+      if (groupStudents && groupStudents.length > 0) {
+        // Remove the student from the group
+        await databaseService.delete(`groups/${group.id}/students`, groupStudents[0].id);
+      } else {
+        throw new Error('Student not found in group');
       }
 
       toast({
