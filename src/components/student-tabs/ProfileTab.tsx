@@ -59,24 +59,37 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   const user = userData ? JSON.parse(userData) : null;
   const schoolId = user?.schoolId;
 
-  // Fetch student levels from the database
-  const { data: studentLevels = [], isLoading: levelsLoading } = useQuery({
+  // Default student levels with colors
+  const defaultStudentLevels = [
+    { id: '1', name: 'Beginner', color: '#3B82F6', sort_order: 1 },
+    { id: '2', name: 'Intermediate', color: '#8B5CF6', sort_order: 2 },
+    { id: '3', name: 'Advanced', color: '#F97316', sort_order: 3 },
+    { id: '4', name: 'Fluent', color: '#10B981', sort_order: 4 },
+  ];
+
+  // Fetch student levels from the database (or use defaults)
+  const { data: studentLevels = defaultStudentLevels, isLoading: levelsLoading } = useQuery({
     queryKey: ['student-levels', schoolId],
     queryFn: async () => {
-      if (!schoolId) return [];
+      if (!schoolId) return defaultStudentLevels;
 
-      const { data, error } = await supabase
-        .from('student_levels')
-        .select('*')
-        .eq('school_id', schoolId)
-        .order('sort_order', { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from('student_levels')
+          .select('*')
+          .eq('school_id', schoolId)
+          .order('sort_order', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching student levels:', error);
-        return [];
+        if (error) {
+          console.log('Using default student levels');
+          return defaultStudentLevels;
+        }
+        
+        return data && data.length > 0 ? data : defaultStudentLevels;
+      } catch (error) {
+        console.log('Using default student levels');
+        return defaultStudentLevels;
       }
-      
-      return data || [];
     },
     enabled: !!schoolId,
   });
@@ -305,7 +318,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               </div>
             ) : studentLevels.length > 0 ? (
               <Select
-                value={studentData.level || ""}
+                value={studentData.level?.toLowerCase() || ""}
                 onValueChange={(value) => handleInputChange("level", value)}
                 disabled={isViewMode}
               >

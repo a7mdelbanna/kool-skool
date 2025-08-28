@@ -26,7 +26,7 @@ export const useStudentForm = (
     lessonType: "individual",
     ageGroup: "adult",
     courseName: "",
-    level: "beginner",
+    level: "",
     paymentStatus: "pending",
     teacherId: "",
     countryCode: "+1"
@@ -109,6 +109,11 @@ export const useStudentForm = (
       // If phone contains country code, separate them for the form
       let processedStudent = { ...student };
       
+      // Normalize the level to lowercase
+      if (processedStudent.level) {
+        processedStudent.level = processedStudent.level.toLowerCase();
+      }
+      
       // Process phone number if it exists
       if (student.phone) {
         const phoneStr = student.phone.toString();
@@ -160,7 +165,7 @@ export const useStudentForm = (
         lessonType: "individual",
         ageGroup: "adult",
         courseName: "",
-        level: "beginner",
+        level: "",
         paymentStatus: "pending",
         teacherId: "",
         countryCode: "+1"
@@ -221,7 +226,8 @@ export const useStudentForm = (
           course_name: studentData.courseName,
           lesson_type: studentData.lessonType,
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
-          level: studentData.level === 'beginner' ? 'Beginner' : 
+          level: !studentData.level || studentData.level === '' ? 'Beginner' :
+            studentData.level === 'beginner' ? 'Beginner' : 
             studentData.level === 'intermediate' ? 'Intermediate' : 
             studentData.level === 'advanced' ? 'Advanced' : 
             studentData.level === 'fluent' ? 'Fluent' : 'Beginner',
@@ -320,9 +326,11 @@ export const useStudentForm = (
           // Fix: Send capitalized age group values to match database constraint
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
           // Fix: Send capitalized level values to match database constraint
-          level: studentData.level === 'beginner' ? 'Beginner' : 
+          level: !studentData.level || studentData.level === '' ? 'Beginner' :
+            studentData.level === 'beginner' ? 'Beginner' : 
             studentData.level === 'intermediate' ? 'Intermediate' : 
-            studentData.level === 'advanced' ? 'Advanced' : 'Beginner'
+            studentData.level === 'advanced' ? 'Advanced' : 
+            studentData.level === 'fluent' ? 'Fluent' : 'Beginner'
         };
         
         // Add phone with country code if provided
