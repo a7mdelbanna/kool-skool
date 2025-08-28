@@ -17,10 +17,12 @@ export interface StudentRecord {
   last_name: string;
   email: string;
   phone?: string;
+  country_code?: string;
+  countryCode?: string; // Support both camelCase and snake_case
   course_name: string;
   lesson_type: 'individual' | 'group';
-  age_group: 'adult' | 'kid';
-  level: 'beginner' | 'intermediate' | 'advanced' | 'fluent';
+  age_group: 'adult' | 'kid' | 'Adult' | 'Kid';
+  level: 'beginner' | 'intermediate' | 'advanced' | 'fluent' | 'Beginner' | 'Intermediate' | 'Advanced' | 'Fluent';
   teacher_id?: string;
   school_id?: string;
   payment_status?: 'paid' | 'pending' | 'overdue';
@@ -29,6 +31,13 @@ export interface StudentRecord {
   lessons_count?: number;
   next_session_date?: string;
   subscription_progress?: string;
+  parent_info?: {
+    name: string;
+    phone: string;
+    countryCode: string;
+    email: string;
+    relationship: string;
+  };
 }
 
 export interface CourseRecord {
@@ -206,6 +215,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         last_name: user?.lastName || '',
         email: user?.email || '',
         phone: student.phone || user?.phoneNumber || '',
+        countryCode: student.countryCode || student.country_code || '',
         course_name: student.courseName || '',
         lesson_type: student.lessonType || 'individual',
         age_group: student.ageGroup || 'adult',
@@ -219,7 +229,8 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         next_payment_date: student.nextPaymentDate || null,
         next_payment_amount: student.nextPaymentAmount || null,
         subscription_progress: student.subscriptionProgress || '0/0',
-        user_id: student.userId || ''
+        user_id: student.userId || '',
+        parent_info: student.parentInfo || student.parent_info || null
       };
     }));
     

@@ -33,10 +33,35 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = exports.testTwilioCredentials = void 0;
+exports.handleNotificationErrors = exports.cleanupOldReminders = exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = exports.testTwilioCredentials = void 0;
+exports.sendNotificationToStudent = sendNotificationToStudent;
+exports.checkReminderTiming = checkReminderTiming;
+exports.formatTime = formatTime;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const twilio = require('twilio');
+// Notification system types and enums
+var NotificationTemplateType;
+(function (NotificationTemplateType) {
+    NotificationTemplateType["LESSON_REMINDER_1_DAY"] = "lesson_reminder_1_day";
+    NotificationTemplateType["LESSON_REMINDER_2_HOURS"] = "lesson_reminder_2_hours";
+    NotificationTemplateType["LESSON_REMINDER_15_MIN"] = "lesson_reminder_15_min";
+    NotificationTemplateType["PAYMENT_REMINDER"] = "payment_reminder";
+    NotificationTemplateType["LESSON_CANCELLATION"] = "lesson_cancellation";
+    NotificationTemplateType["CUSTOM"] = "custom";
+})(NotificationTemplateType || (NotificationTemplateType = {}));
+var NotificationRuleType;
+(function (NotificationRuleType) {
+    NotificationRuleType["LESSON_REMINDERS"] = "lesson_reminders";
+    NotificationRuleType["PAYMENT_REMINDERS"] = "payment_reminders";
+    NotificationRuleType["LESSON_CANCELLATION"] = "lesson_cancellation";
+})(NotificationRuleType || (NotificationRuleType = {}));
+var NotificationChannel;
+(function (NotificationChannel) {
+    NotificationChannel["SMS"] = "sms";
+    NotificationChannel["WHATSAPP"] = "whatsapp";
+    NotificationChannel["BOTH"] = "both";
+})(NotificationChannel || (NotificationChannel = {}));
 /**
  * Test Twilio credentials without sending a message
  */
@@ -243,231 +268,650 @@ exports.sendTwilioMessage = functions.https.onCall(async (data, context) => {
     }
 });
 /**
- * Schedule lesson reminders
+ * Schedule lesson reminders - Enhanced with notification system
  */
 exports.scheduleLessonReminders = functions.pubsub
-    .schedule('0 9 * * *') // Run daily at 9 AM
+    .schedule('*/30 * * * *') // Run every 30 minutes for better timing coverage
     .timeZone('UTC')
     .onRun(async (context) => {
     var _a;
-    console.log('Running lesson reminder scheduler');
+    console.log('Running enhanced lesson reminder scheduler');
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const endTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // Look ahead 7 days
     // Get all schools with active Twilio
     const schoolsSnapshot = await admin.firestore()
         .collection('twilioConfigs')
         .where('isActive', '==', true)
         .get();
+    let totalProcessed = 0;
+    let totalSent = 0;
     for (const schoolDoc of schoolsSnapshot.docs) {
         const schoolId = schoolDoc.id;
-        // Get notification settings
-        const settingsDoc = await admin.firestore()
-            .collection('notificationSettings')
-            .doc(`${schoolId}_lesson_reminder`)
-            .get();
-        if (!settingsDoc.exists || !((_a = settingsDoc.data()) === null || _a === void 0 ? void 0 : _a.enabled)) {
-            continue;
+        try {
+            // Get notification rules for lesson reminders
+            const notificationRule = await getNotificationRule(schoolId, NotificationRuleType.LESSON_REMINDERS);
+            if (!notificationRule || !notificationRule.enabled) {
+                console.log(`Lesson reminders not enabled for school ${schoolId}`);
+                continue;
+            }
+            // Get upcoming lessons
+            const lessonsSnapshot = await admin.firestore()
+                .collection('sessions')
+                .where('schoolId', '==', schoolId)
+                .where('scheduled_date', '>=', now)
+                .where('scheduled_date', '<=', endTime)
+                .where('status', '==', 'scheduled')
+                .get();
+            console.log(`Found ${lessonsSnapshot.size} upcoming lessons for school ${schoolId}`);
+            for (const lessonDoc of lessonsSnapshot.docs) {
+                const lesson = lessonDoc.data();
+                const lessonId = lessonDoc.id;
+                totalProcessed++;
+                // Get student details
+                const studentDoc = await admin.firestore()
+                    .collection('students')
+                    .doc(lesson.student_id)
+                    .get();
+                if (!studentDoc.exists) {
+                    console.log(`Student not found: ${lesson.student_id}`);
+                    continue;
+                }
+                const student = studentDoc.data();
+                // Get user details for student name
+                const userDoc = await admin.firestore()
+                    .collection('users')
+                    .doc(student.userId)
+                    .get();
+                if (!userDoc.exists) {
+                    console.log(`User not found: ${student.userId}`);
+                    continue;
+                }
+                const user = userDoc.data();
+                // Check each reminder timing
+                for (const reminder of notificationRule.reminders) {
+                    if (!reminder.enabled)
+                        continue;
+                    // Check if we should send this reminder now
+                    const shouldSend = checkAdvancedReminderTiming(lesson.scheduled_date, reminder.timing, now);
+                    if (!shouldSend)
+                        continue;
+                    // Check if we already sent this reminder
+                    const reminderKey = `${lessonId}_${reminder.id}_${reminder.timing.value}${reminder.timing.unit}`;
+                    const alreadySent = await checkIfReminderSent(schoolId, reminderKey);
+                    if (alreadySent) {
+                        console.log(`Reminder already sent: ${reminderKey}`);
+                        continue;
+                    }
+                    // Prepare template variables
+                    const variables = {
+                        studentName: `${user === null || user === void 0 ? void 0 : user.firstName} ${user === null || user === void 0 ? void 0 : user.lastName}`,
+                        parentName: ((_a = student.parentInfo) === null || _a === void 0 ? void 0 : _a.name) || '',
+                        teacherName: lesson.teacher_name || 'Your teacher',
+                        subject: lesson.course_name || 'your lesson',
+                        lessonTime: formatLessonTime(lesson.scheduled_date),
+                        date: formatDate(lesson.scheduled_date),
+                        lessonDuration: lesson.duration ? `${lesson.duration} minutes` : '60 minutes',
+                        location: lesson.location || 'Online',
+                        schoolName: lesson.school_name || 'TutorFlow'
+                    };
+                    // Send notification using new system
+                    const sent = await sendEnhancedNotification(schoolId, student, notificationRule, reminder, variables, lessonId);
+                    if (sent) {
+                        totalSent++;
+                        // Mark reminder as sent
+                        await markReminderAsSent(schoolId, reminderKey, {
+                            lessonId,
+                            studentId: student.id,
+                            reminderType: reminder.templateType,
+                            sentAt: now
+                        });
+                    }
+                }
+            }
         }
-        const settings = settingsDoc.data();
-        // Get tomorrow's lessons
-        const lessonsSnapshot = await admin.firestore()
-            .collection('sessions')
-            .where('schoolId', '==', schoolId)
-            .where('scheduled_date', '>=', now)
-            .where('scheduled_date', '<=', tomorrow)
-            .where('status', '==', 'scheduled')
-            .get();
-        for (const lessonDoc of lessonsSnapshot.docs) {
-            const lesson = lessonDoc.data();
-            // Get student details
-            const studentDoc = await admin.firestore()
-                .collection('students')
-                .doc(lesson.student_id)
-                .get();
-            if (!studentDoc.exists)
-                continue;
-            const student = studentDoc.data();
-            // Get user details for name
-            const userDoc = await admin.firestore()
-                .collection('users')
-                .doc(student === null || student === void 0 ? void 0 : student.userId)
-                .get();
-            if (!userDoc.exists)
-                continue;
-            const user = userDoc.data();
-            // Check if we should send reminder based on timing rules
-            const shouldSend = checkReminderTiming(lesson.scheduled_date, settings === null || settings === void 0 ? void 0 : settings.timing);
-            if (!shouldSend)
-                continue;
-            // Prepare template variables
-            const variables = {
-                name: `${user === null || user === void 0 ? void 0 : user.firstName} ${user === null || user === void 0 ? void 0 : user.lastName}`,
-                subject: lesson.course_name,
-                teacher: lesson.teacher_name,
-                time: formatTime(lesson.scheduled_date),
-                date: formatDate(lesson.scheduled_date)
-            };
-            // Send notification
-            await sendNotificationToStudent(schoolId, lesson.student_id, 'lesson_reminder', variables, settings);
+        catch (error) {
+            console.error(`Error processing school ${schoolId}:`, error);
         }
     }
-    return null;
+    console.log(`Lesson reminders completed. Processed: ${totalProcessed}, Sent: ${totalSent}`);
+    return { totalProcessed, totalSent };
 });
 /**
- * Schedule payment reminders
+ * Schedule payment reminders - Enhanced with notification system
  */
 exports.schedulePaymentReminders = functions.pubsub
-    .schedule('0 10 * * *') // Run daily at 10 AM
+    .schedule('0 */6 * * *') // Run every 6 hours for better timing coverage
     .timeZone('UTC')
     .onRun(async (context) => {
     var _a;
-    console.log('Running payment reminder scheduler');
+    console.log('Running enhanced payment reminder scheduler');
     const now = new Date();
+    const endTime = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // Look ahead 30 days
     // Get all schools with active Twilio
     const schoolsSnapshot = await admin.firestore()
         .collection('twilioConfigs')
         .where('isActive', '==', true)
         .get();
+    let totalProcessed = 0;
+    let totalSent = 0;
     for (const schoolDoc of schoolsSnapshot.docs) {
         const schoolId = schoolDoc.id;
-        // Get notification settings
-        const settingsDoc = await admin.firestore()
-            .collection('notificationSettings')
-            .doc(`${schoolId}_payment_reminder`)
-            .get();
-        if (!settingsDoc.exists || !((_a = settingsDoc.data()) === null || _a === void 0 ? void 0 : _a.enabled)) {
-            continue;
+        try {
+            // Get notification rules for payment reminders
+            const notificationRule = await getNotificationRule(schoolId, NotificationRuleType.PAYMENT_REMINDERS);
+            if (!notificationRule || !notificationRule.enabled) {
+                console.log(`Payment reminders not enabled for school ${schoolId}`);
+                continue;
+            }
+            // Get upcoming payments
+            const paymentsSnapshot = await admin.firestore()
+                .collection('payments')
+                .where('schoolId', '==', schoolId)
+                .where('status', '==', 'pending')
+                .where('due_date', '>=', now)
+                .where('due_date', '<=', endTime)
+                .get();
+            console.log(`Found ${paymentsSnapshot.size} upcoming payments for school ${schoolId}`);
+            for (const paymentDoc of paymentsSnapshot.docs) {
+                const payment = paymentDoc.data();
+                const paymentId = paymentDoc.id;
+                totalProcessed++;
+                // Get student details
+                const studentDoc = await admin.firestore()
+                    .collection('students')
+                    .doc(payment.student_id)
+                    .get();
+                if (!studentDoc.exists) {
+                    console.log(`Student not found: ${payment.student_id}`);
+                    continue;
+                }
+                const student = studentDoc.data();
+                // Get user details for student name
+                const userDoc = await admin.firestore()
+                    .collection('users')
+                    .doc(student.userId)
+                    .get();
+                if (!userDoc.exists) {
+                    console.log(`User not found: ${student.userId}`);
+                    continue;
+                }
+                const user = userDoc.data();
+                // Check each reminder timing
+                for (const reminder of notificationRule.reminders) {
+                    if (!reminder.enabled)
+                        continue;
+                    // Check if we should send this reminder now
+                    const shouldSend = checkAdvancedReminderTiming(payment.due_date, reminder.timing, now);
+                    if (!shouldSend)
+                        continue;
+                    // Check if we already sent this reminder
+                    const reminderKey = `${paymentId}_${reminder.id}_${reminder.timing.value}${reminder.timing.unit}`;
+                    const alreadySent = await checkIfReminderSent(schoolId, reminderKey);
+                    if (alreadySent) {
+                        console.log(`Payment reminder already sent: ${reminderKey}`);
+                        continue;
+                    }
+                    // Prepare template variables
+                    const variables = {
+                        studentName: `${user === null || user === void 0 ? void 0 : user.firstName} ${user === null || user === void 0 ? void 0 : user.lastName}`,
+                        parentName: ((_a = student.parentInfo) === null || _a === void 0 ? void 0 : _a.name) || `${user === null || user === void 0 ? void 0 : user.firstName} ${user === null || user === void 0 ? void 0 : user.lastName}`,
+                        teacherName: payment.teacher_name || '',
+                        subject: payment.course_name || 'lessons',
+                        amount: formatCurrency(payment.amount, payment.currency || 'USD'),
+                        date: formatDate(payment.due_date),
+                        schoolName: payment.school_name || 'TutorFlow'
+                    };
+                    // Send notification using new system
+                    const sent = await sendEnhancedNotification(schoolId, student, notificationRule, reminder, variables, paymentId);
+                    if (sent) {
+                        totalSent++;
+                        // Mark reminder as sent
+                        await markReminderAsSent(schoolId, reminderKey, {
+                            paymentId,
+                            studentId: student.id,
+                            reminderType: reminder.templateType,
+                            sentAt: now
+                        });
+                    }
+                }
+            }
         }
-        const settings = settingsDoc.data();
-        // Get upcoming payments
-        const paymentsSnapshot = await admin.firestore()
-            .collection('payments')
-            .where('schoolId', '==', schoolId)
-            .where('status', '==', 'pending')
-            .where('due_date', '>=', now)
-            .get();
-        for (const paymentDoc of paymentsSnapshot.docs) {
-            const payment = paymentDoc.data();
-            // Check if we should send reminder based on timing rules
-            const shouldSend = checkReminderTiming(payment.due_date, settings === null || settings === void 0 ? void 0 : settings.timing);
-            if (!shouldSend)
-                continue;
-            // Get student details
-            const studentDoc = await admin.firestore()
-                .collection('students')
-                .doc(payment.student_id)
-                .get();
-            if (!studentDoc.exists)
-                continue;
-            const student = studentDoc.data();
-            // Get user details for name
-            const userDoc = await admin.firestore()
-                .collection('users')
-                .doc(student === null || student === void 0 ? void 0 : student.userId)
-                .get();
-            if (!userDoc.exists)
-                continue;
-            const user = userDoc.data();
-            // Prepare template variables
-            const variables = {
-                name: `${user === null || user === void 0 ? void 0 : user.firstName} ${user === null || user === void 0 ? void 0 : user.lastName}`,
-                amount: formatCurrency(payment.amount, payment.currency),
-                course: payment.course_name,
-                date: formatDate(payment.due_date)
-            };
-            // Send notification
-            await sendNotificationToStudent(schoolId, payment.student_id, 'payment_reminder', variables, settings);
+        catch (error) {
+            console.error(`Error processing payments for school ${schoolId}:`, error);
         }
     }
-    return null;
+    console.log(`Payment reminders completed. Processed: ${totalProcessed}, Sent: ${totalSent}`);
+    return { totalProcessed, totalSent };
 });
-// Helper functions
-async function sendNotificationToStudent(schoolId, studentId, type, variables, settings) {
+// Enhanced Helper Functions for New Notification System
+/**
+ * Get notification rule for a school by type
+ */
+async function getNotificationRule(schoolId, ruleType) {
+    var _a, _b;
     try {
-        // Get student preferences
-        const prefsDoc = await admin.firestore()
-            .collection('studentNotificationPrefs')
+        const rulesSnapshot = await admin.firestore()
+            .collection('notificationRules')
+            .where('schoolId', '==', schoolId)
+            .where('type', '==', ruleType)
+            .limit(1)
+            .get();
+        if (rulesSnapshot.empty) {
+            console.log(`No notification rule found for school ${schoolId}, type ${ruleType}`);
+            return null;
+        }
+        const doc = rulesSnapshot.docs[0];
+        return Object.assign(Object.assign({ id: doc.id }, doc.data()), { createdAt: (_a = doc.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate(), updatedAt: (_b = doc.data().updatedAt) === null || _b === void 0 ? void 0 : _b.toDate() });
+    }
+    catch (error) {
+        console.error(`Error getting notification rule:`, error);
+        return null;
+    }
+}
+/**
+ * Get notification template by type and language
+ */
+async function getNotificationTemplate(schoolId, templateType, language = 'en') {
+    var _a, _b;
+    try {
+        const templatesSnapshot = await admin.firestore()
+            .collection('notificationTemplates')
+            .where('schoolId', '==', schoolId)
+            .where('type', '==', templateType)
+            .where('language', '==', language)
+            .where('isActive', '==', true)
+            .limit(1)
+            .get();
+        if (templatesSnapshot.empty) {
+            console.log(`No template found for school ${schoolId}, type ${templateType}, language ${language}`);
+            return null;
+        }
+        const doc = templatesSnapshot.docs[0];
+        return Object.assign(Object.assign({ id: doc.id }, doc.data()), { createdAt: (_a = doc.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate(), updatedAt: (_b = doc.data().updatedAt) === null || _b === void 0 ? void 0 : _b.toDate() });
+    }
+    catch (error) {
+        console.error(`Error getting notification template:`, error);
+        return null;
+    }
+}
+/**
+ * Enhanced timing check with better precision
+ */
+function checkAdvancedReminderTiming(eventDate, timing, currentTime) {
+    try {
+        const event = eventDate.toDate ? eventDate.toDate() : new Date(eventDate);
+        const now = currentTime;
+        // Convert timing to milliseconds
+        let timingMs = 0;
+        switch (timing.unit) {
+            case 'minutes':
+                timingMs = timing.value * 60 * 1000;
+                break;
+            case 'hours':
+                timingMs = timing.value * 60 * 60 * 1000;
+                break;
+            case 'days':
+                timingMs = timing.value * 24 * 60 * 60 * 1000;
+                break;
+        }
+        const targetTime = event.getTime() - timingMs;
+        const currentTimeMs = now.getTime();
+        // Check if we're within the reminder window (30 minutes before target time to 30 minutes after)
+        const windowMs = 30 * 60 * 1000; // 30 minutes
+        const isInWindow = currentTimeMs >= (targetTime - windowMs) && currentTimeMs <= (targetTime + windowMs);
+        if (isInWindow) {
+            console.log(`Reminder timing matched for ${timing.value} ${timing.unit} before event`);
+        }
+        return isInWindow;
+    }
+    catch (error) {
+        console.error('Error checking reminder timing:', error);
+        return false;
+    }
+}
+/**
+ * Check if a specific reminder has already been sent
+ */
+async function checkIfReminderSent(schoolId, reminderKey) {
+    try {
+        const sentRemindersDoc = await admin.firestore()
+            .collection('sentReminders')
+            .doc(`${schoolId}_${reminderKey}`)
+            .get();
+        return sentRemindersDoc.exists;
+    }
+    catch (error) {
+        console.error('Error checking if reminder was sent:', error);
+        return false;
+    }
+}
+/**
+ * Mark a reminder as sent to prevent duplicates
+ */
+async function markReminderAsSent(schoolId, reminderKey, metadata) {
+    try {
+        await admin.firestore()
+            .collection('sentReminders')
+            .doc(`${schoolId}_${reminderKey}`)
+            .set(Object.assign(Object.assign({}, metadata), { schoolId,
+            reminderKey, sentAt: admin.firestore.FieldValue.serverTimestamp() }));
+    }
+    catch (error) {
+        console.error('Error marking reminder as sent:', error);
+    }
+}
+/**
+ * Process template variables in message body
+ */
+function processTemplateVariables(templateBody, variables) {
+    let processedMessage = templateBody;
+    // Replace all variables with actual values
+    Object.entries(variables).forEach(([key, value]) => {
+        const regex = new RegExp(`{${key}}`, 'g');
+        processedMessage = processedMessage.replace(regex, value || '');
+    });
+    // Clean up any remaining unreplaced variables
+    processedMessage = processedMessage.replace(/{\\w+}/g, '');
+    return processedMessage.trim();
+}
+/**
+ * Enhanced notification sending with template system and parent support
+ */
+async function sendEnhancedNotification(schoolId, student, notificationRule, reminder, variables, entityId) {
+    var _a;
+    try {
+        // Get the appropriate template
+        const template = await getNotificationTemplate(schoolId, reminder.templateType, 'en' // TODO: Add language detection based on student/parent preference
+        );
+        if (!template) {
+            console.error(`Template not found for type ${reminder.templateType}`);
+            return false;
+        }
+        // Process template with variables
+        const message = processTemplateVariables(template.body, variables);
+        if (!message) {
+            console.error('Processed message is empty');
+            return false;
+        }
+        // Determine recipients based on rule and student age
+        const recipients = [];
+        // Add student if specified in rule
+        if (notificationRule.recipients.student) {
+            if (student.phone && student.countryCode) {
+                recipients.push({
+                    name: variables.studentName,
+                    phone: student.phone,
+                    countryCode: student.countryCode,
+                    type: 'student'
+                });
+            }
+        }
+        // Add parent if specified in rule and student is a kid or parent info exists
+        if (notificationRule.recipients.parent) {
+            if (student.ageGroup === 'kid' && student.parentInfo) {
+                recipients.push({
+                    name: student.parentInfo.name,
+                    phone: student.parentInfo.phone,
+                    countryCode: student.parentInfo.countryCode,
+                    type: 'parent'
+                });
+            }
+            else if (student.ageGroup === 'adult' && student.parentInfo) {
+                // For adults, only send to parent if explicitly requested
+                recipients.push({
+                    name: student.parentInfo.name,
+                    phone: student.parentInfo.phone,
+                    countryCode: student.parentInfo.countryCode,
+                    type: 'parent'
+                });
+            }
+        }
+        if (recipients.length === 0) {
+            console.log(`No valid recipients for student ${student.id}`);
+            return false;
+        }
+        // Get Twilio configuration
+        const configDoc = await admin.firestore()
+            .collection('twilioConfigs')
+            .doc(schoolId)
+            .get();
+        if (!configDoc.exists || !((_a = configDoc.data()) === null || _a === void 0 ? void 0 : _a.isActive)) {
+            console.error(`Twilio not configured or active for school ${schoolId}`);
+            return false;
+        }
+        const config = configDoc.data();
+        // Decode credentials
+        let decodedAccountSid = config.accountSid;
+        let decodedAuthToken = config.authToken;
+        try {
+            if (isBase64(config.accountSid)) {
+                decodedAccountSid = Buffer.from(config.accountSid, 'base64').toString();
+            }
+            if (isBase64(config.authToken)) {
+                decodedAuthToken = Buffer.from(config.authToken, 'base64').toString();
+            }
+        }
+        catch (error) {
+            console.warn('Using credentials as plain text');
+        }
+        const client = twilio(decodedAccountSid, decodedAuthToken);
+        let sentCount = 0;
+        // Send to each recipient via each channel
+        for (const recipient of recipients) {
+            const channels = getChannelsForReminder(reminder.channel);
+            for (const channel of channels) {
+                try {
+                    const result = await sendMessageViaChannel(client, config, recipient, message, channel, schoolId, student.id, reminder.templateType, entityId);
+                    if (result) {
+                        sentCount++;
+                    }
+                }
+                catch (error) {
+                    console.error(`Failed to send via ${channel} to ${recipient.type}:`, error);
+                }
+            }
+        }
+        return sentCount > 0;
+    }
+    catch (error) {
+        console.error(`Error in sendEnhancedNotification:`, error);
+        return false;
+    }
+}
+/**
+ * Get channels array from channel enum
+ */
+function getChannelsForReminder(channel) {
+    switch (channel) {
+        case NotificationChannel.SMS:
+            return ['sms'];
+        case NotificationChannel.WHATSAPP:
+            return ['whatsapp'];
+        case NotificationChannel.BOTH:
+            return ['sms', 'whatsapp'];
+        default:
+            return ['sms'];
+    }
+}
+/**
+ * Send message via specific channel with proper formatting and logging
+ */
+async function sendMessageViaChannel(client, config, recipient, message, channel, schoolId, studentId, notificationType, entityId) {
+    try {
+        // Format phone number with country code
+        const fullPhone = recipient.countryCode + recipient.phone.replace(/^\+/, '');
+        // Get appropriate Twilio phone number
+        let fromNumber = channel === 'whatsapp'
+            ? config.phoneNumberWhatsapp
+            : config.phoneNumberSms;
+        if (!fromNumber) {
+            console.error(`No ${channel} phone number configured for school ${schoolId}`);
+            return false;
+        }
+        // Format numbers for WhatsApp
+        let to = fullPhone;
+        let from = fromNumber;
+        if (channel === 'whatsapp') {
+            if (!from.startsWith('whatsapp:')) {
+                from = `whatsapp:${from}`;
+            }
+            if (!to.startsWith('whatsapp:')) {
+                to = `whatsapp:${to}`;
+            }
+        }
+        console.log(`Sending ${channel} to ${recipient.type} (${recipient.name}):`, {
+            from,
+            to: to.replace(/\d(?=\d{4})/g, '*'), // Mask phone number for logging
+            messageLength: message.length
+        });
+        // Send message
+        const messageResponse = await client.messages.create({
+            body: message,
+            from: from,
+            to: to
+        });
+        // Log successful send
+        await admin.firestore()
+            .collection('notificationLogs')
+            .add({
+            schoolId,
+            studentId,
+            recipientId: studentId,
+            recipientName: recipient.name,
+            recipientPhone: fullPhone,
+            recipientType: recipient.type,
+            entityId,
+            type: notificationType,
+            channel,
+            status: 'sent',
+            message,
+            twilioSid: messageResponse.sid,
+            cost: messageResponse.price ? parseFloat(messageResponse.price) : 0,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            isAutomated: true
+        });
+        // Update spend tracking
+        if (messageResponse.price) {
+            await updateSpendTracking(schoolId, parseFloat(messageResponse.price));
+        }
+        console.log(`✅ ${channel} sent successfully to ${recipient.type}:`, messageResponse.sid);
+        return true;
+    }
+    catch (error) {
+        console.error(`❌ Failed to send ${channel} to ${recipient.type}:`, error.message);
+        // Log failed attempt
+        await admin.firestore()
+            .collection('notificationLogs')
+            .add({
+            schoolId,
+            studentId,
+            recipientId: studentId,
+            recipientName: recipient.name,
+            recipientPhone: recipient.countryCode + recipient.phone,
+            recipientType: recipient.type,
+            entityId,
+            type: notificationType,
+            channel,
+            status: 'failed',
+            message,
+            error: error.message,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            isAutomated: true
+        });
+        return false;
+    }
+}
+// Legacy function for backward compatibility
+async function sendNotificationToStudent(schoolId, studentId, type, variables, settings) {
+    console.warn('Using legacy sendNotificationToStudent function. Consider upgrading to sendEnhancedNotification.');
+    try {
+        // Get student data
+        const studentDoc = await admin.firestore()
+            .collection('students')
             .doc(studentId)
             .get();
-        const prefs = prefsDoc.exists ? prefsDoc.data() : null;
-        if (prefs === null || prefs === void 0 ? void 0 : prefs.optedOut) {
-            console.log(`Student ${studentId} has opted out`);
+        if (!studentDoc.exists)
             return;
-        }
+        const student = studentDoc.data();
         // Parse template
-        let message = settings.template;
+        let message = settings.template || settings.body || '';
         for (const [key, value] of Object.entries(variables)) {
             message = message.replace(new RegExp(`{${key}}`, 'g'), value);
         }
-        // Determine channels
-        const channels = [];
-        if (settings.channel === 'both' || settings.channel === 'sms') {
-            if ((prefs === null || prefs === void 0 ? void 0 : prefs.smsEnabled) !== false && (prefs === null || prefs === void 0 ? void 0 : prefs.phoneNumber)) {
-                channels.push({ type: 'sms', phone: prefs.phoneNumber });
-            }
-        }
-        if (settings.channel === 'both' || settings.channel === 'whatsapp') {
-            if ((prefs === null || prefs === void 0 ? void 0 : prefs.whatsappEnabled) !== false && (prefs === null || prefs === void 0 ? void 0 : prefs.whatsappNumber)) {
-                channels.push({ type: 'whatsapp', phone: prefs.whatsappNumber });
-            }
-        }
-        // Send via each channel
-        for (const channel of channels) {
-            // Direct call to send message
-            const configDoc = await admin.firestore()
-                .collection('twilioConfigs')
-                .doc(schoolId)
-                .get();
-            if (configDoc.exists) {
-                const config = configDoc.data();
-                if (config === null || config === void 0 ? void 0 : config.isActive) {
-                    let decodedAccountSid = config.accountSid;
-                    let decodedAuthToken = config.authToken;
-                    try {
-                        if (isBase64(config.accountSid)) {
-                            decodedAccountSid = Buffer.from(config.accountSid, 'base64').toString();
-                        }
-                        if (isBase64(config.authToken)) {
-                            decodedAuthToken = Buffer.from(config.authToken, 'base64').toString();
-                        }
-                    }
-                    catch (error) {
-                        console.warn('Using credentials as plain text');
-                    }
-                    const client = twilio(decodedAccountSid, decodedAuthToken);
-                    let from = channel.type === 'whatsapp'
-                        ? config.phoneNumberWhatsapp
-                        : config.phoneNumberSms;
-                    // Ensure WhatsApp from number has proper whatsapp: prefix
-                    if (channel.type === 'whatsapp' && from && !from.startsWith('whatsapp:')) {
-                        from = `whatsapp:${from}`;
-                    }
-                    let to = channel.phone;
-                    // Ensure WhatsApp to number has proper whatsapp: prefix
-                    if (channel.type === 'whatsapp' && !channel.phone.startsWith('whatsapp:')) {
-                        to = `whatsapp:${channel.phone}`;
-                    }
-                    // Log the formatted numbers for debugging
-                    console.log(`📱 Sending automated ${channel.type} message:`, {
-                        from: from,
-                        to: to,
-                        channel: channel.type
-                    });
-                    await client.messages.create({
-                        body: message,
-                        from: from,
-                        to: to
-                    });
-                }
+        // Send using basic method
+        if (student.phone && student.countryCode) {
+            const channels = settings.channel === 'both' ? ['sms', 'whatsapp'] : [settings.channel];
+            for (const channel of channels) {
+                await sendTwilioMessageDirect(schoolId, {
+                    phone: student.countryCode + student.phone,
+                    message,
+                    channel: channel,
+                    studentId,
+                    notificationType: type
+                });
             }
         }
     }
     catch (error) {
-        console.error(`Error sending notification to student ${studentId}:`, error);
+        console.error(`Error in legacy sendNotificationToStudent:`, error);
     }
 }
+/**
+ * Direct message sending helper
+ */
+async function sendTwilioMessageDirect(schoolId, data) {
+    var _a;
+    const { phone, message, channel } = data;
+    try {
+        const configDoc = await admin.firestore()
+            .collection('twilioConfigs')
+            .doc(schoolId)
+            .get();
+        if (!configDoc.exists || !((_a = configDoc.data()) === null || _a === void 0 ? void 0 : _a.isActive)) {
+            throw new Error('Twilio configuration not found or inactive');
+        }
+        const config = configDoc.data();
+        let decodedAccountSid = config.accountSid;
+        let decodedAuthToken = config.authToken;
+        try {
+            if (isBase64(config.accountSid)) {
+                decodedAccountSid = Buffer.from(config.accountSid, 'base64').toString();
+            }
+            if (isBase64(config.authToken)) {
+                decodedAuthToken = Buffer.from(config.authToken, 'base64').toString();
+            }
+        }
+        catch (error) {
+            console.warn('Using credentials as plain text');
+        }
+        const client = twilio(decodedAccountSid, decodedAuthToken);
+        let from = channel === 'whatsapp'
+            ? config.phoneNumberWhatsapp
+            : config.phoneNumberSms;
+        let to = phone;
+        if (channel === 'whatsapp') {
+            if (!from.startsWith('whatsapp:')) {
+                from = `whatsapp:${from}`;
+            }
+            if (!to.startsWith('whatsapp:')) {
+                to = `whatsapp:${to}`;
+            }
+        }
+        await client.messages.create({
+            body: message,
+            from: from,
+            to: to
+        });
+        console.log(`Legacy message sent via ${channel}`);
+    }
+    catch (error) {
+        console.error(`Error in sendTwilioMessageDirect:`, error);
+        throw error;
+    }
+}
+// Legacy function for backward compatibility - kept for existing integrations
 function checkReminderTiming(eventDate, timingRules) {
+    console.warn('Using legacy checkReminderTiming function. Consider upgrading to checkAdvancedReminderTiming.');
     if (!timingRules || timingRules.length === 0)
         return false;
     const now = new Date();
@@ -497,6 +941,27 @@ async function updateSpendTracking(schoolId, amount) {
         console.error('Error updating spend tracking:', error);
     }
 }
+// Enhanced formatting functions for templates
+/**
+ * Format lesson time with improved readability
+ */
+function formatLessonTime(date) {
+    const d = date.toDate ? date.toDate() : new Date(date);
+    // Get day of week
+    const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' });
+    // Get date
+    const dateStr = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+    });
+    // Get time
+    const timeStr = d.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+    return `${dayOfWeek}, ${dateStr} at ${timeStr}`;
+}
 function formatTime(date) {
     const d = date.toDate ? date.toDate() : new Date(date);
     return d.toLocaleTimeString('en-US', {
@@ -513,14 +978,17 @@ function formatDate(date) {
         year: 'numeric'
     });
 }
-function formatCurrency(amount, currency) {
+function formatCurrency(amount, currency = 'USD') {
     const symbols = {
         USD: '$',
         EUR: '€',
         GBP: '£',
-        RUB: '₽'
+        RUB: '₽',
+        AED: 'AED ',
+        SAR: 'SAR '
     };
-    return `${symbols[currency] || currency} ${amount.toFixed(2)}`;
+    const symbol = symbols[currency] || `${currency} `;
+    return `${symbol}${amount.toFixed(2)}`;
 }
 function isBase64(str) {
     try {
@@ -533,4 +1001,79 @@ function isBase64(str) {
         return false;
     }
 }
+/**
+ * Cleanup function to remove old sent reminders (run weekly)
+ */
+exports.cleanupOldReminders = functions.pubsub
+    .schedule('0 2 * * 0') // Run weekly on Sunday at 2 AM
+    .timeZone('UTC')
+    .onRun(async (context) => {
+    console.log('Running cleanup for old sent reminders');
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 30); // Keep 30 days of history
+    try {
+        // Query old reminder records
+        const oldRemindersSnapshot = await admin.firestore()
+            .collection('sentReminders')
+            .where('sentAt', '<=', cutoffDate)
+            .limit(500) // Process in batches
+            .get();
+        if (oldRemindersSnapshot.empty) {
+            console.log('No old reminders to clean up');
+            return { deleted: 0 };
+        }
+        // Delete in batch
+        const batch = admin.firestore().batch();
+        oldRemindersSnapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(`Cleaned up ${oldRemindersSnapshot.size} old reminder records`);
+        return { deleted: oldRemindersSnapshot.size };
+    }
+    catch (error) {
+        console.error('Error cleaning up old reminders:', error);
+        return { error: error.message || 'Unknown error' };
+    }
+});
+/**
+ * Enhanced error handling for notification system
+ */
+exports.handleNotificationErrors = functions.firestore
+    .document('notificationLogs/{logId}')
+    .onCreate(async (snap, context) => {
+    var _a;
+    const logData = snap.data();
+    // Only process failed notifications
+    if (logData.status !== 'failed' || !logData.isAutomated) {
+        return null;
+    }
+    try {
+        // Count recent failures for this school
+        const recentFailuresSnapshot = await admin.firestore()
+            .collection('notificationLogs')
+            .where('schoolId', '==', logData.schoolId)
+            .where('status', '==', 'failed')
+            .where('sentAt', '>=', new Date(Date.now() - 24 * 60 * 60 * 1000)) // Last 24 hours
+            .get();
+        const failureCount = recentFailuresSnapshot.size;
+        // Alert if too many failures
+        if (failureCount >= 10) {
+            console.error(`High failure rate detected for school ${logData.schoolId}: ${failureCount} failures in 24h`);
+            // Could add email notification to admin here
+            // await sendAdminAlert(logData.schoolId, failureCount);
+        }
+        // Check for specific error patterns
+        if ((_a = logData.error) === null || _a === void 0 ? void 0 : _a.includes('21611')) {
+            // Invalid phone number error
+            console.log(`Invalid phone number detected for ${logData.recipientPhone}`);
+            // Could disable notifications for this number
+        }
+        return null;
+    }
+    catch (error) {
+        console.error('Error in notification error handler:', error);
+        return null;
+    }
+});
 //# sourceMappingURL=sendMessage.js.map

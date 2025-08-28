@@ -7,6 +7,14 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
+export interface ParentInfo {
+  name: string;
+  relationship: 'mother' | 'father' | 'guardian';
+  phone: string;
+  countryCode: string;
+  email: string;
+}
+
 export interface Student {
   id: string;
   firstName: string;
@@ -17,6 +25,7 @@ export interface Student {
   courseName: string;
   level: 'beginner' | 'intermediate' | 'advanced' | 'fluent';
   phone?: string;
+  countryCode?: string;
   paymentStatus: 'paid' | 'pending' | 'overdue';
   teacherId?: string;
   image?: string;
@@ -25,6 +34,7 @@ export interface Student {
   nextPaymentDate?: string;
   nextPaymentAmount?: number;
   subscriptionProgress?: string;
+  parentInfo?: ParentInfo;
 }
 
 interface StudentCardProps {

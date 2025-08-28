@@ -19,6 +19,9 @@ import { db } from '@/config/firebase';
 import { authService } from '@/services/firebase/auth.service';
 import { databaseService } from '@/services/firebase/database.service';
 
+// Global DEBUG flag - set to true only when debugging database issues
+const DEBUG_MODE = false;
+
 // This file provides a migration layer from Supabase to Firebase
 // It maps Supabase-like operations to Firebase operations
 
@@ -507,9 +510,11 @@ async function handleAddSubscription(params: any) {
     
     // Also generate the lesson sessions for this subscription
     if (params.p_schedule && params.p_schedule.length > 0 && params.p_session_count > 0) {
-      console.log('Creating sessions for subscription:', subscriptionId);
-      console.log('Schedule:', params.p_schedule);
-      console.log('Session count:', params.p_session_count);
+      if (DEBUG_MODE) {
+        console.log('Creating sessions for subscription:', subscriptionId);
+        console.log('Schedule:', params.p_schedule);
+        console.log('Session count:', params.p_session_count);
+      }
       
       // Generate sessions based on schedule
       const sessions = [];
@@ -559,9 +564,9 @@ async function handleAddSubscription(params: any) {
         sessionsCreated++;
       }
       
-      console.log('Created sessions:', sessions.length);
+      if (DEBUG_MODE) console.log('Created sessions:', sessions.length);
     } else {
-      console.log('No schedule or session count provided, skipping session creation');
+      if (DEBUG_MODE) console.log('No schedule or session count provided, skipping session creation');
     }
     
     // Return in the format expected by the frontend (array with subscription as first element)
@@ -606,7 +611,7 @@ async function handleScheduleConflicts(params: any) {
 
 async function handleCreateTransaction(params: any) {
   try {
-    console.log('💳 Creating transaction with params:', params);
+    if (DEBUG_MODE) console.log('💳 Creating transaction with params:', params);
     
     // Map the p_ prefixed params to actual field names
     const transactionData = {
@@ -628,11 +633,11 @@ async function handleCreateTransaction(params: any) {
       updated_at: new Date().toISOString()
     };
     
-    console.log('💳 Transaction data to save:', transactionData);
+    if (DEBUG_MODE) console.log('💳 Transaction data to save:', transactionData);
     
     const transactionId = await databaseService.create('transactions', transactionData);
     
-    console.log('✅ Transaction created with ID:', transactionId);
+    if (DEBUG_MODE) console.log('✅ Transaction created with ID:', transactionId);
     
     return { data: transactionId, error: null }; // Return just the ID, not wrapped in object
   } catch (error) {
@@ -708,7 +713,7 @@ async function handleGetSchoolCurrencies(params: any) {
       school_id: currency.school_id || currency.schoolId
     }));
     
-    console.log('Fetched currencies for school:', params.p_school_id, 'Count:', mappedCurrencies.length);
+    if (DEBUG_MODE) console.log('Fetched currencies for school:', params.p_school_id, 'Count:', mappedCurrencies.length);
     return { data: mappedCurrencies, error: null };
   } catch (error) {
     console.error('Error fetching school currencies:', error);
@@ -762,7 +767,7 @@ async function handleGetSchoolAccounts(params: any) {
       };
     }));
     
-    console.log('Fetched accounts for school:', params.p_school_id, 'Count:', mappedAccounts.length);
+    if (DEBUG_MODE) console.log('Fetched accounts for school:', params.p_school_id, 'Count:', mappedAccounts.length);
     return { data: mappedAccounts, error: null };
   } catch (error) {
     console.error('Error fetching school accounts:', error);
@@ -1023,14 +1028,16 @@ async function handleCreateDefaultCategories(params: any) {
 // Handle get_lesson_sessions RPC function
 async function handleGetLessonSessions(params: { p_student_id: string }) {
   try {
-    console.log('Getting lesson sessions for student:', params.p_student_id);
-    
-    // First, let's check if there are ANY sessions in the database
-    const allSessions = await databaseService.query('sessions', {});
-    console.log(`Total sessions in database: ${allSessions.length}`);
-    if (allSessions.length > 0) {
-      console.log('Sample session fields:', Object.keys(allSessions[0]));
-      console.log('Sample session:', allSessions[0]);
+    if (DEBUG_MODE) {
+      console.log('Getting lesson sessions for student:', params.p_student_id);
+      
+      // First, let's check if there are ANY sessions in the database
+      const allSessions = await databaseService.query('sessions', {});
+      console.log(`Total sessions in database: ${allSessions.length}`);
+      if (allSessions.length > 0) {
+        console.log('Sample session fields:', Object.keys(allSessions[0]));
+        console.log('Sample session:', allSessions[0]);
+      }
     }
     
     // Query sessions from Firebase - try both camelCase and snake_case field names
@@ -1038,15 +1045,12 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
     let sessions = await databaseService.query('sessions', {
       where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
     });
-    console.log(`Found ${sessions.length} sessions with studentId field`);
     
     // If no results, try snake_case (old format)
     if (!sessions || sessions.length === 0) {
-      console.log('No sessions found with studentId, trying student_id...');
       sessions = await databaseService.query('sessions', {
         where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
       });
-      console.log(`Found ${sessions.length} sessions with student_id field`);
     }
     
     // Map sessions to the expected format (Firebase uses camelCase, return snake_case)
@@ -1072,8 +1076,6 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
       payment_status: session.paymentStatus || session.payment_status || null
     }));
     
-    console.log(`Found ${mappedSessions.length} sessions for student ${params.p_student_id}`);
-    
     return { 
       data: mappedSessions,
       error: null 
@@ -1087,14 +1089,16 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
 // Handle get_student_subscriptions RPC function
 async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
   try {
-    console.log('Getting subscriptions for student:', params.p_student_id);
+    if (DEBUG_MODE) console.log('Getting subscriptions for student:', params.p_student_id);
     
     // First, let's check if there are ANY subscriptions in the database
-    const allSubscriptions = await databaseService.query('subscriptions', {});
-    console.log(`Total subscriptions in database: ${allSubscriptions.length}`);
-    if (allSubscriptions.length > 0) {
-      console.log('Sample subscription fields:', Object.keys(allSubscriptions[0]));
-      console.log('Sample subscription:', allSubscriptions[0]);
+    if (DEBUG_MODE) {
+      const allSubscriptions = await databaseService.query('subscriptions', {});
+      console.log(`Total subscriptions in database: ${allSubscriptions.length}`);
+      if (allSubscriptions.length > 0) {
+        console.log('Sample subscription fields:', Object.keys(allSubscriptions[0]));
+        console.log('Sample subscription:', allSubscriptions[0]);
+      }
     }
     
     // Query subscriptions from Firebase - try both camelCase and snake_case field names
@@ -1102,15 +1106,15 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
     let subscriptions = await databaseService.query('subscriptions', {
       where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
     });
-    console.log(`Found ${subscriptions.length} subscriptions with studentId field`);
+    if (DEBUG_MODE) console.log(`Found ${subscriptions.length} subscriptions with studentId field`);
     
     // If no results, try snake_case (old format)
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('No subscriptions found with studentId, trying student_id...');
+      if (DEBUG_MODE) console.log('No subscriptions found with studentId, trying student_id...');
       subscriptions = await databaseService.query('subscriptions', {
         where: [{ field: 'student_id', operator: '==', value: params.p_student_id }]
       });
-      console.log(`Found ${subscriptions.length} subscriptions with student_id field`);
+      if (DEBUG_MODE) console.log(`Found ${subscriptions.length} subscriptions with student_id field`);
     }
     
     // For each subscription, calculate sessions taken and scheduled
@@ -1187,7 +1191,7 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
 // Handle session action RPC function
 async function handleSessionActionRPC(params: any) {
   try {
-    console.log('🎯 Handling session action:', params);
+    if (DEBUG_MODE) console.log('🎯 Handling session action:', params);
     
     const { p_session_id, p_action, p_new_datetime } = params;
     
@@ -1292,7 +1296,7 @@ async function handleSessionActionRPC(params: any) {
           };
           
           const newSessionId = await databaseService.create('sessions', replacementSession);
-          console.log('✅ Created replacement session:', newSessionId);
+          if (DEBUG_MODE) console.log('✅ Created replacement session:', newSessionId);
           
           return { 
             data: { 
@@ -1323,7 +1327,7 @@ async function handleSessionActionRPC(params: any) {
       // Update the session in Firebase
       await databaseService.update('sessions', p_session_id, updates);
       
-      console.log('✅ Session updated successfully:', p_session_id, updates);
+      if (DEBUG_MODE) console.log('✅ Session updated successfully:', p_session_id, updates);
       
       // Update subscription session counts
       const session = await databaseService.getById('sessions', p_session_id);
@@ -1348,7 +1352,7 @@ async function handleSessionActionRPC(params: any) {
           updated_at: new Date().toISOString()
         });
         
-        console.log('✅ Updated subscription counts:', {
+        if (DEBUG_MODE) console.log('✅ Updated subscription counts:', {
           subscription_id: session.subscription_id,
           attended: sessionsAttended,
           cancelled: sessionsCancelled,
@@ -1377,7 +1381,7 @@ async function handleSessionActionRPC(params: any) {
 // Handle get_school_transactions RPC function
 async function handleGetSchoolTransactions(params: { p_school_id: string }) {
   try {
-    console.log('Getting transactions for school:', params.p_school_id);
+    if (DEBUG_MODE) console.log('Getting transactions for school:', params.p_school_id);
     
     // Query all transactions for the school
     const transactions = await databaseService.query('transactions', {
@@ -1500,7 +1504,7 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
       };
     });
     
-    console.log(`Found ${enrichedTransactions.length} transactions for school`);
+    if (DEBUG_MODE) console.log(`Found ${enrichedTransactions.length} transactions for school`);
     
     return { 
       data: enrichedTransactions,
@@ -1546,14 +1550,14 @@ async function handleSetDefaultCurrency(params: { p_currency_id: string, p_schoo
 // Handle get_students_password_info RPC function
 async function handleGetStudentsPasswordInfo(params: { p_school_id: string }) {
   try {
-    console.log('Getting students password info for school:', params.p_school_id);
+    if (DEBUG_MODE) console.log('Getting students password info for school:', params.p_school_id);
     
     // Get all students for the school
     const students = await databaseService.query('students', {
       where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
     });
     
-    console.log(`Found ${students.length} students`);
+    if (DEBUG_MODE) console.log(`Found ${students.length} students`);
     
     // For each student, get their user data to check for password
     const passwordInfo = await Promise.all(students.map(async (student: any) => {
@@ -1578,7 +1582,7 @@ async function handleGetStudentsPasswordInfo(params: { p_school_id: string }) {
       }
     }));
     
-    console.log(`Returning password info for ${passwordInfo.length} students`);
+    if (DEBUG_MODE) console.log(`Returning password info for ${passwordInfo.length} students`);
     
     return { data: passwordInfo, error: null };
   } catch (error) {
@@ -1590,12 +1594,12 @@ async function handleGetStudentsPasswordInfo(params: { p_school_id: string }) {
 // Handle get_user_password_hash RPC function (returns plain text password)
 async function handleGetUserPasswordHash(params: { p_user_id: string }) {
   try {
-    console.log('Getting password for user:', params.p_user_id);
+    if (DEBUG_MODE) console.log('Getting password for user:', params.p_user_id);
     
     const user = await databaseService.getById('users', params.p_user_id);
     
     if (!user) {
-      console.log('User not found:', params.p_user_id);
+      if (DEBUG_MODE) console.log('User not found:', params.p_user_id);
       return { data: null, error: null };
     }
     
@@ -1613,7 +1617,7 @@ async function handleGetUserPasswordHash(params: { p_user_id: string }) {
       };
     }
     
-    console.log('No password set for user:', params.p_user_id);
+    if (DEBUG_MODE) console.log('No password set for user:', params.p_user_id);
     return { data: [], error: null };
   } catch (error) {
     console.error('Error getting user password:', error);
@@ -1624,7 +1628,7 @@ async function handleGetUserPasswordHash(params: { p_user_id: string }) {
 // Handle update_student_password RPC function
 async function handleUpdateStudentPassword(params: { p_user_id: string, p_password: string }) {
   try {
-    console.log('Updating password for user:', params.p_user_id);
+    if (DEBUG_MODE) console.log('Updating password for user:', params.p_user_id);
     
     // Update the user document with the new temporary password
     await databaseService.update('users', params.p_user_id, {
@@ -1633,7 +1637,7 @@ async function handleUpdateStudentPassword(params: { p_user_id: string, p_passwo
       updatedAt: new Date().toISOString()
     });
     
-    console.log('Password updated successfully for user:', params.p_user_id);
+    if (DEBUG_MODE) console.log('Password updated successfully for user:', params.p_user_id);
     
     return { 
       data: { 
@@ -1657,7 +1661,7 @@ async function handleUpdateStudentPassword(params: { p_user_id: string, p_passwo
 // Handle verify_password_update RPC function
 async function handleVerifyPasswordUpdate(params: { p_user_id: string }) {
   try {
-    console.log('Verifying password update for user:', params.p_user_id);
+    if (DEBUG_MODE) console.log('Verifying password update for user:', params.p_user_id);
     
     const user = await databaseService.getById('users', params.p_user_id);
     

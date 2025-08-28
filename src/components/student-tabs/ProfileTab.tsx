@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Student } from "../StudentCard";
+import { Student, ParentInfo } from "../StudentCard";
 import { Course } from "@/integrations/supabase/client";
-import { Users } from "lucide-react";
+import { Users, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import CountryCodeSelector from "../CountryCodeSelector";
 
 interface Teacher {
   id: string;
@@ -87,6 +88,23 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     setStudentData({ [field]: value });
   };
 
+  const handleParentInfoChange = (field: keyof ParentInfo, value: string) => {
+    const currentParentInfo = studentData.parentInfo || {
+      name: '',
+      relationship: 'mother' as const,
+      phone: '',
+      countryCode: '+1',
+      email: ''
+    };
+    
+    setStudentData({
+      parentInfo: {
+        ...currentParentInfo,
+        [field]: value
+      }
+    });
+  };
+
   const handleGoToTeamAccess = () => {
     window.location.href = '/team-access';
   };
@@ -134,13 +152,21 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              value={studentData.phone || ""}
-              onChange={(e) => handleInputChange("phone", e.target.value)}
-              placeholder="Phone number"
-              disabled={isViewMode}
-            />
+            <div className="flex gap-2">
+              <CountryCodeSelector
+                value={studentData.countryCode || "+1"}
+                onSelect={(code) => handleInputChange("countryCode", code)}
+                disabled={isViewMode}
+              />
+              <Input
+                id="phone"
+                value={studentData.phone || ""}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                placeholder="Phone number"
+                disabled={isViewMode}
+                className="flex-1"
+              />
+            </div>
           </div>
           
           {isNewStudent && (
@@ -386,6 +412,79 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Parent Information Section - Only show for kids */}
+      {studentData.ageGroup === "kid" && (
+        <div className="mt-8 p-6 border rounded-lg bg-blue-50/50">
+          <div className="flex items-center gap-2 mb-4">
+            <UserCheck className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-blue-900">Parent/Guardian Information</h3>
+            <span className="text-sm text-blue-600">(Required for kids)</span>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="parentName">Parent/Guardian Name*</Label>
+              <Input
+                id="parentName"
+                value={studentData.parentInfo?.name || ""}
+                onChange={(e) => handleParentInfoChange("name", e.target.value)}
+                placeholder="Full name"
+                disabled={isViewMode}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="relationship">Relationship*</Label>
+              <Select
+                value={studentData.parentInfo?.relationship || "mother"}
+                onValueChange={(value: "mother" | "father" | "guardian") => handleParentInfoChange("relationship", value)}
+                disabled={isViewMode}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select relationship" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mother">Mother</SelectItem>
+                  <SelectItem value="father">Father</SelectItem>
+                  <SelectItem value="guardian">Guardian</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="parentPhone">Parent Phone*</Label>
+              <div className="flex gap-2">
+                <CountryCodeSelector
+                  value={studentData.parentInfo?.countryCode || "+1"}
+                  onSelect={(code) => handleParentInfoChange("countryCode", code)}
+                  disabled={isViewMode}
+                />
+                <Input
+                  id="parentPhone"
+                  value={studentData.parentInfo?.phone || ""}
+                  onChange={(e) => handleParentInfoChange("phone", e.target.value)}
+                  placeholder="Phone number"
+                  disabled={isViewMode}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="parentEmail">Parent Email*</Label>
+              <Input
+                id="parentEmail"
+                type="email"
+                value={studentData.parentInfo?.email || ""}
+                onChange={(e) => handleParentInfoChange("email", e.target.value)}
+                placeholder="parent@example.com"
+                disabled={isViewMode}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

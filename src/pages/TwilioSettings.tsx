@@ -24,10 +24,18 @@ import {
   TestTube,
   Eye,
   EyeOff,
-  HelpCircle
+  HelpCircle,
+  Bell,
+  Plus,
+  Edit,
+  Trash2,
+  Users
 } from 'lucide-react';
 import { UserContext } from '@/App';
+import NotificationLogsViewer from '@/components/NotificationLogsViewer';
 import { twilioService } from '@/services/twilio.service';
+import { notificationSettingsService } from '@/services/notificationSettings.service';
+import NotificationTemplateEditor from '@/components/NotificationTemplateEditor';
 import { 
   validateTwilioConfig, 
   validatePhoneNumber, 
@@ -41,6 +49,15 @@ import {
   getConfigurationStatus,
   type TwilioValidationError 
 } from '@/utils/twilioValidation';
+import {
+  NotificationTemplate,
+  NotificationRule,
+  NotificationRuleType,
+  NotificationChannel,
+  NotificationTemplateType,
+  DEFAULT_TEMPLATES,
+  DEFAULT_NOTIFICATION_RULES
+} from '@/types/notification.types';
 
 interface NotificationTemplate {
   type: string;
@@ -73,6 +90,13 @@ const TwilioSettings = () => {
     details?: any;
     timestamp: Date;
   } | null>(null);
+
+  // Notification Rules state
+  const [notificationRules, setNotificationRules] = useState<NotificationRule[]>([]);
+  const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
+  const [templateEditorMode, setTemplateEditorMode] = useState<'create' | 'edit'>('create');
   
   // Form state
   const [config, setConfig] = useState({
@@ -138,6 +162,20 @@ const TwilioSettings = () => {
     queryFn: () => twilioService.getNotificationSettings(user!.schoolId),
     enabled: !!user?.schoolId
   });
+
+  // Fetch notification rules
+  const { data: fetchedNotificationRules } = useQuery({
+    queryKey: ['notification-rules', user?.schoolId],
+    queryFn: () => notificationSettingsService.getNotificationRules(user!.schoolId),
+    enabled: !!user?.schoolId
+  });
+
+  // Fetch notification templates  
+  const { data: fetchedNotificationTemplates } = useQuery({
+    queryKey: ['notification-templates', user?.schoolId],
+    queryFn: () => notificationSettingsService.getTemplates(user!.schoolId),
+    enabled: !!user?.schoolId
+  });
   
   // Save config mutation
   const saveConfigMutation = useMutation({
@@ -195,6 +233,43 @@ const TwilioSettings = () => {
     },
     onError: (error: any) => {
       toast.error('Failed to save notification settings');
+    }
+  });
+
+  // Save notification rules mutation
+  const saveNotificationRulesMutation = useMutation({
+    mutationFn: async (rules: NotificationRule[]) => {
+      const promises = rules.map(rule => 
+        notificationSettingsService.saveNotificationRule({
+          ...rule,
+          schoolId: user!.schoolId
+        })
+      );
+      return await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-rules'] });
+      toast.success('Notification rules saved successfully');
+    },
+    onError: (error: any) => {
+      console.error('Error saving notification rules:', error);
+      toast.error('Failed to save notification rules');
+    }
+  });
+
+  // Initialize defaults mutation
+  const initializeDefaultsMutation = useMutation({
+    mutationFn: async () => {
+      return await notificationSettingsService.initializeDefaults(user!.schoolId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-rules'] });
+      queryClient.invalidateQueries({ queryKey: ['notification-templates'] });
+      toast.success('Default templates and rules initialized');
+    },
+    onError: (error: any) => {
+      console.error('Error initializing defaults:', error);
+      toast.error('Failed to initialize defaults');
     }
   });
   
@@ -457,6 +532,20 @@ const TwilioSettings = () => {
       setTemplates(notificationSettings);
     }
   }, [notificationSettings]);
+
+  // Load notification rules
+  useEffect(() => {
+    if (fetchedNotificationRules) {
+      setNotificationRules(fetchedNotificationRules);
+    }
+  }, [fetchedNotificationRules]);
+
+  // Load notification templates
+  useEffect(() => {
+    if (fetchedNotificationTemplates) {
+      setNotificationTemplates(fetchedNotificationTemplates);
+    }
+  }, [fetchedNotificationTemplates]);
   
   const handleConfigSave = () => {
     // Allow saving with just credentials if user doesn't want to configure phone numbers yet
@@ -577,6 +666,85 @@ const TwilioSettings = () => {
     };
     return titles[type] || type;
   };
+
+  // Notification Rules handlers
+  const handleRuleChange = (ruleIndex: number, field: keyof NotificationRule, value: any) => {
+    const updatedRules = [...notificationRules];
+    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
+    setNotificationRules(updatedRules);
+  };
+
+  const handleReminderChange = (ruleIndex: number, reminderIndex: number, field: string, value: any) => {
+    const updatedRules = [...notificationRules];
+    const updatedReminders = [...updatedRules[ruleIndex].reminders];
+    updatedReminders[reminderIndex] = { ...updatedReminders[reminderIndex], [field]: value };
+    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], reminders: updatedReminders };
+    setNotificationRules(updatedRules);
+  };
+
+  const handleSaveNotificationRules = () => {
+    saveNotificationRulesMutation.mutate(notificationRules);
+  };
+
+  const handleInitializeDefaults = () => {
+    if (confirm('This will initialize default notification templates and rules. Continue?')) {
+      initializeDefaultsMutation.mutate();
+    }
+  };
+
+  const handleEditTemplate = (template: NotificationTemplate) => {
+    setEditingTemplate(template);
+    setTemplateEditorMode('edit');
+    setShowTemplateEditor(true);
+  };
+
+  const handleCreateTemplate = () => {
+    setEditingTemplate(null);
+    setTemplateEditorMode('create');
+    setShowTemplateEditor(true);
+  };
+
+  const handleTemplateAction = (template: NotificationTemplate) => {
+    const updatedTemplates = [...notificationTemplates];
+    const existingIndex = updatedTemplates.findIndex(t => t.id === template.id);
+    
+    if (existingIndex >= 0) {
+      updatedTemplates[existingIndex] = template;
+    } else {
+      updatedTemplates.push(template);
+    }
+    
+    setNotificationTemplates(updatedTemplates);
+    queryClient.invalidateQueries({ queryKey: ['notification-templates'] });
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    const updatedTemplates = notificationTemplates.filter(t => t.id !== templateId);
+    setNotificationTemplates(updatedTemplates);
+    queryClient.invalidateQueries({ queryKey: ['notification-templates'] });
+  };
+
+  const getRuleTypeDisplayName = (type: NotificationRuleType): string => {
+    const names: Record<NotificationRuleType, string> = {
+      [NotificationRuleType.LESSON_REMINDERS]: 'Lesson Reminders',
+      [NotificationRuleType.PAYMENT_REMINDERS]: 'Payment Reminders',
+      [NotificationRuleType.LESSON_CANCELLATION]: 'Lesson Cancellation'
+    };
+    return names[type] || type;
+  };
+
+  const getChannelDisplayName = (channel: NotificationChannel): string => {
+    const names: Record<NotificationChannel, string> = {
+      [NotificationChannel.SMS]: 'SMS',
+      [NotificationChannel.WHATSAPP]: 'WhatsApp', 
+      [NotificationChannel.BOTH]: 'Both'
+    };
+    return names[channel] || channel;
+  };
+
+  const getTemplatesByType = (type: NotificationTemplateType) => {
+    return notificationTemplates.filter(t => t.type === type && t.isActive);
+  };
   
   if (isLoading) {
     return (
@@ -622,10 +790,14 @@ const TwilioSettings = () => {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="config">
             <Settings className="h-4 w-4 mr-2" />
             Configuration
+          </TabsTrigger>
+          <TabsTrigger value="rules">
+            <Bell className="h-4 w-4 mr-2" />
+            Notification Rules
           </TabsTrigger>
           <TabsTrigger value="templates">
             <MessageSquare className="h-4 w-4 mr-2" />
@@ -1012,6 +1184,315 @@ const TwilioSettings = () => {
           </Card>
         </TabsContent>
         
+        <TabsContent value="rules" className="space-y-4">
+          {/* Help Section */}
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-100 p-2 rounded-full">
+                  <Bell className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-medium text-blue-900">Notification Rules</h3>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <p>Configure when and how notifications are sent to students and parents.</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>Set up lesson reminders with custom timing</li>
+                      <li>Configure payment reminder schedules</li>
+                      <li>Customize message templates and recipients</li>
+                      <li>Choose delivery channels (SMS, WhatsApp, or both)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Initialize Defaults Button */}
+          {notificationRules.length === 0 && notificationTemplates.length === 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <div className="text-muted-foreground">
+                    <Bell className="h-12 w-12 mx-auto mb-4" />
+                    <p>No notification rules or templates found.</p>
+                    <p className="text-sm">Initialize default notification settings to get started.</p>
+                  </div>
+                  <Button
+                    onClick={handleInitializeDefaults}
+                    disabled={initializeDefaultsMutation.isPending}
+                  >
+                    {initializeDefaultsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
+                    Initialize Default Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Notification Rules */}
+          {notificationRules.map((rule, ruleIndex) => (
+            <Card key={rule.type}>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-lg">
+                      {getRuleTypeDisplayName(rule.type)}
+                    </CardTitle>
+                    <CardDescription>
+                      Configure {getRuleTypeDisplayName(rule.type).toLowerCase()} settings
+                    </CardDescription>
+                  </div>
+                  <Switch
+                    checked={rule.enabled}
+                    onCheckedChange={(enabled) => handleRuleChange(ruleIndex, 'enabled', enabled)}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Recipients */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Recipients
+                  </Label>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`${rule.type}-student`}
+                        checked={rule.recipients.student}
+                        onCheckedChange={(checked) => 
+                          handleRuleChange(ruleIndex, 'recipients', {
+                            ...rule.recipients,
+                            student: checked
+                          })
+                        }
+                      />
+                      <Label htmlFor={`${rule.type}-student`} className="text-sm">
+                        Students
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`${rule.type}-parent`}
+                        checked={rule.recipients.parent}
+                        onCheckedChange={(checked) => 
+                          handleRuleChange(ruleIndex, 'recipients', {
+                            ...rule.recipients,
+                            parent: checked
+                          })
+                        }
+                      />
+                      <Label htmlFor={`${rule.type}-parent`} className="text-sm">
+                        Parents
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reminders */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Reminder Schedule</Label>
+                  <div className="space-y-3">
+                    {rule.reminders.map((reminder, reminderIndex) => (
+                      <div key={reminder.id} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={reminder.enabled}
+                              onCheckedChange={(enabled) => 
+                                handleReminderChange(ruleIndex, reminderIndex, 'enabled', enabled)
+                              }
+                            />
+                            <span className="text-sm font-medium">
+                              {reminder.timing.value} {reminder.timing.unit} before
+                            </span>
+                          </div>
+                          <Badge variant="secondary">
+                            {getChannelDisplayName(reminder.channel)}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Channel</Label>
+                            <Select
+                              value={reminder.channel}
+                              onValueChange={(value: NotificationChannel) => 
+                                handleReminderChange(ruleIndex, reminderIndex, 'channel', value)
+                              }
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={NotificationChannel.SMS}>SMS Only</SelectItem>
+                                <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp Only</SelectItem>
+                                <SelectItem value={NotificationChannel.BOTH}>Both SMS & WhatsApp</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-xs">Template</Label>
+                            <Select
+                              value={reminder.customTemplateId || reminder.templateType}
+                              onValueChange={(value) => {
+                                // Check if it's a custom template ID or template type
+                                const isCustomTemplate = notificationTemplates.find(t => t.id === value);
+                                if (isCustomTemplate) {
+                                  handleReminderChange(ruleIndex, reminderIndex, 'customTemplateId', value);
+                                } else {
+                                  handleReminderChange(ruleIndex, reminderIndex, 'templateType', value);
+                                  handleReminderChange(ruleIndex, reminderIndex, 'customTemplateId', undefined);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {/* Default templates for this type */}
+                                {notificationTemplates
+                                  .filter(t => t.type === reminder.templateType && t.isDefault)
+                                  .map(template => (
+                                    <SelectItem key={template.id} value={template.type}>
+                                      {template.name} ({template.language.toUpperCase()})
+                                    </SelectItem>
+                                  ))
+                                }
+                                {/* Custom templates */}
+                                {notificationTemplates
+                                  .filter(t => t.type === reminder.templateType && !t.isDefault)
+                                  .map(template => (
+                                    <SelectItem key={template.id} value={template.id!}>
+                                      {template.name} (Custom - {template.language.toUpperCase()})
+                                    </SelectItem>
+                                  ))
+                                }
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Template Management */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Message Templates</CardTitle>
+                  <CardDescription>
+                    Manage notification message templates
+                  </CardDescription>
+                </div>
+                <Button onClick={handleCreateTemplate} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Template
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {notificationTemplates.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2" />
+                  <p>No templates found</p>
+                  <p className="text-sm">Create your first template or initialize defaults</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {Object.values(NotificationTemplateType).map(type => {
+                    const templatesOfType = getTemplatesByType(type);
+                    if (templatesOfType.length === 0 && type === NotificationTemplateType.CUSTOM) return null;
+                    
+                    return (
+                      <div key={type} className="space-y-2">
+                        <h4 className="text-sm font-medium text-muted-foreground">
+                          {notificationSettingsService.getTemplateTypeDisplayName(type)}
+                        </h4>
+                        {templatesOfType.length === 0 ? (
+                          <p className="text-xs text-muted-foreground ml-4">
+                            No templates for this type
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {templatesOfType.map(template => (
+                              <div key={template.id} className="border rounded p-3 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium">{template.name}</span>
+                                    <Badge variant={template.isDefault ? "secondary" : "outline"} className="text-xs">
+                                      {template.language.toUpperCase()}
+                                    </Badge>
+                                    {template.isDefault && (
+                                      <Badge variant="secondary" className="text-xs">Default</Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditTemplate(template)}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    {!template.isDefault && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteTemplate(template.id!)}
+                                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  {template.body}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          {notificationRules.length > 0 && (
+            <Button
+              onClick={handleSaveNotificationRules}
+              disabled={saveNotificationRulesMutation.isPending}
+              className="w-full"
+            >
+              {saveNotificationRulesMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving Rules...
+                </>
+              ) : (
+                'Save Notification Rules'
+              )}
+            </Button>
+          )}
+        </TabsContent>
+        
         <TabsContent value="templates" className="space-y-4">
           {templates.map((template, index) => (
             <Card key={template.type}>
@@ -1200,21 +1681,20 @@ const TwilioSettings = () => {
         </TabsContent>
         
         <TabsContent value="logs">
-          <Card>
-            <CardHeader>
-              <CardTitle>Message Delivery Logs</CardTitle>
-              <CardDescription>
-                Track sent messages and delivery status
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                Message logs will appear here once you start sending notifications
-              </div>
-            </CardContent>
-          </Card>
+          <NotificationLogsViewer schoolId={user?.schoolId || ''} />
         </TabsContent>
       </Tabs>
+
+      {/* Notification Template Editor */}
+      <NotificationTemplateEditor
+        open={showTemplateEditor}
+        onOpenChange={setShowTemplateEditor}
+        template={editingTemplate}
+        schoolId={user?.schoolId || ''}
+        onSave={handleTemplateAction}
+        onDelete={handleDeleteTemplate}
+        mode={templateEditorMode}
+      />
 
       {/* Test Results Modal */}
       <Dialog open={showTestResults} onOpenChange={setShowTestResults}>

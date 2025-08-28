@@ -1,14 +1,15 @@
 
 import { useState, useEffect } from "react";
-import { Student } from "@/components/StudentCard";
+import { Student, ParentInfo } from "@/components/StudentCard";
 import { toast } from "sonner";
 import { 
   createStudent, 
+  updateStudent,
   getSchoolCourses, 
   Course,
   CreateStudentResponse
 } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTeachers } from "./useTeachers";
 
 export const useStudentForm = (
@@ -27,7 +28,8 @@ export const useStudentForm = (
     courseName: "",
     level: "beginner",
     paymentStatus: "pending",
-    teacherId: ""
+    teacherId: "",
+    countryCode: "+1"
   });
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState("defaultPassword123");
@@ -48,6 +50,7 @@ export const useStudentForm = (
 
   const userData = getUserData();
   const schoolId = userData?.schoolId || null;
+  const queryClient = useQueryClient();
   
   // Use the dedicated teachers hook
   const { teachers, isLoading: teachersLoading, error: teachersError, refetch: refetchTeachers } = useTeachers(schoolId, open);
@@ -103,7 +106,52 @@ export const useStudentForm = (
   
   useEffect(() => {
     if (student) {
-      setStudentData(student);
+      // If phone contains country code, separate them for the form
+      let processedStudent = { ...student };
+      
+      // Process phone number if it exists
+      if (student.phone) {
+        const phoneStr = student.phone.toString();
+        
+        // If we have a stored country code, use it
+        if (student.countryCode) {
+          processedStudent.countryCode = student.countryCode;
+          // Remove the country code from the phone if it's at the beginning
+          if (phoneStr.startsWith(student.countryCode)) {
+            processedStudent.phone = phoneStr.substring(student.countryCode.length).trim();
+          } else if (phoneStr.startsWith('+')) {
+            // Phone has a different country code than stored, extract it
+            const match = phoneStr.match(/^(\+\d{1,4})/);
+            if (match) {
+              processedStudent.countryCode = match[1];
+              processedStudent.phone = phoneStr.substring(match[1].length).trim();
+            }
+          } else {
+            // Phone doesn't have country code, use as is
+            processedStudent.phone = phoneStr;
+          }
+        } else if (phoneStr.startsWith('+')) {
+          // No stored country code but phone has one, extract it
+          const match = phoneStr.match(/^(\+\d{1,4})/);
+          if (match) {
+            processedStudent.countryCode = match[1];
+            processedStudent.phone = phoneStr.substring(match[1].length).trim();
+          } else {
+            // Couldn't extract, use default
+            processedStudent.countryCode = '+1';
+            processedStudent.phone = phoneStr;
+          }
+        } else {
+          // No country code anywhere, use default
+          processedStudent.countryCode = '+1';
+          processedStudent.phone = phoneStr;
+        }
+      } else {
+        // No phone at all, just set default country code
+        processedStudent.countryCode = processedStudent.countryCode || '+1';
+      }
+      
+      setStudentData(processedStudent);
     } else {
       setStudentData({
         firstName: "",
@@ -114,7 +162,8 @@ export const useStudentForm = (
         courseName: "",
         level: "beginner",
         paymentStatus: "pending",
-        teacherId: ""
+        teacherId: "",
+        countryCode: "+1"
       });
       setPassword("defaultPassword123");
       setCreatePassword(true);
@@ -134,13 +183,96 @@ export const useStudentForm = (
       return;
     }
     
+    // Validate parent information for kids
+    if (studentData.ageGroup === "kid") {
+      if (!studentData.parentInfo?.name || 
+          !studentData.parentInfo?.phone || 
+          !studentData.parentInfo?.email || 
+          !studentData.parentInfo?.relationship) {
+        toast.error("Parent information is required for kids");
+        return;
+      }
+      
+      // Validate parent email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(studentData.parentInfo.email)) {
+        toast.error("Please enter a valid parent email address");
+        return;
+      }
+    }
+    
     const studentPassword = password || "defaultPassword123";
     
     try {
       setSaving(true);
       
       if (isEditMode) {
+        if (!student?.id) {
+          toast.error("Student ID is missing");
+          setSaving(false);
+          return;
+        }
+        
+        // Build update payload
+        const updatePayload: any = {
+          first_name: studentData.firstName,
+          last_name: studentData.lastName,
+          email: studentData.email,
+          course_name: studentData.courseName,
+          lesson_type: studentData.lessonType,
+          age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
+          level: studentData.level === 'beginner' ? 'Beginner' : 
+            studentData.level === 'intermediate' ? 'Intermediate' : 
+            studentData.level === 'advanced' ? 'Advanced' : 
+            studentData.level === 'fluent' ? 'Fluent' : 'Beginner',
+          teacher_id: studentData.teacherId
+        };
+        
+        // Add phone with country code if provided (combine them like in create)
+        if (studentData.phone && studentData.phone.trim() !== '') {
+          // Remove any existing plus sign from the phone number
+          const cleanPhone = studentData.phone.replace(/^\+/, '').trim();
+          // If the phone already includes country code, use as is, otherwise combine
+          if (cleanPhone.startsWith(studentData.countryCode?.replace('+', ''))) {
+            updatePayload.phone = `+${cleanPhone}`;
+          } else {
+            updatePayload.phone = `${studentData.countryCode || '+1'}${cleanPhone}`;
+          }
+        }
+        // Store country code separately for UI display
+        if (studentData.countryCode) {
+          updatePayload.countryCode = studentData.countryCode;
+        }
+        
+        // Add parent information if this is a kid
+        if (studentData.ageGroup === 'kid' && studentData.parentInfo) {
+          updatePayload.parent_info = studentData.parentInfo;
+        }
+        
+        toast.loading("Updating student...");
+        
+        await updateStudent(student.id, updatePayload);
+        
+        toast.dismiss();
         toast.success(`${studentData.firstName} ${studentData.lastName} updated successfully`);
+        
+        // Invalidate queries to refresh the data
+        await queryClient.invalidateQueries({ queryKey: ['students'] });
+        await queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
+        await queryClient.invalidateQueries({ queryKey: ['student', student.id] });
+        await queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+        await queryClient.invalidateQueries({ queryKey: ['sessions'] });
+        
+        // Call onStudentAdded with updated data to refresh the list
+        if (onStudentAdded) {
+          const updatedStudent: Student = {
+            ...student,
+            ...studentData,
+            phone: updatePayload.phone, // Use the formatted phone from the payload
+            countryCode: updatePayload.countryCode || studentData.countryCode
+          };
+          onStudentAdded(updatedStudent);
+        }
       } else {
         const userData = getUserData();
         
@@ -193,9 +325,30 @@ export const useStudentForm = (
             studentData.level === 'advanced' ? 'Advanced' : 'Beginner'
         };
         
-        // Only add phone if it has a value
+        // Add phone with country code if provided
         if (studentData.phone && studentData.phone.trim() !== '') {
-          studentPayload.phone = studentData.phone;
+          // Remove any existing plus sign from the phone number
+          const cleanPhone = studentData.phone.replace(/^\+/, '').trim();
+          // If the phone already includes country code, use as is, otherwise combine
+          if (cleanPhone.startsWith(studentData.countryCode?.replace('+', ''))) {
+            studentPayload.phone = `+${cleanPhone}`;
+          } else {
+            studentPayload.phone = `${studentData.countryCode || '+1'}${cleanPhone}`;
+          }
+        }
+        // Store country code separately for UI display
+        if (studentData.countryCode) {
+          studentPayload.countryCode = studentData.countryCode;
+        }
+        
+        // Add parent information if this is a kid
+        if (studentData.ageGroup === 'kid' && studentData.parentInfo) {
+          studentPayload.parent_info = {
+            name: studentData.parentInfo.name,
+            relationship: studentData.parentInfo.relationship,
+            phone: `${studentData.parentInfo.countryCode}${studentData.parentInfo.phone.replace(/^\+?[0-9]*/, '')}`,
+            email: studentData.parentInfo.email
+          };
         }
         
         const response = await createStudent(studentPayload);
@@ -223,15 +376,21 @@ export const useStudentForm = (
             paymentStatus: "pending",
             teacherId: selectedTeacherId,
             lessonsCompleted: 0,
-            nextLesson: 'Not scheduled'
+            nextLesson: 'Not scheduled',
+            phone: studentData.phone,
+            countryCode: studentData.countryCode,
+            parentInfo: studentData.parentInfo
           };
           onStudentAdded(newStudent);
         }
       }
       
-      if (onClose) {
-        onClose();
-      }
+      // Wait a bit for queries to invalidate before closing
+      setTimeout(() => {
+        if (onClose) {
+          onClose();
+        }
+      }, 100);
     } catch (error) {
       console.error("Error saving student:", error);
       toast.error("An error occurred while saving the student");

@@ -122,13 +122,15 @@ const Students = () => {
       ageGroup: (data.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
       level: (data.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
       phone: data.phone,
+      countryCode: data.countryCode || data.country_code || '',
       paymentStatus: (data.payment_status || 'pending') as 'paid' | 'pending' | 'overdue',
       teacherId: data.teacher_id,
       lessonsCompleted: data.lessons_count || 0,
       nextLesson: formatNextSession(data.next_session_date),
       nextPaymentDate: data.next_payment_date,
       nextPaymentAmount: data.next_payment_amount,
-      subscriptionProgress: data.subscription_progress || '0/0'
+      subscriptionProgress: data.subscription_progress || '0/0',
+      parentInfo: data.parent_info || data.parentInfo || null
     };
     
     return mappedStudent;
@@ -335,15 +337,21 @@ const Students = () => {
     }
   };
   
-  const handleStudentAdded = (newStudent: Student) => {
-    toast.success(`Student ${newStudent.firstName} ${newStudent.lastName} added successfully`);
+  const handleStudentAdded = async (newStudent: Student) => {
+    // Don't show duplicate toast for updates (already shown in useStudentForm)
+    if (!isEditMode) {
+      toast.success(`Student ${newStudent.firstName} ${newStudent.lastName} added successfully`);
+    }
     
-    refetchStudents();
+    // Invalidate all related queries immediately
+    await queryClient.invalidateQueries({ queryKey: ['students'] });
+    await queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
     
-    setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ['students'] });
-      refetchStudents();
-    }, 1000);
+    // Refetch students data
+    await refetchStudents();
+    
+    // Close the dialog
+    handleCloseDialog();
   };
   
   const handleForceRefresh = () => {

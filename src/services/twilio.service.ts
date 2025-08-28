@@ -16,6 +16,8 @@ import {
 import { db } from '@/config/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/config/firebase';
+import { notificationLogsService } from './notificationLogs.service';
+import { NotificationLog as NotificationLogType } from '@/types/notificationLog.types';
 
 interface TwilioConfig {
   accountSid: string;
@@ -232,15 +234,18 @@ class TwilioService {
         isTest: true
       });
       
-      // Log the test message
-      await this.logNotification(schoolId, {
-        recipientId: 'test',
+      // Log the test message using the new service
+      await notificationLogsService.createLog({
+        schoolId,
+        recipientName: 'Test Recipient',
         recipientPhone: params.phone,
-        type: 'test',
+        recipientType: 'student',
+        notificationType: 'custom',
         channel: params.channel,
         status: 'sent',
         message: params.message,
-        sentAt: Timestamp.now()
+        sentAt: new Date(),
+        retryCount: 0
       });
       
       return result.data as any;
@@ -303,15 +308,22 @@ class TwilioService {
           notificationType: type
         });
         
-        // Log notification
-        await this.logNotification(schoolId, {
-          recipientId: studentId,
+        // Log notification using the new service
+        await notificationLogsService.createLog({
+          schoolId,
+          recipientName: variables.studentName || 'Unknown',
           recipientPhone: phone,
-          type,
+          recipientType: 'student',
+          notificationType: type as any,
           channel,
           status: 'sent',
           message,
-          sentAt: Timestamp.now()
+          sentAt: new Date(),
+          retryCount: 0,
+          metadata: {
+            studentId,
+            variables
+          }
         });
       }
     } catch (error) {
@@ -359,31 +371,6 @@ class TwilioService {
     }
   }
   
-  /**
-   * Get notification logs
-   */
-  async getNotificationLogs(
-    schoolId: string,
-    limit: number = 100
-  ): Promise<NotificationLog[]> {
-    try {
-      const q = query(
-        collection(db, this.logsCollection),
-        where('schoolId', '==', schoolId),
-        orderBy('sentAt', 'desc'),
-        limit(limit)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as NotificationLog[];
-    } catch (error) {
-      console.error('Error fetching notification logs:', error);
-      return [];
-    }
-  }
   
   /**
    * Schedule bulk notifications (for Cloud Functions)
@@ -412,20 +399,6 @@ class TwilioService {
   
   // Private helper methods
   
-  private async logNotification(
-    schoolId: string,
-    log: NotificationLog
-  ): Promise<void> {
-    try {
-      await addDoc(collection(db, this.logsCollection), {
-        ...log,
-        schoolId,
-        createdAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error logging notification:', error);
-    }
-  }
   
   private async getNotificationSettingByType(
     schoolId: string,
