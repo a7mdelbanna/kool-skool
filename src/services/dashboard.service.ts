@@ -465,7 +465,7 @@ class DashboardService {
           nextLesson: nextSession ? 
             format(new Date(nextSession.scheduled_date), 'MMM d, h:mm a') : 
             'No upcoming lesson',
-          paymentStatus: activeSubscription?.payment_status || 'not paid',
+          paymentStatus: activeSubscription?.payment_status || 'overdue',
           nextPaymentDate: activeSubscription?.next_payment_date || ''
         });
       }

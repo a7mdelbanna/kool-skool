@@ -213,7 +213,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
       let nextSessionDate = null;
       let nextPaymentDate = null;
       let nextPaymentAmount = null;
-      let paymentStatus = 'not paid'; // Default payment status
+      let paymentStatus = 'overdue'; // Default payment status
       
       try {
         // Get active subscriptions for this student
@@ -315,11 +315,12 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
             } else if (paymentPercentage > 0) {
               paymentStatus = 'partial';
             } else {
-              paymentStatus = 'not paid';
+              paymentStatus = 'overdue';
             }
             
-            // Check if payment is overdue based on next payment date
-            if (earliestNextPayment && new Date(earliestNextPayment) < new Date() && paymentPercentage < 100) {
+            // Keep overdue status for unpaid or check if partially paid is late
+            if (paymentStatus === 'partial' && earliestNextPayment && new Date(earliestNextPayment) < new Date()) {
+              // If partially paid but payment date has passed, keep it as overdue
               paymentStatus = 'overdue';
             }
           }
