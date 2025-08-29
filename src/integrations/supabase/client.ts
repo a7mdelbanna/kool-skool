@@ -213,6 +213,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
       let nextSessionDate = null;
       let nextPaymentDate = null;
       let nextPaymentAmount = null;
+      let nextPaymentCurrency = null;
       let paymentStatus = 'overdue'; // Default payment status
       
       try {
@@ -231,6 +232,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
           let earliestNextSession = null;
           let earliestNextPayment = null;
           let nextPaymentAmt = 0;
+          let nextPaymentCurr = null;
           let totalPaid = 0;
           let totalPrice = 0;
           
@@ -300,6 +302,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
                     if (!earliestNextPayment || nextPayment < earliestNextPayment) {
                       earliestNextPayment = nextPayment;
                       nextPaymentAmt = subscription.price_per_session || subscription.total_price || 0;
+                      nextPaymentCurr = subscription.currency || 'USD';
                     }
                   }
                 }
@@ -329,6 +332,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
           nextSessionDate = earliestNextSession ? earliestNextSession.toISOString() : null;
           nextPaymentDate = earliestNextPayment ? earliestNextPayment.toISOString() : null;
           nextPaymentAmount = nextPaymentAmt;
+          nextPaymentCurrency = nextPaymentCurr;
         }
       } catch (error) {
         console.error('Error fetching subscription data for student:', student.id, error);
@@ -354,6 +358,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         next_session_date: nextSessionDate,
         next_payment_date: nextPaymentDate,
         next_payment_amount: nextPaymentAmount,
+        next_payment_currency: nextPaymentCurrency,
         subscription_progress: subscriptionProgress,
         user_id: student.userId || '',
         parent_info: student.parentInfo || student.parent_info || null

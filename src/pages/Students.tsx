@@ -129,6 +129,7 @@ const Students = () => {
       nextLesson: formatNextSession(data.next_session_date),
       nextPaymentDate: data.next_payment_date,
       nextPaymentAmount: data.next_payment_amount,
+      nextPaymentCurrency: data.next_payment_currency,
       subscriptionProgress: data.subscription_progress || '0/0',
       parentInfo: data.parent_info || data.parentInfo || null
     };

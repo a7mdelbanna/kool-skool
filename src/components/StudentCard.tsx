@@ -35,6 +35,7 @@ export interface Student {
   nextLesson?: string;
   nextPaymentDate?: string;
   nextPaymentAmount?: number;
+  nextPaymentCurrency?: string;
   subscriptionProgress?: string;
   parentInfo?: ParentInfo;
 }
@@ -113,15 +114,62 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     };
   };
 
+  // Currency symbol mapping
+  const getCurrencySymbol = (currency: string | undefined): string => {
+    const symbols: { [key: string]: string } = {
+      'USD': '$',
+      'EUR': '€',
+      'GBP': '£',
+      'RUB': '₽',
+      'CNY': '¥',
+      'JPY': '¥',
+      'INR': '₹',
+      'KRW': '₩',
+      'BRL': 'R$',
+      'CAD': 'C$',
+      'AUD': 'A$',
+      'CHF': 'Fr',
+      'SEK': 'kr',
+      'NOK': 'kr',
+      'DKK': 'kr',
+      'PLN': 'zł',
+      'TRY': '₺',
+      'MXN': '$',
+      'AED': 'د.إ',
+      'SAR': 'ر.س',
+      'EGP': '£',
+      'THB': '฿',
+      'SGD': 'S$',
+      'MYR': 'RM',
+      'PHP': '₱',
+      'IDR': 'Rp',
+      'VND': '₫',
+      'HKD': 'HK$',
+      'TWD': 'NT$',
+      'ILS': '₪',
+      'ZAR': 'R',
+      'NGN': '₦',
+      'KES': 'KSh',
+      'UAH': '₴',
+      'CZK': 'Kč',
+      'HUF': 'Ft',
+      'RON': 'lei'
+    };
+    
+    if (!currency) return '$'; // Default to USD
+    return symbols[currency.toUpperCase()] || currency + ' '; // Fallback to currency code + space
+  };
+
   // ... keep existing code (formatNextPayment function)
-  const formatNextPayment = (dateStr: string | null | undefined, amount: number | null | undefined): string => {
+  const formatNextPayment = (dateStr: string | null | undefined, amount: number | null | undefined, currency?: string): string => {
     if (!dateStr || !amount) return 'Not scheduled';
     
     const date = new Date(dateStr);
     const now = new Date();
     const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     
-    const formattedAmount = `$${amount.toFixed(0)}`;
+    const currencySymbol = getCurrencySymbol(currency);
+    const formattedAmount = `${currencySymbol}${amount.toFixed(0)}`;
     
     if (diffDays === 0) return `${formattedAmount} - Today`;
     if (diffDays === 1) return `${formattedAmount} - Tomorrow`;
@@ -250,7 +298,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
             <CreditCard className="h-4 w-4 text-primary" />
             <div className="text-xs">
               <p className="text-muted-foreground">Next Payment</p>
-              <p className="font-medium">{formatNextPayment(student.nextPaymentDate, student.nextPaymentAmount)}</p>
+              <p className="font-medium">{formatNextPayment(student.nextPaymentDate, student.nextPaymentAmount, student.nextPaymentCurrency)}</p>
             </div>
           </div>
         </div>
