@@ -123,7 +123,7 @@ const Students = () => {
       level: data.level || '',
       phone: data.phone,
       countryCode: data.countryCode || data.country_code || '',
-      paymentStatus: (data.payment_status || 'pending') as 'paid' | 'partial' | 'pending' | 'overdue',
+      paymentStatus: (data.payment_status || 'not paid') as 'paid' | 'partial' | 'not paid' | 'overdue',
       teacherId: data.teacher_id,
       lessonsCompleted: data.lessons_count || 0,
       nextLesson: formatNextSession(data.next_session_date),
@@ -593,10 +593,10 @@ const Students = () => {
             Paid
             <Badge variant="secondary">{students.filter(s => s.paymentStatus === 'paid').length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pending" className="gap-2">
-            <span className="h-2 w-2 rounded-full bg-yellow-500" />
-            Pending
-            <Badge variant="secondary">{students.filter(s => s.paymentStatus === 'pending').length}</Badge>
+          <TabsTrigger value="not paid" className="gap-2">
+            <span className="h-2 w-2 rounded-full bg-gray-500" />
+            Not Paid
+            <Badge variant="secondary">{students.filter(s => s.paymentStatus === 'not paid').length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="overdue" className="gap-2">
             <span className="h-2 w-2 rounded-full bg-red-500" />

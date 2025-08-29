@@ -213,7 +213,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
       let nextSessionDate = null;
       let nextPaymentDate = null;
       let nextPaymentAmount = null;
-      let paymentStatus = 'pending'; // Default payment status
+      let paymentStatus = 'not paid'; // Default payment status
       
       try {
         // Get active subscriptions for this student
@@ -315,7 +315,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
             } else if (paymentPercentage > 0) {
               paymentStatus = 'partial';
             } else {
-              paymentStatus = 'pending';
+              paymentStatus = 'not paid';
             }
             
             // Check if payment is overdue based on next payment date

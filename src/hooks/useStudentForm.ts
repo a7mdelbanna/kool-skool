@@ -27,7 +27,7 @@ export const useStudentForm = (
     ageGroup: "adult",
     courseName: "",
     level: "",
-    paymentStatus: "pending",
+    paymentStatus: "not paid",
     teacherId: "",
     countryCode: "+1"
   });
@@ -165,7 +165,7 @@ export const useStudentForm = (
         ageGroup: "adult",
         courseName: "",
         level: "",
-        paymentStatus: "pending",
+        paymentStatus: "not paid",
         teacherId: "",
         countryCode: "+1"
       });
@@ -372,7 +372,7 @@ export const useStudentForm = (
             ageGroup: (studentData.ageGroup as 'adult' | 'kid') || 'adult',
             courseName: studentData.courseName as string,
             level: studentData.level || '',
-            paymentStatus: "pending",
+            paymentStatus: "not paid",
             teacherId: selectedTeacherId,
             lessonsCompleted: 0,
             nextLesson: 'Not scheduled',
