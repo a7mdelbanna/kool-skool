@@ -109,10 +109,9 @@ export const useStudentForm = (
       // If phone contains country code, separate them for the form
       let processedStudent = { ...student };
       
-      // Normalize the level to lowercase
-      if (processedStudent.level) {
-        processedStudent.level = processedStudent.level.toLowerCase();
-      }
+      // Keep the original level value (don't normalize to lowercase)
+      // This preserves custom levels like A1, A2, B1, etc.
+      console.log('Loading student with level:', student.level);
       
       // Process phone number if it exists
       if (student.phone) {
@@ -226,11 +225,7 @@ export const useStudentForm = (
           course_name: studentData.courseName,
           lesson_type: studentData.lessonType,
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
-          level: !studentData.level || studentData.level === '' ? 'Beginner' :
-            studentData.level === 'beginner' ? 'Beginner' : 
-            studentData.level === 'intermediate' ? 'Intermediate' : 
-            studentData.level === 'advanced' ? 'Advanced' : 
-            studentData.level === 'fluent' ? 'Fluent' : 'Beginner',
+          level: studentData.level || '', // Keep levels exactly as selected
           teacher_id: studentData.teacherId
         };
         
@@ -325,12 +320,8 @@ export const useStudentForm = (
           lesson_type: studentData.lessonType || 'individual',
           // Fix: Send capitalized age group values to match database constraint
           age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
-          // Fix: Send capitalized level values to match database constraint
-          level: !studentData.level || studentData.level === '' ? 'Beginner' :
-            studentData.level === 'beginner' ? 'Beginner' : 
-            studentData.level === 'intermediate' ? 'Intermediate' : 
-            studentData.level === 'advanced' ? 'Advanced' : 
-            studentData.level === 'fluent' ? 'Fluent' : 'Beginner'
+          // Keep level exactly as selected from dropdown
+          level: studentData.level || ''
         };
         
         // Add phone with country code if provided
@@ -380,7 +371,7 @@ export const useStudentForm = (
             lessonType: (studentData.lessonType as 'individual' | 'group') || 'individual',
             ageGroup: (studentData.ageGroup as 'adult' | 'kid') || 'adult',
             courseName: studentData.courseName as string,
-            level: (studentData.level as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
+            level: studentData.level || '',
             paymentStatus: "pending",
             teacherId: selectedTeacherId,
             lessonsCompleted: 0,

@@ -460,7 +460,7 @@ class DashboardService {
           courseName: student.course_name || 'No course',
           lessonType: activeSubscription?.subscription_type === 'group' ? 'group' : 'individual',
           ageGroup: student.age_group || 'adult',
-          level: student.level || 'beginner',
+          level: student.level || '',
           lessonsCompleted: completedSessions,
           nextLesson: nextSession ? 
             format(new Date(nextSession.scheduled_date), 'MMM d, h:mm a') : 

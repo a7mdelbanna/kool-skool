@@ -120,7 +120,7 @@ const Students = () => {
       courseName: data.course_name || '',
       lessonType: (data.lesson_type as 'individual' | 'group') || 'individual',
       ageGroup: (data.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
-      level: (data.level?.toLowerCase() as 'beginner' | 'intermediate' | 'advanced' | 'fluent') || 'beginner',
+      level: data.level || '',
       phone: data.phone,
       countryCode: data.countryCode || data.country_code || '',
       paymentStatus: (data.payment_status || 'pending') as 'paid' | 'pending' | 'overdue',

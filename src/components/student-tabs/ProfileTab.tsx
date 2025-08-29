@@ -59,36 +59,35 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   const user = userData ? JSON.parse(userData) : null;
   const schoolId = user?.schoolId;
 
-  // Default student levels with colors
-  const defaultStudentLevels = [
-    { id: '1', name: 'Beginner', color: '#3B82F6', sort_order: 1 },
-    { id: '2', name: 'Intermediate', color: '#8B5CF6', sort_order: 2 },
-    { id: '3', name: 'Advanced', color: '#F97316', sort_order: 3 },
-    { id: '4', name: 'Fluent', color: '#10B981', sort_order: 4 },
-  ];
-
-  // Fetch student levels from the database (or use defaults)
-  const { data: studentLevels = defaultStudentLevels, isLoading: levelsLoading } = useQuery({
+  // Fetch student levels from the database
+  const { data: studentLevels = [], isLoading: levelsLoading } = useQuery({
     queryKey: ['student-levels', schoolId],
     queryFn: async () => {
-      if (!schoolId) return defaultStudentLevels;
+      if (!schoolId) return [];
 
       try {
         const { data, error } = await supabase
           .from('student_levels')
           .select('*')
           .eq('school_id', schoolId)
+          .eq('is_active', true)
           .order('sort_order', { ascending: true });
 
         if (error) {
-          console.log('Using default student levels');
-          return defaultStudentLevels;
+          console.error('Error fetching student levels:', error);
+          return [];
         }
         
-        return data && data.length > 0 ? data : defaultStudentLevels;
+        // Return only database levels, no defaults
+        const levels = data || [];
+        
+        console.log('Fetched levels from database:', levels);
+        console.log('Current student level:', studentData.level);
+        
+        return levels;
       } catch (error) {
-        console.log('Using default student levels');
-        return defaultStudentLevels;
+        console.error('Error fetching student levels:', error);
+        return [];
       }
     },
     enabled: !!schoolId,
@@ -311,14 +310,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="level">Level*</Label>
+            <Label htmlFor="level">Level{studentLevels.length > 0 ? '*' : ''}</Label>
             {levelsLoading ? (
               <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
                 Loading levels...
               </div>
             ) : studentLevels.length > 0 ? (
               <Select
-                value={studentData.level?.toLowerCase() || ""}
+                value={studentData.level || ""}
                 onValueChange={(value) => handleInputChange("level", value)}
                 disabled={isViewMode}
               >
@@ -326,8 +325,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                   <SelectValue placeholder="Select a level" />
                 </SelectTrigger>
                 <SelectContent>
-                  {studentLevels.map((level: StudentLevel) => (
-                    <SelectItem key={level.id} value={level.name.toLowerCase()}>
+                  {studentLevels.map((level: any) => (
+                    <SelectItem key={level.id} value={level.name}>
                       <div className="flex items-center gap-2">
                         <div
                           className="w-3 h-3 rounded-full"
@@ -359,7 +358,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                         variant="outline"
                         size="sm"
                         className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-100"
-                        onClick={() => window.location.href = '/settings?tab=levels'}
+                        onClick={() => window.location.href = '/settings/academic'}
                       >
                         Add Levels
                       </Button>

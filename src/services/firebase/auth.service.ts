@@ -49,7 +49,7 @@ export interface CreateUserData {
 export interface StudentData {
   birthday?: Date;
   ageGroup?: 'child' | 'teen' | 'adult';
-  level?: 'beginner' | 'intermediate' | 'advanced';
+  level?: string;
   phone?: string;
   whatsapp?: string;
   telegram?: string;

@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ParentInfo {
   name: string;
@@ -23,7 +25,7 @@ export interface Student {
   lessonType: 'individual' | 'group';
   ageGroup: 'adult' | 'kid';
   courseName: string;
-  level: 'beginner' | 'intermediate' | 'advanced' | 'fluent';
+  level: string; // Allow any string to support custom levels like A1, A2, B1, etc.
   phone?: string;
   countryCode?: string;
   paymentStatus: 'paid' | 'pending' | 'overdue';
@@ -64,20 +66,49 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     }
   };
 
-  // ... keep existing code (getLevelColor function)
-  const getLevelColor = (level: Student['level']) => {
-    switch (level) {
-      case 'beginner':
-        return 'bg-blue-100 text-blue-800';
-      case 'intermediate':
-        return 'bg-purple-100 text-purple-800';
-      case 'advanced':
-        return 'bg-orange-100 text-orange-800';
-      case 'fluent':
-        return 'bg-green-100 text-green-800';
-      default:
-        return '';
+  // Get current user's school ID for fetching levels
+  const userData = localStorage.getItem('user');
+  const user = userData ? JSON.parse(userData) : null;
+  const schoolId = user?.schoolId;
+
+  // Fetch student levels from the database to get colors
+  const { data: studentLevels = [] } = useQuery({
+    queryKey: ['student-levels', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+
+      const { data, error } = await supabase
+        .from('student_levels')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching student levels:', error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Get level style object for dynamic colors
+  const getLevelStyle = (levelName: string | undefined) => {
+    if (!levelName) return {};
+    
+    const level = studentLevels.find((l: any) => l.name === levelName);
+    if (level && level.color) {
+      return {
+        backgroundColor: `${level.color}20`, // Add transparency
+        color: level.color,
+        borderColor: level.color
+      };
     }
+    return {
+      backgroundColor: '#F3F4F6',
+      color: '#6B7280'
+    };
   };
 
   // ... keep existing code (formatNextPayment function)
@@ -160,9 +191,15 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
             </div>
             <p className="text-sm text-muted-foreground truncate">{student.email || 'No email'}</p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <Badge variant="outline" className={cn("text-xs", getLevelColor(student.level))}>
-                {student.level || 'beginner'}
-              </Badge>
+              {student.level && (
+                <Badge 
+                  variant="outline" 
+                  className="text-xs"
+                  style={getLevelStyle(student.level)}
+                >
+                  {student.level}
+                </Badge>
+              )}
               <Badge variant="outline" className="text-xs bg-secondary">
                 {student.lessonType || 'individual'}
               </Badge>

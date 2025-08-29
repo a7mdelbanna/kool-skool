@@ -22,7 +22,7 @@ export interface StudentRecord {
   course_name: string;
   lesson_type: 'individual' | 'group';
   age_group: 'adult' | 'kid' | 'Adult' | 'Kid';
-  level: 'beginner' | 'intermediate' | 'advanced' | 'fluent' | 'Beginner' | 'Intermediate' | 'Advanced' | 'Fluent';
+  level: string; // Allow any string to support custom levels like A1, A2, B1, etc.
   teacher_id?: string;
   school_id?: string;
   payment_status?: 'paid' | 'pending' | 'overdue';
@@ -219,7 +219,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         course_name: student.courseName || '',
         lesson_type: student.lessonType || 'individual',
         age_group: student.ageGroup || 'adult',
-        level: student.level || 'beginner',
+        level: student.level || '',
         teacher_id: student.teacherId || '',
         teacher_first_name: teacherFirstName,
         teacher_last_name: teacherLastName,
