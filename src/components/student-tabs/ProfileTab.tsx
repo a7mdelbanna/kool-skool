@@ -251,61 +251,73 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           
           <div className="space-y-2">
             <Label>Lesson Type*</Label>
-            <div className="flex space-x-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="individual"
-                  name="lessonType"
-                  value="individual"
-                  checked={studentData.lessonType === "individual"}
-                  onChange={(e) => handleInputChange("lessonType", e.target.value)}
-                  disabled={isViewMode}
-                />
-                <Label htmlFor="individual">Individual</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="group"
-                  name="lessonType"
-                  value="group"
-                  checked={studentData.lessonType === "group"}
-                  onChange={(e) => handleInputChange("lessonType", e.target.value)}
-                  disabled={isViewMode}
-                />
-                <Label htmlFor="group">Group</Label>
-              </div>
+            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => handleInputChange("lessonType", "individual")}
+                disabled={isViewMode}
+                className={`
+                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.lessonType === "individual" 
+                    ? "bg-white text-blue-600 shadow-sm" 
+                    : "text-gray-600 hover:text-gray-900"
+                  }
+                  ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
+                `}
+              >
+                Individual
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInputChange("lessonType", "group")}
+                disabled={isViewMode}
+                className={`
+                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.lessonType === "group" 
+                    ? "bg-white text-blue-600 shadow-sm" 
+                    : "text-gray-600 hover:text-gray-900"
+                  }
+                  ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
+                `}
+              >
+                Group
+              </button>
             </div>
           </div>
           
           <div className="space-y-2">
             <Label>Age Group*</Label>
-            <div className="flex space-x-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="adult"
-                  name="ageGroup"
-                  value="adult"
-                  checked={studentData.ageGroup === "adult"}
-                  onChange={(e) => handleInputChange("ageGroup", e.target.value)}
-                  disabled={isViewMode}
-                />
-                <Label htmlFor="adult">Adult</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="kid"
-                  name="ageGroup"
-                  value="kid"
-                  checked={studentData.ageGroup === "kid"}
-                  onChange={(e) => handleInputChange("ageGroup", e.target.value)}
-                  disabled={isViewMode}
-                />
-                <Label htmlFor="kid">Kid</Label>
-              </div>
+            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => handleInputChange("ageGroup", "adult")}
+                disabled={isViewMode}
+                className={`
+                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.ageGroup === "adult" 
+                    ? "bg-white text-blue-600 shadow-sm" 
+                    : "text-gray-600 hover:text-gray-900"
+                  }
+                  ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
+                `}
+              >
+                Adult
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInputChange("ageGroup", "kid")}
+                disabled={isViewMode}
+                className={`
+                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.ageGroup === "kid" 
+                    ? "bg-white text-blue-600 shadow-sm" 
+                    : "text-gray-600 hover:text-gray-900"
+                  }
+                  ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
+                `}
+              >
+                Kid
+              </button>
             </div>
           </div>
           
