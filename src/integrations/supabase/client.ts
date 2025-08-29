@@ -193,7 +193,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
       where: [{ field: 'schoolId', operator: '==', value: schoolId }]
     });
     
-    // Enrich with user data
+    // Enrich with user data and subscription info
     const enrichedStudents = await Promise.all(students.map(async (student: any) => {
       const user = await databaseService.getById('users', student.userId);
       
@@ -206,6 +206,95 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
           teacherFirstName = teacher.firstName || '';
           teacherLastName = teacher.lastName || '';
         }
+      }
+      
+      // Fetch active subscriptions for progress calculation
+      let subscriptionProgress = '0/0';
+      let nextSessionDate = null;
+      let nextPaymentDate = null;
+      let nextPaymentAmount = null;
+      
+      try {
+        // Get active subscriptions for this student
+        const subscriptions = await databaseService.query('subscriptions', {
+          where: [
+            { field: 'student_id', operator: '==', value: student.id },
+            { field: 'status', operator: '==', value: 'active' }
+          ]
+        });
+        
+        if (subscriptions && subscriptions.length > 0) {
+          // Calculate total progress across all active subscriptions
+          let totalCompleted = 0;
+          let totalSessions = 0;
+          let earliestNextSession = null;
+          let earliestNextPayment = null;
+          let nextPaymentAmt = 0;
+          
+          for (const subscription of subscriptions) {
+            // Get sessions for this subscription
+            const sessions = await databaseService.query('sessions', {
+              where: [
+                { field: 'subscription_id', operator: '==', value: subscription.id }
+              ]
+            });
+            
+            if (sessions) {
+              // Count completed sessions
+              const completedSessions = sessions.filter((s: any) => s.status === 'attended').length;
+              const totalSessionCount = sessions.filter((s: any) => s.status !== 'cancelled').length;
+              
+              totalCompleted += completedSessions;
+              totalSessions += subscription.session_count || totalSessionCount;
+              
+              // Find next scheduled session
+              const upcomingSessions = sessions
+                .filter((s: any) => s.status === 'scheduled' && new Date(s.scheduled_date) > new Date())
+                .sort((a: any, b: any) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+              
+              if (upcomingSessions.length > 0) {
+                const nextSession = new Date(upcomingSessions[0].scheduled_date);
+                if (!earliestNextSession || nextSession < earliestNextSession) {
+                  earliestNextSession = nextSession;
+                }
+              }
+              
+              // Calculate next payment based on last session
+              const lastScheduledSession = sessions
+                .filter((s: any) => s.scheduled_date)
+                .sort((a: any, b: any) => new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime())[0];
+              
+              if (lastScheduledSession && subscription.schedule) {
+                const schedule = Array.isArray(subscription.schedule) ? subscription.schedule[0] : subscription.schedule;
+                if (schedule && schedule.day) {
+                  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                  const targetDayIndex = daysOfWeek.indexOf(schedule.day);
+                  
+                  if (targetDayIndex !== -1) {
+                    let nextPayment = new Date(lastScheduledSession.scheduled_date);
+                    nextPayment.setDate(nextPayment.getDate() + 1);
+                    
+                    while (nextPayment.getDay() !== targetDayIndex) {
+                      nextPayment.setDate(nextPayment.getDate() + 1);
+                    }
+                    
+                    if (!earliestNextPayment || nextPayment < earliestNextPayment) {
+                      earliestNextPayment = nextPayment;
+                      nextPaymentAmt = subscription.price_per_session || subscription.total_price || 0;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          subscriptionProgress = `${totalCompleted}/${totalSessions}`;
+          nextSessionDate = earliestNextSession ? earliestNextSession.toISOString() : null;
+          nextPaymentDate = earliestNextPayment ? earliestNextPayment.toISOString() : null;
+          nextPaymentAmount = nextPaymentAmt;
+        }
+      } catch (error) {
+        console.error('Error fetching subscription data for student:', student.id, error);
       }
       
       // Map the fields correctly for the UI
@@ -225,10 +314,10 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         teacher_last_name: teacherLastName,
         payment_status: student.paymentStatus || 'pending',
         lessons_count: student.totalLessonsTaken || 0,
-        next_session_date: student.nextSessionDate || null,
-        next_payment_date: student.nextPaymentDate || null,
-        next_payment_amount: student.nextPaymentAmount || null,
-        subscription_progress: student.subscriptionProgress || '0/0',
+        next_session_date: nextSessionDate,
+        next_payment_date: nextPaymentDate,
+        next_payment_amount: nextPaymentAmount,
+        subscription_progress: subscriptionProgress,
         user_id: student.userId || '',
         parent_info: student.parentInfo || student.parent_info || null
       };
