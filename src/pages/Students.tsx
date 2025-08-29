@@ -123,7 +123,7 @@ const Students = () => {
       level: data.level || '',
       phone: data.phone,
       countryCode: data.countryCode || data.country_code || '',
-      paymentStatus: (data.payment_status || 'pending') as 'paid' | 'pending' | 'overdue',
+      paymentStatus: (data.payment_status || 'pending') as 'paid' | 'partial' | 'pending' | 'overdue',
       teacherId: data.teacher_id,
       lessonsCompleted: data.lessons_count || 0,
       nextLesson: formatNextSession(data.next_session_date),

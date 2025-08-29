@@ -213,6 +213,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
       let nextSessionDate = null;
       let nextPaymentDate = null;
       let nextPaymentAmount = null;
+      let paymentStatus = 'pending'; // Default payment status
       
       try {
         // Get active subscriptions for this student
@@ -230,6 +231,8 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
           let earliestNextSession = null;
           let earliestNextPayment = null;
           let nextPaymentAmt = 0;
+          let totalPaid = 0;
+          let totalPrice = 0;
           
           for (const subscription of subscriptions) {
             // Get sessions for this subscription
@@ -238,6 +241,22 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
                 { field: 'subscription_id', operator: '==', value: subscription.id }
               ]
             });
+            
+            // Fetch payments for this subscription to calculate payment status
+            try {
+              const transactions = await databaseService.query('transactions', {
+                where: [
+                  { field: 'subscription_id', operator: '==', value: subscription.id },
+                  { field: 'type', operator: '==', value: 'income' }
+                ]
+              });
+              
+              const subscriptionPaid = transactions ? transactions.reduce((sum: number, t: any) => sum + (t.amount || 0), 0) : 0;
+              totalPaid += subscriptionPaid;
+              totalPrice += subscription.total_price || 0;
+            } catch (error) {
+              console.error('Error fetching payments for subscription:', subscription.id, error);
+            }
             
             if (sessions) {
               // Count completed sessions
@@ -288,6 +307,23 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
             }
           }
           
+          // Calculate payment status based on total payments
+          if (totalPrice > 0) {
+            const paymentPercentage = (totalPaid / totalPrice) * 100;
+            if (paymentPercentage >= 100) {
+              paymentStatus = 'paid';
+            } else if (paymentPercentage > 0) {
+              paymentStatus = 'partial';
+            } else {
+              paymentStatus = 'pending';
+            }
+            
+            // Check if payment is overdue based on next payment date
+            if (earliestNextPayment && new Date(earliestNextPayment) < new Date() && paymentPercentage < 100) {
+              paymentStatus = 'overdue';
+            }
+          }
+          
           subscriptionProgress = `${totalCompleted}/${totalSessions}`;
           nextSessionDate = earliestNextSession ? earliestNextSession.toISOString() : null;
           nextPaymentDate = earliestNextPayment ? earliestNextPayment.toISOString() : null;
@@ -312,7 +348,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         teacher_id: student.teacherId || '',
         teacher_first_name: teacherFirstName,
         teacher_last_name: teacherLastName,
-        payment_status: student.paymentStatus || 'pending',
+        payment_status: paymentStatus, // Use calculated payment status
         lessons_count: student.totalLessonsTaken || 0,
         next_session_date: nextSessionDate,
         next_payment_date: nextPaymentDate,

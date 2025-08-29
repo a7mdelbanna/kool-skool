@@ -28,7 +28,7 @@ export interface Student {
   level: string; // Allow any string to support custom levels like A1, A2, B1, etc.
   phone?: string;
   countryCode?: string;
-  paymentStatus: 'paid' | 'pending' | 'overdue';
+  paymentStatus: 'paid' | 'partial' | 'pending' | 'overdue';
   teacherId?: string;
   image?: string;
   lessonsCompleted?: number;
@@ -57,8 +57,10 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
     switch (status) {
       case 'paid':
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending':
+      case 'partial':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'pending':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
       case 'overdue':
         return 'bg-red-100 text-red-800 border-red-200';
       default:
