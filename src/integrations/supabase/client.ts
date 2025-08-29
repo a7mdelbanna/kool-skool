@@ -237,6 +237,11 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
           let totalPrice = 0;
           
           for (const subscription of subscriptions) {
+            // Add subscription session count even if no sessions exist yet
+            if (subscription.session_count && subscription.session_count > 0) {
+              totalSessions += subscription.session_count;
+            }
+            
             // Get sessions for this subscription
             const sessions = await databaseService.query('sessions', {
               where: [
@@ -261,12 +266,21 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
             }
             
             if (sessions) {
-              // Count completed sessions
+              // Count completed sessions (attended status)
               const completedSessions = sessions.filter((s: any) => s.status === 'attended').length;
-              const totalSessionCount = sessions.filter((s: any) => s.status !== 'cancelled').length;
-              
               totalCompleted += completedSessions;
-              totalSessions += subscription.session_count || totalSessionCount;
+              
+              // If we didn't already add session_count above (for subscriptions without sessions yet)
+              if (!subscription.session_count || subscription.session_count === 0) {
+                // Use actual session count if subscription doesn't have session_count set
+                totalSessions += sessions.length;
+              }
+              
+              console.log(`Subscription ${subscription.id} progress:`, {
+                completedSessions,
+                totalSessionsForSub: subscription.session_count || sessions.length,
+                actualSessions: sessions.length
+              });
               
               // Find next scheduled session
               const upcomingSessions = sessions
