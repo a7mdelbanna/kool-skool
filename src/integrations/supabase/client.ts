@@ -247,10 +247,39 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
                 // Use the pre-calculated sessions_completed from RPC - THIS WORKS PERFECTLY DON'T CHANGE
                 totalCompleted += rpcSub.sessions_completed || 0;
                 totalSessions += rpcSub.session_count || 0;
-                
-                // Use total_paid from RPC for accurate payment status
-                totalPaid += rpcSub.total_paid || 0;
                 totalPrice += rpcSub.total_price || 0;
+                
+                // Calculate total_paid manually like SubscriptionsTab does
+                let subscriptionPaid = 0;
+                
+                try {
+                  // Get payments from student_payments table
+                  const { data: studentPayments, error: studentPaymentsError } = await supabase
+                    .from('student_payments')
+                    .select('amount')
+                    .eq('student_id', student.id);
+                  
+                  const studentPaymentTotal = (studentPayments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
+                  
+                  // Get transaction payments for this subscription
+                  let transactionPaymentTotal = 0;
+                  try {
+                    const transactions = await databaseService.query('transactions', {
+                      where: [
+                        { field: 'subscription_id', operator: '==', value: rpcSub.id },
+                        { field: 'type', operator: '==', value: 'income' }
+                      ]
+                    });
+                    transactionPaymentTotal = (transactions || []).reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+                  } catch (error) {
+                    console.error('Error fetching transaction payments:', error);
+                  }
+                  
+                  subscriptionPaid = studentPaymentTotal + transactionPaymentTotal;
+                  totalPaid += subscriptionPaid;
+                } catch (error) {
+                  console.error('Error calculating payments for subscription:', rpcSub.id, error);
+                }
                 
                 // Fetch sessions for this subscription to find next scheduled session
                 try {
@@ -354,12 +383,6 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
                   paymentStatus = 'overdue';
                 }
               }
-              
-              console.log(`Student ${student.id} progress from RPC:`, {
-                totalCompleted,
-                totalSessions,
-                subscriptionProgress
-              });
             } else {
               // Fallback to manual calculation if RPC fails
               console.log('RPC failed, falling back to manual calculation');
