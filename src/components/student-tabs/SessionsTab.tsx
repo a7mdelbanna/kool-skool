@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 import { 
   Calendar, 
   Clock, 
@@ -12,7 +13,9 @@ import {
   Check,
   XCircle,
   RefreshCcw,
-  CalendarClock
+  CalendarClock,
+  Eye,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
@@ -101,6 +104,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [selectedSession, setSelectedSession] = React.useState<DatabaseSession | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = React.useState(false);
@@ -535,18 +539,38 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     }
   };
 
+  const handleOpenSessionDetails = (sessionId: string, event?: React.MouseEvent) => {
+    // Check if we're in a modal context by looking for dialog elements
+    const isInModal = document.querySelector('[role="dialog"]') !== null;
+    
+    if (isInModal) {
+      // Open in new tab when inside a modal to avoid closing the modal
+      if (event) {
+        event.stopPropagation();
+      }
+      window.open(`/session/${sessionId}`, '_blank');
+    } else {
+      // Navigate normally when not in a modal
+      navigate(`/session/${sessionId}`);
+    }
+  };
+
   const renderSession = (session: DatabaseSession) => (
     <div
       key={session.id}
       className={cn(
-        "border rounded-md p-4 mb-3",
+        "border rounded-md p-4 mb-3 relative group transition-colors hover:border-primary/50",
         (session.status === "cancelled" || !session.counts_toward_completion) && "bg-muted/30"
       )}
     >
       <div className="flex flex-wrap justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">
+        <div className="flex-1">
+          <div 
+            className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+            onClick={(e) => handleOpenSessionDetails(session.id, e)}
+            title="Click to view session details (opens in new tab)"
+          >
+            <span className="font-medium underline-offset-4 hover:underline decoration-primary/50">
               {format(new Date(session.scheduled_date), "EEEE, MMMM d, yyyy")}
             </span>
             {session.index_in_sub && (
@@ -566,6 +590,16 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs font-medium border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
+            onClick={(e) => handleOpenSessionDetails(session.id, e)}
+            title="View session details (opens in new tab)"
+          >
+            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            Details
+          </Button>
           {getStatusBadge(session)}
           {getPaymentBadge(session)}
         </div>

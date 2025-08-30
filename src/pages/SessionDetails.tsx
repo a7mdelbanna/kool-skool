@@ -25,6 +25,7 @@ import SessionAttachments from '@/components/session-details/SessionAttachments'
 
 import { sessionDetailsService, SessionDetails } from '@/services/firebase/sessionDetails.service';
 import { todosService } from '@/services/firebase/todos.service';
+import { studentsService } from '@/services/firebase/students.service';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SessionInfo {
@@ -74,21 +75,7 @@ const SessionDetailsPage: React.FC = () => {
       // Load session info from Supabase
       const { data: sessionData, error: sessionError } = await supabase
         .from('lesson_sessions')
-        .select(`
-          *,
-          students:student_id (
-            id,
-            first_name,
-            last_name,
-            course_name,
-            level,
-            teacher_id
-          ),
-          subscriptions:subscription_id (
-            id,
-            course_id
-          )
-        `)
+        .select('*')
         .eq('id', sessionId)
         .single();
       
@@ -98,8 +85,37 @@ const SessionDetailsPage: React.FC = () => {
         return;
       }
       
+      // Load student data from Firebase
+      let studentName = 'Unknown';
+      let courseName = '';
+      let level = '';
+      let teacherId = '';
+      let teacherName = '';
+      
+      if (sessionData.student_id) {
+        const studentData = await studentsService.getById(sessionData.student_id);
+        if (studentData) {
+          studentName = `${studentData.firstName} ${studentData.lastName}`;
+          courseName = studentData.courseName || '';
+          level = studentData.level || '';
+          teacherId = studentData.teacherId || '';
+          
+          // Get teacher name if available
+          if (studentData.teacherId) {
+            const { data: teacherData } = await supabase
+              .from('users')
+              .select('first_name, last_name')
+              .eq('id', studentData.teacherId)
+              .single();
+            
+            if (teacherData) {
+              teacherName = `${teacherData.first_name} ${teacherData.last_name}`;
+            }
+          }
+        }
+      }
+      
       // Format session info
-      const student = sessionData.students;
       const sessionInfoData: SessionInfo = {
         id: sessionData.id,
         scheduled_date: sessionData.scheduled_date,
@@ -107,24 +123,12 @@ const SessionDetailsPage: React.FC = () => {
         status: sessionData.status,
         student_id: sessionData.student_id,
         subscription_id: sessionData.subscription_id,
-        student_name: student ? `${student.first_name} ${student.last_name}` : 'Unknown',
-        course_name: student?.course_name,
-        level: student?.level,
-        teacher_id: student?.teacher_id
+        student_name: studentName,
+        course_name: courseName,
+        level: level,
+        teacher_id: teacherId,
+        teacher_name: teacherName
       };
-      
-      // Get teacher name if available
-      if (student?.teacher_id) {
-        const { data: teacherData } = await supabase
-          .from('users')
-          .select('first_name, last_name')
-          .eq('id', student.teacher_id)
-          .single();
-        
-        if (teacherData) {
-          sessionInfoData.teacher_name = `${teacherData.first_name} ${teacherData.last_name}`;
-        }
-      }
       
       setSessionInfo(sessionInfoData);
       
@@ -285,14 +289,14 @@ const SessionDetailsPage: React.FC = () => {
               <BookOpen className="h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Course</p>
-                <p className="font-medium">
-                  {sessionInfo.course_name}
+                <div className="font-medium flex items-center gap-2">
+                  <span>{sessionInfo.course_name}</span>
                   {sessionInfo.level && (
-                    <Badge variant="outline" className="ml-2">
+                    <Badge variant="outline">
                       {sessionInfo.level}
                     </Badge>
                   )}
-                </p>
+                </div>
               </div>
             </div>
             
