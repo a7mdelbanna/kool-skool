@@ -96,7 +96,7 @@ const SessionTodos: React.FC<SessionTodosProps> = ({
         session_id: sessionId,
         student_id: studentId,
         teacher_id: teacherId,
-        school_id: userData.school_id || ''
+        school_id: userData.schoolId || ''
       };
 
       const todoId = await todosService.create(newTodo);

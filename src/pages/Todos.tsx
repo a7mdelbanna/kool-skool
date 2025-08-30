@@ -34,7 +34,8 @@ import {
   ChevronRight,
   User,
   BookOpen,
-  Target
+  Target,
+  RefreshCcw
 } from 'lucide-react';
 import { format, addDays, startOfWeek, endOfWeek, isAfter, isBefore } from 'date-fns';
 import { toast } from 'sonner';
@@ -47,6 +48,7 @@ import {
   TodoFilter
 } from '@/services/firebase/todos.service';
 import { supabase } from '@/integrations/supabase/client';
+import { fixTodosWithoutSchoolId } from '@/utils/fixTodosSchoolId';
 
 const TodosPage: React.FC = () => {
   const { user } = useContext(UserContext);
@@ -70,6 +72,7 @@ const TodosPage: React.FC = () => {
     notes: '',
     student_id: ''
   });
+  const [showMigrationButton, setShowMigrationButton] = useState(false);
 
   // Statistics
   const [stats, setStats] = useState({
@@ -163,6 +166,14 @@ const TodosPage: React.FC = () => {
       }
       
       console.log('Loaded TODOs count:', todosList.length);
+      
+      // Show migration button if no TODOs found and user is admin
+      if (todosList.length === 0 && (user.role === 'admin' || user.role === 'superadmin')) {
+        setShowMigrationButton(true);
+      } else {
+        setShowMigrationButton(false);
+      }
+      
       setTodos(todosList);
       calculateStats(todosList);
     } catch (error) {
@@ -334,6 +345,30 @@ const TodosPage: React.FC = () => {
     } catch (error) {
       console.error('Error updating TODO status:', error);
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleFixTodosSchoolId = async () => {
+    if (!user || !user.schoolId) {
+      toast.error('Unable to fix TODOs: School information missing');
+      return;
+    }
+    
+    try {
+      const toastId = toast.loading('Fixing TODOs school_id...');
+      const result = await fixTodosWithoutSchoolId(user.schoolId);
+      
+      toast.dismiss(toastId);
+      if (result.success) {
+        toast.success(`Fixed ${result.count} TODOs with school_id`);
+        // Reload TODOs after fixing
+        await loadTodos();
+      } else {
+        toast.error('Failed to fix TODOs');
+      }
+    } catch (error) {
+      console.error('Error fixing TODOs:', error);
+      toast.error('An error occurred while fixing TODOs');
     }
   };
 
@@ -648,6 +683,21 @@ const TodosPage: React.FC = () => {
           ) : filteredTodos.length === 0 ? (
             <Card className="p-12 text-center">
               <p className="text-muted-foreground">No TODOs found</p>
+              {showMigrationButton && (
+                <div className="mt-6">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    If you have existing TODOs that aren't showing up, they may need to be migrated.
+                  </p>
+                  <Button 
+                    onClick={handleFixTodosSchoolId}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <RefreshCcw className="h-4 w-4" />
+                    Fix Missing TODOs
+                  </Button>
+                </div>
+              )}
             </Card>
           ) : (
             <div className="space-y-3">
