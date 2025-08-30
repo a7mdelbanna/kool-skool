@@ -167,7 +167,12 @@ export const useStudentForm = (
         level: "",
         paymentStatus: "pending",
         teacherId: "",
-        countryCode: "+1"
+        countryCode: "+1",
+        socialLinks: [],
+        birthday: undefined,
+        teacherPreference: "any",
+        additionalNotes: "",
+        interests: []
       });
       setPassword("defaultPassword123");
       setCreatePassword(true);
@@ -248,6 +253,23 @@ export const useStudentForm = (
         // Add parent information if this is a kid
         if (studentData.ageGroup === 'kid' && studentData.parentInfo) {
           updatePayload.parent_info = studentData.parentInfo;
+        }
+        
+        // Add additional info fields
+        if (studentData.socialLinks) {
+          updatePayload.social_links = studentData.socialLinks;
+        }
+        if (studentData.birthday) {
+          updatePayload.birthday = studentData.birthday;
+        }
+        if (studentData.teacherPreference) {
+          updatePayload.teacher_preference = studentData.teacherPreference;
+        }
+        if (studentData.additionalNotes) {
+          updatePayload.additional_notes = studentData.additionalNotes;
+        }
+        if (studentData.interests) {
+          updatePayload.interests = studentData.interests;
         }
         
         toast.loading("Updating student...");
@@ -348,6 +370,23 @@ export const useStudentForm = (
             phone: `${studentData.parentInfo.countryCode}${studentData.parentInfo.phone.replace(/^\+?[0-9]*/, '')}`,
             email: studentData.parentInfo.email
           };
+        }
+        
+        // Add additional info fields for new student
+        if (studentData.socialLinks) {
+          studentPayload.social_links = studentData.socialLinks;
+        }
+        if (studentData.birthday) {
+          studentPayload.birthday = studentData.birthday;
+        }
+        if (studentData.teacherPreference) {
+          studentPayload.teacher_preference = studentData.teacherPreference;
+        }
+        if (studentData.additionalNotes) {
+          studentPayload.additional_notes = studentData.additionalNotes;
+        }
+        if (studentData.interests) {
+          studentPayload.interests = studentData.interests;
         }
         
         const response = await createStudent(studentPayload);

@@ -532,7 +532,13 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         next_payment_currency: nextPaymentCurrency,
         subscription_progress: subscriptionProgress,
         user_id: student.userId || '',
-        parent_info: student.parentInfo || student.parent_info || null
+        parent_info: student.parentInfo || student.parent_info || null,
+        // Additional info fields
+        social_links: student.socialLinks || student.social_links || [],
+        birthday: student.birthday || null,
+        teacher_preference: student.teacherPreference || student.teacher_preference || 'any',
+        additional_notes: student.additionalNotes || student.additional_notes || '',
+        interests: student.interests || []
       };
     }));
     

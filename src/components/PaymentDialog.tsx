@@ -43,7 +43,7 @@ interface PaymentDialogProps {
 const PaymentDialog = ({ open, onOpenChange, payment, mode, onSuccess }: PaymentDialogProps) => {
   const queryClient = useQueryClient();
 
-  const [amount, setAmount] = useState<number>(0);
+  const [amount, setAmount] = useState<string>('');
   const [date, setDate] = useState<Date>(new Date());
   const [method, setMethod] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -138,7 +138,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode, onSuccess }: Payment
   // Initialize form when payment changes or dialog opens
   useEffect(() => {
     if (payment && mode === 'edit') {
-      setAmount(payment.amount);
+      setAmount(payment.amount?.toString() || '');
       setDate(new Date(payment.date));
       setMethod(payment.method);
       setNotes(payment.notes);
@@ -146,7 +146,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode, onSuccess }: Payment
       setSelectedStudentId(payment.student_id || '');
     } else {
       // Default values for add mode
-      setAmount(0);
+      setAmount('');
       setDate(new Date());
       setMethod('');
       setNotes('');
@@ -156,7 +156,8 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode, onSuccess }: Payment
   }, [payment, mode, open]);
 
   const handleSubmit = () => {
-    if (!amount || amount <= 0) {
+    const numericAmount = parseFloat(amount);
+    if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
       toast.error('Amount is required and must be greater than 0');
       return;
     }
@@ -168,7 +169,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode, onSuccess }: Payment
 
     const paymentData = {
       student_id: selectedStudentId,
-      amount,
+      amount: numericAmount,
       payment_date: format(date, 'yyyy-MM-dd'),
       payment_method: method || 'Cash',
       status,
@@ -229,7 +230,7 @@ const PaymentDialog = ({ open, onOpenChange, payment, mode, onSuccess }: Payment
                 id="amount"
                 type="number"
                 value={amount}
-                onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setAmount(e.target.value)}
                 className="pl-7"
                 placeholder="0.00"
                 required

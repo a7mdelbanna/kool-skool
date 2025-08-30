@@ -6,8 +6,9 @@ import ProfileTab from "../student-tabs/ProfileTab";
 import SubscriptionsTab from "../student-tabs/SubscriptionsTab";
 import PaymentsTab from "../student-tabs/PaymentsTab";
 import SessionsTab from "../student-tabs/SessionsTab";
+import AdditionalInfoTab from "../student-tabs/AdditionalInfoTab";
 import { Student } from "../StudentCard";
-import { User, CreditCard, Calendar, BookOpen } from "lucide-react";
+import { User, CreditCard, Calendar, BookOpen, Info } from "lucide-react";
 import { useStudentForm } from "@/hooks/useStudentForm";
 import { toast } from "sonner";
 
@@ -66,7 +67,7 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
   return (
     <>
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4">
-        <TabsList className="grid grid-cols-4 mb-6">
+        <TabsList className="grid grid-cols-5 mb-6">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             <span>Profile</span>
@@ -82,6 +83,10 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
           <TabsTrigger value="sessions" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
             <span>Sessions</span>
+          </TabsTrigger>
+          <TabsTrigger value="additional" className="flex items-center gap-2">
+            <Info className="h-4 w-4" />
+            <span>Additional</span>
           </TabsTrigger>
         </TabsList>
         
@@ -114,6 +119,14 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         
         <TabsContent value="sessions">
           <SessionsTab studentData={studentData} setStudentData={updateStudentData} isViewMode={false} />
+        </TabsContent>
+        
+        <TabsContent value="additional">
+          <AdditionalInfoTab 
+            studentData={studentData} 
+            setStudentData={updateStudentData} 
+            isViewMode={false}
+          />
         </TabsContent>
       </Tabs>
       

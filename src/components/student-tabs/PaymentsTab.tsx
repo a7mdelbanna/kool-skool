@@ -37,7 +37,7 @@ interface PaymentsTabProps {
 }
 
 const paymentSchema = z.object({
-  amount: z.coerce.number().min(0.01, { message: "Amount must be greater than 0" }),
+  amount: z.string().refine((val) => val !== '' && parseFloat(val) > 0, { message: "Amount must be greater than 0" }),
   date: z.date({ required_error: "Payment date is required" }),
   method: z.string().min(1, { message: "Payment method is required" }),
   notes: z.string().optional(),
@@ -61,7 +61,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      amount: 0,
+      amount: "",
       date: new Date(),
       method: "",
       notes: "",
@@ -211,7 +211,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       const { data: transactionData, error } = await supabase.rpc('create_transaction', {
         p_school_id: schoolId,
         p_type: 'income',
-        p_amount: data.amount,
+        p_amount: parseFloat(data.amount),
         p_currency: data.currency,
         p_transaction_date: format(data.date, 'yyyy-MM-dd'),
         p_description: `Student payment from ${studentData.firstName || 'Unknown'} ${studentData.lastName || 'Student'}`,
@@ -240,7 +240,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
       toast.success("Payment added successfully");
       form.reset({
-        amount: 0,
+        amount: "",
         date: new Date(),
         method: "",
         notes: "",
@@ -514,7 +514,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                             {selectedCurrency ? (selectedCurrency.symbol || selectedCurrency.currency_symbol) : ''}
                           </span>
-                          <Input type="number" min="0.01" step="0.01" className="pl-7" {...field} />
+                          <Input type="number" min="0.01" step="0.01" className="pl-7" placeholder="0.00" {...field} />
                         </div>
                       </FormControl>
                       <FormMessage />

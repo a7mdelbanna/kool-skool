@@ -59,7 +59,7 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
   // Form data
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [startDate, setStartDate] = useState('');
-  const [initialPaymentAmount, setInitialPaymentAmount] = useState(0);
+  const [initialPaymentAmount, setInitialPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [accountId, setAccountId] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
@@ -184,7 +184,8 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
       return;
     }
 
-    if (initialPaymentAmount > 0 && !accountId) {
+    const paymentAmount = parseFloat(initialPaymentAmount);
+    if (paymentAmount > 0 && !accountId) {
       toast({
         title: "Validation Error",
         description: "Please select an account for the initial payment.",
@@ -208,12 +209,12 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
       });
       
       // Create initial payment if amount provided
-      if (initialPaymentAmount > 0) {
+      if (paymentAmount > 0) {
         await databaseService.create('payments', {
           school_id: user.schoolId,
           student_id: selectedStudentId,
           group_id: group.id,
-          amount: initialPaymentAmount,
+          amount: paymentAmount,
           currency: group.currency,
           payment_date: new Date().toISOString().split('T')[0],
           payment_method: paymentMethod,
@@ -232,7 +233,7 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
       // Reset form
       setSelectedStudentId('');
       setStartDate('');
-      setInitialPaymentAmount(0);
+      setInitialPaymentAmount('');
       setPaymentMethod('Cash');
       setAccountId('');
       setPaymentNotes('');
@@ -345,7 +346,7 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
                     type="number"
                     step="0.01"
                     value={initialPaymentAmount}
-                    onChange={(e) => setInitialPaymentAmount(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setInitialPaymentAmount(e.target.value)}
                     placeholder="0.00"
                   />
                 </div>
@@ -367,7 +368,7 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
                 </div>
               </div>
 
-              {initialPaymentAmount > 0 && (
+              {parseFloat(initialPaymentAmount) > 0 && (
                 <div>
                   <Label htmlFor="account">Account ({group?.currency})</Label>
                   <Select value={accountId} onValueChange={setAccountId}>
@@ -421,8 +422,8 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
                   <p><strong>Email:</strong> {selectedStudent.email}</p>
                   {selectedStudent.phone && <p><strong>Phone:</strong> {selectedStudent.phone}</p>}
                   <p><strong>Start Date:</strong> {startDate || 'Not set'}</p>
-                  {initialPaymentAmount > 0 && (
-                    <p><strong>Initial Payment:</strong> {getSelectedCurrencySymbol()}{initialPaymentAmount.toFixed(2)}</p>
+                  {parseFloat(initialPaymentAmount) > 0 && (
+                    <p><strong>Initial Payment:</strong> {getSelectedCurrencySymbol()}{parseFloat(initialPaymentAmount).toFixed(2)}</p>
                   )}
                 </div>
               </CardContent>

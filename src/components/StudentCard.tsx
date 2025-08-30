@@ -17,6 +17,12 @@ export interface ParentInfo {
   email: string;
 }
 
+export interface SocialLink {
+  id: string;
+  platform: string;
+  url: string;
+}
+
 export interface Student {
   id: string;
   firstName: string;
@@ -38,6 +44,12 @@ export interface Student {
   nextPaymentCurrency?: string;
   subscriptionProgress?: string;
   parentInfo?: ParentInfo;
+  // Additional Info fields
+  socialLinks?: SocialLink[];
+  birthday?: string;
+  teacherPreference?: 'native' | 'russian' | 'any';
+  additionalNotes?: string;
+  interests?: string[];
 }
 
 interface StudentCardProps {

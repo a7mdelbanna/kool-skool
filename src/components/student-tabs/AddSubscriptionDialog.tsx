@@ -135,18 +135,18 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
   });
 
   const [formData, setFormData] = useState({
-    sessionCount: 4,
-    durationMonths: 1,
+    sessionCount: '',
+    durationMonths: '',
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
     priceMode: 'perSession' as 'perSession' | 'fixedPrice',
-    pricePerSession: 0,
-    fixedPrice: 0,
+    pricePerSession: '',
+    fixedPrice: '',
     currency: '',
     notes: '',
     status: 'active',
     initialPayment: {
-      amount: 0,
+      amount: '',
       method: 'Cash',
       notes: '',
       accountId: ''
@@ -171,18 +171,18 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
   useEffect(() => {
     if (open) {
       setFormData({
-        sessionCount: 4,
-        durationMonths: 1,
+        sessionCount: '',
+        durationMonths: '',
         startDate: undefined,
         schedule: [],
         priceMode: 'perSession',
-        pricePerSession: 0,
-        fixedPrice: 0,
+        pricePerSession: '',
+        fixedPrice: '',
         currency: currencies.length > 0 ? (currencies.find(c => c.is_default) || currencies[0]).code : '',
         notes: '',
         status: 'active',
         initialPayment: {
-          amount: 0,
+          amount: '',
           method: 'Cash',
           notes: '',
           accountId: ''
@@ -290,9 +290,12 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
   };
 
   const getTotalPrice = () => {
+    const pricePerSession = parseFloat(formData.pricePerSession) || 0;
+    const sessionCount = parseInt(formData.sessionCount) || 0;
+    const fixedPrice = parseFloat(formData.fixedPrice) || 0;
     return formData.priceMode === 'perSession' 
-      ? formData.pricePerSession * formData.sessionCount 
-      : formData.fixedPrice;
+      ? pricePerSession * sessionCount 
+      : fixedPrice;
   };
 
   const handleSubmit = async () => {
@@ -379,6 +382,14 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
     const subscriptionData = {
       ...formData,
+      sessionCount: parseInt(formData.sessionCount) || 0,
+      durationMonths: parseInt(formData.durationMonths) || 0,
+      pricePerSession: parseFloat(formData.pricePerSession) || 0,
+      fixedPrice: parseFloat(formData.fixedPrice) || 0,
+      initialPayment: {
+        ...formData.initialPayment,
+        amount: parseFloat(formData.initialPayment.amount) || 0
+      },
       totalPrice: getTotalPrice()
     };
 
@@ -408,7 +419,8 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                     type="number" 
                     id="sessionCount" 
                     value={formData.sessionCount} 
-                    onChange={(e) => setFormData({ ...formData, sessionCount: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, sessionCount: e.target.value })}
+                    placeholder="4"
                     className="mt-1"
                   />
                 </div>
@@ -418,7 +430,8 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                     type="number" 
                     id="durationMonths" 
                     value={formData.durationMonths} 
-                    onChange={(e) => setFormData({ ...formData, durationMonths: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, durationMonths: e.target.value })}
+                    placeholder="1"
                     className="mt-1"
                   />
                 </div>
@@ -575,7 +588,8 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                       type="number" 
                       id="pricePerSession" 
                       value={formData.pricePerSession} 
-                      onChange={(e) => setFormData({ ...formData, pricePerSession: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setFormData({ ...formData, pricePerSession: e.target.value })}
+                      placeholder="0.00"
                       className="mt-1"
                       step="0.01"
                     />
@@ -596,7 +610,8 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                       type="number" 
                       id="fixedPrice" 
                       value={formData.fixedPrice} 
-                      onChange={(e) => setFormData({ ...formData, fixedPrice: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setFormData({ ...formData, fixedPrice: e.target.value })}
+                      placeholder="0.00"
                       className="mt-1"
                       step="0.01"
                     />
@@ -636,9 +651,10 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                         ...formData, 
                         initialPayment: { 
                           ...formData.initialPayment, 
-                          amount: parseFloat(e.target.value) || 0 
+                          amount: e.target.value 
                         } 
                       })}
+                      placeholder="0.00"
                       className="mt-1"
                       step="0.01"
                     />

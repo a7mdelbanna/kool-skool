@@ -43,7 +43,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
   const { addExpense, updateExpense, expenseCategories, accounts } = usePayments();
   const { toast } = useToast();
 
-  const [amount, setAmount] = useState<number>(0);
+  const [amount, setAmount] = useState<string>('');
   const [date, setDate] = useState<Date>(new Date());
   const [category, setCategory] = useState<string>('');
   const [name, setName] = useState<string>('');
@@ -55,7 +55,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
   // Initialize form when expense changes or dialog opens
   useEffect(() => {
     if (expense && mode === 'edit') {
-      setAmount(expense.amount);
+      setAmount(expense.amount?.toString() || '');
       setDate(new Date(expense.date));
       setCategory(expense.category);
       setName(expense.name);
@@ -65,7 +65,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
       setAccountId(expense.accountId || '');
     } else {
       // Default values for add mode
-      setAmount(0);
+      setAmount('');
       setDate(new Date());
       setCategory('');
       setName('');
@@ -77,10 +77,11 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
   }, [expense, mode, open]);
 
   const handleSubmit = () => {
-    if (!amount) {
+    const numericAmount = parseFloat(amount);
+    if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
       toast({
         title: "Error",
-        description: "Amount is required",
+        description: "Amount is required and must be greater than 0",
         variant: "destructive",
       });
       return;
@@ -105,7 +106,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
     }
 
     const expenseData = {
-      amount,
+      amount: numericAmount,
       date,
       category,
       name,
@@ -119,13 +120,13 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
       addExpense(expenseData as Required<typeof expenseData>);
       toast({
         title: "Expense added",
-        description: `Expense of $${amount} has been added.`,
+        description: `Expense of $${numericAmount} has been added.`,
       });
     } else if (expense) {
       updateExpense(expense.id, expenseData);
       toast({
         title: "Expense updated",
-        description: `Expense of $${amount} has been updated.`,
+        description: `Expense of $${numericAmount} has been updated.`,
       });
     }
 
@@ -163,7 +164,7 @@ const ExpenseDialog = ({ open, onOpenChange, expense, mode }: ExpenseDialogProps
                 id="amount"
                 type="number"
                 value={amount}
-                onChange={(e) => setAmount(parseFloat(e.target.value))}
+                onChange={(e) => setAmount(e.target.value)}
                 className="pl-7"
                 placeholder="0.00"
                 required

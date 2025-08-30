@@ -131,7 +131,13 @@ const Students = () => {
       nextPaymentAmount: data.next_payment_amount,
       nextPaymentCurrency: data.next_payment_currency,
       subscriptionProgress: data.subscription_progress || '0/0',
-      parentInfo: data.parent_info || data.parentInfo || null
+      parentInfo: data.parent_info || data.parentInfo || null,
+      // Additional Info fields
+      socialLinks: data.social_links || data.socialLinks || [],
+      birthday: data.birthday,
+      teacherPreference: data.teacher_preference || data.teacherPreference,
+      additionalNotes: data.additional_notes || data.additionalNotes,
+      interests: data.interests || []
     };
     
     return mappedStudent;

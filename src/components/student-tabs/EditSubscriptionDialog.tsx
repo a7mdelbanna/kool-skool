@@ -187,18 +187,18 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   });
 
   const [formData, setFormData] = useState({
-    sessionCount: 4,
-    durationMonths: 1,
+    sessionCount: '',
+    durationMonths: '',
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
     priceMode: 'perSession',
-    pricePerSession: 0,
-    fixedPrice: 0,
+    pricePerSession: '',
+    fixedPrice: '',
     currency: '',
     notes: '',
     status: 'active',
     initialPayment: {
-      amount: 0,
+      amount: '',
       method: 'Cash',
       notes: '',
       accountId: ''
@@ -238,18 +238,18 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       }
 
       setFormData({
-        sessionCount: subscription.session_count,
-        durationMonths: subscription.duration_months,
+        sessionCount: subscription.session_count?.toString() || '',
+        durationMonths: subscription.duration_months?.toString() || '',
         startDate: subscription.start_date ? new Date(subscription.start_date) : undefined,
         schedule: parsedSchedule,
         priceMode: subscription.price_mode,
-        pricePerSession: subscription.price_per_session || 0,
-        fixedPrice: subscription.fixed_price || 0,
+        pricePerSession: subscription.price_per_session?.toString() || '',
+        fixedPrice: subscription.fixed_price?.toString() || '',
         currency: subscription.currency,
         notes: subscription.notes || '',
         status: subscription.status,
         initialPayment: {
-          amount: initialPaymentData?.amount || 0,
+          amount: initialPaymentData?.amount?.toString() || '',
           method: initialPaymentData?.payment_method || 'Cash',
           notes: initialPaymentData?.notes || '',
           accountId: initialPaymentData?.to_account_id || ''
@@ -358,9 +358,12 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   };
 
   const getTotalPrice = () => {
+    const pricePerSession = parseFloat(formData.pricePerSession) || 0;
+    const sessionCount = parseInt(formData.sessionCount) || 0;
+    const fixedPrice = parseFloat(formData.fixedPrice) || 0;
     return formData.priceMode === 'perSession' 
-      ? formData.pricePerSession * formData.sessionCount 
-      : formData.fixedPrice;
+      ? pricePerSession * sessionCount 
+      : fixedPrice;
   };
 
   const handleSubmit = async () => {
@@ -450,13 +453,13 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       // Pass the schedule as a JSONB array directly, not as a JSON string
       const { data, error } = await supabase.rpc('update_subscription_with_related_data', {
         p_subscription_id: subscription.id,
-        p_session_count: formData.sessionCount,
-        p_duration_months: formData.durationMonths,
+        p_session_count: parseInt(formData.sessionCount) || 0,
+        p_duration_months: parseInt(formData.durationMonths) || 0,
         p_start_date: formData.startDate.toISOString().split('T')[0],
         p_schedule: scheduleForDatabase, // Pass as array, not JSON string
         p_price_mode: formData.priceMode,
-        p_price_per_session: formData.priceMode === 'perSession' ? formData.pricePerSession : null,
-        p_fixed_price: formData.priceMode === 'fixedPrice' ? formData.fixedPrice : null,
+        p_price_per_session: formData.priceMode === 'perSession' ? parseFloat(formData.pricePerSession) || 0 : null,
+        p_fixed_price: formData.priceMode === 'fixedPrice' ? parseFloat(formData.fixedPrice) || 0 : null,
         p_total_price: getTotalPrice(),
         p_currency: formData.currency,
         p_notes: formData.notes,
@@ -520,7 +523,8 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                     type="number" 
                     id="sessionCount" 
                     value={formData.sessionCount} 
-                    onChange={(e) => setFormData({ ...formData, sessionCount: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, sessionCount: e.target.value })}
+                    placeholder="4"
                     className="mt-1"
                   />
                 </div>
@@ -530,7 +534,8 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                     type="number" 
                     id="durationMonths" 
                     value={formData.durationMonths} 
-                    onChange={(e) => setFormData({ ...formData, durationMonths: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, durationMonths: e.target.value })}
+                    placeholder="1"
                     className="mt-1"
                   />
                 </div>
@@ -680,7 +685,8 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                       type="number" 
                       id="pricePerSession" 
                       value={formData.pricePerSession} 
-                      onChange={(e) => setFormData({ ...formData, pricePerSession: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setFormData({ ...formData, pricePerSession: e.target.value })}
+                      placeholder="0.00"
                       className="mt-1"
                       step="0.01"
                     />
@@ -701,7 +707,8 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                       type="number" 
                       id="fixedPrice" 
                       value={formData.fixedPrice} 
-                      onChange={(e) => setFormData({ ...formData, fixedPrice: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setFormData({ ...formData, fixedPrice: e.target.value })}
+                      placeholder="0.00"
                       className="mt-1"
                       step="0.01"
                     />
@@ -741,9 +748,10 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                         ...formData, 
                         initialPayment: { 
                           ...formData.initialPayment, 
-                          amount: parseFloat(e.target.value) || 0 
+                          amount: e.target.value 
                         } 
                       })}
+                      placeholder="0.00"
                       className="mt-1"
                       step="0.01"
                     />

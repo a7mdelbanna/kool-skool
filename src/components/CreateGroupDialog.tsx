@@ -42,18 +42,18 @@ interface GroupFormData {
   description: string;
   course_id: string;
   teacher_id: string;
-  session_count: number;
-  session_duration_minutes: number;
+  session_count: string | number;
+  session_duration_minutes: string | number;
   schedule: ScheduleItem[];
   currency: string;
   price_mode: 'perSession' | 'total';
-  price_per_session: number;
-  total_price: number;
+  price_per_session: string | number;
+  total_price: string | number;
 }
 
 interface StudentPaymentDetails {
   start_date: string;
-  initial_payment_amount: number;
+  initial_payment_amount: string | number;
   payment_method: string;
   account_id: string;
   payment_notes: string;
@@ -96,13 +96,13 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     description: '',
     course_id: '',
     teacher_id: '',
-    session_count: 8,
-    session_duration_minutes: 60,
+    session_count: '',
+    session_duration_minutes: '',
     schedule: [],
     currency: 'RUB', // Default to RUB for now
     price_mode: 'total',
-    price_per_session: 0,
-    total_price: 0
+    price_per_session: '',
+    total_price: ''
   });
 
   // Students tab data
@@ -313,7 +313,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         email: student.email,
         paymentDetails: {
           start_date: '',
-          initial_payment_amount: 0,
+          initial_payment_amount: '',
           payment_method: 'Cash',
           account_id: '',
           payment_notes: ''
@@ -392,14 +392,19 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       console.log('Creating group...');
       
       // Prepare the group data with proper price handling
+      const sessionCount = parseInt(String(groupData.session_count)) || 0;
+      const sessionDuration = parseInt(String(groupData.session_duration_minutes)) || 60;
+      const pricePerSession = parseFloat(String(groupData.price_per_session)) || 0;
+      const totalPrice = parseFloat(String(groupData.total_price)) || 0;
+      
       const groupInsertData = {
         school_id: user.schoolId,
         name: groupData.name,
         description: groupData.description,
         course_id: groupData.course_id,
         teacher_id: groupData.teacher_id,
-        session_count: groupData.session_count,
-        session_duration_minutes: groupData.session_duration_minutes,
+        session_count: sessionCount,
+        session_duration_minutes: sessionDuration,
         schedule: groupData.schedule as any,
         currency: groupData.currency,
         price_mode: groupData.price_mode,
@@ -407,12 +412,12 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         // Handle price fields based on price_mode
         ...(groupData.price_mode === 'perSession' 
           ? { 
-              price_per_session: groupData.price_per_session,
-              total_price: groupData.price_per_session * groupData.session_count
+              price_per_session: pricePerSession,
+              total_price: pricePerSession * sessionCount
             }
           : { 
               price_per_session: null, // Set to null for total pricing mode
-              total_price: groupData.total_price
+              total_price: totalPrice
             }
         )
       };
@@ -463,12 +468,12 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
             course_name: selectedCourse?.name || 'Unknown',
             group_id: groupResult.id,
             group_name: groupData.name,
-            session_count: groupData.session_count,
-            session_duration: groupData.session_duration_minutes,
+            session_count: sessionCount,
+            session_duration: sessionDuration,
             schedule: groupData.schedule,
             price_mode: groupData.price_mode,
-            price_per_session: groupData.price_mode === 'perSession' ? groupData.price_per_session : null,
-            total_price: groupData.price_mode === 'total' ? groupData.total_price : groupData.price_per_session * groupData.session_count,
+            price_per_session: groupData.price_mode === 'perSession' ? pricePerSession : null,
+            total_price: groupData.price_mode === 'total' ? totalPrice : pricePerSession * sessionCount,
             status: 'active',
             start_date: student.paymentDetails.start_date || new Date().toISOString().split('T')[0],
             created_at: new Date().toISOString(),
@@ -479,7 +484,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
           console.log('Created subscription:', subscriptionId);
           
           // Generate sessions based on schedule
-          if (groupData.schedule.length > 0 && groupData.session_count > 0) {
+          if (groupData.schedule.length > 0 && sessionCount > 0) {
             console.log('Generating sessions for subscription:', subscriptionId);
             
             const startDate = new Date(student.paymentDetails.start_date || new Date());
@@ -498,7 +503,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
               }
               
               // Create sessions on the scheduled day of each week
-              for (let sessionNumber = 1; sessionNumber <= groupData.session_count; sessionNumber++) {
+              for (let sessionNumber = 1; sessionNumber <= sessionCount; sessionNumber++) {
                 const sessionData = {
                   subscription_id: subscriptionId,
                   student_id: student.id,
@@ -527,13 +532,14 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
           }
           
           // Create initial payment if amount provided
-          if (student.paymentDetails.initial_payment_amount > 0) {
+          const paymentAmount = parseFloat(String(student.paymentDetails.initial_payment_amount)) || 0;
+          if (paymentAmount > 0) {
             await databaseService.create('payments', {
               school_id: user.schoolId,
               student_id: student.id,
               group_id: groupResult.id,
               subscription_id: subscriptionId,
-              amount: student.paymentDetails.initial_payment_amount,
+              amount: paymentAmount,
               currency: groupData.currency,
               payment_date: new Date().toISOString().split('T')[0],
               payment_method: student.paymentDetails.payment_method || 'Cash',
@@ -689,7 +695,8 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                       id="session-count"
                       type="number"
                       value={groupData.session_count}
-                      onChange={(e) => setGroupData(prev => ({ ...prev, session_count: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => setGroupData(prev => ({ ...prev, session_count: e.target.value }))}
+                      placeholder="8"
                       min="1"
                     />
                   </div>
@@ -700,7 +707,8 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                       id="session-duration"
                       type="number"
                       value={groupData.session_duration_minutes}
-                      onChange={(e) => setGroupData(prev => ({ ...prev, session_duration_minutes: parseInt(e.target.value) || 60 }))}
+                      onChange={(e) => setGroupData(prev => ({ ...prev, session_duration_minutes: e.target.value }))}
+                      placeholder="60"
                       min="15"
                       max="480"
                       step="15"
@@ -833,13 +841,14 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                       step="0.01"
                       value={groupData.price_mode === 'perSession' ? groupData.price_per_session : groupData.total_price}
                       onChange={(e) => {
-                        const value = parseFloat(e.target.value) || 0;
+                        const value = e.target.value;
                         if (groupData.price_mode === 'perSession') {
                           setGroupData(prev => ({ ...prev, price_per_session: value }));
                         } else {
                           setGroupData(prev => ({ ...prev, total_price: value }));
                         }
                       }}
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
@@ -911,9 +920,9 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    {student.paymentDetails.initial_payment_amount > 0 && (
+                                    {parseFloat(String(student.paymentDetails.initial_payment_amount)) > 0 && (
                                       <Badge variant="outline">
-                                        {getSelectedCurrencySymbol()}{student.paymentDetails.initial_payment_amount}
+                                        {getSelectedCurrencySymbol()}{parseFloat(String(student.paymentDetails.initial_payment_amount)).toFixed(2)}
                                       </Badge>
                                     )}
                                     {student.isExpanded ? (
@@ -957,7 +966,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                                       type="number"
                                       step="0.01"
                                       value={student.paymentDetails.initial_payment_amount}
-                                      onChange={(e) => handleStudentPaymentChange(student.id, 'initial_payment_amount', parseFloat(e.target.value) || 0)}
+                                      onChange={(e) => handleStudentPaymentChange(student.id, 'initial_payment_amount', e.target.value)}
                                       placeholder="0.00"
                                     />
                                   </div>
