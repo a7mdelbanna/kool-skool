@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Dialog,
   DialogContent,
@@ -23,7 +24,8 @@ import {
   RefreshCcw,
   Check,
   X,
-  ArrowRight
+  ArrowRight,
+  FileText
 } from 'lucide-react';
 import { Session } from '@/contexts/PaymentContext';
 import { format } from 'date-fns';
@@ -66,6 +68,7 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
   onOpenChange,
   onSessionUpdate
 }) => {
+  const navigate = useNavigate();
   const [statusChangeOpen, setStatusChangeOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -277,6 +280,18 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
         
         <DialogFooter className="flex sm:justify-between gap-2 flex-wrap pt-2">
           <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-primary"
+              onClick={() => {
+                navigate(`/session/${session.id}`);
+                onOpenChange(false);
+              }}
+            >
+              <FileText className="h-3.5 w-3.5 mr-1.5" />
+              Session Details
+            </Button>
             <Button size="sm" variant="outline" className="text-muted-foreground">
               <Pencil className="h-3.5 w-3.5 mr-1.5" />
               Edit

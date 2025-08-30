@@ -118,6 +118,22 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
     
+    // Session Details Collection
+    match /session_details/{detailsId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+    
+    // TODOs Collection
+    match /todos/{todoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+    
     // Catch-all rule for any other collections
     match /{document=**} {
       allow read, write: if isAuthenticated();

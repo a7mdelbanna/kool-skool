@@ -26,6 +26,8 @@ import SchoolSettings from '@/pages/SchoolSettings';
 import AcademicSettings from '@/pages/AcademicSettings';
 import FinancialSettings from '@/pages/FinancialSettings';
 import NotificationSettings from '@/pages/NotificationSettings';
+import SessionDetails from '@/pages/SessionDetails';
+import Todos from '@/pages/Todos';
 
 const MainLayout = () => {
   return (
@@ -58,6 +60,8 @@ const MainLayout = () => {
                   <Route path="/settings/academic" element={<AcademicSettings />} />
                   <Route path="/settings/financial" element={<FinancialSettings />} />
                   <Route path="/settings/notifications" element={<NotificationSettings />} />
+                  <Route path="/session/:sessionId" element={<SessionDetails />} />
+                  <Route path="/todos" element={<Todos />} />
                 </Routes>
               </div>
             </div>
