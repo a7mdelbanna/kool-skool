@@ -8,9 +8,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Student, ParentInfo } from "../StudentCard";
 import { Course } from "@/integrations/supabase/client";
-import { Users, UserCheck } from "lucide-react";
+import { Users, UserCheck, Camera, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import CountryCodeSelector from "../CountryCodeSelector";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { toast } from "sonner";
+import { storageService } from "@/services/firebase/storage.service";
 
 interface Teacher {
   id: string;
@@ -53,6 +56,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   teachers = [],
   isLoading = false
 }) => {
+  const [uploadingImage, setUploadingImage] = React.useState(false);
   
   // Get current user's school ID for fetching levels
   const userData = localStorage.getItem('user');
@@ -121,8 +125,94 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     window.location.href = '/team-access';
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    
+    try {
+      // Upload to Firebase Storage
+      const fileName = `students/${studentData.id || Date.now()}_${file.name}`;
+      const downloadUrl = await storageService.uploadFile(file, fileName);
+      
+      // Update student data with image URL
+      setStudentData({ ...studentData, image: downloadUrl });
+      toast.success('Profile picture uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setStudentData({ ...studentData, image: undefined });
+    toast.success('Profile picture removed');
+  };
+
   return (
     <div className="space-y-6">
+      {/* Profile Picture Section */}
+      <div className="flex flex-col items-center space-y-4">
+        <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
+          <AvatarImage src={studentData.image} alt={`${studentData.firstName} ${studentData.lastName}`} />
+          <AvatarFallback className="bg-primary/10 text-primary text-3xl">
+            {`${studentData.firstName?.[0] || ''}${studentData.lastName?.[0] || ''}`}
+          </AvatarFallback>
+        </Avatar>
+        
+        {!isViewMode && (
+          <div className="flex gap-2">
+            <div className="relative">
+              <input
+                type="file"
+                id="image-upload"
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={uploadingImage}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById('image-upload')?.click()}
+                disabled={uploadingImage}
+                className="gap-2"
+              >
+                <Camera className="h-4 w-4" />
+                {uploadingImage ? 'Uploading...' : studentData.image ? 'Change Photo' : 'Upload Photo'}
+              </Button>
+            </div>
+            
+            {studentData.image && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRemoveImage}
+                className="gap-2 text-destructive hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+                Remove
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
         {/* Personal Information */}
         <div className="space-y-4">

@@ -137,7 +137,8 @@ const Students = () => {
       birthday: data.birthday,
       teacherPreference: data.teacher_preference || data.teacherPreference,
       additionalNotes: data.additional_notes || data.additionalNotes,
-      interests: data.interests || []
+      interests: data.interests || [],
+      image: data.image || data.profileImage || null
     };
     
     return mappedStudent;

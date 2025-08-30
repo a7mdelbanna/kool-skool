@@ -271,6 +271,10 @@ export const useStudentForm = (
         if (studentData.interests) {
           updatePayload.interests = studentData.interests;
         }
+        // Add image field
+        if (studentData.image !== undefined) {
+          updatePayload.image = studentData.image || null;
+        }
         
         toast.loading("Updating student...");
         
@@ -387,6 +391,10 @@ export const useStudentForm = (
         }
         if (studentData.interests) {
           studentPayload.interests = studentData.interests;
+        }
+        // Add image field for new student
+        if (studentData.image) {
+          studentPayload.image = studentData.image;
         }
         
         const response = await createStudent(studentPayload);

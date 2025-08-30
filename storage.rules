@@ -1,100 +1,25 @@
-rules_version = '2';
+rules_version = "2";
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
+    // Allow authenticated users to read/write files in the students folder
+    match /students/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.resource.size < 5 * 1024 * 1024  // Max 5MB
+        && request.resource.contentType.matches("image/.*"); // Only images
+      allow delete: if request.auth != null;
     }
     
-    function getUserRole() {
-      return request.auth.token.role;
+    // Allow authenticated users to manage their own profile pictures
+    match /profiles/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches("image/.*");
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
-    function getUserSchoolId() {
-      return request.auth.token.schoolId;
-    }
-    
-    function isSuperAdmin() {
-      return isAuthenticated() && getUserRole() == 'superadmin';
-    }
-    
-    function isSchoolStaff() {
-      return isAuthenticated() && 
-             (getUserRole() == 'admin' || getUserRole() == 'teacher');
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    function belongsToSchool(schoolId) {
-      return isAuthenticated() && getUserSchoolId() == schoolId;
-    }
-    
-    // School logos and assets
-    match /schools/{schoolId}/logo/{fileName} {
-      allow read: if belongsToSchool(schoolId) || isSuperAdmin();
-      allow write: if (belongsToSchool(schoolId) && getUserRole() == 'admin') || 
-                     isSuperAdmin();
-    }
-    
-    match /schools/{schoolId}/assets/{fileName} {
-      allow read: if belongsToSchool(schoolId) || isSuperAdmin();
-      allow write: if (belongsToSchool(schoolId) && isSchoolStaff()) || 
-                     isSuperAdmin();
-    }
-    
-    // User avatars
-    match /users/{userId}/avatar/{fileName} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(userId) || isSuperAdmin();
-    }
-    
-    // Student documents
-    match /schools/{schoolId}/students/{studentId}/documents/{fileName} {
-      allow read: if (belongsToSchool(schoolId) && isSchoolStaff()) || 
-                    isOwner(studentId) || 
-                    isSuperAdmin();
-      allow write: if (belongsToSchool(schoolId) && isSchoolStaff()) || 
-                     isSuperAdmin();
-    }
-    
-    // Course materials
-    match /schools/{schoolId}/courses/{courseId}/materials/{fileName} {
-      allow read: if belongsToSchool(schoolId) || isSuperAdmin();
-      allow write: if (belongsToSchool(schoolId) && isSchoolStaff()) || 
-                     isSuperAdmin();
-    }
-    
-    // Session attachments
-    match /schools/{schoolId}/sessions/{sessionId}/attachments/{fileName} {
-      allow read: if belongsToSchool(schoolId) || isSuperAdmin();
-      allow write: if (belongsToSchool(schoolId) && isSchoolStaff()) || 
-                     isSuperAdmin();
-    }
-    
-    // Transaction receipts
-    match /schools/{schoolId}/transactions/{transactionId}/receipts/{fileName} {
-      allow read: if (belongsToSchool(schoolId) && isSchoolStaff()) || 
-                    isSuperAdmin();
-      allow write: if (belongsToSchool(schoolId) && isSchoolStaff()) || 
-                     isSuperAdmin();
-    }
-    
-    // Temporary uploads (for processing)
-    match /temp/{userId}/{fileName} {
-      allow read, write: if isOwner(userId);
-      // Files in temp should be automatically deleted after 24 hours via lifecycle rules
-    }
-    
-    // Public assets (logos, etc. that can be viewed by anyone)
-    match /public/{allPaths=**} {
-      allow read: if true;
-      allow write: if isSuperAdmin();
-    }
-    
-    // Default deny all other paths
+    // Default: deny all other access
     match /{allPaths=**} {
       allow read, write: if false;
     }
