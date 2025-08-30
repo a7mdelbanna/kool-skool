@@ -126,10 +126,13 @@ const TodosPage: React.FC = () => {
         todosList = await todosService.getByTeacherId(user.id);
       } else if (user.role === 'admin' || user.role === 'superadmin') {
         // Load all TODOs for the school
-        const filter: TodoFilter = {
-          teacher_id: user.role === 'admin' ? undefined : user.id
-        };
-        todosList = await todosService.getWithFilters(filter);
+        if (user.school_id) {
+          todosList = await todosService.getBySchoolId(user.school_id);
+        } else {
+          console.error('User school_id is missing');
+          toast.error('Unable to load TODOs: school information missing');
+          return;
+        }
       }
       
       setTodos(todosList);

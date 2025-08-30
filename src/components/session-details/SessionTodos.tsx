@@ -20,6 +20,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   Plus, 
   Edit2, 
@@ -61,6 +71,8 @@ const SessionTodos: React.FC<SessionTodosProps> = ({
 }) => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [deletingTodoId, setDeletingTodoId] = useState<string | null>(null);
+  const [deletingTodoTitle, setDeletingTodoTitle] = useState<string>('');
   const [formData, setFormData] = useState<Partial<Todo>>({
     title: '',
     description: '',
@@ -115,17 +127,24 @@ const SessionTodos: React.FC<SessionTodosProps> = ({
     }
   };
 
-  const handleDeleteTodo = async (todoId: string) => {
-    if (!confirm('Are you sure you want to delete this TODO?')) return;
+  const handleDeleteTodo = async () => {
+    if (!deletingTodoId) return;
 
     try {
-      await todosService.delete(todoId);
-      onTodoDeleted(todoId);
+      await todosService.delete(deletingTodoId);
+      onTodoDeleted(deletingTodoId);
       toast.success('TODO deleted successfully');
+      setDeletingTodoId(null);
+      setDeletingTodoTitle('');
     } catch (error) {
       console.error('Error deleting TODO:', error);
       toast.error('Failed to delete TODO');
     }
+  };
+
+  const openDeleteDialog = (todoId: string, todoTitle: string) => {
+    setDeletingTodoId(todoId);
+    setDeletingTodoTitle(todoTitle);
   };
 
   const handleStatusChange = async (todo: Todo, newStatus: TodoStatus) => {
@@ -404,7 +423,7 @@ const SessionTodos: React.FC<SessionTodosProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDeleteTodo(todo.id!)}
+                    onClick={() => openDeleteDialog(todo.id!, todo.title)}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
@@ -550,6 +569,54 @@ const SessionTodos: React.FC<SessionTodosProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog 
+        open={!!deletingTodoId} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingTodoId(null);
+            setDeletingTodoTitle('');
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Delete TODO
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Are you sure you want to delete this TODO?</p>
+                {deletingTodoTitle && (
+                  <div className="p-3 bg-muted rounded-lg border">
+                    <div className="font-medium text-foreground flex items-center gap-2">
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      {deletingTodoTitle}
+                    </div>
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  This action cannot be undone. The TODO will be permanently removed from this session.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="hover:bg-muted">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteTodo}
+              className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete TODO
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

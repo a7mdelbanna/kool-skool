@@ -60,6 +60,7 @@ export interface Todo {
 }
 
 export interface TodoFilter {
+  school_id?: string;
   student_ids?: string[];
   teacher_id?: string;
   status?: TodoStatus[];
@@ -192,6 +193,9 @@ class TodosService {
       const constraints: QueryConstraint[] = [];
       
       // Add filters
+      if (filter.school_id) {
+        constraints.push(where('school_id', '==', filter.school_id));
+      }
       if (filter.student_ids && filter.student_ids.length > 0) {
         constraints.push(where('student_id', 'in', filter.student_ids));
       }
@@ -280,6 +284,27 @@ class TodosService {
     } catch (error) {
       console.error('Error getting TODOs by student:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get TODOs by school ID
+   */
+  async getBySchoolId(schoolId: string): Promise<Todo[]> {
+    try {
+      const q = query(
+        collection(db, this.collectionName),
+        where('school_id', '==', schoolId),
+        orderBy('due_date', 'asc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => 
+        this.formatTodo(doc.id, doc.data())
+      );
+    } catch (error) {
+      console.error('Error getting TODOs by school:', error);
+      return [];
     }
   }
 

@@ -153,6 +153,22 @@
         { "fieldPath": "teacherId", "order": "ASCENDING" },
         { "fieldPath": "firstName", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "todos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "school_id", "order": "ASCENDING" },
+        { "fieldPath": "due_date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "todos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "teacher_id", "order": "ASCENDING" },
+        { "fieldPath": "due_date", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
