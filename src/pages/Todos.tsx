@@ -90,20 +90,37 @@ const TodosPage: React.FC = () => {
   }, [selectedStudent, filterStatus, filterPriority, filterCategory, activeTab]);
 
   const loadData = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user found, skipping data load');
+      return;
+    }
+    
+    console.log('Loading data for user:', { 
+      id: user.id, 
+      role: user.role, 
+      schoolId: user.schoolId 
+    });
     
     try {
       setLoading(true);
       
-      // Load students
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('students')
-        .select('id, first_name, last_name')
-        .eq('school_id', user.school_id)
-        .order('first_name');
-      
-      if (studentsError) throw studentsError;
-      setStudents(studentsData || []);
+      // Load students only if schoolId exists
+      if (user.schoolId) {
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select('id, first_name, last_name')
+          .eq('school_id', user.schoolId)
+          .order('first_name');
+        
+        if (studentsError) {
+          console.error('Error loading students:', studentsError);
+        } else {
+          setStudents(studentsData || []);
+        }
+      } else {
+        console.warn('User has no schoolId, skipping student load');
+        setStudents([]);
+      }
       
       // Load TODOs
       await loadTodos();
@@ -116,30 +133,43 @@ const TodosPage: React.FC = () => {
   };
 
   const loadTodos = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user found, skipping TODOs load');
+      return;
+    }
+    
+    console.log('Loading TODOs for user role:', user.role);
     
     try {
       let todosList: Todo[] = [];
       
-      if (user.role === 'teacher') {
+      if (user.role === 'teacher' && user.id) {
         // Load TODOs for this teacher
+        console.log('Loading teacher TODOs for:', user.id);
         todosList = await todosService.getByTeacherId(user.id);
-      } else if (user.role === 'admin' || user.role === 'superadmin') {
+      } else if ((user.role === 'admin' || user.role === 'superadmin') && user.schoolId) {
         // Load all TODOs for the school
-        if (user.school_id) {
-          todosList = await todosService.getBySchoolId(user.school_id);
-        } else {
-          console.error('User school_id is missing');
-          toast.error('Unable to load TODOs: school information missing');
-          return;
-        }
+        console.log('Loading school TODOs for school:', user.schoolId);
+        todosList = await todosService.getBySchoolId(user.schoolId);
+      } else {
+        console.warn('Missing required user data:', {
+          role: user.role,
+          id: user.id,
+          schoolId: user.schoolId
+        });
+        setTodos([]);
+        calculateStats([]);
+        return;
       }
       
+      console.log('Loaded TODOs count:', todosList.length);
       setTodos(todosList);
       calculateStats(todosList);
     } catch (error) {
       console.error('Error loading TODOs:', error);
       toast.error('Failed to load TODOs');
+      setTodos([]);
+      calculateStats([]);
     }
   };
 
@@ -248,7 +278,15 @@ const TodosPage: React.FC = () => {
   };
 
   const handleAddTodo = async () => {
-    if (!user) return;
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+    
+    if (!user.schoolId) {
+      toast.error('Unable to create TODO: School information missing');
+      return;
+    }
     
     try {
       if (!formData.title || !formData.student_id) {
@@ -258,8 +296,8 @@ const TodosPage: React.FC = () => {
       
       const newTodo: Todo = {
         ...formData as Todo,
-        teacher_id: user.id,
-        school_id: user.school_id
+        teacher_id: user.id || '',
+        school_id: user.schoolId
       };
       
       const todoId = await todosService.create(newTodo);
