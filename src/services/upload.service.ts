@@ -1,4 +1,4 @@
-import { storage } from '@/config/firebase';
+import { storage, auth } from '@/config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 class UploadService {
@@ -10,6 +10,11 @@ class UploadService {
     schoolId: string
   ): Promise<string> {
     try {
+      // Check if user is authenticated
+      if (!auth.currentUser) {
+        throw new Error('User must be authenticated to upload files');
+      }
+
       // Validate image file
       if (!file.type.startsWith('image/')) {
         throw new Error('Please upload an image file');
@@ -29,7 +34,8 @@ class UploadService {
         customMetadata: {
           schoolId,
           uploadedAt: new Date().toISOString(),
-          originalName: file.name
+          originalName: file.name,
+          uploadedBy: auth.currentUser.uid
         }
       });
 
@@ -38,9 +44,19 @@ class UploadService {
       
       console.log('Payment method logo uploaded successfully:', downloadUrl);
       return downloadUrl;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading payment method logo:', error);
-      throw new Error('Failed to upload logo. Please try again.');
+      
+      // Provide more specific error messages
+      if (error?.code === 'storage/unauthorized') {
+        throw new Error('Permission denied. Please check Firebase Storage rules or contact support.');
+      } else if (error?.code === 'storage/unauthenticated') {
+        throw new Error('You must be logged in to upload files.');
+      } else if (error?.code === 'storage/quota-exceeded') {
+        throw new Error('Storage quota exceeded. Please contact support.');
+      }
+      
+      throw new Error(error?.message || 'Failed to upload logo. Please try again.');
     }
   }
 

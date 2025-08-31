@@ -1,5 +1,68 @@
 # Welcome to your Lovable project
 
+## 🚨 IMPORTANT: Firebase Storage Setup Required 🚨
+
+To enable file uploads (payment logos, payment proofs, avatars), you MUST configure Firebase Storage security rules:
+
+### Quick Setup Steps:
+
+1. **Open Firebase Console**
+   - Go to [Firebase Console](https://console.firebase.google.com)
+   - Select your project: `kool-skool-7e858`
+
+2. **Navigate to Storage**
+   - Click **Storage** in the left sidebar
+   - If first time: Click **Get started**, choose location, select **production mode**
+
+3. **Update Security Rules**
+   - Click the **Rules** tab
+   - Replace ALL existing rules with:
+
+```javascript
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to read and write payment logos
+    match /payment-logos/{schoolId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Allow authenticated users to read and write payment proofs
+    match /payment-proofs/{schoolId}/{studentId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.resource.size < 5 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*') 
+            || request.resource.contentType == 'application/pdf');
+    }
+    
+    // Allow authenticated users to upload avatars
+    match /avatars/{schoolId}/{userType}/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Allow authenticated users to upload teacher documents
+    match /teacher-documents/{schoolId}/{teacherId}/{documentType}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.resource.size < 10 * 1024 * 1024;
+    }
+  }
+}
+```
+
+4. **Click "Publish"** to apply the rules
+
+✅ **Storage is now configured!** File uploads will work properly.
+
+---
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/e39a344b-5f65-4e00-89d2-0e0c1bcf76cc
