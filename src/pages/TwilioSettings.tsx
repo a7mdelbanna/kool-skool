@@ -36,6 +36,7 @@ import NotificationLogsViewer from '@/components/NotificationLogsViewer';
 import { twilioService } from '@/services/twilio.service';
 import { notificationSettingsService } from '@/services/notificationSettings.service';
 import NotificationTemplateEditor from '@/components/NotificationTemplateEditor';
+import ConfirmationDialog from '@/components/ui/confirmation-dialog';
 import { 
   validateTwilioConfig, 
   validatePhoneNumber, 
@@ -97,6 +98,7 @@ const TwilioSettings = () => {
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
   const [templateEditorMode, setTemplateEditorMode] = useState<'create' | 'edit'>('create');
+  const [showInitializeDialog, setShowInitializeDialog] = useState(false);
   
   // Form state
   const [config, setConfig] = useState({
@@ -687,9 +689,12 @@ const TwilioSettings = () => {
   };
 
   const handleInitializeDefaults = () => {
-    if (confirm('This will initialize default notification templates and rules. Continue?')) {
-      initializeDefaultsMutation.mutate();
-    }
+    setShowInitializeDialog(true);
+  };
+
+  const confirmInitializeDefaults = () => {
+    initializeDefaultsMutation.mutate();
+    setShowInitializeDialog(false);
   };
 
   const handleEditTemplate = (template: NotificationTemplate) => {
@@ -1777,6 +1782,19 @@ const TwilioSettings = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Initialize Defaults Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showInitializeDialog}
+        onOpenChange={setShowInitializeDialog}
+        title="Initialize Default Settings"
+        description="This will initialize default notification templates and rules for your school. This action will help you get started quickly with pre-configured templates for common notifications."
+        onConfirm={confirmInitializeDefaults}
+        confirmText="OK"
+        cancelText="Cancel"
+        type="info"
+        loading={initializeDefaultsMutation.isPending}
+      />
     </div>
   );
 };
