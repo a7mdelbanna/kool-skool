@@ -130,8 +130,8 @@ class StudentsService {
     try {
       const q = query(
         collection(db, this.collectionName),
-        where('schoolId', '==', schoolId),
-        orderBy('firstName', 'asc')
+        where('school_id', '==', schoolId),
+        orderBy('first_name', 'asc')
       );
       const querySnapshot = await getDocs(q);
       
@@ -151,8 +151,8 @@ class StudentsService {
     try {
       const q = query(
         collection(db, this.collectionName),
-        where('teacherId', '==', teacherId),
-        orderBy('firstName', 'asc')
+        where('teacher_id', '==', teacherId),
+        orderBy('first_name', 'asc')
       );
       const querySnapshot = await getDocs(q);
       
@@ -172,9 +172,9 @@ class StudentsService {
     try {
       const q = query(
         collection(db, this.collectionName),
-        where('groupId', '==', groupId),
+        where('group_id', '==', groupId),
         where('status', '==', 'active'),
-        orderBy('firstName', 'asc')
+        orderBy('first_name', 'asc')
       );
       const querySnapshot = await getDocs(q);
       
@@ -195,13 +195,13 @@ class StudentsService {
       const constraints: QueryConstraint[] = [];
       
       if (schoolId) {
-        constraints.push(where('schoolId', '==', schoolId));
+        constraints.push(where('school_id', '==', schoolId));
       }
       
       // Note: Firestore doesn't support full-text search natively
       // This is a simple implementation that requires exact matching
       // For better search, consider using a search service like Algolia
-      constraints.push(orderBy('firstName', 'asc'));
+      constraints.push(orderBy('first_name', 'asc'));
       
       const q = query(collection(db, this.collectionName), ...constraints);
       const querySnapshot = await getDocs(q);

@@ -22,7 +22,7 @@
       "collectionGroup": "students",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "schoolId", "order": "ASCENDING" },
+        { "fieldPath": "school_id", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "level", "order": "ASCENDING" }
       ]
@@ -141,17 +141,25 @@
       "collectionGroup": "students",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "groupId", "order": "ASCENDING" },
+        { "fieldPath": "group_id", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "firstName", "order": "ASCENDING" }
+        { "fieldPath": "first_name", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "students",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "teacherId", "order": "ASCENDING" },
-        { "fieldPath": "firstName", "order": "ASCENDING" }
+        { "fieldPath": "teacher_id", "order": "ASCENDING" },
+        { "fieldPath": "first_name", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "school_id", "order": "ASCENDING" },
+        { "fieldPath": "first_name", "order": "ASCENDING" }
       ]
     },
     {

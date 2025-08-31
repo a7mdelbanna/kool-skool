@@ -49,12 +49,14 @@ import {
 } from '@/services/firebase/todos.service';
 import { supabase } from '@/integrations/supabase/client';
 import { fixTodosWithoutSchoolId } from '@/utils/fixTodosSchoolId';
+import { studentsService, FirebaseStudent } from '@/services/firebase/students.service';
+import TodoItem from '@/components/todos/TodoItem';
 
 const TodosPage: React.FC = () => {
   const { user } = useContext(UserContext);
   const [loading, setLoading] = useState(true);
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<FirebaseStudent[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<TodoStatus[]>([]);
@@ -107,26 +109,24 @@ const TodosPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Load students only if schoolId exists
+      // Load TODOs first
+      await loadTodos();
+      
+      // Then load students (we'll fetch them individually if batch fetch fails)
       if (user.schoolId) {
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('students')
-          .select('id, first_name, last_name')
-          .eq('school_id', user.schoolId)
-          .order('first_name');
-        
-        if (studentsError) {
-          console.error('Error loading students:', studentsError);
-        } else {
-          setStudents(studentsData || []);
+        try {
+          const studentsData = await studentsService.getBySchoolId(user.schoolId);
+          console.log('Loaded students from Firebase:', studentsData.length);
+          setStudents(studentsData);
+        } catch (error) {
+          console.error('Error loading students from Firebase:', error);
+          // We'll fetch students individually as needed
+          setStudents([]);
         }
       } else {
         console.warn('User has no schoolId, skipping student load');
         setStudents([]);
       }
-      
-      // Load TODOs
-      await loadTodos();
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
@@ -464,7 +464,7 @@ const TodosPage: React.FC = () => {
                     <SelectContent>
                       {students.map(student => (
                         <SelectItem key={student.id} value={student.id}>
-                          {student.first_name} {student.last_name}
+                          {student.firstName} {student.lastName}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -652,7 +652,7 @@ const TodosPage: React.FC = () => {
               <SelectItem value="all">All Students</SelectItem>
               {students.map(student => (
                 <SelectItem key={student.id} value={student.id}>
-                  {student.first_name} {student.last_name}
+                  {student.firstName} {student.lastName}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -701,83 +701,15 @@ const TodosPage: React.FC = () => {
             </Card>
           ) : (
             <div className="space-y-3">
-              {filteredTodos.map(todo => {
-                const student = students.find(s => s.id === todo.student_id);
-                
-                return (
-                  <Card 
-                    key={todo.id} 
-                    className={`p-4 ${isOverdue(todo) ? 'border-red-200 bg-red-50' : ''}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        <button
-                          onClick={() => handleStatusChange(
-                            todo, 
-                            todo.status === 'completed' ? 'pending' : 'completed'
-                          )}
-                          className="mt-1"
-                        >
-                          {getStatusIcon(todo.status)}
-                        </button>
-                        
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-lg">{getCategoryIcon(todo.category)}</span>
-                            <h4 className={`font-medium ${
-                              todo.status === 'completed' ? 'line-through text-muted-foreground' : ''
-                            }`}>
-                              {todo.title}
-                            </h4>
-                            <Badge variant={getPriorityColor(todo.priority)}>
-                              {todo.priority}
-                            </Badge>
-                            {isOverdue(todo) && (
-                              <Badge variant="destructive">Overdue</Badge>
-                            )}
-                          </div>
-                          
-                          {todo.description && (
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {todo.description}
-                            </p>
-                          )}
-                          
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {student ? `${student.first_name} ${student.last_name}` : 'Unknown'}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              Due: {format(new Date(todo.due_date), 'MMM dd, yyyy')}
-                            </span>
-                            {todo.completed_at && (
-                              <span className="text-green-600">
-                                Completed: {format(new Date(todo.completed_at), 'MMM dd, yyyy')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          // TODO: Navigate to session details if session_id exists
-                          if (todo.session_id) {
-                            window.location.href = `/session/${todo.session_id}`;
-                          }
-                        }}
-                        disabled={!todo.session_id}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
+              {filteredTodos.map(todo => (
+                <TodoItem
+                  key={todo.id}
+                  todo={todo}
+                  students={students}
+                  onStatusChange={handleStatusChange}
+                  isOverdue={isOverdue}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
