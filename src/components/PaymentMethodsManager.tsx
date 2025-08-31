@@ -47,6 +47,7 @@ import {
 import { toast } from 'sonner';
 import { paymentMethodsService } from '@/services/paymentMethods.service';
 import { uploadService } from '@/services/upload.service';
+import { uploadBase64Service } from '@/services/uploadBase64.service';
 import {
   PaymentMethod,
   PaymentMethodType,
@@ -205,13 +206,32 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
       // Upload logo if provided
       if (logoFile) {
         try {
+          // Try Firebase Storage first
           logoUrl = await uploadService.uploadPaymentMethodLogo(logoFile, schoolId);
-        } catch (error) {
-          console.error('Error uploading logo:', error);
-          toast.error('Failed to upload logo');
-          setUploadingLogo(false);
-          setSaving(false);
-          return;
+        } catch (error: any) {
+          console.error('Error uploading to Firebase Storage:', error);
+          
+          // Fallback to base64 if Firebase Storage fails
+          if (error?.message?.includes('Permission denied') || error?.message?.includes('storage/unauthorized')) {
+            console.log('Falling back to base64 storage...');
+            toast.warning('Using alternative storage method. Please configure Firebase Storage for better performance.');
+            
+            try {
+              // Compress and convert to base64
+              logoUrl = await uploadBase64Service.compressImage(logoFile, 200);
+            } catch (base64Error) {
+              console.error('Error with base64 fallback:', base64Error);
+              toast.error('Failed to upload logo. Please try a smaller image.');
+              setUploadingLogo(false);
+              setSaving(false);
+              return;
+            }
+          } else {
+            toast.error('Failed to upload logo');
+            setUploadingLogo(false);
+            setSaving(false);
+            return;
+          }
         }
       }
       
