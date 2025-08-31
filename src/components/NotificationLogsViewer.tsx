@@ -200,7 +200,7 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
   };
 
   // Get status badge variant
-  const getStatusBadgeVariant = (status: NotificationLog['status']) => {
+  const getStatusBadgeVariant = (status: NotificationLog['status'] | undefined) => {
     switch (status) {
       case 'sent':
       case 'delivered':
@@ -217,7 +217,7 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
   };
 
   // Get status icon
-  const getStatusIcon = (status: NotificationLog['status']) => {
+  const getStatusIcon = (status: NotificationLog['status'] | undefined) => {
     switch (status) {
       case 'sent':
       case 'delivered':
@@ -234,7 +234,7 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
   };
 
   // Get channel icon
-  const getChannelIcon = (channel: NotificationLog['channel']) => {
+  const getChannelIcon = (channel: NotificationLog['channel'] | undefined) => {
     switch (channel) {
       case 'sms':
         return <MessageSquare className="h-3 w-3" />;
@@ -258,7 +258,7 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Sent</p>
-                  <p className="text-2xl font-bold">{stats.totalSent + stats.totalDelivered + stats.totalRead}</p>
+                  <p className="text-2xl font-bold">{(stats.totalSent || 0) + (stats.totalDelivered || 0) + (stats.totalRead || 0)}</p>
                 </div>
                 <div className="p-2 bg-blue-100 rounded-full">
                   <MessageSquare className="h-4 w-4 text-blue-600" />
@@ -272,10 +272,10 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
-                  <p className="text-2xl font-bold">{stats.successRate.toFixed(1)}%</p>
+                  <p className="text-2xl font-bold">{(stats.successRate || 0).toFixed(1)}%</p>
                 </div>
                 <div className="p-2 bg-green-100 rounded-full">
-                  {stats.successRate >= 95 ? (
+                  {(stats.successRate || 0) >= 95 ? (
                     <TrendingUp className="h-4 w-4 text-green-600" />
                   ) : (
                     <TrendingDown className="h-4 w-4 text-red-600" />
@@ -290,7 +290,7 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
-                  <p className="text-2xl font-bold">${stats.totalCost.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">${(stats.totalCost || 0).toFixed(2)}</p>
                 </div>
                 <div className="p-2 bg-orange-100 rounded-full">
                   <DollarSign className="h-4 w-4 text-orange-600" />
@@ -304,7 +304,7 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Failed</p>
-                  <p className="text-2xl font-bold">{stats.totalFailed}</p>
+                  <p className="text-2xl font-bold">{stats.totalFailed || 0}</p>
                 </div>
                 <div className="p-2 bg-red-100 rounded-full">
                   <XCircle className="h-4 w-4 text-red-600" />
@@ -691,37 +691,37 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
                     {logs.map((log) => (
                       <TableRow key={log.id} className="hover:bg-muted/50">
                         <TableCell className="font-mono text-sm">
-                          {format(log.sentAt, 'MMM dd, HH:mm')}
+                          {log.sentAt ? format(log.sentAt, 'MMM dd, HH:mm') : '—'}
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{log.recipientName}</div>
-                            <div className="text-sm text-muted-foreground capitalize">{log.recipientType}</div>
+                            <div className="font-medium">{log.recipientName || 'Unknown'}</div>
+                            <div className="text-sm text-muted-foreground capitalize">{log.recipientType || 'unknown'}</div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-sm">{log.recipientPhone}</TableCell>
+                        <TableCell className="font-mono text-sm">{log.recipientPhone || '—'}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs capitalize">
-                            {log.notificationType.replace('_', ' ')}
+                            {(log.notificationType || 'unknown').replace('_', ' ')}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            {getChannelIcon(log.channel)}
-                            <span className="text-sm capitalize">{log.channel}</span>
+                            {getChannelIcon(log.channel || 'sms')}
+                            <span className="text-sm capitalize">{log.channel || 'unknown'}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStatusBadgeVariant(log.status)} className="flex items-center gap-1 w-fit">
-                            {getStatusIcon(log.status)}
-                            <span className="capitalize">{log.status}</span>
+                          <Badge variant={getStatusBadgeVariant(log.status || 'pending')} className="flex items-center gap-1 w-fit">
+                            {getStatusIcon(log.status || 'pending')}
+                            <span className="capitalize">{log.status || 'pending'}</span>
                           </Badge>
                         </TableCell>
                         <TableCell>
                           {log.cost ? `$${log.cost.toFixed(4)}` : '—'}
                         </TableCell>
                         <TableCell className="max-w-48">
-                          <div className="truncate text-sm">{log.messagePreview}</div>
+                          <div className="truncate text-sm">{log.messagePreview || '—'}</div>
                           {log.templateName && (
                             <div className="text-xs text-muted-foreground truncate">{log.templateName}</div>
                           )}
