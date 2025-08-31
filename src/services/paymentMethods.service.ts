@@ -52,23 +52,29 @@ class PaymentMethodsService {
    */
   async getPaymentMethods(schoolId: string): Promise<PaymentMethod[]> {
     try {
-      const q = query(
+      // Try simple query first to avoid index issues
+      const simpleQuery = query(
         collection(db, this.collectionName),
-        where('schoolId', '==', schoolId),
-        orderBy('displayOrder', 'asc'),
-        orderBy('createdAt', 'desc')
+        where('schoolId', '==', schoolId)
       );
-
-      const snapshot = await getDocs(q);
+      
+      const snapshot = await getDocs(simpleQuery);
       const methods = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate()
       })) as PaymentMethod[];
+      
+      // Sort client-side
+      const sortedMethods = methods.sort((a, b) => {
+        const orderDiff = (a.displayOrder || 0) - (b.displayOrder || 0);
+        if (orderDiff !== 0) return orderDiff;
+        return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+      });
 
       // Decrypt sensitive data for Stripe methods
-      return methods.map(method => {
+      return sortedMethods.map(method => {
         if (method.type === PaymentMethodType.STRIPE && method.stripeSecretKey) {
           return {
             ...method,
@@ -77,36 +83,8 @@ class PaymentMethodsService {
         }
         return method;
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching payment methods:', error);
-      
-      // Handle index not ready error
-      if (error?.message?.includes('requires an index')) {
-        try {
-          const simpleQuery = query(
-            collection(db, this.collectionName),
-            where('schoolId', '==', schoolId)
-          );
-          const snapshot = await getDocs(simpleQuery);
-          const methods = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate(),
-            updatedAt: doc.data().updatedAt?.toDate()
-          })) as PaymentMethod[];
-          
-          // Sort client-side
-          return methods.sort((a, b) => {
-            const orderDiff = (a.displayOrder || 0) - (b.displayOrder || 0);
-            if (orderDiff !== 0) return orderDiff;
-            return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
-          });
-        } catch (fallbackError) {
-          console.error('Fallback query also failed:', fallbackError);
-          return [];
-        }
-      }
-      
       return [];
     }
   }
@@ -375,16 +353,14 @@ class PaymentMethodsService {
    */
   async getPendingPayments(schoolId: string): Promise<Payment[]> {
     try {
-      const q = query(
+      // Use simpler query to avoid index requirements
+      const simpleQuery = query(
         collection(db, this.paymentsCollection),
-        where('schoolId', '==', schoolId),
-        where('paymentMethodType', '==', PaymentMethodType.MANUAL),
-        where('status', 'in', [PaymentStatus.PENDING, PaymentStatus.PROCESSING]),
-        orderBy('createdAt', 'desc')
+        where('schoolId', '==', schoolId)
       );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+      
+      const snapshot = await getDocs(simpleQuery);
+      const payments = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         dueDate: doc.data().dueDate?.toDate(),
@@ -393,38 +369,16 @@ class PaymentMethodsService {
         paidAt: doc.data().paidAt?.toDate(),
         confirmedAt: doc.data().confirmedAt?.toDate()
       })) as Payment[];
-    } catch (error: any) {
+      
+      // Filter and sort client-side
+      return payments
+        .filter(p => 
+          p.paymentMethodType === PaymentMethodType.MANUAL &&
+          (p.status === PaymentStatus.PENDING || p.status === PaymentStatus.PROCESSING)
+        )
+        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    } catch (error) {
       console.error('Error fetching pending payments:', error);
-      
-      // Handle index error with simpler query
-      if (error?.message?.includes('requires an index')) {
-        try {
-          const simpleQuery = query(
-            collection(db, this.paymentsCollection),
-            where('schoolId', '==', schoolId),
-            where('status', '==', PaymentStatus.PENDING)
-          );
-          const snapshot = await getDocs(simpleQuery);
-          const payments = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            dueDate: doc.data().dueDate?.toDate(),
-            createdAt: doc.data().createdAt?.toDate(),
-            updatedAt: doc.data().updatedAt?.toDate(),
-            paidAt: doc.data().paidAt?.toDate(),
-            confirmedAt: doc.data().confirmedAt?.toDate()
-          })) as Payment[];
-          
-          // Filter client-side
-          return payments
-            .filter(p => p.paymentMethodType === PaymentMethodType.MANUAL)
-            .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-        } catch (fallbackError) {
-          console.error('Fallback query also failed:', fallbackError);
-          return [];
-        }
-      }
-      
       return [];
     }
   }
