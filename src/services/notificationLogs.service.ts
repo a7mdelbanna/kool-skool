@@ -161,8 +161,19 @@ class NotificationLogsService {
         hasMore: querySnapshot.size === limit,
         lastDoc
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting notification logs:', error);
+      
+      // Check if it's an index error and provide helpful message
+      if (error?.message?.includes('requires an index')) {
+        console.warn('Firebase index is still building. Please wait a few moments and refresh the page.');
+        // Return empty logs instead of throwing
+        return {
+          logs: [],
+          hasMore: false
+        };
+      }
+      
       throw error;
     }
   }

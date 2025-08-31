@@ -597,10 +597,24 @@ const NotificationLogsViewer: React.FC<NotificationLogsViewerProps> = ({ schoolI
         </CardHeader>
         <CardContent>
           {logsError && (
-            <div className="text-center py-8 text-destructive">
-              <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-              <p>Failed to load notification logs</p>
-              <p className="text-sm text-muted-foreground">Please try refreshing the page</p>
+            <div className="text-center py-8">
+              <AlertCircle className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
+              <p className="text-lg font-medium">Setting up notification logs...</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Firebase indexes are being created. This usually takes 1-2 minutes.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Please refresh the page in a moment.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => window.location.reload()}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Page
+              </Button>
             </div>
           )}
 

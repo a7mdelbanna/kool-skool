@@ -54,8 +54,39 @@ class NotificationSettingsService {
       })) as NotificationTemplate[];
 
       return templates;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching notification templates:', error);
+      
+      // Check if it's an index error
+      if (error?.message?.includes('requires an index')) {
+        console.warn('Firebase index is still building. Trying simplified query...');
+        
+        // Try a simpler query without ordering
+        try {
+          const simpleQuery = query(
+            collection(db, this.templatesCollection),
+            where('schoolId', '==', schoolId)
+          );
+          const snapshot = await getDocs(simpleQuery);
+          const templates = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(),
+            updatedAt: doc.data().updatedAt?.toDate()
+          })) as NotificationTemplate[];
+          
+          // Sort client-side
+          return templates.sort((a, b) => {
+            if (a.type !== b.type) return a.type.localeCompare(b.type);
+            if (a.language !== b.language) return a.language.localeCompare(b.language);
+            return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+          });
+        } catch (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          return [];
+        }
+      }
+      
       return [];
     }
   }
@@ -207,8 +238,35 @@ class NotificationSettingsService {
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate()
       })) as NotificationRule[];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching notification rules:', error);
+      
+      // Check if it's an index error
+      if (error?.message?.includes('requires an index')) {
+        console.warn('Firebase index is still building. Trying simplified query...');
+        
+        // Try a simpler query without ordering
+        try {
+          const simpleQuery = query(
+            collection(db, this.rulesCollection),
+            where('schoolId', '==', schoolId)
+          );
+          const snapshot = await getDocs(simpleQuery);
+          const rules = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(),
+            updatedAt: doc.data().updatedAt?.toDate()
+          })) as NotificationRule[];
+          
+          // Sort client-side
+          return rules.sort((a, b) => a.type.localeCompare(b.type));
+        } catch (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          return [];
+        }
+      }
+      
       return [];
     }
   }
