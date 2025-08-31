@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import React, { useState, useContext } from 'react';
+import { Plus, Search, Filter, Download, MoreHorizontal, Edit, Trash2, CreditCard, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +34,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserInfo } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { UserContext } from '@/App';
+import PaymentConfirmationDashboard from '@/components/PaymentConfirmationDashboard';
+import StudentPaymentSubmission from '@/components/StudentPaymentSubmission';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PaymentRecord {
   id: string;
@@ -50,6 +54,7 @@ interface PaymentRecord {
 
 const PaymentsPage = () => {
   const queryClient = useQueryClient();
+  const { user } = useContext(UserContext);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [addTransactionDialogOpen, setAddTransactionDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(undefined);
@@ -367,8 +372,27 @@ const PaymentsPage = () => {
         </div>
       </div>
 
-      {/* Expected Payments Section */}
-      <ExpectedPaymentsSection schoolId={schoolId} />
+      {/* Tabs for different payment views */}
+      <Tabs defaultValue="transactions" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          {user?.role === 'student' && (
+            <TabsTrigger value="submit-payment">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Submit Payment
+            </TabsTrigger>
+          )}
+          {(user?.role === 'teacher' || user?.role === 'admin') && (
+            <TabsTrigger value="confirmations">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Payment Confirmations
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Expected Payments Section */}
+          <ExpectedPaymentsSection schoolId={schoolId} />
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -558,21 +582,41 @@ const PaymentsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Payment Dialog */}
-      <PaymentDialog
-        open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
-        payment={selectedPayment}
-        mode={dialogMode}
-        onSuccess={handlePaymentSuccess}
-      />
+          {/* Payment Dialog */}
+          <PaymentDialog
+            open={paymentDialogOpen}
+            onOpenChange={setPaymentDialogOpen}
+            payment={selectedPayment}
+            mode={dialogMode}
+            onSuccess={handlePaymentSuccess}
+          />
 
-      {/* Add Transaction Dialog */}
-      <AddTransactionDialog
-        open={addTransactionDialogOpen}
-        onOpenChange={setAddTransactionDialogOpen}
-        onSuccess={handleTransactionSuccess}
-      />
+          {/* Add Transaction Dialog */}
+          <AddTransactionDialog
+            open={addTransactionDialogOpen}
+            onOpenChange={setAddTransactionDialogOpen}
+            onSuccess={handleTransactionSuccess}
+          />
+        </TabsContent>
+
+        {user?.role === 'student' && (
+          <TabsContent value="submit-payment">
+            <StudentPaymentSubmission 
+              schoolId={schoolId} 
+              studentId={user.id || user.uid || ''}
+            />
+          </TabsContent>
+        )}
+
+        {(user?.role === 'teacher' || user?.role === 'admin') && (
+          <TabsContent value="confirmations">
+            <PaymentConfirmationDashboard 
+              schoolId={schoolId} 
+              userId={user.id || user.uid || ''}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 };
