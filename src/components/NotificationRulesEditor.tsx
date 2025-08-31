@@ -263,7 +263,7 @@ const NotificationRulesEditor: React.FC<NotificationRulesEditorProps> = ({
   return (
     <div className="space-y-6">
       {rules.map((rule, ruleIndex) => (
-        <Card key={rule.type} className={!rule.enabled ? 'opacity-60' : ''}>
+        <Card key={`rule-${rule.type}-${ruleIndex}`} className={!rule.enabled ? 'opacity-60' : ''}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -439,8 +439,8 @@ const NotificationRulesEditor: React.FC<NotificationRulesEditorProps> = ({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="default">Default Template</SelectItem>
-                            {getRelevantTemplates(rule.type).map(template => (
-                              <SelectItem key={template.id} value={template.id!}>
+                            {getRelevantTemplates(rule.type).map((template, index) => (
+                              <SelectItem key={template.id || `template-${index}`} value={template.id || `default-${index}`}>
                                 {template.name} ({template.language})
                               </SelectItem>
                             ))}
