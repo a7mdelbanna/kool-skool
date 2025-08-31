@@ -38,6 +38,7 @@ import { notificationSettingsService } from '@/services/notificationSettings.ser
 import NotificationTemplateEditor from '@/components/NotificationTemplateEditor';
 import ConfirmationDialog from '@/components/ui/confirmation-dialog';
 import NotificationRulesEditor from '@/components/NotificationRulesEditor';
+import NotificationTestFlow from '@/components/NotificationTestFlow';
 import { 
   validateTwilioConfig, 
   validatePhoneNumber, 
@@ -796,7 +797,7 @@ const TwilioSettings = () => {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="config">
             <Settings className="h-4 w-4 mr-2" />
             Configuration
@@ -812,6 +813,10 @@ const TwilioSettings = () => {
           <TabsTrigger value="test">
             <TestTube className="h-4 w-4 mr-2" />
             Test
+          </TabsTrigger>
+          <TabsTrigger value="testflow">
+            <Users className="h-4 w-4 mr-2" />
+            Test Flow
           </TabsTrigger>
           <TabsTrigger value="logs">
             <Clock className="h-4 w-4 mr-2" />
@@ -1564,6 +1569,13 @@ const TwilioSettings = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="testflow" className="space-y-4">
+          <NotificationTestFlow 
+            schoolId={user?.schoolId || ''} 
+            userId={user?.uid || ''} 
+          />
         </TabsContent>
         
         <TabsContent value="logs">

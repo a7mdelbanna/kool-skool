@@ -222,15 +222,45 @@ class TwilioService {
       message: string;
       channel: 'sms' | 'whatsapp';
     }
-  ): Promise<void> {
+  ): Promise<any> {
     try {
-      // Call Firebase Function to send message
+      // First, get the Twilio configuration to ensure we have the sender numbers
+      const config = await this.getConfig(schoolId);
+      
+      if (!config || !config.isActive) {
+        console.log('Twilio integration is not configured or not active');
+        return { 
+          success: false, 
+          error: 'Twilio integration is not configured or not active. Please configure it in the Configuration tab.' 
+        };
+      }
+      
+      // Check if the channel is configured
+      const fromNumber = params.channel === 'whatsapp' 
+        ? config.phoneNumberWhatsapp 
+        : config.phoneNumberSms;
+        
+      if (!fromNumber) {
+        console.log(`${params.channel} phone number is not configured`);
+        return { 
+          success: false, 
+          error: `${params.channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} phone number is not configured. Please add it in the Configuration tab.` 
+        };
+      }
+      
+      // Format the from number properly for WhatsApp
+      const formattedFrom = params.channel === 'whatsapp' 
+        ? `whatsapp:${fromNumber}`
+        : fromNumber;
+      
+      // Call Firebase Function to send message with the from number
       const sendMessage = httpsCallable(functions, 'sendTwilioMessage');
       const result = await sendMessage({
         schoolId,
         phone: params.phone,
         message: params.message,
         channel: params.channel,
+        from: formattedFrom, // Include the formatted from number
         isTest: true
       });
       
@@ -248,10 +278,15 @@ class TwilioService {
         retryCount: 0
       });
       
-      return result.data as any;
-    } catch (error) {
+      return { success: true, data: result.data };
+    } catch (error: any) {
       console.error('Error sending test message:', error);
-      throw error;
+      
+      // Return a proper error response
+      return { 
+        success: false, 
+        error: error.message || 'Failed to send test message' 
+      };
     }
   }
   
