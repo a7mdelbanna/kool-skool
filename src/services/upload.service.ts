@@ -3,6 +3,48 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 class UploadService {
   /**
+   * Upload payment method logo to Firebase Storage
+   */
+  async uploadPaymentMethodLogo(
+    file: File,
+    schoolId: string
+  ): Promise<string> {
+    try {
+      // Validate image file
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please upload an image file');
+      }
+
+      // Create a unique filename
+      const timestamp = Date.now();
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `payment-logos/${schoolId}/${timestamp}.${fileExtension}`;
+
+      // Create storage reference
+      const storageRef = ref(storage, fileName);
+
+      // Upload file
+      const snapshot = await uploadBytes(storageRef, file, {
+        contentType: file.type,
+        customMetadata: {
+          schoolId,
+          uploadedAt: new Date().toISOString(),
+          originalName: file.name
+        }
+      });
+
+      // Get download URL
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      
+      console.log('Payment method logo uploaded successfully:', downloadUrl);
+      return downloadUrl;
+    } catch (error) {
+      console.error('Error uploading payment method logo:', error);
+      throw new Error('Failed to upload logo. Please try again.');
+    }
+  }
+
+  /**
    * Upload payment proof file to Firebase Storage
    */
   async uploadPaymentProof(
