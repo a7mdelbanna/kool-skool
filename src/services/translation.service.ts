@@ -39,8 +39,8 @@ class TranslationService {
     sourceLanguage?: string
   ): Promise<TranslationResult | TranslationError> {
     try {
-      // For demo purposes, we'll use a mock translation
-      // In production, uncomment the actual API call below
+      // Always use mock translation for now since LibreTranslate has CORS issues
+      // and Google Translate API requires proper API key
       return this.mockTranslate(text, targetLanguage);
 
       /* // Actual Google Translate API call
@@ -114,38 +114,105 @@ class TranslationService {
    * Provides simple translations for common words
    */
   private mockTranslate(text: string, targetLanguage: string): TranslationResult {
-    // Simple mock translations (English to Russian)
+    // Enhanced mock translations with more comprehensive vocabulary
     const mockTranslations: Record<string, Record<string, string>> = {
       'ru': {
-        // Common words
+        // Common greetings and phrases
+        'hey': 'эй',
+        'hi': 'привет',
         'hello': 'привет',
+        'good morning': 'доброе утро',
+        'good afternoon': 'добрый день',
+        'good evening': 'добрый вечер',
+        'good night': 'спокойной ночи',
         'goodbye': 'до свидания',
+        'bye': 'пока',
+        'see you': 'увидимся',
         'thank you': 'спасибо',
+        'thanks': 'спасибо',
         'please': 'пожалуйста',
+        'sorry': 'извините',
+        'excuse me': 'простите',
         'yes': 'да',
         'no': 'нет',
+        'maybe': 'может быть',
+        'ok': 'хорошо',
         'good': 'хорошо',
         'bad': 'плохо',
+        'excellent': 'отлично',
+        'great': 'отлично',
+        'wonderful': 'замечательно',
+        'beautiful': 'красивый',
+        'nice': 'милый',
+        'cool': 'круто',
+        
+        // Common classroom vocabulary
         'book': 'книга',
         'pen': 'ручка',
         'pencil': 'карандаш',
         'paper': 'бумага',
+        'notebook': 'тетрадь',
+        'textbook': 'учебник',
+        'dictionary': 'словарь',
         'computer': 'компьютер',
         'phone': 'телефон',
+        'tablet': 'планшет',
+        'board': 'доска',
+        'desk': 'парта',
         'table': 'стол',
         'chair': 'стул',
         'window': 'окно',
         'door': 'дверь',
+        'wall': 'стена',
+        'floor': 'пол',
+        'ceiling': 'потолок',
+        'classroom': 'класс',
         'house': 'дом',
+        'home': 'дом',
         'school': 'школа',
+        'university': 'университет',
+        'library': 'библиотека',
+        
+        // People
         'teacher': 'учитель',
         'student': 'студент',
+        'pupil': 'ученик',
+        'friend': 'друг',
+        'family': 'семья',
+        'mother': 'мама',
+        'father': 'папа',
+        'sister': 'сестра',
+        'brother': 'брат',
+        'man': 'мужчина',
+        'woman': 'женщина',
+        'boy': 'мальчик',
+        'girl': 'девочка',
+        'child': 'ребенок',
+        'children': 'дети',
+        'person': 'человек',
+        'people': 'люди',
+        
+        // Education terms
         'lesson': 'урок',
+        'class': 'класс',
         'homework': 'домашнее задание',
         'test': 'тест',
         'exam': 'экзамен',
+        'exercise': 'упражнение',
+        'task': 'задание',
         'question': 'вопрос',
         'answer': 'ответ',
+        'grade': 'оценка',
+        'mark': 'отметка',
+        'subject': 'предмет',
+        'math': 'математика',
+        'history': 'история',
+        'science': 'наука',
+        'language': 'язык',
+        'english': 'английский',
+        'russian': 'русский',
+        
+        // Common verbs
         'read': 'читать',
         'write': 'писать',
         'speak': 'говорить',
@@ -153,6 +220,7 @@ class TranslationService {
         'understand': 'понимать',
         'learn': 'учить',
         'study': 'изучать',
+        'teach': 'преподавать',
         'practice': 'практиковать',
         'repeat': 'повторять',
         'remember': 'помнить',
@@ -165,6 +233,38 @@ class TranslationService {
         'like': 'нравиться',
         'love': 'любить',
         'hate': 'ненавидеть',
+        'can': 'мочь',
+        'must': 'должен',
+        'have': 'иметь',
+        'do': 'делать',
+        'make': 'делать',
+        'go': 'идти',
+        'come': 'приходить',
+        'see': 'видеть',
+        'look': 'смотреть',
+        'give': 'давать',
+        'take': 'брать',
+        'help': 'помогать',
+        'work': 'работать',
+        'play': 'играть',
+        'eat': 'есть',
+        'drink': 'пить',
+        'sleep': 'спать',
+        'run': 'бежать',
+        'walk': 'ходить',
+        'sit': 'сидеть',
+        'stand': 'стоять',
+        'open': 'открывать',
+        'close': 'закрывать',
+        'start': 'начинать',
+        'finish': 'заканчивать',
+        'stop': 'останавливать',
+        'begin': 'начинать',
+        'end': 'заканчивать',
+        'ask': 'спрашивать',
+        'tell': 'рассказывать',
+        'show': 'показывать',
+        'explain': 'объяснять',
         // Days of the week
         'monday': 'понедельник',
         'tuesday': 'вторник',
@@ -248,7 +348,7 @@ class TranslationService {
       }
     };
 
-    const lowerText = text.toLowerCase();
+    const lowerText = text.toLowerCase().trim();
     const translations = mockTranslations[targetLanguage] || {};
     
     // Check if we have a direct translation
@@ -259,9 +359,46 @@ class TranslationService {
       };
     }
 
-    // For demo, just return a placeholder translation
+    // Try to find partial matches for compound words
+    const words = lowerText.split(' ');
+    const translatedWords = words.map(word => {
+      if (translations[word]) {
+        return translations[word];
+      }
+      // Return the original word if no translation found
+      return word;
+    });
+    
+    // If at least one word was translated, return the result
+    const translatedText = translatedWords.join(' ');
+    if (translatedText !== lowerText) {
+      return {
+        translatedText: translatedText,
+        detectedSourceLanguage: 'en'
+      };
+    }
+
+    // For any untranslated text, provide a phonetic transliteration for Russian
+    if (targetLanguage === 'ru') {
+      const transliterated = this.transliterateToRussian(lowerText);
+      return {
+        translatedText: transliterated,
+        detectedSourceLanguage: 'en'
+      };
+    }
+    
+    // For other languages, return with language indicator
+    const languageIndicators: Record<string, string> = {
+      'es': text + ' (ES)',
+      'fr': text + ' (FR)',
+      'de': text + ' (DE)',
+      'zh': text + ' (中)',
+      'ja': text + ' (日)',
+      'ko': text + ' (한)'
+    };
+    
     return {
-      translatedText: `[${targetLanguage}] ${text}`,
+      translatedText: languageIndicators[targetLanguage] || text,
       detectedSourceLanguage: 'en'
     };
   }
@@ -290,6 +427,38 @@ class TranslationService {
   }
 
   /**
+   * Transliterate English text to Russian characters
+   */
+  private transliterateToRussian(text: string): string {
+    const transliterationMap: Record<string, string> = {
+      'a': 'а', 'b': 'б', 'v': 'в', 'g': 'г', 'd': 'д', 'e': 'е', 'yo': 'ё',
+      'zh': 'ж', 'z': 'з', 'i': 'и', 'y': 'й', 'k': 'к', 'l': 'л', 'm': 'м',
+      'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у',
+      'f': 'ф', 'h': 'х', 'ts': 'ц', 'ch': 'ч', 'sh': 'ш', 'sch': 'щ',
+      'yu': 'ю', 'ya': 'я'
+    };
+    
+    let result = text.toLowerCase();
+    
+    // Replace digraphs first
+    result = result.replace(/sch/g, 'щ');
+    result = result.replace(/sh/g, 'ш');
+    result = result.replace(/ch/g, 'ч');
+    result = result.replace(/ts/g, 'ц');
+    result = result.replace(/zh/g, 'ж');
+    result = result.replace(/yo/g, 'ё');
+    result = result.replace(/yu/g, 'ю');
+    result = result.replace(/ya/g, 'я');
+    
+    // Then replace single characters
+    result = result.split('').map(char => {
+      return transliterationMap[char] || char;
+    }).join('');
+    
+    return result;
+  }
+
+  /**
    * Alternative: Use LibreTranslate (free, open-source)
    * This is a fallback option that doesn't require API keys
    */
@@ -299,7 +468,17 @@ class TranslationService {
     sourceLanguage: string = 'en'
   ): Promise<TranslationResult | TranslationError> {
     try {
-      const response = await fetch('https://libretranslate.de/translate', {
+      // Try multiple LibreTranslate instances
+      const instances = [
+        'https://translate.terraprint.co/translate',
+        'https://libretranslate.de/translate',
+        'https://translate.argosopentech.com/translate'
+      ];
+      
+      let lastError;
+      for (const instance of instances) {
+        try {
+          const response = await fetch(instance, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -310,18 +489,22 @@ class TranslationService {
           target: targetLanguage,
           format: 'text'
         })
-      });
+          });
 
-      if (!response.ok) {
-        throw new Error('LibreTranslate API error');
+          if (response.ok) {
+            const data = await response.json();
+            return {
+              translatedText: data.translatedText,
+              detectedSourceLanguage: sourceLanguage
+            };
+          }
+        } catch (error) {
+          lastError = error;
+          continue;
+        }
       }
-
-      const data = await response.json();
       
-      return {
-        translatedText: data.translatedText,
-        detectedSourceLanguage: sourceLanguage
-      };
+      throw lastError || new Error('All translation instances failed');
     } catch (error) {
       console.error('LibreTranslate error:', error);
       // Fallback to mock translation

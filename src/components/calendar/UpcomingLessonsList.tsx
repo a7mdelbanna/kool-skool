@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   format, 
   isSameDay, 
@@ -22,7 +23,9 @@ import {
   X,
   ArrowRight,
   RefreshCcw,
-  CircleCheck
+  CircleCheck,
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
 import GroupSessionWidget from './GroupSessionWidget';
@@ -83,6 +86,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
   subscriptionInfoMap,
   studentInfoMap
 }) => {
+  const navigate = useNavigate();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusChangeSession, setStatusChangeSession] = useState<string | null>(null);
 
@@ -199,6 +203,22 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
   const handleLessonClick = (session: Session) => {
     if (onLessonClick) {
       onLessonClick(session);
+    }
+  };
+  
+  const handleOpenSessionDetails = (sessionId: string, event?: React.MouseEvent) => {
+    // Check if we're in a modal context by looking for dialog elements
+    const isInModal = document.querySelector('[role="dialog"]') !== null;
+    
+    if (isInModal) {
+      // Open in new tab when inside a modal to avoid closing the modal
+      if (event) {
+        event.stopPropagation();
+      }
+      window.open(`/session/${sessionId}`, '_blank');
+    } else {
+      // Navigate normally when not in a modal
+      navigate(`/session/${sessionId}`);
     }
   };
 
@@ -323,7 +343,20 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
     const isLoading = actionLoading === sessionId;
 
     return (
-      <div className="grid grid-cols-4 gap-2 mt-3">
+      <div className="space-y-2 mt-3">
+        {/* Details Button */}
+        <Button 
+          onClick={(e) => handleOpenSessionDetails(sessionId, e)}
+          className="w-full h-8 text-sm border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
+          variant="outline"
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          View Session Details
+          <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
+        </Button>
+        
+        {/* Action Buttons */}
+        <div className="grid grid-cols-4 gap-2">
         <Button 
           onClick={(e) => {
             e.stopPropagation();
@@ -372,6 +405,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
           <ArrowRight className="h-3 w-3 mr-1" />
           {actionLoading === sessionId && actionLoading === "moved" ? "..." : "Move"}
         </Button>
+        </div>
       </div>
     );
   };
@@ -382,22 +416,36 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
     const isExpanded = statusChangeSession === sessionId;
     
     return (
-      <div className="mt-3">
-        <Button
-          size="sm"
+      <div className="space-y-2 mt-3">
+        {/* Details Button */}
+        <Button 
+          onClick={(e) => handleOpenSessionDetails(sessionId, e)}
+          className="w-full h-8 text-sm border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
           variant="outline"
-          className="h-7 px-2 text-xs border-purple-500 text-purple-500 hover:bg-purple-50"
-          onClick={(e) => {
-            e.stopPropagation();
-            setStatusChangeSession(isExpanded ? null : sessionId);
-          }}
         >
-          <RefreshCcw className="h-3 w-3 mr-1" />
-          Change Status
+          <FileText className="h-4 w-4 mr-2" />
+          View Session Details
+          <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
         </Button>
         
-        {/* Show status change options when expanded */}
-        {isExpanded && renderStatusChangeOptions(session)}
+        {/* Change Status Button */}
+        <div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs border-purple-500 text-purple-500 hover:bg-purple-50"
+            onClick={(e) => {
+              e.stopPropagation();
+              setStatusChangeSession(isExpanded ? null : sessionId);
+            }}
+          >
+            <RefreshCcw className="h-3 w-3 mr-1" />
+            Change Status
+          </Button>
+          
+          {/* Show status change options when expanded */}
+          {isExpanded && renderStatusChangeOptions(session)}
+        </div>
       </div>
     );
   };
@@ -490,9 +538,16 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <div className={`font-semibold text-lg truncate ${
-                  isPastSession ? 'text-gray-500' : 'text-foreground'
-                }`}>
+                <div 
+                  className={`font-semibold text-lg truncate cursor-pointer hover:text-primary transition-colors ${
+                    isPastSession ? 'text-gray-500' : 'text-foreground hover:text-primary'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenSessionDetails(session.id, e);
+                  }}
+                  title="Click to view session details"
+                >
                   {studentName}
                 </div>
                 <div className={`text-sm mb-3 ${
