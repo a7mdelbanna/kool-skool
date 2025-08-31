@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { 
   Wallet, 
-  DollarSign
+  DollarSign,
+  CreditCard
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CurrencyManagement from '@/components/CurrencyManagement';
 import AccountsManagement from '@/components/AccountsManagement';
+import PaymentMethodsManager from '@/components/PaymentMethodsManager';
+import { UserContext } from '@/App';
 
 const FinancialSettings = () => {
+  const { user } = useContext(UserContext);
   return (
     <div className="space-y-6">
       <div>
@@ -15,8 +19,12 @@ const FinancialSettings = () => {
         <p className="text-muted-foreground mt-1">Manage your financial accounts and currency settings</p>
       </div>
       
-      <Tabs defaultValue="accounts" className="w-full">
-        <TabsList className="grid grid-cols-2 mb-6">
+      <Tabs defaultValue="payment-methods" className="w-full">
+        <TabsList className="grid grid-cols-3 mb-6">
+          <TabsTrigger value="payment-methods" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            <span>Payment Methods</span>
+          </TabsTrigger>
           <TabsTrigger value="accounts" className="gap-2">
             <Wallet className="h-4 w-4" />
             <span>Accounts</span>
@@ -26,6 +34,13 @@ const FinancialSettings = () => {
             <span>Currencies</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="payment-methods" className="mt-0 space-y-6">
+          <PaymentMethodsManager 
+            schoolId={user?.schoolId || ''} 
+            userId={user?.uid || user?.id || ''} 
+          />
+        </TabsContent>
 
         <TabsContent value="accounts" className="mt-0 space-y-6">
           <AccountsManagement />

@@ -12,6 +12,7 @@ import { db } from '@/config/firebase';
 import { twilioService } from './twilio.service';
 import { notificationSettingsService } from './notificationSettings.service';
 import { notificationLogsService } from './notificationLogs.service';
+import { paymentMethodsService } from './paymentMethods.service';
 import { 
   NotificationRule, 
   NotificationTemplate,
@@ -576,6 +577,18 @@ class NotificationSchedulerService {
             continue;
           }
 
+          // Get payment method details
+          let paymentMethodName = 'Payment';
+          let paymentInstructions = '';
+          
+          if (payment.paymentMethodId) {
+            const paymentMethod = await paymentMethodsService.getPaymentMethod(payment.paymentMethodId);
+            if (paymentMethod) {
+              paymentMethodName = paymentMethod.name;
+              paymentInstructions = paymentMethod.instructions || '';
+            }
+          }
+          
           // Prepare variables
           const variables = {
             studentName: `${student.first_name} ${student.last_name}`,
@@ -583,7 +596,9 @@ class NotificationSchedulerService {
             amount: `$${payment.amount.toFixed(2)}`,
             dueDate: format(dueDate, 'MMMM d, yyyy'),
             description: payment.description || 'Payment',
-            schoolName: 'TutorFlow Academy'
+            schoolName: 'TutorFlow Academy',
+            paymentMethod: paymentMethodName,
+            paymentInstructions: paymentInstructions
           };
 
           // Send to configured recipients (usually parents for payments)
