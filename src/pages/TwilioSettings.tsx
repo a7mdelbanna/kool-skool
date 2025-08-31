@@ -37,6 +37,7 @@ import { twilioService } from '@/services/twilio.service';
 import { notificationSettingsService } from '@/services/notificationSettings.service';
 import NotificationTemplateEditor from '@/components/NotificationTemplateEditor';
 import ConfirmationDialog from '@/components/ui/confirmation-dialog';
+import NotificationRulesEditor from '@/components/NotificationRulesEditor';
 import { 
   validateTwilioConfig, 
   validatePhoneNumber, 
@@ -1239,157 +1240,37 @@ const TwilioSettings = () => {
             </Card>
           )}
 
-          {/* Notification Rules */}
-          {notificationRules.map((rule, ruleIndex) => (
-            <Card key={rule.type}>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-lg">
-                      {getRuleTypeDisplayName(rule.type)}
-                    </CardTitle>
-                    <CardDescription>
-                      Configure {getRuleTypeDisplayName(rule.type).toLowerCase()} settings
-                    </CardDescription>
-                  </div>
-                  <Switch
-                    checked={rule.enabled}
-                    onCheckedChange={(enabled) => handleRuleChange(ruleIndex, 'enabled', enabled)}
-                  />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Recipients */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Recipients
-                  </Label>
-                  <div className="flex gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id={`${rule.type}-student`}
-                        checked={rule.recipients.student}
-                        onCheckedChange={(checked) => 
-                          handleRuleChange(ruleIndex, 'recipients', {
-                            ...rule.recipients,
-                            student: checked
-                          })
-                        }
-                      />
-                      <Label htmlFor={`${rule.type}-student`} className="text-sm">
-                        Students
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id={`${rule.type}-parent`}
-                        checked={rule.recipients.parent}
-                        onCheckedChange={(checked) => 
-                          handleRuleChange(ruleIndex, 'recipients', {
-                            ...rule.recipients,
-                            parent: checked
-                          })
-                        }
-                      />
-                      <Label htmlFor={`${rule.type}-parent`} className="text-sm">
-                        Parents
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Reminders */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Reminder Schedule</Label>
-                  <div className="space-y-3">
-                    {rule.reminders.map((reminder, reminderIndex) => (
-                      <div key={reminder.id} className="border rounded-lg p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={reminder.enabled}
-                              onCheckedChange={(enabled) => 
-                                handleReminderChange(ruleIndex, reminderIndex, 'enabled', enabled)
-                              }
-                            />
-                            <span className="text-sm font-medium">
-                              {reminder.timing.value} {reminder.timing.unit} before
-                            </span>
-                          </div>
-                          <Badge variant="secondary">
-                            {getChannelDisplayName(reminder.channel)}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <Label className="text-xs">Channel</Label>
-                            <Select
-                              value={reminder.channel}
-                              onValueChange={(value: NotificationChannel) => 
-                                handleReminderChange(ruleIndex, reminderIndex, 'channel', value)
-                              }
-                            >
-                              <SelectTrigger className="h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={NotificationChannel.SMS}>SMS Only</SelectItem>
-                                <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp Only</SelectItem>
-                                <SelectItem value={NotificationChannel.BOTH}>Both SMS & WhatsApp</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label className="text-xs">Template</Label>
-                            <Select
-                              value={reminder.customTemplateId || reminder.templateType}
-                              onValueChange={(value) => {
-                                // Check if it's a custom template ID or template type
-                                const isCustomTemplate = notificationTemplates.find(t => t.id === value);
-                                if (isCustomTemplate) {
-                                  handleReminderChange(ruleIndex, reminderIndex, 'customTemplateId', value);
-                                } else {
-                                  handleReminderChange(ruleIndex, reminderIndex, 'templateType', value);
-                                  handleReminderChange(ruleIndex, reminderIndex, 'customTemplateId', undefined);
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {/* Default templates for this type */}
-                                {notificationTemplates
-                                  .filter(t => t.type === reminder.templateType && t.isDefault)
-                                  .map(template => (
-                                    <SelectItem key={template.id} value={template.type}>
-                                      {template.name} ({template.language.toUpperCase()})
-                                    </SelectItem>
-                                  ))
-                                }
-                                {/* Custom templates */}
-                                {notificationTemplates
-                                  .filter(t => t.type === reminder.templateType && !t.isDefault)
-                                  .map(template => (
-                                    <SelectItem key={template.id} value={template.id!}>
-                                      {template.name} (Custom - {template.language.toUpperCase()})
-                                    </SelectItem>
-                                  ))
-                                }
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {/* Notification Rules Editor */}
+          {notificationRules.length > 0 || notificationTemplates.length > 0 ? (
+            <NotificationRulesEditor
+              schoolId={user?.schoolId || ''}
+              templates={notificationTemplates}
+              onSave={(updatedRules) => {
+                // Convert the rules to the format expected by the service
+                const formattedRules = updatedRules.map(rule => ({
+                  ...rule,
+                  schoolId: user?.schoolId || '',
+                  id: rule.type // Use type as ID for simplicity
+                }));
+                saveNotificationRulesMutation.mutate(formattedRules);
+              }}
+              initialRules={notificationRules.map(rule => ({
+                type: rule.type,
+                name: getRuleTypeDisplayName(rule.type),
+                description: `Configure ${getRuleTypeDisplayName(rule.type).toLowerCase()} settings`,
+                enabled: rule.enabled,
+                recipients: rule.recipients || { students: false, parents: true, teachers: false },
+                reminders: rule.reminders?.map((r, idx) => ({
+                  id: idx.toString(),
+                  value: r.timing?.value || 1,
+                  unit: r.timing?.unit || 'hours',
+                  channel: r.channel || 'both',
+                  templateId: r.templateId
+                })) || []
+              }))}
+              loading={saveNotificationRulesMutation.isPending}
+            />
+          ) : null}
 
           {/* Template Management */}
           <Card>
