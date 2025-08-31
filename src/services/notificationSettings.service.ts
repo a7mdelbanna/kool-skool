@@ -150,17 +150,20 @@ class NotificationSettingsService {
    */
   async saveTemplate(template: Omit<NotificationTemplate, 'id'>): Promise<string> {
     try {
+      // Clean undefined values from the template object
+      const cleanedTemplate = this.cleanUndefinedValues(template);
+      
       const templateData = {
-        ...template,
+        ...cleanedTemplate,
         updatedAt: serverTimestamp(),
         createdAt: template.createdAt ? Timestamp.fromDate(template.createdAt) : serverTimestamp()
       };
 
-      if (template.id) {
+      if ((template as any).id) {
         // Update existing template
-        const docRef = doc(db, this.templatesCollection, template.id);
+        const docRef = doc(db, this.templatesCollection, (template as any).id);
         await updateDoc(docRef, templateData);
-        return template.id;
+        return (template as any).id;
       } else {
         // Create new template
         const docRef = await addDoc(collection(db, this.templatesCollection), templateData);
@@ -302,24 +305,52 @@ class NotificationSettingsService {
   }
 
   /**
+   * Helper function to remove undefined values from an object
+   */
+  private cleanUndefinedValues(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.cleanUndefinedValues(item));
+    }
+    
+    if (typeof obj === 'object' && obj.constructor === Object) {
+      const cleaned: any = {};
+      for (const key in obj) {
+        if (obj[key] !== undefined) {
+          cleaned[key] = this.cleanUndefinedValues(obj[key]);
+        }
+      }
+      return cleaned;
+    }
+    
+    return obj;
+  }
+
+  /**
    * Save notification rule
    */
   async saveNotificationRule(rule: Omit<NotificationRule, 'id'>): Promise<string> {
     try {
+      // Clean undefined values from the rule object
+      const cleanedRule = this.cleanUndefinedValues(rule);
+      
       const ruleData = {
-        ...rule,
+        ...cleanedRule,
         updatedAt: serverTimestamp(),
         createdAt: rule.createdAt ? Timestamp.fromDate(rule.createdAt) : serverTimestamp()
       };
 
-      if (rule.id) {
+      if ((rule as any).id) {
         // Update existing rule
-        const docRef = doc(db, this.rulesCollection, rule.id);
+        const docRef = doc(db, this.rulesCollection, (rule as any).id);
         await updateDoc(docRef, ruleData);
-        return rule.id;
+        return (rule as any).id;
       } else {
         // Create new rule - first check if rule for this type already exists
-        const existingRule = await this.getNotificationRule(rule.schoolId!, rule.type);
+        const existingRule = await this.getNotificationRule(cleanedRule.schoolId!, cleanedRule.type);
         
         if (existingRule) {
           // Update existing rule
