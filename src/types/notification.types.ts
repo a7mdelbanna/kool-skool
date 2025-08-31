@@ -127,8 +127,26 @@ export const NOTIFICATION_VARIABLES: NotificationVariable[] = [
   {
     key: 'location',
     label: 'Location',
-    description: 'Lesson location or platform',
+    description: 'Lesson location or platform (deprecated, use zoomLink)',
     example: 'Zoom Meeting'
+  },
+  {
+    key: 'zoomLink',
+    label: 'Zoom Link',
+    description: 'Zoom meeting link for online lessons',
+    example: 'https://zoom.us/j/1234567890'
+  },
+  {
+    key: 'paymentMethod',
+    label: 'Payment Method',
+    description: 'Name of the payment method',
+    example: 'Bank Transfer'
+  },
+  {
+    key: 'paymentInstructions',
+    label: 'Payment Instructions',
+    description: 'Instructions for making payment',
+    example: 'Transfer to account 1234567890'
   },
   {
     key: 'schoolName',
@@ -185,8 +203,8 @@ export const DEFAULT_TEMPLATES: Omit<NotificationTemplate, 'id' | 'schoolId' | '
     name: 'Lesson Reminder - 15 Minutes',
     type: NotificationTemplateType.LESSON_REMINDER_15_MIN,
     language: 'en',
-    body: 'Hi {studentName}, your {subject} lesson with {teacherName} starts in 15 minutes! Please join now: {location}',
-    variables: ['studentName', 'subject', 'teacherName', 'location'],
+    body: 'Hi {studentName}, your {subject} lesson with {teacherName} starts in 15 minutes! Please join now: {zoomLink}',
+    variables: ['studentName', 'subject', 'teacherName', 'zoomLink'],
     isDefault: true,
     isActive: true
   },
@@ -194,8 +212,8 @@ export const DEFAULT_TEMPLATES: Omit<NotificationTemplate, 'id' | 'schoolId' | '
     name: 'Напоминание об уроке - 15 минут',
     type: NotificationTemplateType.LESSON_REMINDER_15_MIN,
     language: 'ru',
-    body: 'Привет {studentName}, ваш урок {subject} с {teacherName} начнется через 15 минут! Присоединяйтесь сейчас: {location}',
-    variables: ['studentName', 'subject', 'teacherName', 'location'],
+    body: 'Привет {studentName}, ваш урок {subject} с {teacherName} начнется через 15 минут! Присоединяйтесь сейчас: {zoomLink}',
+    variables: ['studentName', 'subject', 'teacherName', 'zoomLink'],
     isDefault: true,
     isActive: true
   },

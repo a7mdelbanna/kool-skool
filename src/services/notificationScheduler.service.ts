@@ -73,6 +73,23 @@ interface Payment {
 
 class NotificationSchedulerService {
   /**
+   * Get teacher's zoom link
+   */
+  private async getTeacherZoomLink(teacherId: string): Promise<string> {
+    try {
+      const teacherDoc = await getDoc(doc(db, 'users', teacherId));
+      if (teacherDoc.exists()) {
+        const teacher = teacherDoc.data();
+        return teacher.zoomLink || '';
+      }
+      return '';
+    } catch (error) {
+      console.error('Error fetching teacher zoom link:', error);
+      return '';
+    }
+  }
+
+  /**
    * Get phone number for a recipient
    */
   private async getRecipientPhone(
@@ -237,6 +254,9 @@ class NotificationSchedulerService {
             continue;
           }
 
+          // Get teacher's zoom link
+          const zoomLink = await this.getTeacherZoomLink(session.teacherId);
+          
           // Prepare variables
           const variables = {
             studentName: `${student.first_name} ${student.last_name}`,
@@ -247,7 +267,9 @@ class NotificationSchedulerService {
             date: format(sessionDateTime, 'MMMM d, yyyy'),
             time: session.time,
             duration: session.duration,
-            schoolName: 'TutorFlow Academy'
+            schoolName: 'TutorFlow Academy',
+            location: zoomLink || 'Online', // For backward compatibility
+            zoomLink: zoomLink || 'Meeting link will be provided'
           };
 
           // Send to configured recipients

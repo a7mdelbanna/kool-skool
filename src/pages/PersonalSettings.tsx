@@ -5,7 +5,8 @@ import {
   Phone, 
   MapPin, 
   Save,
-  Shield
+  Shield,
+  Video
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import TimezoneSelector from '@/components/TimezoneSelector';
+import TeacherZoomSettings from '@/components/TeacherZoomSettings';
 import { getEffectiveTimezone } from '@/utils/timezone';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -81,11 +83,17 @@ const PersonalSettings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-2 mb-6">
+        <TabsList className={`grid ${user?.role === 'teacher' ? 'grid-cols-3' : 'grid-cols-2'} mb-6`}>
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span>Profile</span>
           </TabsTrigger>
+          {user?.role === 'teacher' && (
+            <TabsTrigger value="meeting" className="gap-2">
+              <Video className="h-4 w-4" />
+              <span>Meeting</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="security" className="gap-2">
             <Shield className="h-4 w-4" />
             <span>Security</span>
@@ -164,6 +172,15 @@ const PersonalSettings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        
+        {user?.role === 'teacher' && (
+          <TabsContent value="meeting" className="mt-0 space-y-6">
+            <TeacherZoomSettings 
+              userId={user?.uid || user?.id || ''} 
+              userRole={user?.role || ''} 
+            />
+          </TabsContent>
+        )}
         
         <TabsContent value="security" className="mt-0 space-y-6">
           <Card className="glass glass-hover">
