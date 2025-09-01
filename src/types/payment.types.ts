@@ -24,6 +24,10 @@ export interface PaymentMethod {
   isActive: boolean;
   isDefault: boolean;
   
+  // Account linking - connects payment method to bookkeeping account
+  linkedAccountId?: string; // ID of the account in Supabase where funds are deposited
+  linkedAccountName?: string; // Cached name for display purposes
+  
   // For manual payment methods
   instructions?: string; // Detailed payment instructions
   accountName?: string;

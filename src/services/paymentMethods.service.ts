@@ -14,6 +14,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { supabase } from '@/integrations/supabase/client';
 import {
   PaymentMethod,
   PaymentMethodType,
@@ -319,7 +320,7 @@ class PaymentMethodsService {
   }
 
   /**
-   * Confirm a manual payment
+   * Confirm a manual payment and create accounting transaction
    */
   async confirmManualPayment(
     paymentId: string,
@@ -330,6 +331,14 @@ class PaymentMethodsService {
         ? PaymentStatus.PAID 
         : PaymentStatus.FAILED;
 
+      // First, get the payment details to find the payment method
+      const paymentDoc = await getDoc(doc(db, this.paymentsCollection, paymentId));
+      if (!paymentDoc.exists()) {
+        throw new Error('Payment not found');
+      }
+      
+      const payment = { id: paymentDoc.id, ...paymentDoc.data() } as Payment;
+
       const updateData: Partial<Payment> = {
         status,
         confirmedBy: confirmation.confirmedBy,
@@ -339,6 +348,49 @@ class PaymentMethodsService {
 
       if (status === PaymentStatus.PAID) {
         updateData.paidAt = confirmation.confirmedAt;
+        
+        // If payment is approved and has a payment method, create an accounting transaction
+        if (payment.paymentMethodId) {
+          // Get the payment method to find the linked account
+          const paymentMethod = await this.getPaymentMethod(payment.paymentMethodId);
+          
+          if (paymentMethod && paymentMethod.linkedAccountId) {
+            // Create a transaction in the Supabase accounting system
+            const { error: transactionError } = await supabase.rpc('create_transaction', {
+              p_school_id: payment.schoolId,
+              p_type: 'income',
+              p_amount: payment.amount,
+              p_currency: payment.currency,
+              p_transaction_date: new Date().toISOString().split('T')[0],
+              p_description: payment.description || `Student Payment - ${payment.paymentMethodName}`,
+              p_notes: `Payment confirmed by ${confirmation.confirmedBy}. ${confirmation.notes || ''}`,
+              p_contact_id: null, // Could link to student contact if available
+              p_from_account_id: null,
+              p_to_account_id: paymentMethod.linkedAccountId, // Deposit to linked account
+              p_payment_method: payment.paymentMethodName,
+              p_status: 'completed',
+              p_receipt_number: null,
+              p_receipt_url: payment.proofUrl || null,
+              p_tax_amount: null,
+              p_tax_rate: null,
+              p_is_recurring: false,
+              p_recurring_frequency: null,
+              p_recurring_end_date: null,
+              p_category_id: null,
+              p_tags: []
+            });
+
+            if (transactionError) {
+              console.error('Error creating accounting transaction:', transactionError);
+              // Don't fail the payment confirmation if accounting fails
+              // Just log the error
+            } else {
+              console.log('Accounting transaction created for payment:', paymentId);
+            }
+          } else {
+            console.warn('Payment method has no linked account, skipping accounting transaction');
+          }
+        }
       }
 
       await this.updatePaymentStatus(paymentId, status, updateData);

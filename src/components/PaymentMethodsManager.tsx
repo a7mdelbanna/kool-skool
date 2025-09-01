@@ -42,12 +42,14 @@ import {
   ArrowUp,
   ArrowDown,
   Upload,
-  Image
+  Image,
+  Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { paymentMethodsService } from '@/services/paymentMethods.service';
 import { uploadService } from '@/services/upload.service';
 import { uploadBase64Service } from '@/services/uploadBase64.service';
+import { supabase } from '@/integrations/supabase/client';
 import {
   PaymentMethod,
   PaymentMethodType,
@@ -72,6 +74,8 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -85,11 +89,13 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
     routingNumber: '',
     stripePublishableKey: '',
     stripeSecretKey: '',
-    isActive: true
+    isActive: true,
+    linkedAccountId: ''
   });
 
   useEffect(() => {
     loadPaymentMethods();
+    loadAccounts();
   }, [schoolId]);
 
   const loadPaymentMethods = async () => {
@@ -110,6 +116,26 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
       toast.error('Failed to load payment methods');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const { data, error } = await supabase.rpc('get_school_accounts', {
+        p_school_id: schoolId
+      });
+      
+      if (error) throw error;
+      
+      // Filter out archived accounts
+      const activeAccounts = (data || []).filter((account: any) => !account.is_archived);
+      setAccounts(activeAccounts);
+    } catch (error) {
+      console.error('Error loading accounts:', error);
+      toast.error('Failed to load accounts');
+    } finally {
+      setLoadingAccounts(false);
     }
   };
 
@@ -153,7 +179,8 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
         routingNumber: method.routingNumber || '',
         stripePublishableKey: method.stripePublishableKey || '',
         stripeSecretKey: method.stripeSecretKey || '',
-        isActive: method.isActive
+        isActive: method.isActive,
+        linkedAccountId: method.linkedAccountId || ''
       });
       setLogoPreview(method.icon || '');
       setLogoFile(null);
@@ -170,7 +197,8 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
         routingNumber: '',
         stripePublishableKey: '',
         stripeSecretKey: '',
-        isActive: true
+        isActive: true,
+        linkedAccountId: ''
       });
       setLogoPreview('');
       setLogoFile(null);
@@ -182,6 +210,11 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
     // Validate required fields
     if (!formData.name) {
       toast.error('Please enter a payment method name');
+      return;
+    }
+
+    if (!formData.linkedAccountId) {
+      toast.error('Please select a linked bookkeeping account');
       return;
     }
 
@@ -237,11 +270,17 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
       
       setUploadingLogo(false);
 
+      // Get the linked account name if account is selected
+      const linkedAccount = formData.linkedAccountId 
+        ? accounts.find(acc => acc.id === formData.linkedAccountId)
+        : null;
+
       if (editingMethod) {
         // Update existing method
         await paymentMethodsService.updatePaymentMethod(editingMethod.id!, {
           ...formData,
           icon: logoUrl || (editingMethod.icon),
+          linkedAccountName: linkedAccount?.name,
           schoolId
         });
         toast.success('Payment method updated successfully');
@@ -250,6 +289,7 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
         await paymentMethodsService.createPaymentMethod({
           ...formData,
           icon: logoUrl,
+          linkedAccountName: linkedAccount?.name,
           schoolId,
           createdBy: userId,
           isDefault: methods.length === 0 // First method is default
@@ -441,6 +481,12 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
                       {method.description && (
                         <p className="text-sm text-muted-foreground">{method.description}</p>
                       )}
+                      {method.linkedAccountName && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          <Wallet className="inline h-3 w-3 mr-1" />
+                          Deposits to: <span className="font-medium">{method.linkedAccountName}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -535,6 +581,35 @@ const PaymentMethodsManager: React.FC<PaymentMethodsManagerProps> = ({
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
+            </div>
+
+            {/* Linked Account - IMPORTANT for financial tracking */}
+            <div className="space-y-2">
+              <Label>Linked Bookkeeping Account *</Label>
+              <Select
+                value={formData.linkedAccountId}
+                onValueChange={(value) => setFormData({ ...formData, linkedAccountId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select where funds will be deposited" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingAccounts ? (
+                    <SelectItem value="loading" disabled>Loading accounts...</SelectItem>
+                  ) : accounts.length === 0 ? (
+                    <SelectItem value="none" disabled>No accounts available</SelectItem>
+                  ) : (
+                    accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name} ({account.currency_code})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                When students pay via this method, funds will be tracked in this account
+              </p>
             </div>
 
             {/* Logo Upload */}
