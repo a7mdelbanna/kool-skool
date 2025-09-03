@@ -389,28 +389,15 @@ const Students = () => {
     nextPaymentCurrency: string;
   }> => {
     try {
-      // Fetch subscriptions (check both field name formats)
-      let subscriptions = [];
+      // Use Supabase RPC to get subscriptions with session progress
+      // This is the same approach as Attendance page
+      const { data: subscriptions, error } = await supabase.rpc('get_student_subscriptions', {
+        p_student_id: studentId
+      });
       
-      try {
-        subscriptions = await databaseService.query('subscriptions', {
-          where: [{ field: 'student_id', operator: '==', value: studentId }]
-        });
-      } catch (e) {
-        // Try with camelCase if snake_case fails
-        subscriptions = await databaseService.query('subscriptions', {
-          where: [{ field: 'studentId', operator: '==', value: studentId }]
-        });
-      }
-      
-      if (subscriptions.length === 0) {
-        try {
-          subscriptions = await databaseService.query('subscriptions', {
-            where: [{ field: 'studentId', operator: '==', value: studentId }]
-          });
-        } catch (e) {
-          console.log('No subscriptions found for student');
-        }
+      if (error) {
+        console.error('Error fetching subscriptions with progress:', error);
+        throw error;
       }
 
       if (subscriptions.length === 0) {
@@ -438,37 +425,22 @@ const Students = () => {
         };
       }
 
-      // Fetch sessions for this subscription (check both field name formats)
-      let sessions = [];
+      // Use the session counts from RPC (already calculated)
+      const attendedSessions = activeSubscription.sessions_attended || 0;
+      const cancelledSessions = activeSubscription.sessions_cancelled || 0;
+      const scheduledSessions = activeSubscription.sessions_scheduled || 0;
       
-      try {
-        sessions = await databaseService.query('sessions', {
-          where: [{ field: 'subscription_id', operator: '==', value: activeSubscription.id }],
-          orderBy: [{ field: 'date', direction: 'asc' }]
-        });
-      } catch (e) {
-        // Try with camelCase if snake_case fails
-        sessions = await databaseService.query('sessions', {
-          where: [{ field: 'subscriptionId', operator: '==', value: activeSubscription.id }],
-          orderBy: [{ field: 'date', direction: 'asc' }]
-        });
-      }
-
-      // Calculate completed sessions
-      const completedSessions = sessions.filter(s => 
-        s.status === 'completed' || s.status === 'attended'
-      ).length;
-
-      // Find next scheduled session
-      const now = new Date();
-      const nextSession = sessions.find(s => {
-        const sessionDate = new Date(s.date);
-        return sessionDate >= now && (s.status === 'scheduled' || s.status === 'upcoming');
-      });
-
+      // For progress, count attended + cancelled as done (same as Attendance page)
+      const completedSessions = attendedSessions + cancelledSessions;
+      
+      // Total sessions from subscription
+      const totalSessions = activeSubscription.session_count || activeSubscription.sessionCount || 0;
+      
       // Calculate progress
-      const totalSessions = activeSubscription.sessionCount || activeSubscription.session_count || sessions.length;
       const progress = `${completedSessions}/${totalSessions}`;
+      
+      // Get next session date from RPC data
+      const nextSessionDate = activeSubscription.next_session_date || null;
 
       // Calculate next payment info
       const totalPaid = activeSubscription.totalPaid || activeSubscription.total_paid || 0;
@@ -477,7 +449,7 @@ const Students = () => {
       
       return {
         progress,
-        nextSessionDate: nextSession ? nextSession.date : null,
+        nextSessionDate,
         completedSessions,
         nextPaymentDate: remaining > 0 ? new Date().toISOString() : null,
         nextPaymentAmount: remaining,
