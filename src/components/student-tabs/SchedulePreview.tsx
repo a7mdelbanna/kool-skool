@@ -52,10 +52,13 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
     const dates = [];
     const currentWeekStart = startOfWeek(startDate);
     
-    // Generate next 4 session dates
-    for (let week = 0; week < 4 && dates.length < Math.min(sessionCount, 4); week++) {
+    // Generate all session dates based on sessionCount
+    // Calculate maximum weeks needed (assuming at least one session per week)
+    const maxWeeks = Math.ceil(sessionCount / schedule.length) + 4; // Add buffer weeks
+    
+    for (let week = 0; week < maxWeeks && dates.length < sessionCount; week++) {
       schedule.forEach(scheduleItem => {
-        if (dates.length >= Math.min(sessionCount, 4)) return;
+        if (dates.length >= sessionCount) return;
         
         const dayOfWeek = getDayOfWeekNumber(scheduleItem.day);
         if (dayOfWeek !== -1) {
@@ -71,7 +74,7 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
       });
     }
     
-    return dates.sort((a, b) => a.date.getTime() - b.date.getTime());
+    return dates.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, sessionCount);
   };
 
   const nextSessions = getNextSessionDates();
@@ -137,7 +140,7 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
         {nextSessions.length > 0 && (
           <div>
             <p className="text-sm font-medium text-gray-900 mb-2">Next Sessions</p>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {nextSessions.map((session, index) => (
                 <div key={index} className="flex items-center justify-between bg-white rounded-lg p-2 border text-sm">
                   <div className="flex items-center space-x-2">
@@ -149,11 +152,6 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
                   <span className="text-gray-600">{formatTime(session.time)}</span>
                 </div>
               ))}
-              {sessionCount > 4 && (
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  ...and {sessionCount - 4} more sessions
-                </p>
-              )}
             </div>
           </div>
         )}
