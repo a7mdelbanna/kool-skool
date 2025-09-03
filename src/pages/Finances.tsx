@@ -106,12 +106,16 @@ const FinancesPage = () => {
     // Handle different date formats
     let transactionDate: Date;
     
-    // If date is in YYYY-MM-DD format, parse it properly
+    // If date is in YYYY-MM-DD format, parse it as local date (not UTC)
     if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      // Add time to make it a valid ISO string for proper parsing
-      transactionDate = new Date(date + 'T00:00:00');
+      // Parse as local date by splitting and using Date constructor with year, month, day
+      const [year, month, day] = date.split('-').map(Number);
+      transactionDate = new Date(year, month - 1, day); // month is 0-indexed
+    } else if (date.includes('T')) {
+      // If it's an ISO string with time, parse it directly
+      transactionDate = new Date(date);
     } else {
-      // Otherwise try to parse as-is (handles ISO strings and other formats)
+      // Otherwise try to parse as-is
       transactionDate = new Date(date);
     }
     
@@ -121,24 +125,38 @@ const FinancesPage = () => {
       return false;
     }
     
+    // For date-only comparisons, compare just the date parts (ignore time)
+    const transactionDateOnly = new Date(
+      transactionDate.getFullYear(),
+      transactionDate.getMonth(),
+      transactionDate.getDate()
+    );
+    const rangeStartDateOnly = new Date(
+      dateRange.from.getFullYear(),
+      dateRange.from.getMonth(),
+      dateRange.from.getDate()
+    );
+    const rangeEndDateOnly = new Date(
+      dateRange.to.getFullYear(),
+      dateRange.to.getMonth(),
+      dateRange.to.getDate(),
+      23, 59, 59, 999 // End of day
+    );
+    
     // Debug logging for date filtering
     if (dateFilter === 'today' || dateFilter === 'month') {
       console.log('Date filter check:', {
         filter: dateFilter,
-        transactionDate: transactionDate.toISOString(),
-        rangeStart: dateRange.from.toISOString(),
-        rangeEnd: dateRange.to.toISOString(),
-        inRange: isWithinInterval(transactionDate, {
-          start: dateRange.from,
-          end: dateRange.to
-        })
+        originalDate: date,
+        transactionDate: transactionDateOnly.toLocaleDateString(),
+        rangeStart: rangeStartDateOnly.toLocaleDateString(),
+        rangeEnd: rangeEndDateOnly.toLocaleDateString(),
+        inRange: transactionDateOnly >= rangeStartDateOnly && transactionDateOnly <= rangeEndDateOnly
       });
     }
     
-    return isWithinInterval(transactionDate, {
-      start: dateRange.from,
-      end: dateRange.to
-    });
+    // Compare dates without time components
+    return transactionDateOnly >= rangeStartDateOnly && transactionDateOnly <= rangeEndDateOnly;
   };
 
   // Fetch available currencies
