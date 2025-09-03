@@ -521,33 +521,64 @@ async function handleAddSubscription(params: any) {
       const startDate = new Date(params.p_start_date);
       const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       
-      // Get the schedule details
-      const schedule = params.p_schedule[0]; // For now, use first schedule item
-      const scheduledDay = schedule.day;
-      const scheduledTime = schedule.time;
-      
-      // Find the day index for the scheduled day
-      const dayIndex = daysOfWeek.findIndex(day => day.toLowerCase() === scheduledDay.toLowerCase());
-      
-      // Calculate actual session dates based on schedule
-      let currentDate = new Date(startDate);
-      let sessionsCreated = 0;
-      
-      // Find the first occurrence of the scheduled day
-      while (currentDate.getDay() !== dayIndex && sessionsCreated < 100) { // Safety limit
-        currentDate.setDate(currentDate.getDate() + 1);
+      // Get all scheduled days and times
+      const scheduleItems = params.p_schedule || [];
+      if (scheduleItems.length === 0) {
+        console.warn('No schedule items provided');
+        return { data: [{ id: subscriptionId, ...subscriptionData }], error: null };
       }
       
-      // Create sessions on the scheduled day of each week
-      for (let sessionNumber = 1; sessionNumber <= params.p_session_count; sessionNumber++) {
+      // Convert schedule days to day indices and sort them
+      const scheduledDays = scheduleItems.map(item => ({
+        dayIndex: daysOfWeek.findIndex(day => day.toLowerCase() === item.day.toLowerCase()),
+        time: item.time
+      })).sort((a, b) => a.dayIndex - b.dayIndex);
+      
+      if (DEBUG_MODE) {
+        console.log('Processing schedule with days:', scheduledDays);
+      }
+      
+      // Find the first scheduled session date
+      let currentDate = new Date(startDate);
+      let sessionDates = [];
+      
+      // Generate all session dates
+      while (sessionDates.length < params.p_session_count) {
+        const currentDayIndex = currentDate.getDay();
+        
+        // Check if current date matches any scheduled day
+        const matchingSchedule = scheduledDays.find(s => s.dayIndex === currentDayIndex);
+        
+        if (matchingSchedule && currentDate >= startDate) {
+          sessionDates.push({
+            date: new Date(currentDate),
+            time: matchingSchedule.time
+          });
+        }
+        
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
+        
+        // Safety limit to prevent infinite loop
+        if (currentDate > new Date(startDate.getTime() + (365 * 24 * 60 * 60 * 1000))) {
+          console.warn('Reached safety limit while generating sessions');
+          break;
+        }
+      }
+      
+      // Create session records
+      for (let i = 0; i < sessionDates.length; i++) {
+        const sessionNumber = i + 1;
+        const { date, time } = sessionDates[i];
+        
         const sessionData = {
           subscriptionId: subscriptionId,  // Use camelCase for Firebase
           studentId: params.p_student_id,
           schoolId: params.p_current_school_id,
           teacherId: params.p_teacher_id || null,
           sessionNumber: sessionNumber,
-          scheduledDate: currentDate.toISOString().split('T')[0],
-          scheduledTime: scheduledTime || '00:00',
+          scheduledDate: date.toISOString().split('T')[0],
+          scheduledTime: time || '00:00',
           durationMinutes: 60, // Default duration
           status: 'scheduled',
           countsTowardCompletion: true, // New sessions count toward completion
@@ -558,10 +589,6 @@ async function handleAddSubscription(params: any) {
         
         const sessionId = await databaseService.create('sessions', sessionData);
         sessions.push({ id: sessionId, ...sessionData });
-        
-        // Move to next week for the next session
-        currentDate.setDate(currentDate.getDate() + 7);
-        sessionsCreated++;
       }
       
       if (DEBUG_MODE) console.log('Created sessions:', sessions.length);
