@@ -121,6 +121,33 @@ const progress = `${completedSessions}/${totalSessions}`;
 - Progress = attended sessions + cancelled sessions
 - This matches the Attendance page logic where cancelled sessions count toward progress
 
+## 5. Next Session Date Calculation (Students.tsx - calculateStudentProgress)
+
+**MUST USE SUPABASE RPC** for fetching sessions
+```typescript  
+// CORRECT - Fetch sessions to find next upcoming
+const { data: sessions } = await supabase.rpc('get_lesson_sessions', {
+  p_student_id: studentId
+});
+
+// Filter for upcoming scheduled sessions
+const upcomingSessions = sessions
+  .filter(s => 
+    s.subscription_id === activeSubscription.id &&
+    s.status === 'scheduled' &&
+    new Date(s.scheduled_date) >= now
+  )
+  .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+
+// Take the first upcoming session
+nextSessionDate = upcomingSessions[0]?.scheduled_date;
+```
+
+**Logic (Same as Sessions Tab):**
+- Session status must be 'scheduled'
+- Session date must be >= today
+- Take the earliest upcoming session by sorting
+
 ## Test Results:
 - Юля Савельева: RUB 6300 paid → Shows as "Paid" ✅
 - Progress: 0/5 → Shows correctly ✅
