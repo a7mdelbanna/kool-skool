@@ -1643,23 +1643,49 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
     
     // Fetch categories
     const categoryMap = new Map<string, string>();
-    if (categoryIds.size > 0) {
-      const categories = await databaseService.query('transaction_categories', {
-        where: [{ field: 'school_id', operator: '==', value: params.p_school_id }]
+    if (categoryIds.size > 0 || studentIds.size > 0) {
+      // Try both field name formats for categories
+      let categories = await databaseService.query('transaction_categories', {
+        where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
       });
       
+      // If no results, try snake_case format
+      if (!categories || categories.length === 0) {
+        categories = await databaseService.query('transaction_categories', {
+          where: [{ field: 'school_id', operator: '==', value: params.p_school_id }]
+        });
+      }
+      
+      // Map all categories by ID, not just the ones in categoryIds
+      // This ensures we have all income categories available for students
       categories.forEach((category: any) => {
-        if (categoryIds.has(category.id)) {
-          categoryMap.set(category.id, category.name || 'Unknown Category');
-        }
+        categoryMap.set(category.id, category.name || 'Unknown Category');
       });
     }
     
     // Enrich transactions with account, contact/student, and category names
-    const enrichedTransactions = transactions.map((transaction: any) => {
+    const enrichedTransactions = await Promise.all(transactions.map(async (transaction: any) => {
       const studentId = transaction.studentId || transaction.student_id;
       const contactId = transaction.contactId || transaction.contact_id;
-      const categoryId = transaction.categoryId || transaction.category_id;
+      let categoryId = transaction.categoryId || transaction.category_id;
+      
+      // If transaction has no category but has a student, try to get category from student
+      if (!categoryId && studentId) {
+        try {
+          const student = students.find(s => s.id === studentId);
+          if (student && (student.income_category_id || student.incomeCategoryId)) {
+            categoryId = student.income_category_id || student.incomeCategoryId;
+            console.log(`📂 Using student's income category for transaction: ${categoryId}`);
+            
+            // Update the transaction in the database to have this category_id for future
+            await databaseService.update('transactions', transaction.id, {
+              category_id: categoryId
+            });
+          }
+        } catch (error) {
+          console.warn('Could not update transaction category:', error);
+        }
+      }
       
       let contactName = null;
       
@@ -1684,7 +1710,7 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
         contact_id: contactId,
         category_id: categoryId
       };
-    });
+    }));
     
     if (DEBUG_MODE) console.log(`Found ${enrichedTransactions.length} transactions for school`);
     
