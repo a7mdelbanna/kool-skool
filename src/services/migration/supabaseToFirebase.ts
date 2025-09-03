@@ -1583,8 +1583,9 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
     
     // Fetch students and their user data
     const studentMap = new Map<string, string>();
+    let students: any[] = [];
     if (studentIds.size > 0) {
-      const students = await databaseService.query('students', {
+      students = await databaseService.query('students', {
         where: [{ field: 'schoolId', operator: '==', value: params.p_school_id }]
       });
       
