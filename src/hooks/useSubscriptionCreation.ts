@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { toast } from 'sonner';
 
 interface SubscriptionFormData {
@@ -159,6 +160,18 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
       if (formData.initialPayment.amount > 0 && formData.initialPayment.accountId) {
         console.log('💰 Creating initial payment transaction...');
         
+        // Get student's income category if available
+        let categoryId = null;
+        try {
+          const student = await databaseService.getById('students', studentId);
+          if (student) {
+            categoryId = student.income_category_id || student.incomeCategoryId || null;
+            console.log('📂 Student income category ID:', categoryId);
+          }
+        } catch (error) {
+          console.warn('Could not fetch student income category:', error);
+        }
+        
         const { data: transactionId, error: transactionError } = await supabase.rpc('create_transaction', {
           p_school_id: schoolId,
           p_type: 'income',
@@ -170,6 +183,7 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
           p_to_account_id: formData.initialPayment.accountId,
           p_payment_method: formData.initialPayment.method,
           p_tag_ids: null,
+          p_category_id: categoryId, // Include the student's income category
           p_subscription_id: subscriptionId, // Link to subscription directly
           p_student_id: studentId // Also link to student for easier tracking
         });

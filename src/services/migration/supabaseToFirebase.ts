@@ -784,6 +784,7 @@ async function handleCreateTransaction(params: any) {
       from_account_id: params.p_from_account_id || null,
       payment_method: params.p_payment_method || 'Cash',
       tag_ids: params.p_tag_ids || [],
+      category_id: params.p_category_id || null, // Add category_id field
       subscription_id: params.p_subscription_id || null,
       student_id: params.p_student_id || null,
       status: 'completed', // Add status field as completed by default
