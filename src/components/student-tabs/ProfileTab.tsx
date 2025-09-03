@@ -133,7 +133,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
   };
 
   const handleParentInfoChange = (field: keyof ParentInfo, value: string) => {
-    const currentParentInfo = studentData.parentInfo || {
+    // Check both field names for compatibility with Firebase snake_case
+    const currentParentInfo = studentData.parentInfo || (studentData as any).parent_info || {
       name: '',
       relationship: 'mother' as const,
       phone: '',
@@ -429,7 +430,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                 onClick={() => {
                   handleInputChange("ageGroup", "kid");
                   // Initialize parent info when switching to kid
-                  if (studentData.ageGroup !== "kid" && !studentData.parentInfo) {
+                  if (studentData.ageGroup !== "kid" && !studentData.parentInfo && !(studentData as any).parent_info) {
                     handleParentInfoChange("relationship", "mother");
                   }
                 }}
@@ -625,7 +626,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               <Label htmlFor="parentName">Parent/Guardian Name*</Label>
               <Input
                 id="parentName"
-                value={studentData.parentInfo?.name || ""}
+                value={studentData.parentInfo?.name || (studentData as any).parent_info?.name || ""}
                 onChange={(e) => handleParentInfoChange("name", e.target.value)}
                 placeholder="Full name"
                 disabled={isViewMode}
@@ -635,7 +636,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             <div className="space-y-2">
               <Label htmlFor="relationship">Relationship*</Label>
               <Select
-                value={studentData.parentInfo?.relationship || "mother"}
+                value={studentData.parentInfo?.relationship || (studentData as any).parent_info?.relationship || "mother"}
                 onValueChange={(value: "mother" | "father" | "guardian") => handleParentInfoChange("relationship", value)}
                 disabled={isViewMode}
               >
@@ -654,13 +655,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               <Label htmlFor="parentPhone">Parent Phone*</Label>
               <div className="flex gap-2">
                 <CountryCodeSelector
-                  value={studentData.parentInfo?.countryCode || "+7"}
+                  value={studentData.parentInfo?.countryCode || (studentData as any).parent_info?.countryCode || "+7"}
                   onSelect={(code) => handleParentInfoChange("countryCode", code)}
                   disabled={isViewMode}
                 />
                 <Input
                   id="parentPhone"
-                  value={studentData.parentInfo?.phone || ""}
+                  value={studentData.parentInfo?.phone || (studentData as any).parent_info?.phone || ""}
                   onChange={(e) => handleParentInfoChange("phone", e.target.value)}
                   placeholder="Phone number"
                   disabled={isViewMode}
@@ -674,7 +675,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               <Input
                 id="parentEmail"
                 type="email"
-                value={studentData.parentInfo?.email || ""}
+                value={studentData.parentInfo?.email || (studentData as any).parent_info?.email || ""}
                 onChange={(e) => handleParentInfoChange("email", e.target.value)}
                 placeholder="parent@example.com (optional)"
                 disabled={isViewMode}

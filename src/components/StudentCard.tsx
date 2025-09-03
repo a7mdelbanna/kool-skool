@@ -45,6 +45,7 @@ export interface Student {
   nextPaymentCurrency?: string;
   subscriptionProgress?: string;
   parentInfo?: ParentInfo;
+  parent_info?: ParentInfo; // Firebase stores with snake_case
   // Additional Info fields
   socialLinks?: SocialLink[];
   birthday?: string;
