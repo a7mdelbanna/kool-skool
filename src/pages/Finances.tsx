@@ -325,13 +325,15 @@ const FinancesPage = () => {
       return sum + convertedAmount;
     }, 0);
     
-    // Add transaction stats with date filtering
-    const filteredIncomeTransactions = transactions.filter(t => 
-      t.type === 'income' && isDateInRange(t.transaction_date)
-    );
-    const filteredExpenseTransactions = transactions.filter(t => 
-      t.type === 'expense' && isDateInRange(t.transaction_date)
-    );
+    // Add transaction stats with date filtering (handle multiple date field formats)
+    const filteredIncomeTransactions = transactions.filter(t => {
+      const transactionDate = t.transaction_date || t.transactionDate || t.date || t.created_at;
+      return t.type === 'income' && transactionDate && isDateInRange(transactionDate);
+    });
+    const filteredExpenseTransactions = transactions.filter(t => {
+      const transactionDate = t.transaction_date || t.transactionDate || t.date || t.created_at;
+      return t.type === 'expense' && transactionDate && isDateInRange(transactionDate);
+    });
     
     const totalTransactionIncome = filteredIncomeTransactions.reduce((sum, t) => {
       const convertedAmount = selectedCurrency ? 
@@ -392,7 +394,7 @@ const FinancesPage = () => {
       student_name: t.contact_name,
       amount: t.amount,
       currency: t.currency,
-      date: t.transaction_date,
+      date: t.transaction_date || t.transactionDate || t.date || t.created_at,
       method: t.payment_method,
       status: t.status,
       notes: t.notes,
