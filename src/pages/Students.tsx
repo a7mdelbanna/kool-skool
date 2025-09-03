@@ -439,8 +439,32 @@ const Students = () => {
       // Calculate progress
       const progress = `${completedSessions}/${totalSessions}`;
       
-      // Get next session date from RPC data
-      const nextSessionDate = activeSubscription.next_session_date || null;
+      // Fetch actual sessions to find the next upcoming one
+      let nextSessionDate = null;
+      try {
+        const { data: sessions, error: sessionsError } = await supabase.rpc('get_lesson_sessions', {
+          p_student_id: studentId
+        });
+        
+        if (!sessionsError && sessions && sessions.length > 0) {
+          // Filter sessions for this subscription and find upcoming ones
+          const now = new Date();
+          const upcomingSessions = sessions
+            .filter(s => 
+              s.subscription_id === activeSubscription.id &&
+              s.status === 'scheduled' &&
+              new Date(s.scheduled_date) >= now
+            )
+            .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+          
+          if (upcomingSessions.length > 0) {
+            nextSessionDate = upcomingSessions[0].scheduled_date;
+            console.log(`📅 Next session for student ${studentId}: ${nextSessionDate}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching sessions for next date:', error);
+      }
 
       // Calculate next payment info
       const totalPaid = activeSubscription.totalPaid || activeSubscription.total_paid || 0;
