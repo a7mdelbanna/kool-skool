@@ -108,8 +108,35 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
           }
         })
       );
+      
+      // Filter students array to remove nulls
+      const validStudents = students.filter(s => s !== null);
+      console.log('✅ Valid students found:', validStudents.length);
+      
+      // Filter subscriptions to only include those with existing students
+      const validSubscriptions = subscriptions.filter((subscription: any) => {
+        const studentId = subscription.studentId || subscription.student_id;
+        if (!studentId) {
+          console.log('⚠️ Subscription has no student ID:', subscription.id);
+          return false;
+        }
+        const studentExists = validStudents.some(s => s?.id === studentId);
+        if (!studentExists) {
+          console.log('⚠️ Filtering out subscription for non-existent student:', studentId);
+        }
+        return studentExists;
+      });
+      
+      console.log('📋 Valid subscriptions after filtering:', validSubscriptions.length);
+      
+      if (validSubscriptions.length === 0) {
+        console.log('No valid subscriptions with existing students');
+        return [];
+      }
+      
+      // Use the filtered lists for the rest of the function
 
-      const userIds = students.filter(s => s).map(s => s.userId || s.user_id).filter(Boolean);
+      const userIds = validStudents.filter(s => s).map(s => s.userId || s.user_id).filter(Boolean);
       console.log('🔍 Fetching users for IDs:', userIds);
       
       const users = await Promise.all(
@@ -126,10 +153,10 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
       );
 
       // Batch fetch all sessions for all subscriptions
-      console.log('⏳ Fetching sessions for', subscriptions.length, 'subscriptions...');
+      console.log('⏳ Fetching sessions for', validSubscriptions.length, 'subscriptions...');
       
       const sessionsBySubscription = await Promise.all(
-        subscriptions.map(async (subscription: any) => {
+        validSubscriptions.map(async (subscription: any) => {
           try {
             // Fetch all sessions for this subscription - try both field formats
             let allSessions = await databaseService.query('sessions', {
@@ -166,7 +193,7 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
       for (const { subscription, sessions } of sessionsBySubscription) {
         // Get student and user info for name (handle both field formats)
         const studentId = subscription.studentId || subscription.student_id;
-        const student = students.find(s => s?.id === studentId);
+        const student = validStudents.find(s => s?.id === studentId);
         
         // Skip subscriptions for non-existent students
         if (studentId && !student) {
