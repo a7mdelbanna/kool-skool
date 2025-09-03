@@ -169,6 +169,8 @@ export const supabase = {
         return handleUpdateStudentPassword(params);
       case 'verify_password_update':
         return handleVerifyPasswordUpdate(params);
+      case 'update_subscription_with_related_data':
+        return handleUpdateSubscriptionWithRelatedData(params);
       default:
         console.warn(`RPC function ${functionName} not implemented`);
         return { data: null, error: new Error('Function not implemented') };
@@ -606,6 +608,135 @@ async function handleAddSubscription(params: any) {
     };
   } catch (error) {
     console.error('Error creating subscription:', error);
+    return { data: null, error };
+  }
+}
+
+async function handleUpdateSubscriptionWithRelatedData(params: any) {
+  try {
+    const DEBUG_MODE = false;
+    if (DEBUG_MODE) {
+      console.log('Updating subscription with params:', params);
+    }
+    
+    const subscriptionId = params.p_subscription_id;
+    if (!subscriptionId) {
+      throw new Error('Subscription ID is required');
+    }
+    
+    // Update the subscription
+    const updateData: any = {
+      sessionCount: params.p_session_count,
+      durationMonths: params.p_duration_months,
+      sessionDurationMinutes: params.p_session_duration_minutes || 60,
+      startDate: params.p_start_date,
+      schedule: params.p_schedule,
+      priceMode: params.p_price_mode,
+      pricePerSession: params.p_price_per_session,
+      fixedPrice: params.p_fixed_price,
+      totalPrice: params.p_total_price,
+      currency: params.p_currency,
+      notes: params.p_notes || '',
+      status: params.p_status || 'active',
+      updatedAt: new Date().toISOString()
+    };
+    
+    await databaseService.update('subscriptions', subscriptionId, updateData);
+    
+    // Delete existing sessions for this subscription
+    const existingSessions = await databaseService.query('sessions', {
+      where: [{ field: 'subscriptionId', operator: '==', value: subscriptionId }]
+    });
+    
+    // Delete each existing session
+    for (const session of existingSessions) {
+      await databaseService.delete('sessions', session.id);
+    }
+    
+    // Regenerate sessions with the new schedule
+    if (params.p_schedule && params.p_schedule.length > 0 && params.p_session_count > 0) {
+      const sessions = [];
+      const startDate = new Date(params.p_start_date);
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      
+      // Get all scheduled days and times
+      const scheduleItems = params.p_schedule || [];
+      
+      // Convert schedule days to day indices and sort them
+      const scheduledDays = scheduleItems.map(item => ({
+        dayIndex: daysOfWeek.findIndex(day => day.toLowerCase() === item.day.toLowerCase()),
+        time: item.time
+      })).sort((a, b) => a.dayIndex - b.dayIndex);
+      
+      // Find the first scheduled session date
+      let currentDate = new Date(startDate);
+      let sessionDates = [];
+      
+      // Generate all session dates
+      while (sessionDates.length < params.p_session_count) {
+        const currentDayIndex = currentDate.getDay();
+        
+        // Check if current date matches any scheduled day
+        const matchingSchedule = scheduledDays.find(s => s.dayIndex === currentDayIndex);
+        
+        if (matchingSchedule && currentDate >= startDate) {
+          sessionDates.push({
+            date: new Date(currentDate),
+            time: matchingSchedule.time
+          });
+        }
+        
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
+        
+        // Safety limit to prevent infinite loop
+        if (currentDate > new Date(startDate.getTime() + (365 * 24 * 60 * 60 * 1000))) {
+          console.warn('Reached safety limit while generating sessions');
+          break;
+        }
+      }
+      
+      // Get the student ID from the subscription
+      const subscription = await databaseService.getById('subscriptions', subscriptionId);
+      const studentId = subscription?.studentId || subscription?.student_id;
+      
+      // Create session records
+      for (let i = 0; i < sessionDates.length; i++) {
+        const sessionNumber = i + 1;
+        const { date, time } = sessionDates[i];
+        
+        const sessionData = {
+          subscriptionId: subscriptionId,
+          studentId: studentId,
+          schoolId: params.p_current_school_id,
+          teacherId: subscription?.teacherId || null,
+          sessionNumber: sessionNumber,
+          scheduledDate: date.toISOString().split('T')[0],
+          scheduledTime: time || '00:00',
+          durationMinutes: params.p_session_duration_minutes || 60,
+          status: 'scheduled',
+          countsTowardCompletion: true,
+          indexInSub: sessionNumber,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        const sessionId = await databaseService.create('sessions', sessionData);
+        sessions.push({ id: sessionId, ...sessionData });
+      }
+      
+      if (DEBUG_MODE) console.log('Regenerated sessions:', sessions.length);
+    }
+    
+    return { 
+      data: { 
+        success: true, 
+        message: 'Subscription updated successfully' 
+      }, 
+      error: null 
+    };
+  } catch (error) {
+    console.error('Error updating subscription:', error);
     return { data: null, error };
   }
 }
