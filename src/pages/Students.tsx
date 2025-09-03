@@ -511,6 +511,11 @@ const Students = () => {
   };
 
   const mapStudentDataToStudent = (data: any): Student => {
+    // Guard against undefined data
+    if (!data) {
+      console.error('[Students] mapStudentDataToStudent called with undefined data');
+      return {} as Student;
+    }
     
     // Format next session date for display
     const formatNextSession = (dateStr: string | null): string => {
@@ -541,6 +546,9 @@ const Students = () => {
       level: data.level || 'Beginner',
       phone: data.phone || '',
       countryCode: data.countryCode || data.country_code || '',
+      // IMPORTANT: Include parent info from both possible field names
+      parentInfo: data.parentInfo || data.parent_info || null,
+      parent_info: data.parent_info || data.parentInfo || null,
       paymentStatus: (() => {
         const status = data.paymentStatus || data.payment_status || 'overdue';
         // Convert pending to overdue
@@ -556,7 +564,6 @@ const Students = () => {
       nextPaymentAmount: data.nextPaymentAmount || data.next_payment_amount,
       nextPaymentCurrency: data.nextPaymentCurrency || data.next_payment_currency || 'USD',
       subscriptionProgress: data.subscriptionProgress || data.subscription_progress || '0/0',
-      parentInfo: data.parentName ? { name: data.parentName, phone: data.parentPhone } : null,
       // Additional Info fields
       socialLinks: data.socialLinks || data.social_links || [],
       birthday: data.birthday || data.dateOfBirth,
