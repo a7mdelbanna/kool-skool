@@ -130,11 +130,170 @@ export const useStudentForm = (
           
           // Check if the phone already has a country code
           if (phoneStr.startsWith('+')) {
-            // Extract country code from the phone
-            const match = phoneStr.match(/^(\+\d{1,4})/);
-            if (match) {
-              processedParentInfo.countryCode = match[1];
-              processedParentInfo.phone = phoneStr.substring(match[1].length).trim();
+            // Extract country code from the phone - be more specific for common codes
+            // Check for specific country codes first (ordered by length to avoid conflicts)
+            if (phoneStr.startsWith('+998')) {
+              // Uzbekistan
+              processedParentInfo.countryCode = '+998';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+996')) {
+              // Kyrgyzstan
+              processedParentInfo.countryCode = '+996';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+995')) {
+              // Georgia
+              processedParentInfo.countryCode = '+995';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+994')) {
+              // Azerbaijan
+              processedParentInfo.countryCode = '+994';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+993')) {
+              // Turkmenistan
+              processedParentInfo.countryCode = '+993';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+992')) {
+              // Tajikistan
+              processedParentInfo.countryCode = '+992';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+380')) {
+              // Ukraine
+              processedParentInfo.countryCode = '+380';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+375')) {
+              // Belarus
+              processedParentInfo.countryCode = '+375';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+374')) {
+              // Armenia
+              processedParentInfo.countryCode = '+374';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+373')) {
+              // Moldova
+              processedParentInfo.countryCode = '+373';
+              processedParentInfo.phone = phoneStr.substring(4).trim();
+            } else if (phoneStr.startsWith('+90')) {
+              // Turkey
+              processedParentInfo.countryCode = '+90';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+86')) {
+              // China
+              processedParentInfo.countryCode = '+86';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+84')) {
+              // Vietnam
+              processedParentInfo.countryCode = '+84';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+82')) {
+              // South Korea
+              processedParentInfo.countryCode = '+82';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+81')) {
+              // Japan
+              processedParentInfo.countryCode = '+81';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+66')) {
+              // Thailand
+              processedParentInfo.countryCode = '+66';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+65')) {
+              // Singapore
+              processedParentInfo.countryCode = '+65';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+63')) {
+              // Philippines
+              processedParentInfo.countryCode = '+63';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+62')) {
+              // Indonesia
+              processedParentInfo.countryCode = '+62';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+60')) {
+              // Malaysia
+              processedParentInfo.countryCode = '+60';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+49')) {
+              // Germany
+              processedParentInfo.countryCode = '+49';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+48')) {
+              // Poland
+              processedParentInfo.countryCode = '+48';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+47')) {
+              // Norway
+              processedParentInfo.countryCode = '+47';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+46')) {
+              // Sweden
+              processedParentInfo.countryCode = '+46';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+45')) {
+              // Denmark
+              processedParentInfo.countryCode = '+45';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+44')) {
+              // United Kingdom
+              processedParentInfo.countryCode = '+44';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+43')) {
+              // Austria
+              processedParentInfo.countryCode = '+43';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+41')) {
+              // Switzerland
+              processedParentInfo.countryCode = '+41';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+40')) {
+              // Romania
+              processedParentInfo.countryCode = '+40';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+39')) {
+              // Italy
+              processedParentInfo.countryCode = '+39';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+34')) {
+              // Spain
+              processedParentInfo.countryCode = '+34';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+33')) {
+              // France
+              processedParentInfo.countryCode = '+33';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+32')) {
+              // Belgium
+              processedParentInfo.countryCode = '+32';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+31')) {
+              // Netherlands
+              processedParentInfo.countryCode = '+31';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+30')) {
+              // Greece
+              processedParentInfo.countryCode = '+30';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+27')) {
+              // South Africa
+              processedParentInfo.countryCode = '+27';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+20')) {
+              // Egypt
+              processedParentInfo.countryCode = '+20';
+              processedParentInfo.phone = phoneStr.substring(3).trim();
+            } else if (phoneStr.startsWith('+7')) {
+              // Russia/Kazakhstan
+              processedParentInfo.countryCode = '+7';
+              processedParentInfo.phone = phoneStr.substring(2).trim();
+            } else if (phoneStr.startsWith('+1')) {
+              // USA/Canada
+              processedParentInfo.countryCode = '+1';
+              processedParentInfo.phone = phoneStr.substring(2).trim();
+            } else {
+              // For other countries, try to extract based on standard patterns
+              const match = phoneStr.match(/^(\+\d{1,3})/);
+              if (match) {
+                processedParentInfo.countryCode = match[1];
+                processedParentInfo.phone = phoneStr.substring(match[1].length).trim();
             } else {
               // Couldn't extract, use default
               processedParentInfo.countryCode = '+7';
@@ -508,12 +667,22 @@ export const useStudentForm = (
         
         // Add parent information if this is a kid
         if (studentData.ageGroup === 'kid' && studentData.parentInfo) {
-          studentPayload.parent_info = {
-            name: studentData.parentInfo.name,
-            relationship: studentData.parentInfo.relationship,
-            phone: `${studentData.parentInfo.countryCode}${studentData.parentInfo.phone.replace(/^\+?[0-9]*/, '')}`,
-            email: studentData.parentInfo.email
-          };
+          // Process parent phone similar to student phone - combine country code with phone
+          const processedParentInfo = { ...studentData.parentInfo };
+          
+          if (processedParentInfo.phone && processedParentInfo.phone.trim() !== '') {
+            const cleanParentPhone = processedParentInfo.phone.replace(/^\+/, '').trim();
+            const parentCountryCode = processedParentInfo.countryCode || '+7';
+            
+            // If the phone already includes country code, use as is, otherwise combine
+            if (cleanParentPhone.startsWith(parentCountryCode.replace('+', ''))) {
+              processedParentInfo.phone = `+${cleanParentPhone}`;
+            } else {
+              processedParentInfo.phone = `${parentCountryCode}${cleanParentPhone}`;
+            }
+          }
+          
+          studentPayload.parent_info = processedParentInfo;
         }
         
         // Add additional info fields for new student
