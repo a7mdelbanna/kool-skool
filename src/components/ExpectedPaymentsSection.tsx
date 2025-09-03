@@ -164,60 +164,6 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
       const expectedPaymentsData: ExpectedPayment[] = [];
       
       for (const { subscription, sessions } of sessionsBySubscription) {
-        if (!sessions || sessions.length === 0) {
-          continue;
-        }
-
-        // Filter out sessions with invalid dates (handle both field formats)
-        const validSessions = sessions.filter((session: any) => {
-          const scheduledDate = session.scheduledDate || session.scheduled_date;
-          if (!scheduledDate) return false;
-          const date = new Date(scheduledDate);
-          return !isNaN(date.getTime());
-        });
-        
-        if (validSessions.length === 0) continue;
-        
-        // Find the last scheduled session (handle both field formats)
-        const sortedSessions = validSessions.sort((a: any, b: any) => {
-          const dateA = new Date(a.scheduledDate || a.scheduled_date);
-          const dateB = new Date(b.scheduledDate || b.scheduled_date);
-          return dateB.getTime() - dateA.getTime();
-        });
-
-        const lastSession = sortedSessions[0];
-        const lastSessionDate = new Date(lastSession.scheduledDate || lastSession.scheduled_date);
-        
-        // Validate the date
-        if (isNaN(lastSessionDate.getTime())) continue;
-
-        // Get subscription schedule to determine payment day
-        const schedule = subscription.schedule;
-        
-        if (!schedule || (Array.isArray(schedule) && schedule.length === 0)) {
-          continue;
-        }
-
-        // Calculate next payment date (next occurrence of scheduled day after last session)
-        const firstSchedule = Array.isArray(schedule) ? schedule[0] : schedule;
-        const scheduledDay = firstSchedule.day; // e.g., "Monday", "Tuesday"
-        
-        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
-        
-        if (targetDayIndex === -1) {
-          continue;
-        }
-
-        // Start from the day after the last session
-        let nextPaymentDate = new Date(lastSessionDate);
-        nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
-
-        // Find the next occurrence of the target day
-        while (nextPaymentDate.getDay() !== targetDayIndex) {
-          nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
-        }
-
         // Get student and user info for name (handle both field formats)
         const studentId = subscription.studentId || subscription.student_id;
         const student = students.find(s => s?.id === studentId);
@@ -239,9 +185,99 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
         }
         
         console.log(`📝 Student name for ${studentId}: ${studentName}`);
-
+        
+        // Get subscription schedule to determine payment day
+        const schedule = subscription.schedule;
+        
+        if (!schedule || (Array.isArray(schedule) && schedule.length === 0)) {
+          continue;
+        }
+        
         // Calculate payment amount (handle all possible field names)
         const paymentAmount = subscription.totalPrice || subscription.total_price || subscription.price || 0;
+        
+        // Check if subscription has no sessions or no valid sessions (meaning no payments yet)
+        if (!sessions || sessions.length === 0) {
+          console.log(`⚠️ No sessions found for subscription ${subscription.id} - setting payment date to today`);
+          
+          // If no sessions/payments yet, expected payment is today
+          const today = new Date();
+          
+          expectedPaymentsData.push({
+            student_id: studentId,
+            student_name: studentName,
+            subscription_id: subscription.id,
+            next_payment_date: today.toISOString().split('T')[0],
+            next_payment_amount: paymentAmount,
+            currency: subscription.currency || 'RUB',
+            subscription_name: subscription.courseName || subscription.course_name || 'Subscription',
+            last_session_date: 'No sessions yet'
+          });
+          
+          continue;
+        }
+
+        // Filter out sessions with invalid dates (handle both field formats)
+        const validSessions = sessions.filter((session: any) => {
+          const scheduledDate = session.scheduledDate || session.scheduled_date;
+          if (!scheduledDate) return false;
+          const date = new Date(scheduledDate);
+          return !isNaN(date.getTime());
+        });
+        
+        // If no valid sessions, treat as no payments
+        if (validSessions.length === 0) {
+          console.log(`⚠️ No valid sessions found for subscription ${subscription.id} - setting payment date to today`);
+          
+          const today = new Date();
+          
+          expectedPaymentsData.push({
+            student_id: studentId,
+            student_name: studentName,
+            subscription_id: subscription.id,
+            next_payment_date: today.toISOString().split('T')[0],
+            next_payment_amount: paymentAmount,
+            currency: subscription.currency || 'RUB',
+            subscription_name: subscription.courseName || subscription.course_name || 'Subscription',
+            last_session_date: 'No valid sessions'
+          });
+          
+          continue;
+        }
+        
+        // Find the last scheduled session (handle both field formats)
+        const sortedSessions = validSessions.sort((a: any, b: any) => {
+          const dateA = new Date(a.scheduledDate || a.scheduled_date);
+          const dateB = new Date(b.scheduledDate || b.scheduled_date);
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        const lastSession = sortedSessions[0];
+        const lastSessionDate = new Date(lastSession.scheduledDate || lastSession.scheduled_date);
+        
+        // Validate the date
+        if (isNaN(lastSessionDate.getTime())) continue;
+
+        // Calculate next payment date (next occurrence of scheduled day after last session)
+        // Note: schedule is already defined above
+        const firstSchedule = Array.isArray(schedule) ? schedule[0] : schedule;
+        const scheduledDay = firstSchedule.day; // e.g., "Monday", "Tuesday"
+        
+        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
+        
+        if (targetDayIndex === -1) {
+          continue;
+        }
+
+        // Start from the day after the last session
+        let nextPaymentDate = new Date(lastSessionDate);
+        nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+
+        // Find the next occurrence of the target day
+        while (nextPaymentDate.getDay() !== targetDayIndex) {
+          nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+        }
 
         expectedPaymentsData.push({
           student_id: studentId,
