@@ -1,8 +1,8 @@
 
 import { format } from 'date-fns';
 import { databaseService } from '@/services/firebase/database.service';
-import { collection, query, where, getDocs, and, or } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, and } from 'firebase/firestore';
+import { db } from '@/services/firebase/config';
 
 interface SessionTime {
   teacherId: string;
