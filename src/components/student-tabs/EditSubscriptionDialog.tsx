@@ -555,10 +555,13 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="40">40 minutes</SelectItem>
                       <SelectItem value="45">45 minutes</SelectItem>
+                      <SelectItem value="50">50 minutes</SelectItem>
                       <SelectItem value="60">60 minutes</SelectItem>
-                      <SelectItem value="75">75 minutes</SelectItem>
+                      <SelectItem value="80">80 minutes</SelectItem>
                       <SelectItem value="90">90 minutes</SelectItem>
+                      <SelectItem value="100">100 minutes</SelectItem>
                       <SelectItem value="120">120 minutes</SelectItem>
                     </SelectContent>
                   </Select>
