@@ -137,6 +137,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
   const [formData, setFormData] = useState({
     sessionCount: '',
     durationMonths: '',
+    sessionDuration: '60', // Default to 60 minutes
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
     priceMode: 'perSession' as 'perSession' | 'fixedPrice',
@@ -173,6 +174,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       setFormData({
         sessionCount: '',
         durationMonths: '',
+        sessionDuration: '60', // Default to 60 minutes
         startDate: undefined,
         schedule: [],
         priceMode: 'perSession',
@@ -240,7 +242,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
             teacherId: studentTeacherId,
             date: dateStr,
             startTime: timeIn24Hour,
-            durationMinutes: 60 // Default session duration, could be made configurable
+            durationMinutes: parseInt(formData.sessionDuration) || 60
           });
 
           if (result.hasConflict && result.conflictMessage) {
@@ -356,7 +358,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
             teacherId: studentTeacherId,
             date: dateStr,
             startTime: timeIn24Hour,
-            durationMinutes: 60
+            durationMinutes: parseInt(formData.sessionDuration) || 60
           });
 
           if (result.hasConflict && result.conflictMessage) {
@@ -384,6 +386,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       ...formData,
       sessionCount: parseInt(formData.sessionCount) || 0,
       durationMonths: parseInt(formData.durationMonths) || 0,
+      sessionDuration: parseInt(formData.sessionDuration) || 60,
       pricePerSession: parseFloat(formData.pricePerSession) || 0,
       fixedPrice: parseFloat(formData.fixedPrice) || 0,
       initialPayment: {
@@ -411,8 +414,8 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
             {/* Left Column - Form */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Session Count, Duration, and Currency */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Session Count, Duration, Session Duration, and Currency */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
                   <Input 
@@ -434,6 +437,24 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                     placeholder="1"
                     className="mt-1"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="sessionDuration" className="text-sm font-semibold text-gray-700">Session Duration</Label>
+                  <Select 
+                    value={formData.sessionDuration} 
+                    onValueChange={(value) => setFormData({ ...formData, sessionDuration: value })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="45">45 minutes</SelectItem>
+                      <SelectItem value="60">60 minutes</SelectItem>
+                      <SelectItem value="90">90 minutes</SelectItem>
+                      <SelectItem value="120">120 minutes</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
@@ -782,6 +803,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                 startDate={formData.startDate}
                 sessionCount={formData.sessionCount}
                 durationMonths={formData.durationMonths}
+                sessionDuration={formData.sessionDuration}
               />
             </div>
           </div>

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 interface SubscriptionFormData {
   sessionCount: number;
   durationMonths: number;
+  sessionDuration?: number; // Add session duration field
   startDate: Date;
   schedule: any[];
   priceMode: 'perSession' | 'fixedPrice';
@@ -127,6 +128,7 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
           p_student_id: studentId,
           p_session_count: formData.sessionCount,
           p_duration_months: formData.durationMonths,
+          p_session_duration_minutes: formData.sessionDuration || 60, // Include session duration
           p_start_date: formData.startDate.toISOString().split('T')[0],
           p_schedule: formData.schedule,
           p_price_mode: formData.priceMode,
