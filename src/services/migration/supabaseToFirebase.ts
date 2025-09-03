@@ -1665,10 +1665,20 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
     }
     
     // Enrich transactions with account, contact/student, and category names
+    // Filter out transactions for non-existent students
     const enrichedTransactions = await Promise.all(transactions.map(async (transaction: any) => {
       const studentId = transaction.studentId || transaction.student_id;
       const contactId = transaction.contactId || transaction.contact_id;
       let categoryId = transaction.categoryId || transaction.category_id;
+      
+      // Check if student exists - if student_id is set but student doesn't exist, skip this transaction
+      if (studentId) {
+        const studentExists = students.find(s => s.id === studentId);
+        if (!studentExists) {
+          console.log(`⚠️ Filtering out transaction for non-existent student: ${studentId}`);
+          return null; // Will be filtered out below
+        }
+      }
       
       // If transaction has no category but has a student, try to get category from student
       if (!categoryId && studentId) {
@@ -1713,10 +1723,16 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
       };
     }));
     
-    if (DEBUG_MODE) console.log(`Found ${enrichedTransactions.length} transactions for school`);
+    // Filter out null entries (transactions for non-existent students)
+    const validTransactions = enrichedTransactions.filter(t => t !== null);
+    
+    if (DEBUG_MODE) {
+      console.log(`Found ${transactions.length} total transactions`);
+      console.log(`Returning ${validTransactions.length} valid transactions (filtered ${transactions.length - validTransactions.length} orphaned)`);
+    }
     
     return { 
-      data: enrichedTransactions,
+      data: validTransactions,
       error: null 
     };
   } catch (error) {

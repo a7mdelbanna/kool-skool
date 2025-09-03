@@ -168,6 +168,12 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
         const studentId = subscription.studentId || subscription.student_id;
         const student = students.find(s => s?.id === studentId);
         
+        // Skip subscriptions for non-existent students
+        if (studentId && !student) {
+          console.log(`⚠️ Skipping expected payment for non-existent student: ${studentId}`);
+          continue;
+        }
+        
         let studentName = 'Unknown Student';
         
         // First try to get name from user data
