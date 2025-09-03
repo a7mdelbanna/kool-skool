@@ -1591,19 +1591,36 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
       for (const student of students) {
         if (studentIds.has(student.id)) {
           try {
-            // Handle both field name formats
+            let studentName = 'Unknown Student';
+            
+            // First try to get name from user data
             const userId = student.userId || student.user_id;
             if (userId) {
-              const user = await databaseService.getById('users', userId);
-              if (user) {
-                const fullName = `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim();
-                studentMap.set(student.id, fullName || 'Unknown Student');
+              try {
+                const user = await databaseService.getById('users', userId);
+                if (user) {
+                  studentName = `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim();
+                }
+              } catch (error) {
+                console.warn('Could not fetch user for student:', student.id, error);
               }
-            } else {
-              console.warn('No user ID found for student:', student.id);
             }
+            
+            // If still unknown, try to get name from student's own fields
+            if (studentName === 'Unknown Student' || !studentName) {
+              const firstName = student.firstName || student.first_name || '';
+              const lastName = student.lastName || student.last_name || '';
+              if (firstName || lastName) {
+                studentName = `${firstName} ${lastName}`.trim();
+              }
+            }
+            
+            studentMap.set(student.id, studentName || 'Unknown Student');
+            console.log(`💳 Transaction student name for ${student.id}: ${studentName}`);
+            
           } catch (error) {
-            console.warn('Could not fetch user for student:', student.id);
+            console.warn('Error processing student:', student.id, error);
+            studentMap.set(student.id, 'Unknown Student');
           }
         }
       }
