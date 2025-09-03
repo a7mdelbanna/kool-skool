@@ -31,8 +31,8 @@ const TeacherZoomSettings: React.FC<TeacherZoomSettingsProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  // Only show for teachers
-  if (userRole !== 'teacher') {
+  // Only show for teachers and admins
+  if (userRole !== 'teacher' && userRole !== 'admin') {
     return null;
   }
 

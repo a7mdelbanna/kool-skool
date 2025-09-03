@@ -195,16 +195,24 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
     
     // Enrich with user data and subscription info
     const enrichedStudents = await Promise.all(students.map(async (student: any) => {
-      const user = await databaseService.getById('users', student.userId);
+      // Skip if no userId
+      let user = null;
+      if (student.userId) {
+        user = await databaseService.getById('users', student.userId);
+      }
       
       // Fetch teacher data if teacherId exists
       let teacherFirstName = '';
       let teacherLastName = '';
       if (student.teacherId) {
-        const teacher = await databaseService.getById('users', student.teacherId);
-        if (teacher) {
-          teacherFirstName = teacher.firstName || '';
-          teacherLastName = teacher.lastName || '';
+        try {
+          const teacher = await databaseService.getById('users', student.teacherId);
+          if (teacher) {
+            teacherFirstName = teacher.firstName || '';
+            teacherLastName = teacher.lastName || '';
+          }
+        } catch (error) {
+          console.warn(`Could not fetch teacher data for ID ${student.teacherId}:`, error);
         }
       }
       
@@ -510,11 +518,12 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
       }
       
       // Map the fields correctly for the UI
+      // For bulk-uploaded students, use the data directly from student record
       return {
         ...student,
-        first_name: user?.firstName || '',
-        last_name: user?.lastName || '',
-        email: user?.email || '',
+        first_name: student.firstName || user?.firstName || '',
+        last_name: student.lastName || user?.lastName || '',
+        email: student.email || user?.email || '',
         phone: student.phone || user?.phoneNumber || '',
         countryCode: student.countryCode || student.country_code || '',
         course_name: student.courseName || '',
@@ -550,8 +559,8 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
 };
 
 export const createStudent = async (studentData: {
-  student_email: string;
-  student_password: string;
+  student_email?: string;  // Made optional
+  student_password?: string;  // Made optional
   first_name: string;
   last_name: string;
   teacher_id: string;
@@ -561,6 +570,8 @@ export const createStudent = async (studentData: {
   level: string;
   lesson_type?: string;
   phone?: string;
+  parent_info?: any;  // Added parent_info
+  [key: string]: any;  // Allow additional fields
 }): Promise<CreateStudentResponse> => {
   
   try {
@@ -577,31 +588,76 @@ export const createStudent = async (studentData: {
       };
     }
     
-    const uid = await authService.createStudent(
-      {
-        email: studentData.student_email,
-        password: studentData.student_password,
+    // If email is provided, create a full user account
+    if (studentData.student_email && studentData.student_password) {
+      const uid = await authService.createStudent(
+        {
+          email: studentData.student_email,
+          password: studentData.student_password,
+          firstName: studentData.first_name,
+          lastName: studentData.last_name,
+          role: 'student',
+          schoolId: schoolId
+        },
+        {
+          teacherId: studentData.teacher_id,
+          courseId: studentData.course_id,
+          courseName: studentData.course_name,
+          lessonType: studentData.lesson_type || 'individual',
+          ageGroup: studentData.age_group as any,
+          level: studentData.level as any,
+          parent_info: studentData.parent_info,
+          ...(studentData.phone && { phone: studentData.phone })
+        }
+      );
+
+      return {
+        success: true,
+        student_id: uid,
+        user_id: uid
+      };
+    } else {
+      // Create student without user account (similar to bulk upload)
+      const studentId = Date.now().toString(); // Generate unique ID
+      
+      const studentRecord: any = {
         firstName: studentData.first_name,
         lastName: studentData.last_name,
-        role: 'student',
-        schoolId: schoolId
-      },
-      {
+        schoolId: schoolId,
         teacherId: studentData.teacher_id,
         courseId: studentData.course_id,
-        courseName: studentData.course_name,
-        lessonType: studentData.lesson_type || 'individual',
-        ageGroup: studentData.age_group as any,
-        level: studentData.level as any,
-        ...(studentData.phone && { phone: studentData.phone })
+        course_name: studentData.course_name,
+        lesson_type: studentData.lesson_type || 'individual',
+        age_group: studentData.age_group,
+        level: studentData.level,
+        payment_status: 'pending',
+        created_at: new Date().toISOString(),
+        status: 'active'
+      };
+      
+      // Add optional fields
+      if (studentData.phone) {
+        studentRecord.phone = studentData.phone;
       }
-    );
-
-    return {
-      success: true,
-      student_id: uid,
-      user_id: uid
-    };
+      if (studentData.parent_info) {
+        studentRecord.parent_info = studentData.parent_info;
+      }
+      if (studentData.countryCode) {
+        studentRecord.country_code = studentData.countryCode;
+      }
+      if (studentData.income_category_id) {
+        studentRecord.income_category_id = studentData.income_category_id;
+      }
+      
+      // Create the student record in Firebase
+      await databaseService.create('students', studentRecord, studentId);
+      
+      return {
+        success: true,
+        student_id: studentId,
+        user_id: null  // No user account created
+      };
+    }
   } catch (error: any) {
     console.error('Error creating student:', error);
     return {
@@ -613,7 +669,100 @@ export const createStudent = async (studentData: {
 
 export const updateStudent = async (id: string, updates: Partial<StudentRecord>) => {
   try {
-    await databaseService.update('students', id, updates);
+    console.log('Updating student with ID:', id);
+    console.log('Updates to apply:', updates);
+    
+    // Ensure we have a valid student ID
+    if (!id) {
+      throw new Error('Student ID is required for update');
+    }
+    
+    // Check if the student exists first
+    const existingStudent = await databaseService.getById('students', id);
+    if (!existingStudent) {
+      throw new Error(`Student with ID ${id} not found`);
+    }
+    
+    // Separate user fields from student fields
+    const userFields: any = {};
+    const studentFields: any = {};
+    
+    // Fields that belong to the users collection
+    if (updates.first_name !== undefined) {
+      userFields.firstName = updates.first_name;
+    }
+    if (updates.last_name !== undefined) {
+      userFields.lastName = updates.last_name;
+    }
+    if (updates.email !== undefined) {
+      userFields.email = updates.email;
+    }
+    
+    // All other fields belong to the students collection
+    // Map camelCase to snake_case for Firebase consistency
+    const camelToSnakeMap: Record<string, string> = {
+      'parentInfo': 'parent_info',
+      'socialLinks': 'social_links',
+      'teacherPreference': 'teacher_preference',
+      'additionalNotes': 'additional_notes',
+      'lessonType': 'lesson_type',
+      'ageGroup': 'age_group',
+      'courseName': 'course_name',
+      'teacherId': 'teacher_id',
+      'paymentStatus': 'payment_status',
+      'countryCode': 'country_code',
+      'income_category_id': 'income_category_id' // Already snake_case, keep as is
+    };
+    
+    Object.keys(updates).forEach(key => {
+      if (!['first_name', 'last_name', 'email'].includes(key)) {
+        // Use mapped snake_case key if available, otherwise use original key
+        const fieldKey = camelToSnakeMap[key] || key;
+        studentFields[fieldKey] = (updates as any)[key];
+      }
+    });
+    
+    // Update user document if there are user fields to update AND a user document exists
+    if (Object.keys(userFields).length > 0) {
+      const userId = existingStudent.userId || id; // Use userId if available, otherwise assume id is userId
+      console.log('Checking if user document exists:', userId);
+      
+      // Check if user document exists before trying to update
+      const userDoc = await databaseService.getById('users', userId);
+      if (userDoc) {
+        console.log('Updating user document:', userId, userFields);
+        await databaseService.update('users', userId, userFields);
+      } else {
+        console.log('No user document found for student, skipping user fields update');
+        // For bulk-uploaded students, we can store these fields directly in the student document
+        // Only add fields that have values (not undefined)
+        if (userFields.firstName !== undefined) {
+          studentFields.firstName = userFields.firstName;
+        }
+        if (userFields.lastName !== undefined) {
+          studentFields.lastName = userFields.lastName;
+        }
+        if (userFields.email !== undefined && userFields.email !== '') {
+          studentFields.email = userFields.email;
+        }
+      }
+    }
+    
+    // Update student document
+    if (Object.keys(studentFields).length > 0) {
+      // Remove any undefined values to avoid Firebase errors
+      const cleanedStudentFields = Object.entries(studentFields).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as any);
+      
+      console.log('Updating student document:', id, cleanedStudentFields);
+      await databaseService.update('students', id, cleanedStudentFields);
+    }
+    
+    console.log('Student updated successfully');
     return { id, ...updates };
   } catch (error) {
     console.error('Error updating student:', error);

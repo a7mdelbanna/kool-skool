@@ -413,15 +413,21 @@ const AdditionalInfoTab: React.FC<AdditionalInfoTabProps> = ({
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-2">
                     <Select
-                      value={studentData.birthday ? new Date(studentData.birthday).getMonth().toString() : new Date().getMonth().toString()}
+                      value={studentData.birthday ? new Date(studentData.birthday).getMonth().toString() : ""}
                       onValueChange={(value) => {
                         const currentDate = studentData.birthday ? new Date(studentData.birthday) : new Date();
-                        currentDate.setMonth(parseInt(value));
-                        handleInputChange("birthday", currentDate.toISOString());
+                        const newDate = new Date(currentDate);
+                        newDate.setMonth(parseInt(value));
+                        // Preserve the year when changing month
+                        if (studentData.birthday) {
+                          const existingYear = new Date(studentData.birthday).getFullYear();
+                          newDate.setFullYear(existingYear);
+                        }
+                        handleInputChange("birthday", newDate.toISOString());
                       }}
                     >
                       <SelectTrigger className="w-[110px]">
-                        <SelectValue />
+                        <SelectValue placeholder="Month" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="0">January</SelectItem>
@@ -440,15 +446,23 @@ const AdditionalInfoTab: React.FC<AdditionalInfoTabProps> = ({
                     </Select>
                     
                     <Select
-                      value={studentData.birthday ? new Date(studentData.birthday).getFullYear().toString() : new Date().getFullYear().toString()}
+                      value={studentData.birthday ? new Date(studentData.birthday).getFullYear().toString() : ""}
                       onValueChange={(value) => {
                         const currentDate = studentData.birthday ? new Date(studentData.birthday) : new Date();
-                        currentDate.setFullYear(parseInt(value));
-                        handleInputChange("birthday", currentDate.toISOString());
+                        const newDate = new Date(currentDate);
+                        newDate.setFullYear(parseInt(value));
+                        // Preserve the month and day when changing year
+                        if (studentData.birthday) {
+                          const existingMonth = new Date(studentData.birthday).getMonth();
+                          const existingDay = new Date(studentData.birthday).getDate();
+                          newDate.setMonth(existingMonth);
+                          newDate.setDate(existingDay);
+                        }
+                        handleInputChange("birthday", newDate.toISOString());
                       }}
                     >
                       <SelectTrigger className="w-[80px]">
-                        <SelectValue />
+                        <SelectValue placeholder="Year" />
                       </SelectTrigger>
                       <SelectContent>
                         {/* Generate years from current year down to 100 years ago */}
@@ -467,7 +481,22 @@ const AdditionalInfoTab: React.FC<AdditionalInfoTabProps> = ({
                 <Calendar
                   mode="single"
                   selected={studentData.birthday ? new Date(studentData.birthday) : undefined}
-                  onSelect={(date) => handleInputChange("birthday", date?.toISOString())}
+                  onSelect={(date) => {
+                    if (date) {
+                      // Preserve the year and month from the dropdowns
+                      const selectedYear = studentData.birthday ? new Date(studentData.birthday).getFullYear() : date.getFullYear();
+                      const selectedMonth = studentData.birthday ? new Date(studentData.birthday).getMonth() : date.getMonth();
+                      
+                      // Create a new date with the selected day but preserve year and month
+                      const newDate = new Date(date);
+                      newDate.setFullYear(selectedYear);
+                      newDate.setMonth(selectedMonth);
+                      
+                      handleInputChange("birthday", newDate.toISOString());
+                    } else {
+                      handleInputChange("birthday", undefined);
+                    }
+                  }}
                   initialFocus
                   fromYear={1900}
                   toYear={new Date().getFullYear()}

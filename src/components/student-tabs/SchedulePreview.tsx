@@ -15,16 +15,25 @@ interface SchedulePreviewProps {
   startDate?: Date;
   sessionCount: number;
   durationMonths: number;
+  sessionDuration?: string;
 }
 
 const SchedulePreview: React.FC<SchedulePreviewProps> = ({
   schedule,
   startDate,
   sessionCount,
-  durationMonths
+  durationMonths,
+  sessionDuration = '60'
 }) => {
   const formatTime = (time: string) => {
     if (!time) return '';
+    
+    // If time already has AM/PM, return as is
+    if (time.includes('AM') || time.includes('PM')) {
+      return time;
+    }
+    
+    // Convert 24-hour format to 12-hour format
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours);
     const period = hour >= 12 ? 'PM' : 'AM';
@@ -97,6 +106,12 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
             <p className="text-xs text-gray-600 mb-1">Duration</p>
             <p className="font-semibold text-gray-900">{durationMonths} month{durationMonths !== 1 ? 's' : ''}</p>
           </div>
+        </div>
+        
+        {/* Session Duration */}
+        <div className="bg-white rounded-lg p-3 border border-blue-100">
+          <p className="text-xs text-gray-600 mb-1">Session Duration</p>
+          <p className="font-semibold text-gray-900">{sessionDuration} minutes</p>
         </div>
 
         {/* Weekly Schedule */}

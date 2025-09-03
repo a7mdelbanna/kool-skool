@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, CheckSquare, DollarSign, Edit, Trash2, CreditCard } from 'lucide-react';
+import { Calendar, CheckSquare, DollarSign, Edit, Trash2, CreditCard, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 export interface ParentInfo {
   name: string;
@@ -50,6 +51,7 @@ export interface Student {
   teacherPreference?: 'native' | 'russian' | 'any';
   additionalNotes?: string;
   interests?: string[];
+  income_category_id?: string; // Transaction category for student payments
 }
 
 interface StudentCardProps {
@@ -61,6 +63,8 @@ interface StudentCardProps {
 }
 
 const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCardProps) => {
+  const navigate = useNavigate();
+  
   // Debug log to see what data is being passed to the component
   console.log('Rendering StudentCard with data:', student);
   console.log('Subscription progress value:', student.subscriptionProgress);
@@ -240,6 +244,10 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(`/student/${student.id}`)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    <span>View Details</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem className="cursor-pointer" onClick={() => onEdit?.(student)}>
                     <Edit className="mr-2 h-4 w-4" />
                     <span>Edit</span>

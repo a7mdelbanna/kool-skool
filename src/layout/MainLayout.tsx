@@ -26,8 +26,14 @@ import SchoolSettings from '@/pages/SchoolSettings';
 import AcademicSettings from '@/pages/AcademicSettings';
 import FinancialSettings from '@/pages/FinancialSettings';
 import NotificationSettings from '@/pages/NotificationSettings';
+import DataManagement from '@/pages/DataManagement';
 import SessionDetails from '@/pages/SessionDetails';
 import Todos from '@/pages/Todos';
+import StudentDetail from '@/pages/StudentDetail';
+import VocabularyPractice from '@/pages/VocabularyPractice';
+import SpeakingTopics from '@/pages/SpeakingTopics';
+import StudentSpeaking from '@/pages/StudentSpeaking';
+import AssignSpeakingTopic from '@/pages/AssignSpeakingTopic';
 
 const MainLayout = () => {
   return (
@@ -60,8 +66,14 @@ const MainLayout = () => {
                   <Route path="/settings/academic" element={<AcademicSettings />} />
                   <Route path="/settings/financial" element={<FinancialSettings />} />
                   <Route path="/settings/notifications" element={<NotificationSettings />} />
+                  <Route path="/settings/data-management" element={<DataManagement />} />
                   <Route path="/session/:sessionId" element={<SessionDetails />} />
                   <Route path="/todos" element={<Todos />} />
+                  <Route path="/student/:studentId" element={<StudentDetail />} />
+                  <Route path="/student/:studentId/practice" element={<VocabularyPractice />} />
+                  <Route path="/speaking-topics" element={<SpeakingTopics />} />
+                  <Route path="/speaking-topics/:topicId/assign" element={<AssignSpeakingTopic />} />
+                  <Route path="/student/:studentId/speaking" element={<StudentSpeaking />} />
                 </Routes>
               </div>
             </div>

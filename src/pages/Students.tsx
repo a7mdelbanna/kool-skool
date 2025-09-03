@@ -1,17 +1,18 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
-import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, RefreshCw } from 'lucide-react';
+import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, Upload, LayoutGrid, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StudentCard, { Student } from '@/components/StudentCard';
+import StudentList from '@/components/StudentList';
 import AddStudentDialog from '@/components/AddStudentDialog';
+import BulkUploadDialog from '@/components/students/BulkUploadDialog';
 import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { databaseService } from '@/services/firebase/database.service';
 import { 
-  getStudentsWithDetails, 
-  StudentRecord, 
   createCourse, 
   supabase
 } from '@/integrations/supabase/client';
@@ -39,6 +40,11 @@ const USE_MOCK_DATA = false;
 
 const Students = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
+    // Load saved view preference from localStorage
+    const savedView = localStorage.getItem('studentViewMode');
+    return (savedView === 'list' || savedView === 'card') ? savedView : 'card';
+  });
   const [activeFilters, setActiveFilters] = useState<{
     courseName: string[];
     lessonType: string[];
@@ -52,6 +58,7 @@ const Students = () => {
   });
   const [selectedTab, setSelectedTab] = useState('all');
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
@@ -75,7 +82,77 @@ const Students = () => {
     isRefetching: isRefetchingStudents
   } = useQuery({
     queryKey: ['students', schoolId],
-    queryFn: () => getStudentsWithDetails(schoolId),
+    queryFn: async () => {
+      if (!schoolId) return [];
+      // Fetch students from Firebase
+      const students = await databaseService.getBySchoolId('students', schoolId);
+      console.log('📚 Raw students from Firebase:', students);
+      
+      // Log payment status fields for debugging
+      const activeStudents = students.filter((s: any) => s.status === 'active');
+      
+      // Calculate payment status and progress for each student
+      const studentsWithCalculatedData = await Promise.all(
+        activeStudents.map(async (student: any) => {
+          // Calculate payment status
+          const calculatedStatus = await calculatePaymentStatus(
+            student.id,
+            student.paymentStatus || student.payment_status || 'overdue'
+          );
+          
+          // Calculate progress and next lesson
+          const progressData = await calculateStudentProgress(student.id);
+          
+          // Update student if status has changed
+          if (calculatedStatus !== (student.paymentStatus || student.payment_status)) {
+            console.log(`📊 Updating payment status for ${student.firstName} ${student.lastName}: ${student.paymentStatus || student.payment_status} -> ${calculatedStatus}`);
+            
+            // Update in database
+            await databaseService.update('students', student.id, {
+              paymentStatus: calculatedStatus,
+              payment_status: calculatedStatus
+            });
+          }
+          
+          // Update progress data in database if different
+          if (progressData.progress !== (student.subscriptionProgress || student.subscription_progress)) {
+            await databaseService.update('students', student.id, {
+              subscriptionProgress: progressData.progress,
+              subscription_progress: progressData.progress,
+              nextSessionDate: progressData.nextSessionDate,
+              next_session_date: progressData.nextSessionDate,
+              completedSessions: progressData.completedSessions,
+              nextPaymentDue: progressData.nextPaymentDate,
+              next_payment_date: progressData.nextPaymentDate,
+              nextPaymentAmount: progressData.nextPaymentAmount,
+              next_payment_amount: progressData.nextPaymentAmount,
+              nextPaymentCurrency: progressData.nextPaymentCurrency,
+              next_payment_currency: progressData.nextPaymentCurrency
+            });
+          }
+          
+          // Update local object with calculated data
+          return {
+            ...student,
+            paymentStatus: calculatedStatus,
+            payment_status: calculatedStatus,
+            subscriptionProgress: progressData.progress,
+            subscription_progress: progressData.progress,
+            nextSessionDate: progressData.nextSessionDate,
+            next_session_date: progressData.nextSessionDate,
+            completedSessions: progressData.completedSessions,
+            nextPaymentDue: progressData.nextPaymentDate,
+            next_payment_date: progressData.nextPaymentDate,
+            nextPaymentAmount: progressData.nextPaymentAmount,
+            next_payment_amount: progressData.nextPaymentAmount,
+            nextPaymentCurrency: progressData.nextPaymentCurrency,
+            next_payment_currency: progressData.nextPaymentCurrency
+          };
+        })
+      );
+      
+      return studentsWithCalculatedData;
+    },
     enabled: !!schoolId,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
@@ -91,7 +168,261 @@ const Students = () => {
     }
   }, [schoolId, refetchStudents]);
   
-  // Update the mapping function to work with the actual data structure
+  // Update the mapping function to work with Firebase data structure
+  // Function to force update payment status for a student
+  const forceUpdatePaymentStatus = async (studentId: string, status: string) => {
+    try {
+      console.log(`🔧 FORCE UPDATE: Setting payment status to ${status} for student ${studentId}`);
+      await databaseService.update('students', studentId, {
+        paymentStatus: status,
+        payment_status: status,
+        lastUpdated: new Date().toISOString()
+      });
+      console.log('✅ Payment status force updated');
+      await refetchStudents();
+    } catch (error) {
+      console.error('❌ Error force updating payment status:', error);
+    }
+  };
+
+  // Function to fix all old data
+  const fixAllStudentData = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔧 Starting fix for all student data...');
+      
+      const students = await databaseService.getBySchoolId('students', schoolId);
+      
+      for (const student of students) {
+        // Calculate correct payment status
+        const calculatedStatus = await calculatePaymentStatus(
+          student.id,
+          student.paymentStatus || student.payment_status || 'overdue'
+        );
+        
+        // Calculate progress and next lesson
+        const progressData = await calculateStudentProgress(student.id);
+        
+        // Update all fields in database
+        await databaseService.update('students', student.id, {
+          paymentStatus: calculatedStatus,
+          payment_status: calculatedStatus,
+          subscriptionProgress: progressData.progress,
+          subscription_progress: progressData.progress,
+          nextSessionDate: progressData.nextSessionDate,
+          next_session_date: progressData.nextSessionDate,
+          completedSessions: progressData.completedSessions,
+          nextPaymentDue: progressData.nextPaymentDate,
+          next_payment_date: progressData.nextPaymentDate,
+          nextPaymentAmount: progressData.nextPaymentAmount,
+          next_payment_amount: progressData.nextPaymentAmount,
+          nextPaymentCurrency: progressData.nextPaymentCurrency,
+          next_payment_currency: progressData.nextPaymentCurrency,
+          lastUpdated: new Date().toISOString()
+        });
+        
+        console.log(`✅ Fixed data for ${student.firstName} ${student.lastName}`);
+      }
+      
+      console.log('✅ All student data fixed successfully');
+      toast.success('All student data has been fixed successfully!');
+      await refetchStudents();
+    } catch (error) {
+      console.error('❌ Error fixing student data:', error);
+      toast.error('Failed to fix student data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to determine if a student is overdue based on subscriptions
+  const calculatePaymentStatus = async (studentId: string, currentStatus: string): Promise<string> => {
+    try {
+      // Fetch subscriptions for this student
+      const subscriptions = await databaseService.query('subscriptions', {
+        where: [{ field: 'student_id', operator: '==', value: studentId }]
+      });
+      
+      if (subscriptions.length === 0) {
+        return 'overdue'; // No subscriptions = overdue
+      }
+      
+      console.log(`📊 Calculating payment status for student ${studentId}:`, subscriptions);
+      
+      const now = new Date();
+      let hasOverdue = false;
+      let hasPartial = false;
+      let hasUnpaid = false;
+      
+      for (const subscription of subscriptions) {
+        // CRITICAL FIX: Calculate totalPaid by fetching actual payments
+        // Fetch payments from Firebase transactions
+        let totalPaid = 0;
+        
+        try {
+          // Fetch transaction payments from Firebase
+          const transactions = await databaseService.query('transactions', {
+            where: [
+              { field: 'subscription_id', operator: '==', value: subscription.id },
+              { field: 'transaction_type', operator: '==', value: 'income' }
+            ]
+          });
+          
+          // Sum up all transaction payments
+          for (const transaction of transactions) {
+            const amount = parseFloat(transaction.amount || 0);
+            if (amount > 0) {
+              totalPaid += amount;
+            }
+          }
+          
+          console.log(`  Found ${transactions.length} transactions for subscription ${subscription.id}, total paid: ${totalPaid}`);
+        } catch (error) {
+          console.error(`Error fetching transactions for subscription ${subscription.id}:`, error);
+        }
+        
+        // Also check for direct payments stored in the subscription (if any)
+        const directPaid = parseFloat(subscription.totalPaid || subscription.total_paid || 0);
+        if (directPaid > 0) {
+          totalPaid = Math.max(totalPaid, directPaid); // Use the higher value
+        }
+        
+        const totalPrice = parseFloat(subscription.totalPrice || subscription.total_price || 0);
+        
+        console.log(`  Subscription ${subscription.id}: paid=${totalPaid}, price=${totalPrice}`);
+        
+        if (totalPrice <= 0) {
+          continue; // Skip invalid subscriptions
+        }
+        
+        // Calculate payment percentage
+        const paymentPercentage = (totalPaid / totalPrice) * 100;
+        
+        console.log(`  Payment percentage: ${paymentPercentage}%`);
+        
+        // Check payment status
+        if (paymentPercentage >= 100) {
+          // Fully paid - do nothing, this is good
+          console.log(`  ✅ Fully paid`);
+        } else if (paymentPercentage > 0) {
+          // Partially paid
+          hasPartial = true;
+          console.log(`  ⚠️ Partially paid`);
+        } else {
+          // Not paid at all
+          hasOverdue = true;
+          hasUnpaid = true;
+          console.log(`  ❌ Not paid`);
+        }
+      }
+      
+      // Determine final status - only Paid, Partial, or Overdue
+      if (hasOverdue || hasUnpaid) {
+        console.log(`Final status: overdue`);
+        return 'overdue';
+      }
+      if (hasPartial) {
+        console.log(`Final status: partial`);
+        return 'partial';
+      }
+      
+      // If we get here, all subscriptions are fully paid
+      console.log(`Final status: paid`);
+      return 'paid';
+    } catch (error) {
+      console.error('Error calculating payment status:', error);
+      return 'overdue'; // Default to overdue
+    }
+  };
+
+  // Function to calculate subscription progress and next lesson
+  const calculateStudentProgress = async (studentId: string): Promise<{
+    progress: string;
+    nextSessionDate: string | null;
+    completedSessions: number;
+    nextPaymentDate: string | null;
+    nextPaymentAmount: number;
+    nextPaymentCurrency: string;
+  }> => {
+    try {
+      // Fetch subscriptions
+      const subscriptions = await databaseService.query('subscriptions', {
+        where: [{ field: 'student_id', operator: '==', value: studentId }]
+      });
+
+      if (subscriptions.length === 0) {
+        return {
+          progress: '0/0',
+          nextSessionDate: null,
+          completedSessions: 0,
+          nextPaymentDate: null,
+          nextPaymentAmount: 0,
+          nextPaymentCurrency: 'USD'
+        };
+      }
+
+      // Get the most recent active subscription
+      const activeSubscription = subscriptions.find(s => s.status === 'active') || subscriptions[0];
+      
+      if (!activeSubscription) {
+        return {
+          progress: '0/0',
+          nextSessionDate: null,
+          completedSessions: 0,
+          nextPaymentDate: null,
+          nextPaymentAmount: 0,
+          nextPaymentCurrency: 'USD'
+        };
+      }
+
+      // Fetch sessions for this subscription
+      const sessions = await databaseService.query('sessions', {
+        where: [{ field: 'subscription_id', operator: '==', value: activeSubscription.id }],
+        orderBy: [{ field: 'date', direction: 'asc' }]
+      });
+
+      // Calculate completed sessions
+      const completedSessions = sessions.filter(s => 
+        s.status === 'completed' || s.status === 'attended'
+      ).length;
+
+      // Find next scheduled session
+      const now = new Date();
+      const nextSession = sessions.find(s => {
+        const sessionDate = new Date(s.date);
+        return sessionDate >= now && (s.status === 'scheduled' || s.status === 'upcoming');
+      });
+
+      // Calculate progress
+      const totalSessions = activeSubscription.sessionCount || activeSubscription.session_count || sessions.length;
+      const progress = `${completedSessions}/${totalSessions}`;
+
+      // Calculate next payment info
+      const totalPaid = activeSubscription.totalPaid || activeSubscription.total_paid || 0;
+      const totalPrice = activeSubscription.totalPrice || activeSubscription.total_price || 0;
+      const remaining = totalPrice - totalPaid;
+      
+      return {
+        progress,
+        nextSessionDate: nextSession ? nextSession.date : null,
+        completedSessions,
+        nextPaymentDate: remaining > 0 ? new Date().toISOString() : null,
+        nextPaymentAmount: remaining,
+        nextPaymentCurrency: activeSubscription.currency || 'USD'
+      };
+    } catch (error) {
+      console.error('Error calculating student progress:', error);
+      return {
+        progress: '0/0',
+        nextSessionDate: null,
+        completedSessions: 0,
+        nextPaymentDate: null,
+        nextPaymentAmount: 0,
+        nextPaymentCurrency: 'USD'
+      };
+    }
+  };
+
   const mapStudentDataToStudent = (data: any): Student => {
     
     // Format next session date for display
@@ -114,31 +445,39 @@ const Students = () => {
     
     const mappedStudent = {
       id: data.id,
-      firstName: data.first_name || '',
-      lastName: data.last_name || '',
+      firstName: data.firstName || data.first_name || '',
+      lastName: data.lastName || data.last_name || '',
       email: data.email || '',
-      courseName: data.course_name || '',
-      lessonType: (data.lesson_type as 'individual' | 'group') || 'individual',
-      ageGroup: (data.age_group?.toLowerCase() as 'adult' | 'kid') || 'adult',
-      level: data.level || '',
-      phone: data.phone,
+      courseName: data.courseName || data.course_name || '',
+      lessonType: (data.lessonType || data.lesson_type || 'individual') as 'individual' | 'group',
+      ageGroup: (data.ageGroup?.toLowerCase() || data.age_group?.toLowerCase() || 'adult') as 'adult' | 'kid',
+      level: data.level || 'Beginner',
+      phone: data.phone || '',
       countryCode: data.countryCode || data.country_code || '',
-      paymentStatus: (data.payment_status || 'overdue') as 'paid' | 'partial' | 'pending' | 'overdue',
-      teacherId: data.teacher_id,
-      lessonsCompleted: data.lessons_count || 0,
-      nextLesson: formatNextSession(data.next_session_date),
-      nextPaymentDate: data.next_payment_date,
-      nextPaymentAmount: data.next_payment_amount,
-      nextPaymentCurrency: data.next_payment_currency,
-      subscriptionProgress: data.subscription_progress || '0/0',
-      parentInfo: data.parent_info || data.parentInfo || null,
+      paymentStatus: (() => {
+        const status = data.paymentStatus || data.payment_status || 'overdue';
+        // Convert pending to overdue
+        if (status === 'pending') {
+          return 'overdue';
+        }
+        return status;
+      })() as 'paid' | 'partial' | 'overdue',
+      teacherId: data.teacherId || data.teacher_id,
+      lessonsCompleted: data.completedSessions || data.lessons_count || 0,
+      nextLesson: formatNextSession(data.nextSessionDate || data.next_session_date),
+      nextPaymentDate: data.nextPaymentDue || data.next_payment_date,
+      nextPaymentAmount: data.nextPaymentAmount || data.next_payment_amount,
+      nextPaymentCurrency: data.nextPaymentCurrency || data.next_payment_currency || 'USD',
+      subscriptionProgress: data.subscriptionProgress || data.subscription_progress || '0/0',
+      parentInfo: data.parentName ? { name: data.parentName, phone: data.parentPhone } : null,
       // Additional Info fields
-      socialLinks: data.social_links || data.socialLinks || [],
-      birthday: data.birthday,
-      teacherPreference: data.teacher_preference || data.teacherPreference,
-      additionalNotes: data.additional_notes || data.additionalNotes,
+      socialLinks: data.socialLinks || data.social_links || [],
+      birthday: data.birthday || data.dateOfBirth,
+      teacherPreference: data.teacherPreference || data.teacher_preference,
+      additionalNotes: data.notes || data.additionalNotes || data.additional_notes,
       interests: data.interests || [],
-      image: data.image || data.profileImage || null
+      image: data.image || data.profileImage || null,
+      income_category_id: data.income_category_id || data.incomeCategoryId || null
     };
     
     return mappedStudent;
@@ -257,12 +596,10 @@ const Students = () => {
     try {
       toast.promise(
         async () => {
-          const { error } = await supabase
-            .from('students')
-            .delete()
-            .eq('id', student.id);
-          
-          if (error) throw new Error(error.message);
+          // Update student status to 'deleted' instead of actually deleting
+          await databaseService.update('students', student.id, {
+            status: 'deleted'
+          });
           
           await refetchStudents();
           
@@ -405,30 +742,108 @@ const Students = () => {
             <span>Add Course</span>
           </Button>
           
-          <Button 
-            className="gap-2 shrink-0" 
-            variant="default"
-            onClick={() => {
-              setSelectedStudent(null);
-              setIsEditMode(false);
-              setIsAddStudentOpen(true);
-            }}
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Add New Student</span>
-          </Button>
-          
-          <Button 
-            variant="outline"
-            size="sm"
-            onClick={handleForceRefresh}
-            className="gap-2"
-            disabled={isRefetchingStudents || isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 ${(isRefetchingStudents || isLoading) ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              className="gap-2 shrink-0" 
+              variant="outline"
+              onClick={() => setIsBulkUploadOpen(true)}
+            >
+              <Upload className="h-4 w-4" />
+              <span>Bulk Upload</span>
+            </Button>
+            <Button 
+              className="gap-2 shrink-0" 
+              variant="default"
+              onClick={() => {
+                setSelectedStudent(null);
+                setIsEditMode(false);
+                setIsAddStudentOpen(true);
+              }}
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>Add New Student</span>
+            </Button>
+          </div>
         </div>
+        
+        {/* Emergency Fix Button for Payment Status Issues */}
+        {students.some(s => s.firstName === 'Юля' && s.lastName && s.lastName.includes('Савельева')) && (
+          <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800 mb-2">
+              Detected student with potential payment status issue
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-yellow-100 hover:bg-yellow-200 border-yellow-300"
+                onClick={async () => {
+                  const student = students.find(s => s.firstName === 'Юля' && s.lastName && s.lastName.includes('Савельева'));
+                  if (student) {
+                    console.log('🔧 Fixing payment status for:', student);
+                    await forceUpdatePaymentStatus(student.id, 'paid');
+                    toast.success('Payment status fixed to PAID');
+                  }
+                }}
+              >
+                Fix Юля Савельева to PAID
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-red-100 hover:bg-red-200 border-red-300"
+                onClick={async () => {
+                  console.log('🔄 Refreshing all student data from Firebase...');
+                  // Clear cache and force refresh
+                  queryClient.removeQueries({ queryKey: ['students', schoolId] });
+                  await refetchStudents();
+                  toast.success('Students data refreshed');
+                }}
+              >
+                Force Refresh All
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-green-100 hover:bg-green-200 border-green-300"
+                onClick={fixAllStudentData}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Fixing...' : 'Fix All Old Data'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-purple-100 hover:bg-purple-200 border-purple-300"
+                onClick={async () => {
+                  console.log('🔄 Recalculating all payment statuses...');
+                  setIsLoading(true);
+                  const students = await databaseService.getBySchoolId('students', schoolId);
+                  
+                  for (const student of students) {
+                    // Force recalculation of payment status
+                    const calculatedStatus = await calculatePaymentStatus(student.id, 'unknown');
+                    
+                    if (calculatedStatus !== (student.paymentStatus || student.payment_status)) {
+                      console.log(`Updating ${student.firstName} ${student.lastName}: ${student.paymentStatus} -> ${calculatedStatus}`);
+                      await databaseService.update('students', student.id, {
+                        paymentStatus: calculatedStatus,
+                        payment_status: calculatedStatus
+                      });
+                    }
+                  }
+                  
+                  await refetchStudents();
+                  setIsLoading(false);
+                  toast.success('Payment statuses recalculated!');
+                }}
+                disabled={isLoading}
+              >
+                Recalculate Payment Status
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="flex flex-col md:flex-row gap-4">
@@ -453,6 +868,34 @@ const Students = () => {
             </Button>
           )}
         </form>
+        
+        {/* View Mode Toggle */}
+        <div className="flex gap-1 p-1 bg-muted rounded-lg">
+          <Button
+            variant={viewMode === 'card' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setViewMode('card');
+              localStorage.setItem('studentViewMode', 'card');
+            }}
+            className="gap-2"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span className="hidden sm:inline">Cards</span>
+          </Button>
+          <Button
+            variant={viewMode === 'list' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setViewMode('list');
+              localStorage.setItem('studentViewMode', 'list');
+            }}
+            className="gap-2"
+          >
+            <List className="h-4 w-4" />
+            <span className="hidden sm:inline">List</span>
+          </Button>
+        </div>
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -631,22 +1074,32 @@ const Students = () => {
                 onClick={() => refetchStudents()}
                 className="gap-2"
               >
-                <RefreshCw className="h-4 w-4" />
                 Try Again
               </Button>
             </div>
           ) : filteredStudents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 element-transition">
-              {filteredStudents.map(student => (
-                <StudentCard 
-                  key={student.id} 
-                  student={student} 
-                  className="glass glass-hover" 
+            viewMode === 'card' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 element-transition">
+                {filteredStudents.map(student => (
+                  <StudentCard 
+                    key={student.id} 
+                    student={student} 
+                    className="glass glass-hover" 
+                    onEdit={handleEditStudent}
+                    onDelete={handleDeleteStudent}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <StudentList 
+                  students={filteredStudents}
+                  onView={handleEditStudent}
                   onEdit={handleEditStudent}
                   onDelete={handleDeleteStudent}
                 />
-              ))}
-            </div>
+              </div>
+            )
           ) : students.length > 0 ? (
             <div className="text-center py-10">
               <h3 className="text-lg font-medium">No students match your filters</h3>
@@ -674,17 +1127,6 @@ const Students = () => {
             <div className="text-center py-10">
               <h3 className="text-lg font-medium">No students found</h3>
               <p className="text-muted-foreground mt-1">Add your first student to get started</p>
-              <div className="mt-2 mb-4">
-                <details className="text-sm text-left bg-gray-50 p-3 rounded border">
-                  <summary className="cursor-pointer font-medium">Debug Info (click to expand)</summary>
-                  <div className="pt-2">
-                    <p>School ID: {schoolId || 'Not set'}</p>
-                    <p>User role: {user?.role || 'Not set'}</p>
-                    <p>Data fetch status: {studentsLoading ? 'Loading' : 'Complete'}</p>
-                    <p>Students data array: {studentsData ? `${studentsData.length} records` : 'Undefined'}</p>
-                  </div>
-                </details>
-              </div>
               <Button 
                 variant="default" 
                 size="sm" 
@@ -712,6 +1154,15 @@ const Students = () => {
           onStudentAdded={handleStudentAdded}
         />
       </PaymentProvider>
+
+      <BulkUploadDialog
+        isOpen={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
+        onSuccess={() => {
+          refetchStudents();
+          toast.success('Students uploaded successfully');
+        }}
+      />
       
       <Dialog open={isAddCourseOpen} onOpenChange={setIsAddCourseOpen}>
         <DialogContent className="sm:max-w-[425px]">

@@ -161,27 +161,29 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     enabled: !!schoolId,
   });
 
-  // Fetch initial payment data
+  // Fetch initial payment data - simplified query to avoid index requirement
   const { data: initialPaymentData } = useQuery({
     queryKey: ['subscription-initial-payment', subscription?.id],
     queryFn: async () => {
       if (!subscription?.id) return null;
       
-      const { data, error } = await supabase
+      // First get all transactions for this subscription
+      const { data: transactions, error } = await supabase
         .from('transactions')
         .select('*')
-        .eq('subscription_id', subscription.id)
-        .eq('type', 'income')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single();
+        .eq('subscription_id', subscription.id);
       
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching initial payment:', error);
         return null;
       }
       
-      return data;
+      // Filter for income type and sort by created_at in JavaScript
+      const incomeTransactions = (transactions || [])
+        .filter(t => t.type === 'income')
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      
+      return incomeTransactions[0] || null;
     },
     enabled: !!subscription?.id && open,
   });
@@ -189,6 +191,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   const [formData, setFormData] = useState({
     sessionCount: '',
     durationMonths: '',
+    sessionDuration: '60', // Default to 60 minutes
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
     priceMode: 'perSession',
@@ -240,6 +243,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       setFormData({
         sessionCount: subscription.session_count?.toString() || '',
         durationMonths: subscription.duration_months?.toString() || '',
+        sessionDuration: subscription.session_duration_minutes?.toString() || '60',
         startDate: subscription.start_date ? new Date(subscription.start_date) : undefined,
         schedule: parsedSchedule,
         priceMode: subscription.price_mode,
@@ -302,7 +306,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
             teacherId: studentTeacherId,
             date: dateStr,
             startTime: scheduleItem.time,
-            durationMinutes: 60, // Default session duration
+            durationMinutes: parseInt(formData.sessionDuration) || 60,
             excludeSessionId: subscription.id // Exclude current subscription's sessions
           });
 
@@ -409,7 +413,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
             teacherId: studentTeacherId,
             date: dateStr,
             startTime: scheduleItem.time,
-            durationMinutes: 60,
+            durationMinutes: parseInt(formData.sessionDuration) || 60,
             excludeSessionId: subscription.id
           });
 
@@ -437,10 +441,10 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     try {
       setLoading(true);
       
-      // Prepare schedule data - convert times back to 12-hour format for database consistency
+      // Prepare schedule data - keep times in 24-hour format for database consistency
       const scheduleForDatabase = formData.schedule.map(item => ({
         day: item.day,
-        time: convertTo12Hour(item.time)
+        time: item.time // Keep in 24-hour format
       }));
       
       console.log('Updating subscription with data:', {
@@ -455,6 +459,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         p_subscription_id: subscription.id,
         p_session_count: parseInt(formData.sessionCount) || 0,
         p_duration_months: parseInt(formData.durationMonths) || 0,
+        p_session_duration_minutes: parseInt(formData.sessionDuration) || 60,
         p_start_date: formData.startDate.toISOString().split('T')[0],
         p_schedule: scheduleForDatabase, // Pass as array, not JSON string
         p_price_mode: formData.priceMode,
@@ -516,7 +521,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
             {/* Main Form - Left Side */}
             <div className="lg:col-span-2 space-y-6">
               {/* Session Count, Duration, and Currency */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
                   <Input 
@@ -538,6 +543,25 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                     placeholder="1"
                     className="mt-1"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="sessionDuration" className="text-sm font-semibold text-gray-700">Session Duration</Label>
+                  <Select 
+                    value={formData.sessionDuration} 
+                    onValueChange={(value) => setFormData({ ...formData, sessionDuration: value })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="45">45 minutes</SelectItem>
+                      <SelectItem value="60">60 minutes</SelectItem>
+                      <SelectItem value="75">75 minutes</SelectItem>
+                      <SelectItem value="90">90 minutes</SelectItem>
+                      <SelectItem value="120">120 minutes</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
@@ -886,6 +910,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                   startDate={formData.startDate}
                   sessionCount={formData.sessionCount}
                   durationMonths={formData.durationMonths}
+                  sessionDuration={formData.sessionDuration}
                 />
               </div>
             </div>

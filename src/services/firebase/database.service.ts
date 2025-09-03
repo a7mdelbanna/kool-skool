@@ -85,13 +85,21 @@ class DatabaseService {
     documentId: string
   ): Promise<T | null> {
     try {
+      // Validate inputs
+      if (!collectionName || !documentId) {
+        console.warn(`[DatabaseService] Invalid parameters for getById: collection="${collectionName}", id="${documentId}"`);
+        return null;
+      }
+      
       const docSnap = await getDoc(doc(db, collectionName, documentId));
       if (docSnap.exists()) {
         return { id: docSnap.id, ...docSnap.data() } as T;
       }
       return null;
     } catch (error: any) {
-      throw new Error(`Failed to get document: ${error.message}`);
+      console.error(`[DatabaseService] Error getting document ${collectionName}/${documentId}:`, error);
+      // Return null instead of throwing to prevent cascade failures
+      return null;
     }
   }
 
@@ -102,11 +110,19 @@ class DatabaseService {
     updates: T
   ): Promise<void> {
     try {
-      await updateDoc(doc(db, collectionName, documentId), {
+      console.log(`[DatabaseService] Updating ${collectionName}/${documentId} with:`, updates);
+      
+      const docRef = doc(db, collectionName, documentId);
+      const updateData = {
         ...updates,
         updatedAt: serverTimestamp()
-      });
+      };
+      
+      console.log('[DatabaseService] Final update data:', updateData);
+      await updateDoc(docRef, updateData);
+      console.log(`[DatabaseService] Successfully updated ${collectionName}/${documentId}`);
     } catch (error: any) {
+      console.error(`[DatabaseService] Update failed:`, error);
       throw new Error(`Failed to update document: ${error.message}`);
     }
   }
@@ -397,6 +413,21 @@ class DatabaseService {
       });
     } catch (error: any) {
       throw new Error(`Failed to remove from array: ${error.message}`);
+    }
+  }
+
+  // Get all documents in a collection
+  async getAll<T>(
+    collectionName: string
+  ): Promise<T[]> {
+    try {
+      const querySnapshot = await getDocs(collection(db, collectionName));
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as T[];
+    } catch (error: any) {
+      throw new Error(`Failed to get all documents: ${error.message}`);
     }
   }
 

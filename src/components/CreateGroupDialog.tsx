@@ -274,9 +274,11 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
   // Calculate total amount based on price mode
   const calculateTotalAmount = () => {
     if (groupData.price_mode === 'perSession') {
-      return groupData.price_per_session * groupData.session_count;
+      const pricePerSession = parseFloat(groupData.price_per_session) || 0;
+      const sessionCount = parseFloat(groupData.session_count) || 0;
+      return pricePerSession * sessionCount;
     } else {
-      return groupData.total_price;
+      return parseFloat(groupData.total_price) || 0;
     }
   };
 

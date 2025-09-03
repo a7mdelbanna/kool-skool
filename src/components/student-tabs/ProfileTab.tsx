@@ -8,12 +8,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Student, ParentInfo } from "../StudentCard";
 import { Course } from "@/integrations/supabase/client";
-import { Users, UserCheck, Camera, X } from "lucide-react";
+import { Users, UserCheck, Camera, X, DollarSign, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import CountryCodeSelector from "../CountryCodeSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { storageService } from "@/services/firebase/storage.service";
+import { databaseService } from "@/services/firebase/database.service";
 
 interface Teacher {
   id: string;
@@ -96,12 +97,39 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     },
     enabled: !!schoolId,
   });
+
+  // Fetch income categories for student payment tracking
+  const { data: incomeCategories = [], isLoading: categoriesLoading } = useQuery({
+    queryKey: ['income-categories', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      
+      try {
+        // Fetch from Firebase - simplified query to avoid composite index requirement
+        const data = await databaseService.query('transaction_categories', {
+          where: [
+            { field: 'school_id', operator: '==', value: schoolId },
+            { field: 'type', operator: '==', value: 'income' }
+          ]
+        });
+        
+        // Filter active categories in memory
+        const activeCategories = (data || []).filter((cat: any) => cat.is_active !== false);
+        
+        return activeCategories.sort((a: any, b: any) => a.name.localeCompare(b.name));
+      } catch (err) {
+        console.error('Failed to fetch income categories:', err);
+        return [];
+      }
+    },
+    enabled: !!schoolId,
+  });
   
   // Validate teachers data structure
   const validTeachers = Array.isArray(teachers) ? teachers : [];
 
   const handleInputChange = (field: keyof Student, value: string) => {
-    setStudentData({ [field]: value });
+    setStudentData({ ...studentData, [field]: value });
   };
 
   const handleParentInfoChange = (field: keyof ParentInfo, value: string) => {
@@ -109,11 +137,12 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
       name: '',
       relationship: 'mother' as const,
       phone: '',
-      countryCode: '+1',
+      countryCode: '+7',
       email: ''
     };
     
     setStudentData({
+      ...studentData,
       parentInfo: {
         ...currentParentInfo,
         [field]: value
@@ -241,13 +270,15 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="email">Email*</Label>
+            <Label htmlFor="email">
+              Email{studentData.ageGroup === "kid" ? " (Optional for kids)" : "*"}
+            </Label>
             <Input
               id="email"
               type="email"
               value={studentData.email || ""}
               onChange={(e) => handleInputChange("email", e.target.value)}
-              placeholder="email@example.com"
+              placeholder={studentData.ageGroup === "kid" ? "email@example.com (optional)" : "email@example.com"}
               disabled={isViewMode}
             />
           </div>
@@ -256,7 +287,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             <Label htmlFor="phone">Phone</Label>
             <div className="flex gap-2">
               <CountryCodeSelector
-                value={studentData.countryCode || "+1"}
+                value={studentData.countryCode || "+7"}
                 onSelect={(code) => handleInputChange("countryCode", code)}
                 disabled={isViewMode}
               />
@@ -395,7 +426,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => handleInputChange("ageGroup", "kid")}
+                onClick={() => {
+                  handleInputChange("ageGroup", "kid");
+                  // Initialize parent info when switching to kid
+                  if (studentData.ageGroup !== "kid" && !studentData.parentInfo) {
+                    handleParentInfoChange("relationship", "mother");
+                  }
+                }}
                 disabled={isViewMode}
                 className={`
                   flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
@@ -409,6 +446,53 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                 Kid
               </button>
             </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="incomeCategory">Income Category*</Label>
+            {categoriesLoading ? (
+              <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                Loading categories...
+              </div>
+            ) : incomeCategories.length > 0 ? (
+              <Select
+                value={studentData.income_category_id || ""}
+                onValueChange={(value) => handleInputChange("income_category_id", value)}
+                disabled={isViewMode}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select income category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {incomeCategories.map((category: any) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: category.color }}
+                        />
+                        {category.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="space-y-3">
+                <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                  No income categories available
+                </div>
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
+                  <div className="flex items-start space-x-3">
+                    <DollarSign className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-medium">Income categories needed</p>
+                      <p className="mt-1">Please add income categories in Academic Settings → Transaction Categories to track student payments properly.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -570,7 +654,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               <Label htmlFor="parentPhone">Parent Phone*</Label>
               <div className="flex gap-2">
                 <CountryCodeSelector
-                  value={studentData.parentInfo?.countryCode || "+1"}
+                  value={studentData.parentInfo?.countryCode || "+7"}
                   onSelect={(code) => handleParentInfoChange("countryCode", code)}
                   disabled={isViewMode}
                 />
@@ -586,13 +670,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="parentEmail">Parent Email*</Label>
+              <Label htmlFor="parentEmail">Parent Email (Optional)</Label>
               <Input
                 id="parentEmail"
                 type="email"
                 value={studentData.parentInfo?.email || ""}
                 onChange={(e) => handleParentInfoChange("email", e.target.value)}
-                placeholder="parent@example.com"
+                placeholder="parent@example.com (optional)"
                 disabled={isViewMode}
               />
             </div>

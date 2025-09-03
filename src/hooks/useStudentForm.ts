@@ -29,7 +29,7 @@ export const useStudentForm = (
     level: "",
     paymentStatus: "pending",
     teacherId: "",
-    countryCode: "+1"
+    countryCode: "+7"
   });
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState("defaultPassword123");
@@ -142,17 +142,17 @@ export const useStudentForm = (
             processedStudent.phone = phoneStr.substring(match[1].length).trim();
           } else {
             // Couldn't extract, use default
-            processedStudent.countryCode = '+1';
+            processedStudent.countryCode = '+7';
             processedStudent.phone = phoneStr;
           }
         } else {
           // No country code anywhere, use default
-          processedStudent.countryCode = '+1';
+          processedStudent.countryCode = '+7';
           processedStudent.phone = phoneStr;
         }
       } else {
         // No phone at all, just set default country code
-        processedStudent.countryCode = processedStudent.countryCode || '+1';
+        processedStudent.countryCode = processedStudent.countryCode || '+7';
       }
       
       setStudentData(processedStudent);
@@ -167,7 +167,7 @@ export const useStudentForm = (
         level: "",
         paymentStatus: "pending",
         teacherId: "",
-        countryCode: "+1",
+        countryCode: "+7",
         socialLinks: [],
         birthday: undefined,
         teacherPreference: "any",
@@ -180,33 +180,74 @@ export const useStudentForm = (
   }, [student, open]);
 
   const handleUpdateStudentData = (data: Partial<Student>) => {
-    setStudentData(prevData => ({
-      ...prevData,
-      ...data
-    }));
+    setStudentData(prevData => {
+      const newData = {
+        ...prevData,
+        ...data
+      };
+      // Special handling for parentInfo to ensure it's properly merged
+      if (data.parentInfo) {
+        newData.parentInfo = data.parentInfo;
+      }
+      return newData;
+    });
   };
 
   const handleSave = async () => {
-    if (!studentData.firstName || !studentData.lastName || !studentData.email || !studentData.courseName) {
-      toast.error("Please fill in required fields");
+    console.log('[useStudentForm] handleSave called');
+    console.log('[useStudentForm] isEditMode:', isEditMode);
+    console.log('[useStudentForm] Current studentData:', studentData);
+    console.log('[useStudentForm] Age Group:', studentData.ageGroup);
+    console.log('[useStudentForm] Parent Info:', studentData.parentInfo);
+    
+    // Only require first name and last name for updates
+    // This allows updating bulk-uploaded students with incomplete data
+    if (!studentData.firstName || !studentData.lastName) {
+      toast.error("Please fill in required fields: First Name and Last Name");
       return;
+    }
+    
+    // For new students, require course
+    if (!isEditMode) {
+      // Course is always required
+      if (!studentData.courseName) {
+        toast.error("Please select a course for the new student");
+        return;
+      }
+      
+      // For adults, email is required
+      if (studentData.ageGroup === "adult" && !studentData.email) {
+        toast.error("Email is required for adult students");
+        return;
+      }
+      
+      // For kids, we just need parent contact info (phone is sufficient)
+      // Parent validation will be handled below
     }
     
     // Validate parent information for kids
     if (studentData.ageGroup === "kid") {
+      console.log('[useStudentForm] Validating parent info for kid');
       if (!studentData.parentInfo?.name || 
           !studentData.parentInfo?.phone || 
-          !studentData.parentInfo?.email || 
           !studentData.parentInfo?.relationship) {
-        toast.error("Parent information is required for kids");
+        console.log('[useStudentForm] Missing parent info:', {
+          name: studentData.parentInfo?.name,
+          phone: studentData.parentInfo?.phone,
+          email: studentData.parentInfo?.email,
+          relationship: studentData.parentInfo?.relationship
+        });
+        toast.error("Parent name, phone, and relationship are required for kids");
         return;
       }
       
-      // Validate parent email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(studentData.parentInfo.email)) {
-        toast.error("Please enter a valid parent email address");
-        return;
+      // Validate parent email format only if email is provided
+      if (studentData.parentInfo.email && studentData.parentInfo.email.trim() !== '') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(studentData.parentInfo.email)) {
+          toast.error("Please enter a valid parent email address");
+          return;
+        }
       }
     }
     
@@ -224,15 +265,29 @@ export const useStudentForm = (
         
         // Build update payload
         const updatePayload: any = {
+          // User fields (will be updated in users collection)
           first_name: studentData.firstName,
           last_name: studentData.lastName,
-          email: studentData.email,
-          course_name: studentData.courseName,
-          lesson_type: studentData.lessonType,
-          age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
-          level: studentData.level || '', // Keep levels exactly as selected
-          teacher_id: studentData.teacherId
+          // Student fields (will be updated in students collection)
+          lessonType: studentData.lessonType || 'individual',
+          ageGroup: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
         };
+        
+        // Only add these fields if they have values (for bulk-uploaded students they might be empty)
+        if (studentData.email) {
+          updatePayload.email = studentData.email;
+        }
+        if (studentData.courseName) {
+          updatePayload.courseName = studentData.courseName;
+        }
+        if (studentData.level) {
+          updatePayload.level = studentData.level;
+        }
+        if (studentData.teacherId) {
+          updatePayload.teacherId = studentData.teacherId;
+        }
+        
+        console.log('[useStudentForm] Initial update payload:', updatePayload);
         
         // Add phone with country code if provided (combine them like in create)
         if (studentData.phone && studentData.phone.trim() !== '') {
@@ -242,31 +297,37 @@ export const useStudentForm = (
           if (cleanPhone.startsWith(studentData.countryCode?.replace('+', ''))) {
             updatePayload.phone = `+${cleanPhone}`;
           } else {
-            updatePayload.phone = `${studentData.countryCode || '+1'}${cleanPhone}`;
+            updatePayload.phone = `${studentData.countryCode || '+7'}${cleanPhone}`;
           }
+          console.log('[useStudentForm] Phone added to payload:', updatePayload.phone);
+        } else {
+          console.log('[useStudentForm] No phone number provided');
         }
         // Store country code separately for UI display
         if (studentData.countryCode) {
           updatePayload.countryCode = studentData.countryCode;
         }
         
-        // Add parent information if this is a kid
-        if (studentData.ageGroup === 'kid' && studentData.parentInfo) {
-          updatePayload.parent_info = studentData.parentInfo;
+        console.log('[useStudentForm] Final update payload before sending:', updatePayload);
+        
+        // Add parent information if this is a kid (check both lowercase and the value we're setting)
+        if ((studentData.ageGroup === 'kid' || updatePayload.ageGroup === 'Kid') && studentData.parentInfo) {
+          updatePayload.parentInfo = studentData.parentInfo;
+          console.log('[useStudentForm] Adding parent info to payload:', studentData.parentInfo);
         }
         
-        // Add additional info fields
+        // Add additional info fields using camelCase
         if (studentData.socialLinks) {
-          updatePayload.social_links = studentData.socialLinks;
+          updatePayload.socialLinks = studentData.socialLinks;
         }
         if (studentData.birthday) {
           updatePayload.birthday = studentData.birthday;
         }
         if (studentData.teacherPreference) {
-          updatePayload.teacher_preference = studentData.teacherPreference;
+          updatePayload.teacherPreference = studentData.teacherPreference;
         }
         if (studentData.additionalNotes) {
-          updatePayload.additional_notes = studentData.additionalNotes;
+          updatePayload.additionalNotes = studentData.additionalNotes;
         }
         if (studentData.interests) {
           updatePayload.interests = studentData.interests;
@@ -275,10 +336,23 @@ export const useStudentForm = (
         if (studentData.image !== undefined) {
           updatePayload.image = studentData.image || null;
         }
+        // Add income category for payment tracking
+        if (studentData.income_category_id) {
+          updatePayload.income_category_id = studentData.income_category_id;
+        }
         
         toast.loading("Updating student...");
         
-        await updateStudent(student.id, updatePayload);
+        try {
+          const result = await updateStudent(student.id, updatePayload);
+          console.log('Update result:', result);
+        } catch (updateError) {
+          console.error('Failed to update student:', updateError);
+          toast.dismiss();
+          toast.error(`Failed to update student: ${(updateError as Error).message}`);
+          setSaving(false);
+          return;
+        }
         
         toast.dismiss();
         toast.success(`${studentData.firstName} ${studentData.lastName} updated successfully`);
@@ -336,8 +410,6 @@ export const useStudentForm = (
 
         
         const studentPayload: any = {
-          student_email: studentData.email as string,
-          student_password: studentPassword,
           first_name: studentData.firstName as string,
           last_name: studentData.lastName as string,
           teacher_id: selectedTeacherId,
@@ -350,6 +422,12 @@ export const useStudentForm = (
           level: studentData.level || ''
         };
         
+        // Only add email and password if email is provided (required for adults, optional for kids)
+        if (studentData.email && studentData.email.trim() !== '') {
+          studentPayload.student_email = studentData.email;
+          studentPayload.student_password = studentPassword;
+        }
+        
         // Add phone with country code if provided
         if (studentData.phone && studentData.phone.trim() !== '') {
           // Remove any existing plus sign from the phone number
@@ -358,7 +436,7 @@ export const useStudentForm = (
           if (cleanPhone.startsWith(studentData.countryCode?.replace('+', ''))) {
             studentPayload.phone = `+${cleanPhone}`;
           } else {
-            studentPayload.phone = `${studentData.countryCode || '+1'}${cleanPhone}`;
+            studentPayload.phone = `${studentData.countryCode || '+7'}${cleanPhone}`;
           }
         }
         // Store country code separately for UI display
@@ -396,6 +474,10 @@ export const useStudentForm = (
         if (studentData.image) {
           studentPayload.image = studentData.image;
         }
+        // Add income category for payment tracking
+        if (studentData.income_category_id) {
+          studentPayload.income_category_id = studentData.income_category_id;
+        }
         
         const response = await createStudent(studentPayload);
         
@@ -425,7 +507,8 @@ export const useStudentForm = (
             nextLesson: 'Not scheduled',
             phone: studentData.phone,
             countryCode: studentData.countryCode,
-            parentInfo: studentData.parentInfo
+            parentInfo: studentData.parentInfo,
+            income_category_id: studentData.income_category_id
           };
           onStudentAdded(newStudent);
         }

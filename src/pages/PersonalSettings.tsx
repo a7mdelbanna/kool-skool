@@ -83,12 +83,12 @@ const PersonalSettings = () => {
       </div>
       
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className={`grid ${user?.role === 'teacher' ? 'grid-cols-3' : 'grid-cols-2'} mb-6`}>
+        <TabsList className={`grid ${(user?.role === 'teacher' || user?.role === 'admin') ? 'grid-cols-3' : 'grid-cols-2'} mb-6`}>
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span>Profile</span>
           </TabsTrigger>
-          {user?.role === 'teacher' && (
+          {(user?.role === 'teacher' || user?.role === 'admin') && (
             <TabsTrigger value="meeting" className="gap-2">
               <Video className="h-4 w-4" />
               <span>Meeting</span>
@@ -173,7 +173,7 @@ const PersonalSettings = () => {
           </Card>
         </TabsContent>
         
-        {user?.role === 'teacher' && (
+        {(user?.role === 'teacher' || user?.role === 'admin') && (
           <TabsContent value="meeting" className="mt-0 space-y-6">
             <TeacherZoomSettings 
               userId={user?.uid || user?.id || ''} 

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, CreditCard, Plus, Receipt, Trash, Wallet } from "lucide-react";
+import { CalendarIcon, CreditCard, Plus, Receipt, Trash, Wallet, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
@@ -29,6 +29,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSchoolTransactions, supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { databaseService } from "@/services/firebase/database.service";
 
 interface PaymentsTabProps {
   studentData: Partial<Student>;
@@ -56,6 +57,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   isViewMode = false 
 }) => {
   const [selectedCurrency, setSelectedCurrency] = useState<any>(null);
+  const [isSyncingPaymentStatus, setIsSyncingPaymentStatus] = useState(false);
   const queryClient = useQueryClient();
   
   const form = useForm<PaymentFormValues>({
@@ -115,6 +117,16 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         p_student_id: studentData.id
       });
       if (error) throw error;
+      console.log('📊 SUBSCRIPTIONS DATA FROM RPC:', data);
+      if (data && data.length > 0) {
+        data.forEach((sub: any) => {
+          console.log(`💰 Subscription ${sub.id}:`, {
+            total_price: sub.total_price,
+            total_paid: sub.total_paid,
+            is_fully_paid: (sub.total_paid || 0) >= (sub.total_price || 0)
+          });
+        });
+      }
       return data;
     },
     enabled: !!studentData.id,
@@ -193,6 +205,257 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     }
   }, [paymentsError]);
 
+  // Simple function to directly set payment status based on subscription data
+  const setPaymentStatusDirect = async (studentId: string, status: string) => {
+    try {
+      console.log(`🎯 DIRECT: Setting payment status to ${status} for student ${studentId}`);
+      
+      // Update both field names to ensure compatibility
+      const updateData = {
+        paymentStatus: status,
+        payment_status: status,
+        lastPaymentStatusUpdate: new Date().toISOString()
+      };
+      
+      await databaseService.update('students', studentId, updateData);
+      console.log('✅ DIRECT: Payment status updated successfully');
+      
+      // Force refresh
+      queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
+      
+      return status;
+    } catch (error) {
+      console.error('❌ DIRECT: Error updating payment status:', error);
+      return null;
+    }
+  };
+
+  // Function to calculate and update student payment status using Firebase only
+  const updateStudentPaymentStatus = async (studentId: string, subscriptionId?: string) => {
+    try {
+      console.log('🔄 Updating student payment status for:', { studentId, subscriptionId });
+      
+      // Fetch subscriptions directly from Firebase
+      const subscriptions = await databaseService.query('subscriptions', {
+        where: [{ field: 'student_id', operator: '==', value: studentId }]
+      });
+      
+      console.log('📊 Firebase subscriptions found:', subscriptions);
+      
+      if (!subscriptions || subscriptions.length === 0) {
+        console.log('No subscriptions found for student');
+        // If no subscriptions, set status to pending
+        const updateResult = await databaseService.update('students', studentId, {
+          paymentStatus: 'pending',
+          payment_status: 'pending' // Also update snake_case version
+        });
+        console.log('Updated to pending:', updateResult);
+        queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
+        return 'pending';
+      }
+      
+      // Calculate total payments for all subscriptions
+      let totalPrice = 0;
+      let totalPaid = 0;
+      
+      // For each subscription, get payments from transactions
+      for (const subscription of subscriptions) {
+        const subscriptionPrice = subscription.total_price || 0;
+        totalPrice += subscriptionPrice;
+        
+        // Get all transactions linked to this subscription
+        const transactions = await databaseService.query('transactions', {
+          where: [
+            { field: 'subscription_id', operator: '==', value: subscription.id },
+            { field: 'type', operator: '==', value: 'income' }
+          ]
+        });
+        
+        // Also get transactions for this student without subscription link
+        const studentTransactions = await databaseService.query('transactions', {
+          where: [
+            { field: 'student_id', operator: '==', value: studentId },
+            { field: 'type', operator: '==', value: 'income' }
+          ]
+        });
+        
+        // Also check if subscription already has total_paid field
+        const subscriptionTotalPaid = subscription.total_paid || 0;
+        console.log(`💳 Subscription ${subscription.id} has total_paid field:`, subscriptionTotalPaid);
+        
+        // Calculate payments for this subscription
+        let subscriptionPaid = 0;
+        
+        // Add linked transactions
+        if (transactions && transactions.length > 0) {
+          subscriptionPaid += transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+        }
+        
+        // If only one subscription and unlinked student payments exist, count them too
+        if (subscriptions.length === 1 && studentTransactions && studentTransactions.length > 0) {
+          const unlinkedPayments = studentTransactions
+            .filter(t => !t.subscription_id)
+            .reduce((sum, t) => sum + (t.amount || 0), 0);
+          subscriptionPaid += unlinkedPayments;
+        }
+        
+        totalPaid += subscriptionPaid;
+        
+        console.log(`📊 Subscription ${subscription.id}:`, {
+          price: subscriptionPrice,
+          paid: subscriptionPaid,
+          transactions: transactions?.length || 0,
+          studentTransactions: studentTransactions?.length || 0
+        });
+      }
+      
+      console.log('💵 Total calculation:', {
+        totalPrice,
+        totalPaid,
+        percentage: totalPrice > 0 ? ((totalPaid / totalPrice) * 100).toFixed(2) + '%' : '0%'
+      });
+      
+      // Calculate payment status based on percentage
+      let paymentStatus = 'pending';
+      if (totalPrice > 0) {
+        const paymentPercentage = (totalPaid / totalPrice) * 100;
+        console.log(`💰 Total payment percentage: ${paymentPercentage.toFixed(2)}% (${totalPaid} of ${totalPrice})`);
+        
+        if (paymentPercentage >= 100) {
+          paymentStatus = 'paid';
+        } else if (paymentPercentage > 0) {
+          paymentStatus = 'partial';
+        } else {
+          // Check if any subscription is overdue
+          const hasOverdue = subscriptions.some(sub => {
+            if (!sub.end_date) return false;
+            const endDate = new Date(sub.end_date);
+            return endDate < new Date();
+          });
+          
+          if (hasOverdue) {
+            paymentStatus = 'overdue';
+          }
+        }
+      }
+      
+      console.log(`✅ Updating student ${studentId} payment status to: ${paymentStatus}`);
+      
+      // Update both camelCase and snake_case fields to ensure compatibility
+      const updateData = {
+        paymentStatus: paymentStatus,
+        payment_status: paymentStatus // Also update snake_case version
+      };
+      
+      console.log('📝 Updating Firebase with:', {
+        studentId,
+        updateData
+      });
+      
+      const updateResult = await databaseService.update('students', studentId, updateData);
+      console.log('Firebase update result:', updateResult);
+      
+      console.log('🎉 Student payment status updated successfully in Firebase');
+      
+      // Force refresh of students data
+      console.log('🔄 Forcing refresh of students list');
+      await queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
+      await queryClient.refetchQueries({ queryKey: ['students', schoolId] });
+      
+      // Return the new payment status so caller can update local state
+      return paymentStatus;
+      
+    } catch (error) {
+      console.error('❌ Error updating student payment status:', error);
+      // Don't throw error to prevent payment creation from failing
+      return null;
+    }
+  };
+
+  // Only update payment status after actual payment changes, not on mount
+  // This prevents overwriting correct status with stale calculations
+
+  // Manual sync function for payment status
+  const handleSyncPaymentStatus = async () => {
+    if (!studentData.id) {
+      toast.error("Student ID is required");
+      return;
+    }
+    
+    setIsSyncingPaymentStatus(true);
+    try {
+      // First, let's check what's actually in Firebase for this student
+      console.log('🔍 Checking current student data in Firebase...');
+      const currentStudent = await databaseService.getById('students', studentData.id);
+      console.log('👤 Current student in Firebase:', currentStudent);
+      
+      // Check if we have subscription data showing it's fully paid
+      if (subscriptions && subscriptions.length > 0) {
+        console.log('📄 Checking subscription payment status from RPC data...');
+        let totalPrice = 0;
+        let totalPaid = 0;
+        
+        for (const sub of subscriptions) {
+          totalPrice += sub.total_price || 0;
+          totalPaid += sub.total_paid || 0;
+          console.log(`Subscription ${sub.id}: price=${sub.total_price}, paid=${sub.total_paid}`);
+        }
+        
+        let paymentStatus = 'pending';
+        if (totalPrice > 0) {
+          const percentage = (totalPaid / totalPrice) * 100;
+          console.log(`📊 Payment percentage: ${percentage.toFixed(2)}% (${totalPaid}/${totalPrice})`);
+          
+          if (percentage >= 100) {
+            paymentStatus = 'paid';
+          } else if (percentage > 0) {
+            paymentStatus = 'partial';
+          }
+        }
+        
+        console.log(`🎯 Setting payment status directly to: ${paymentStatus}`);
+        const newStatus = await setPaymentStatusDirect(studentData.id, paymentStatus);
+        
+        // Update local state
+        if (newStatus && setStudentData) {
+          setStudentData(prev => ({
+            ...prev,
+            paymentStatus: newStatus as any
+          }));
+        }
+        
+        toast.success(`Payment status synced: ${newStatus}`);
+      } else {
+        // Fallback to Firebase calculation
+        const newStatus = await updateStudentPaymentStatus(studentData.id);
+        
+        // Update local state with the new payment status
+        if (newStatus && setStudentData) {
+          setStudentData(prev => ({
+            ...prev,
+            paymentStatus: newStatus as any
+          }));
+        }
+        
+        toast.success(`Payment status synced: ${newStatus}`);
+      }
+      
+      // Check the student data again after update
+      const updatedStudent = await databaseService.getById('students', studentData.id);
+      console.log('✅ Updated student in Firebase:', updatedStudent);
+      
+      // Force a page refresh after a short delay to ensure data is updated
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error("Error syncing payment status:", error);
+      toast.error("Failed to sync payment status");
+    } finally {
+      setIsSyncingPaymentStatus(false);
+    }
+  };
+
   const addPaymentMutation = useMutation({
     mutationFn: async (data: PaymentFormValues) => {
       if (!studentData.id || !schoolId) {
@@ -235,10 +498,25 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
 
       return transactionData;
     },
-    onSuccess: () => {
+    onSuccess: async (transactionId, variables) => {
       queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
       queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['student-subscriptions', studentData.id] });
       toast.success("Payment added successfully");
+      
+      // Update student payment status after successful payment
+      if (studentData.id) {
+        const newStatus = await updateStudentPaymentStatus(studentData.id, variables.subscription_id);
+        
+        // Update local state with the new payment status
+        if (newStatus && setStudentData) {
+          setStudentData(prev => ({
+            ...prev,
+            paymentStatus: newStatus as any
+          }));
+        }
+      }
+      
       form.reset({
         amount: "",
         date: new Date(),
@@ -265,10 +543,24 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
       queryClient.invalidateQueries({ queryKey: ['school-accounts', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['student-subscriptions', studentData.id] });
       toast.success("Payment deleted successfully");
+      
+      // Update student payment status after deleting payment
+      if (studentData.id) {
+        const newStatus = await updateStudentPaymentStatus(studentData.id);
+        
+        // Update local state with the new payment status
+        if (newStatus && setStudentData) {
+          setStudentData(prev => ({
+            ...prev,
+            paymentStatus: newStatus as any
+          }));
+        }
+      }
     },
     onError: (error) => {
       console.error("Error deleting payment:", error);
@@ -389,7 +681,39 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium mb-3">Payment History</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-medium">Payment History</h3>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncPaymentStatus}
+              disabled={isSyncingPaymentStatus || !studentData.id}
+              className="gap-2"
+            >
+              <RefreshCw className={cn("h-4 w-4", isSyncingPaymentStatus && "animate-spin")} />
+              {isSyncingPaymentStatus ? "Syncing..." : "Sync Payment Status"}
+            </Button>
+            {subscriptions && subscriptions.length > 0 && subscriptions.some(s => (s.total_paid || 0) >= (s.total_price || 0)) && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={async () => {
+                  if (studentData.id) {
+                    const result = await setPaymentStatusDirect(studentData.id, 'paid');
+                    if (result) {
+                      toast.success('Payment status set to PAID');
+                      setTimeout(() => window.location.reload(), 1000);
+                    }
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Mark as Paid
+              </Button>
+            )}
+          </div>
+        </div>
         {payments.length === 0 ? (
           <div className="text-center py-8 border rounded-md bg-muted/30">
             <p className="text-muted-foreground">No payment history</p>
