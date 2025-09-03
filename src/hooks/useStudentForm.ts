@@ -294,10 +294,11 @@ export const useStudentForm = (
               if (match) {
                 processedParentInfo.countryCode = match[1];
                 processedParentInfo.phone = phoneStr.substring(match[1].length).trim();
-            } else {
-              // Couldn't extract, use default
-              processedParentInfo.countryCode = '+7';
-              processedParentInfo.phone = phoneStr;
+              } else {
+                // Couldn't extract, use default
+                processedParentInfo.countryCode = '+7';
+                processedParentInfo.phone = phoneStr;
+              }
             }
           } else if (parentInfo.countryCode) {
             // Country code is stored separately, use it
