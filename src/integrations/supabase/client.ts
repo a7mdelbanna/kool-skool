@@ -719,6 +719,11 @@ export const updateStudent = async (id: string, updates: Partial<StudentRecord>)
         // Use mapped snake_case key if available, otherwise use original key
         const fieldKey = camelToSnakeMap[key] || key;
         studentFields[fieldKey] = (updates as any)[key];
+        
+        // Log parent info specifically for debugging
+        if (key === 'parentInfo' || key === 'parent_info') {
+          console.log(`Mapping ${key} to ${fieldKey}:`, (updates as any)[key]);
+        }
       }
     });
     

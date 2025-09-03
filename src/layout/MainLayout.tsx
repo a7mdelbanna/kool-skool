@@ -34,6 +34,7 @@ import VocabularyPractice from '@/pages/VocabularyPractice';
 import SpeakingTopics from '@/pages/SpeakingTopics';
 import StudentSpeaking from '@/pages/StudentSpeaking';
 import AssignSpeakingTopic from '@/pages/AssignSpeakingTopic';
+import Birthdays from '@/pages/Birthdays';
 
 const MainLayout = () => {
   return (
@@ -52,6 +53,7 @@ const MainLayout = () => {
                   <Route path="/courses" element={<Courses />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/attendance" element={<Attendance />} />
+                  <Route path="/birthdays" element={<Birthdays />} />
                   <Route path="/payments" element={<Payments />} />
                   <Route path="/finances" element={<Finances />} />
                   <Route path="/contacts" element={<Contacts />} />

@@ -88,6 +88,13 @@ const Students = () => {
       const students = await databaseService.getBySchoolId('students', schoolId);
       console.log('📚 Raw students from Firebase:', students);
       
+      // Log parent info for debugging
+      students.forEach((s: any) => {
+        if (s.parent_info || s.parentInfo) {
+          console.log(`Student ${s.firstName} has parent info:`, s.parent_info || s.parentInfo);
+        }
+      });
+      
       // Log payment status fields for debugging
       const activeStudents = students.filter((s: any) => s.status === 'active');
       
@@ -132,8 +139,9 @@ const Students = () => {
           }
           
           // Update local object with calculated data
-          return {
-            ...student,
+          // IMPORTANT: Spread student FIRST to preserve ALL original fields
+          const mappedStudent = {
+            ...student, // This preserves ALL fields including parent_info
             paymentStatus: calculatedStatus,
             payment_status: calculatedStatus,
             subscriptionProgress: progressData.progress,
@@ -146,8 +154,18 @@ const Students = () => {
             nextPaymentAmount: progressData.nextPaymentAmount,
             next_payment_amount: progressData.nextPaymentAmount,
             nextPaymentCurrency: progressData.nextPaymentCurrency,
-            next_payment_currency: progressData.nextPaymentCurrency
+            next_payment_currency: progressData.nextPaymentCurrency,
+            // Ensure parent info is accessible with both field names for compatibility
+            parentInfo: student.parent_info || student.parentInfo,
+            parent_info: student.parent_info || student.parentInfo
           };
+          
+          // Debug log to verify parent_info is preserved
+          if (student.parent_info || student.parentInfo) {
+            console.log(`[Students] Mapped student ${student.firstName} with parent_info:`, mappedStudent.parent_info);
+          }
+          
+          return mappedStudent;
         })
       );
       
@@ -656,6 +674,8 @@ const Students = () => {
   };
   
   const handleEditStudent = (student: Student) => {
+    console.log('[Students] handleEditStudent called with:', student);
+    console.log('[Students] Parent info in student:', student.parent_info || student.parentInfo);
     setSelectedStudent(student);
     setIsEditMode(true);
     setIsAddStudentOpen(true);

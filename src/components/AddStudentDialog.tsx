@@ -51,6 +51,14 @@ const AddStudentDialog: React.FC<AddStudentDialogProps> = ({
     }
   };
 
+  // Debug log when dialog opens with student
+  useEffect(() => {
+    if (open && student) {
+      console.log('[AddStudentDialog] Opening with student:', student);
+      console.log('[AddStudentDialog] Parent info:', student.parent_info || student.parentInfo);
+    }
+  }, [open, student]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">

@@ -106,12 +106,59 @@ export const useStudentForm = (
   
   useEffect(() => {
     if (student) {
+      console.log('[useStudentForm] Loading student data:', student);
       // If phone contains country code, separate them for the form
       let processedStudent = { ...student };
       
       // Keep the original level value (don't normalize to lowercase)
       // This preserves custom levels like A1, A2, B1, etc.
       console.log('Loading student with level:', student.level);
+      
+      // Handle parent info - check both field names and parse the phone if needed
+      console.log('[useStudentForm] Checking for parent info...');
+      console.log('[useStudentForm] student.parent_info:', student.parent_info);
+      console.log('[useStudentForm] student.parentInfo:', student.parentInfo);
+      
+      if (student.parent_info || student.parentInfo) {
+        const parentInfo = student.parentInfo || student.parent_info;
+        console.log('[useStudentForm] Found parent info:', parentInfo);
+        
+        // If parent info exists and has phone, parse the country code similar to main phone
+        if (parentInfo && parentInfo.phone) {
+          const processedParentInfo = { ...parentInfo };
+          const phoneStr = parentInfo.phone.toString();
+          
+          // Check if the phone already has a country code
+          if (phoneStr.startsWith('+')) {
+            // Extract country code from the phone
+            const match = phoneStr.match(/^(\+\d{1,4})/);
+            if (match) {
+              processedParentInfo.countryCode = match[1];
+              processedParentInfo.phone = phoneStr.substring(match[1].length).trim();
+            } else {
+              // Couldn't extract, use default
+              processedParentInfo.countryCode = '+7';
+              processedParentInfo.phone = phoneStr;
+            }
+          } else if (parentInfo.countryCode) {
+            // Country code is stored separately, use it
+            processedParentInfo.countryCode = parentInfo.countryCode;
+            processedParentInfo.phone = phoneStr;
+          } else {
+            // No country code anywhere, use default
+            processedParentInfo.countryCode = '+7';
+            processedParentInfo.phone = phoneStr;
+          }
+          
+          processedStudent.parentInfo = processedParentInfo;
+        } else {
+          processedStudent.parentInfo = parentInfo;
+        }
+        
+        console.log('[useStudentForm] Processed parent info:', processedStudent.parentInfo);
+      } else {
+        console.log('[useStudentForm] NO parent info found in student data');
+      }
       
       // Process phone number if it exists
       if (student.phone) {
@@ -312,8 +359,23 @@ export const useStudentForm = (
         
         // Add parent information if this is a kid (check both lowercase and the value we're setting)
         if ((studentData.ageGroup === 'kid' || updatePayload.ageGroup === 'Kid') && studentData.parentInfo) {
-          updatePayload.parentInfo = studentData.parentInfo;
-          console.log('[useStudentForm] Adding parent info to payload:', studentData.parentInfo);
+          // Process parent phone similar to student phone - combine country code with phone
+          const processedParentInfo = { ...studentData.parentInfo };
+          
+          if (processedParentInfo.phone && processedParentInfo.phone.trim() !== '') {
+            const cleanParentPhone = processedParentInfo.phone.replace(/^\+/, '').trim();
+            const parentCountryCode = processedParentInfo.countryCode || '+7';
+            
+            // If the phone already includes country code, use as is, otherwise combine
+            if (cleanParentPhone.startsWith(parentCountryCode.replace('+', ''))) {
+              processedParentInfo.phone = `+${cleanParentPhone}`;
+            } else {
+              processedParentInfo.phone = `${parentCountryCode}${cleanParentPhone}`;
+            }
+          }
+          
+          updatePayload.parentInfo = processedParentInfo;
+          console.log('[useStudentForm] Adding parent info to payload:', processedParentInfo);
         }
         
         // Add additional info fields using camelCase

@@ -27,7 +27,8 @@ import {
   Wallet,
   Bell,
   Database,
-  Mic
+  Mic,
+  Cake
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ const Sidebar = () => {
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
     { name: 'TODOs', href: '/todos', icon: CheckSquare },
     { name: 'Speaking Practice', href: '/speaking-topics', icon: Mic },
+    { name: 'Birthdays', href: '/birthdays', icon: Cake },
     { name: 'Payments', href: '/payments', icon: CreditCard },
     { name: 'Finances', href: '/finances', icon: DollarSign },
     { name: 'Contacts', href: '/contacts', icon: Phone },
