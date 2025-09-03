@@ -148,6 +148,38 @@ nextSessionDate = upcomingSessions[0]?.scheduled_date;
 - Session date must be >= today
 - Take the earliest upcoming session by sorting
 
+## 6. Session Generation for Multiple Days (supabaseToFirebase.ts)
+
+**CRITICAL FIX** - Sessions must alternate between all scheduled days
+```typescript
+// WRONG - Only uses first day
+const schedule = params.p_schedule[0]; // Bug: ignores other days
+
+// CORRECT - Process all scheduled days
+const scheduleItems = params.p_schedule || [];
+const scheduledDays = scheduleItems.map(item => ({
+  dayIndex: daysOfWeek.findIndex(day => day.toLowerCase() === item.day.toLowerCase()),
+  time: item.time
+}));
+
+// Generate sessions on alternating days
+while (sessionDates.length < params.p_session_count) {
+  // Check if current date matches ANY scheduled day
+  const matchingSchedule = scheduledDays.find(s => s.dayIndex === currentDayIndex);
+  if (matchingSchedule) {
+    sessionDates.push({ date, time });
+  }
+}
+```
+
+**Issue Fixed:**
+- Selecting Tuesday & Thursday was generating all sessions on Tuesday only
+- Now correctly alternates: Tue → Thu → Tue → Thu...
+
+**Important Note:**
+- This fixes Firebase/fallback implementation
+- Supabase RPC functions (`add_student_subscription`, `update_subscription_with_related_data`) may need similar fix on database side
+
 ## Test Results:
 - Юля Савельева: RUB 6300 paid → Shows as "Paid" ✅
 - Progress: 0/5 → Shows correctly ✅
