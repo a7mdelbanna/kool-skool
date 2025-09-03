@@ -94,22 +94,32 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
 
       // Fetch all students and users for name mapping (handle both field formats)
       const studentIds = [...new Set(subscriptions.map((s: any) => s.studentId || s.student_id).filter(Boolean))];
+      console.log('🔍 Fetching students for IDs:', studentIds);
+      
       const students = await Promise.all(
         studentIds.map(async (id) => {
           try {
-            return await databaseService.getById('students', id);
+            const student = await databaseService.getById('students', id);
+            console.log('👤 Found student:', student?.id, student);
+            return student;
           } catch (error) {
+            console.error('Failed to fetch student:', id, error);
             return null;
           }
         })
       );
 
       const userIds = students.filter(s => s).map(s => s.userId || s.user_id).filter(Boolean);
+      console.log('🔍 Fetching users for IDs:', userIds);
+      
       const users = await Promise.all(
         userIds.map(async (userId: string) => {
           try {
-            return await databaseService.getById('users', userId);
+            const user = await databaseService.getById('users', userId);
+            console.log('👤 Found user:', userId, user);
+            return user;
           } catch (error) {
+            console.error('Failed to fetch user:', userId, error);
             return null;
           }
         })
@@ -211,10 +221,24 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
         // Get student and user info for name (handle both field formats)
         const studentId = subscription.studentId || subscription.student_id;
         const student = students.find(s => s?.id === studentId);
-        const user = student ? users.find(u => u?.id === (student.userId || student.user_id)) : null;
-        const studentName = user ? 
-          `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 
-          'Unknown Student';
+        
+        let studentName = 'Unknown Student';
+        
+        // First try to get name from user data
+        if (student) {
+          const userId = student.userId || student.user_id;
+          const user = userId ? users.find(u => u?.id === userId) : null;
+          
+          if (user) {
+            studentName = `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim();
+          } 
+          // If no user found, try to get name directly from student
+          else if (student.firstName || student.first_name || student.lastName || student.last_name) {
+            studentName = `${student.firstName || student.first_name || ''} ${student.lastName || student.last_name || ''}`.trim();
+          }
+        }
+        
+        console.log(`📝 Student name for ${studentId}: ${studentName}`);
 
         // Calculate payment amount (handle all possible field names)
         const paymentAmount = subscription.totalPrice || subscription.total_price || subscription.price || 0;
