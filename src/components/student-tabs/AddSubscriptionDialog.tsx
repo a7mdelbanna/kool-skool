@@ -160,17 +160,14 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
   const paymentMethods = ['Cash', 'Card', 'Bank Transfer', 'Check', 'Online'];
 
-  // Set default currency when currencies are loaded
-  useEffect(() => {
-    if (currencies.length > 0 && !formData.currency) {
-      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
-      setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
-    }
-  }, [currencies, formData.currency]);
 
-  // Reset form when dialog opens
+  // Store whether dialog was previously open
+  const [wasOpen, setWasOpen] = useState(false);
+  
+  // Only reset form when dialog is freshly opened, not when switching tabs/windows
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpen) {
+      // Dialog is being opened fresh - reset the form
       setFormData({
         sessionCount: '',
         durationMonths: '',
@@ -194,7 +191,16 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       setConflictMessage('');
       setShowConflictDialog(false);
     }
-  }, [open, currencies]);
+    setWasOpen(open);
+  }, [open]);  // Removed currencies dependency to prevent reset on currency load
+  
+  // Set default currency separately when currencies load
+  useEffect(() => {
+    if (currencies.length > 0 && !formData.currency) {
+      const defaultCurrency = currencies.find(c => c.is_default) || currencies[0];
+      setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
+    }
+  }, [currencies]);
 
   // Clear validation error when form fields change
   useEffect(() => {
