@@ -1591,10 +1591,16 @@ async function handleGetSchoolTransactions(params: { p_school_id: string }) {
       for (const student of students) {
         if (studentIds.has(student.id)) {
           try {
-            const user = await databaseService.getById('users', student.userId);
-            if (user) {
-              const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-              studentMap.set(student.id, fullName || 'Unknown Student');
+            // Handle both field name formats
+            const userId = student.userId || student.user_id;
+            if (userId) {
+              const user = await databaseService.getById('users', userId);
+              if (user) {
+                const fullName = `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim();
+                studentMap.set(student.id, fullName || 'Unknown Student');
+              }
+            } else {
+              console.warn('No user ID found for student:', student.id);
             }
           } catch (error) {
             console.warn('Could not fetch user for student:', student.id);

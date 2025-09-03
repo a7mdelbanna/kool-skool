@@ -67,13 +67,23 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
       console.log('🔄 Fetching expected payments for school:', schoolId);
       
       try {
-        // Fetch active subscriptions
-        const subscriptions = await databaseService.query('subscriptions', {
+        // Fetch active subscriptions - try both field name formats
+        let subscriptions = await databaseService.query('subscriptions', {
           where: [
-            { field: 'school_id', operator: '==', value: schoolId },
+            { field: 'schoolId', operator: '==', value: schoolId },
             { field: 'status', operator: '==', value: 'active' }
           ]
         });
+        
+        // If no results, try snake_case format
+        if (!subscriptions || subscriptions.length === 0) {
+          subscriptions = await databaseService.query('subscriptions', {
+            where: [
+              { field: 'school_id', operator: '==', value: schoolId },
+              { field: 'status', operator: '==', value: 'active' }
+            ]
+          });
+        }
 
         console.log('📋 Found subscriptions:', subscriptions?.length || 0);
 
@@ -82,8 +92,8 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
           return [];
         }
 
-      // Fetch all students and users for name mapping
-      const studentIds = [...new Set(subscriptions.map((s: any) => s.student_id).filter(Boolean))];
+      // Fetch all students and users for name mapping (handle both field formats)
+      const studentIds = [...new Set(subscriptions.map((s: any) => s.studentId || s.student_id).filter(Boolean))];
       const students = await Promise.all(
         studentIds.map(async (id) => {
           try {
@@ -111,12 +121,21 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
       const sessionsBySubscription = await Promise.all(
         subscriptions.map(async (subscription: any) => {
           try {
-            // Fetch all sessions for this subscription
-            const allSessions = await databaseService.query('sessions', {
+            // Fetch all sessions for this subscription - try both field formats
+            let allSessions = await databaseService.query('sessions', {
               where: [
-                { field: 'subscription_id', operator: '==', value: subscription.id }
+                { field: 'subscriptionId', operator: '==', value: subscription.id }
               ]
             });
+            
+            // If no results, try snake_case format
+            if (!allSessions || allSessions.length === 0) {
+              allSessions = await databaseService.query('sessions', {
+                where: [
+                  { field: 'subscription_id', operator: '==', value: subscription.id }
+                ]
+              });
+            }
             
             // Filter out cancelled sessions client-side
             const sessions = allSessions ? allSessions.filter((s: any) => s.status !== 'cancelled') : [];
@@ -139,24 +158,25 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
           continue;
         }
 
-        // Filter out sessions with invalid dates
+        // Filter out sessions with invalid dates (handle both field formats)
         const validSessions = sessions.filter((session: any) => {
-          if (!session.scheduled_date) return false;
-          const date = new Date(session.scheduled_date);
+          const scheduledDate = session.scheduledDate || session.scheduled_date;
+          if (!scheduledDate) return false;
+          const date = new Date(scheduledDate);
           return !isNaN(date.getTime());
         });
         
         if (validSessions.length === 0) continue;
         
-        // Find the last scheduled session
+        // Find the last scheduled session (handle both field formats)
         const sortedSessions = validSessions.sort((a: any, b: any) => {
-          const dateA = new Date(a.scheduled_date);
-          const dateB = new Date(b.scheduled_date);
+          const dateA = new Date(a.scheduledDate || a.scheduled_date);
+          const dateB = new Date(b.scheduledDate || b.scheduled_date);
           return dateB.getTime() - dateA.getTime();
         });
 
         const lastSession = sortedSessions[0];
-        const lastSessionDate = new Date(lastSession.scheduled_date);
+        const lastSessionDate = new Date(lastSession.scheduledDate || lastSession.scheduled_date);
         
         // Validate the date
         if (isNaN(lastSessionDate.getTime())) continue;
@@ -188,24 +208,25 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
           nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
         }
 
-        // Get student and user info for name
-        const student = students.find(s => s?.id === subscription.student_id);
+        // Get student and user info for name (handle both field formats)
+        const studentId = subscription.studentId || subscription.student_id;
+        const student = students.find(s => s?.id === studentId);
         const user = student ? users.find(u => u?.id === (student.userId || student.user_id)) : null;
         const studentName = user ? 
           `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 
           'Unknown Student';
 
-        // Calculate payment amount (full subscription price or remaining balance)
-        const paymentAmount = subscription.total_price || 0;
+        // Calculate payment amount (handle all possible field names)
+        const paymentAmount = subscription.totalPrice || subscription.total_price || subscription.price || 0;
 
         expectedPaymentsData.push({
-          student_id: subscription.student_id,
+          student_id: studentId,
           student_name: studentName,
           subscription_id: subscription.id,
           next_payment_date: nextPaymentDate.toISOString().split('T')[0],
           next_payment_amount: paymentAmount,
           currency: subscription.currency || 'RUB',
-          subscription_name: subscription.course_name || 'Subscription',
+          subscription_name: subscription.courseName || subscription.course_name || 'Subscription',
           last_session_date: lastSessionDate.toISOString().split('T')[0]
         });
       }
