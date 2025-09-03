@@ -1,4 +1,4 @@
-# Payment Status and Subscriptions Fix Documentation
+# Payment Status, Subscriptions, and Progress Fix Documentation
 
 ## Critical: DO NOT CHANGE THESE IMPLEMENTATIONS
 
@@ -95,6 +95,34 @@ Calculate payment status
 3. ✅ Price MUST check totalPrice, total_price, and price fields
 4. ✅ Only 3 payment statuses: paid, partial, overdue
 
+## 4. Session Progress Calculation (Students.tsx - calculateStudentProgress)
+
+**MUST USE SUPABASE RPC** - Do not change to Firebase!
+```typescript
+// CORRECT - This works!
+const { data: subscriptions, error } = await supabase.rpc('get_student_subscriptions', {
+  p_student_id: studentId
+});
+
+// Use session counts from RPC
+const attendedSessions = activeSubscription.sessions_attended || 0;
+const cancelledSessions = activeSubscription.sessions_cancelled || 0;
+const completedSessions = attendedSessions + cancelledSessions; // Same as Attendance page
+const totalSessions = activeSubscription.session_count || 0;
+const progress = `${completedSessions}/${totalSessions}`;
+```
+
+**Why:** 
+- Avoids Firebase index requirements for session queries
+- Uses same logic as working Attendance page
+- Session counts are pre-calculated in Supabase RPC
+
+**Progress Calculation Rule:**
+- Progress = attended sessions + cancelled sessions
+- This matches the Attendance page logic where cancelled sessions count toward progress
+
 ## Test Results:
 - Юля Савельева: RUB 6300 paid → Shows as "Paid" ✅
-- Юра Сулин: RUB 0 paid of 18900 → Shows as "Overdue" ✅
+- Progress: 0/5 → Shows correctly ✅
+- Юра Сулин: RUB 0 paid of 18900 → Shows as "Overdue" ✅  
+- Progress: 0/12 → Shows correctly ✅
