@@ -238,16 +238,38 @@ const Students = () => {
   // Function to determine if a student is overdue based on subscriptions
   const calculatePaymentStatus = async (studentId: string, currentStatus: string): Promise<string> => {
     try {
-      // Fetch subscriptions for this student
-      const subscriptions = await databaseService.query('subscriptions', {
-        where: [{ field: 'student_id', operator: '==', value: studentId }]
-      });
+      // Fetch subscriptions for this student (check both field name formats)
+      let subscriptions = [];
+      
+      // Try with snake_case first
+      try {
+        subscriptions = await databaseService.query('subscriptions', {
+          where: [{ field: 'student_id', operator: '==', value: studentId }]
+        });
+      } catch (e) {
+        console.log('No subscriptions with student_id field');
+      }
+      
+      // If no results, try with camelCase
+      if (subscriptions.length === 0) {
+        try {
+          subscriptions = await databaseService.query('subscriptions', {
+            where: [{ field: 'studentId', operator: '==', value: studentId }]
+          });
+        } catch (e) {
+          console.log('No subscriptions with studentId field');
+        }
+      }
       
       if (subscriptions.length === 0) {
         return 'overdue'; // No subscriptions = overdue
       }
       
-      console.log(`📊 Calculating payment status for student ${studentId}:`, subscriptions);
+      console.log(`📊 Calculating payment status for student ${studentId}:`);
+      console.log('  Found subscriptions:', subscriptions.length);
+      if (subscriptions.length > 0) {
+        console.log('  First subscription fields:', Object.keys(subscriptions[0]));
+      }
       
       const now = new Date();
       let hasOverdue = false;
@@ -260,13 +282,34 @@ const Students = () => {
         let totalPaid = 0;
         
         try {
-          // Fetch transaction payments from Firebase
-          const transactions = await databaseService.query('transactions', {
-            where: [
-              { field: 'subscription_id', operator: '==', value: subscription.id },
-              { field: 'type', operator: '==', value: 'income' }
-            ]
-          });
+          // Fetch transaction payments from Firebase (check both field name formats)
+          let transactions = [];
+          
+          // Try with snake_case first
+          try {
+            transactions = await databaseService.query('transactions', {
+              where: [
+                { field: 'subscription_id', operator: '==', value: subscription.id },
+                { field: 'type', operator: '==', value: 'income' }
+              ]
+            });
+          } catch (e) {
+            console.log('No transactions with subscription_id field');
+          }
+          
+          // If no results, try with camelCase
+          if (transactions.length === 0) {
+            try {
+              transactions = await databaseService.query('transactions', {
+                where: [
+                  { field: 'subscriptionId', operator: '==', value: subscription.id },
+                  { field: 'type', operator: '==', value: 'income' }
+                ]
+              });
+            } catch (e) {
+              console.log('No transactions with subscriptionId field');
+            }
+          }
           
           // Sum up all transaction payments
           for (const transaction of transactions) {
@@ -288,7 +331,7 @@ const Students = () => {
           totalPaid = Math.max(totalPaid, directPaid); // Use the higher value
         }
         
-        const totalPrice = parseFloat(subscription.totalPrice || subscription.total_price || 0);
+        const totalPrice = parseFloat(subscription.totalPrice || subscription.total_price || subscription.price || 0);
         
         console.log(`  Subscription ${subscription.id}: paid=${totalPaid}, price=${totalPrice}`);
         
@@ -346,10 +389,29 @@ const Students = () => {
     nextPaymentCurrency: string;
   }> => {
     try {
-      // Fetch subscriptions
-      const subscriptions = await databaseService.query('subscriptions', {
-        where: [{ field: 'student_id', operator: '==', value: studentId }]
-      });
+      // Fetch subscriptions (check both field name formats)
+      let subscriptions = [];
+      
+      try {
+        subscriptions = await databaseService.query('subscriptions', {
+          where: [{ field: 'student_id', operator: '==', value: studentId }]
+        });
+      } catch (e) {
+        // Try with camelCase if snake_case fails
+        subscriptions = await databaseService.query('subscriptions', {
+          where: [{ field: 'studentId', operator: '==', value: studentId }]
+        });
+      }
+      
+      if (subscriptions.length === 0) {
+        try {
+          subscriptions = await databaseService.query('subscriptions', {
+            where: [{ field: 'studentId', operator: '==', value: studentId }]
+          });
+        } catch (e) {
+          console.log('No subscriptions found for student');
+        }
+      }
 
       if (subscriptions.length === 0) {
         return {
@@ -376,11 +438,21 @@ const Students = () => {
         };
       }
 
-      // Fetch sessions for this subscription
-      const sessions = await databaseService.query('sessions', {
-        where: [{ field: 'subscription_id', operator: '==', value: activeSubscription.id }],
-        orderBy: [{ field: 'date', direction: 'asc' }]
-      });
+      // Fetch sessions for this subscription (check both field name formats)
+      let sessions = [];
+      
+      try {
+        sessions = await databaseService.query('sessions', {
+          where: [{ field: 'subscription_id', operator: '==', value: activeSubscription.id }],
+          orderBy: [{ field: 'date', direction: 'asc' }]
+        });
+      } catch (e) {
+        // Try with camelCase if snake_case fails
+        sessions = await databaseService.query('sessions', {
+          where: [{ field: 'subscriptionId', operator: '==', value: activeSubscription.id }],
+          orderBy: [{ field: 'date', direction: 'asc' }]
+        });
+      }
 
       // Calculate completed sessions
       const completedSessions = sessions.filter(s => 
@@ -400,7 +472,7 @@ const Students = () => {
 
       // Calculate next payment info
       const totalPaid = activeSubscription.totalPaid || activeSubscription.total_paid || 0;
-      const totalPrice = activeSubscription.totalPrice || activeSubscription.total_price || 0;
+      const totalPrice = activeSubscription.totalPrice || activeSubscription.total_price || activeSubscription.price || 0;
       const remaining = totalPrice - totalPaid;
       
       return {
