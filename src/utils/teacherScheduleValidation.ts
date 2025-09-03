@@ -1,7 +1,7 @@
 
 import { format } from 'date-fns';
 import { databaseService } from '@/services/firebase/database.service';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, and, or } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface SessionTime {
@@ -64,46 +64,143 @@ export const validateTeacherScheduleOverlap = async (
     const newStartMinutes = timeToMinutes(startTime);
     const newEndMinutes = newStartMinutes + durationMinutes;
     
-    // For now, skip validation in Firebase environment to avoid index issues
-    // TODO: Implement proper Firebase validation with correct indexes
-    console.log('Teacher schedule validation temporarily disabled for Firebase');
-    return { hasConflict: false };
+    console.log('Validating teacher schedule for:', { teacherId, date, startTime, durationMinutes });
     
-    /* Firebase implementation - disabled until indexes are created
     try {
-      // Create date range for the query
-      const startOfDay = new Date(`${date}T00:00:00`);
-      const endOfDay = new Date(`${date}T23:59:59`);
-      
-      // Query for sessions where this teacher is involved
-      const sessionsRef = collection(db, 'lesson_sessions');
-      const q = query(
-        sessionsRef,
-        where('teacher_id', '==', teacherId),
-        where('scheduled_date', '>=', startOfDay.toISOString()),
-        where('scheduled_date', '<=', endOfDay.toISOString()),
-        where('status', '==', 'scheduled')
+      // First, get all students taught by this teacher
+      const studentsRef = collection(db, 'students');
+      const studentQuery = query(
+        studentsRef,
+        where('teacher_id', '==', teacherId)
       );
       
-      const querySnapshot = await getDocs(q);
-      const existingSessions = [];
+      const studentSnapshot = await getDocs(studentQuery);
+      const studentIds = [];
+      const studentNames = {};
       
-      querySnapshot.forEach((doc) => {
-        const session = { id: doc.id, ...doc.data() };
-        if (session.id !== excludeSessionId) {
-          existingSessions.push(session);
-        }
+      studentSnapshot.forEach((doc) => {
+        const studentData = doc.data();
+        studentIds.push(doc.id);
+        // Store student names for later use
+        studentNames[doc.id] = `${studentData.firstName || studentData.first_name || ''} ${studentData.lastName || studentData.last_name || ''}`;
       });
       
-      if (existingSessions.length === 0) {
+      if (studentIds.length === 0) {
+        console.log('No students found for teacher:', teacherId);
         return { hasConflict: false };
       }
+      
+      console.log('Found students for teacher:', studentIds);
+      
+      // Now query sessions for these students on the given date
+      // We need to check sessions that are scheduled for the same day
+      const sessionsRef = collection(db, 'lesson_sessions');
+      
+      // Create date range for the query (using date strings for comparison)
+      const dateStart = `${date}T00:00:00`;
+      const dateEnd = `${date}T23:59:59`;
+      
+      // Query sessions for all students of this teacher on the given date
+      const existingSessions = [];
+      
+      // We need to query in batches if there are many students (Firestore limit is 10 for 'in' queries)
+      const batchSize = 10;
+      for (let i = 0; i < studentIds.length; i += batchSize) {
+        const batch = studentIds.slice(i, i + batchSize);
+        
+        const sessionQuery = query(
+          sessionsRef,
+          and(
+            where('student_id', 'in', batch),
+            where('status', '==', 'scheduled')
+          )
+        );
+        
+        const sessionSnapshot = await getDocs(sessionQuery);
+        
+        sessionSnapshot.forEach((doc) => {
+          const session = { id: doc.id, ...doc.data() };
+          
+          // Check if this session is on the same date
+          const sessionDate = session.scheduled_date || session.scheduledDate;
+          if (sessionDate && sessionDate >= dateStart && sessionDate <= dateEnd) {
+            // Exclude the session being rescheduled
+            if (session.id !== excludeSessionId) {
+              existingSessions.push(session);
+            }
+          }
+        });
+      }
+      
+      if (existingSessions.length === 0) {
+        console.log('No existing sessions found for this teacher on', date);
+        return { hasConflict: false };
+      }
+      
+      console.log('Found existing sessions:', existingSessions.length);
+      
+      // Check for conflicts
+      const conflictingSessions: ConflictingSession[] = [];
+      const dayName = getDayName(date);
+      
+      for (const session of existingSessions) {
+        const sessionDateStr = session.scheduled_date || session.scheduledDate;
+        const sessionDate = new Date(sessionDateStr);
+        const existingStartTime = format(sessionDate, 'HH:mm');
+        const existingStartMinutes = timeToMinutes(existingStartTime);
+        const existingEndMinutes = existingStartMinutes + (session.duration_minutes || session.durationMinutes || 60);
+        
+        // Check for overlap
+        const hasOverlap = (
+          (newStartMinutes < existingEndMinutes) && 
+          (newEndMinutes > existingStartMinutes)
+        );
+        
+        if (hasOverlap) {
+          const studentId = session.student_id || session.studentId;
+          const studentName = studentNames[studentId] || 'Unknown Student';
+          const groupId = session.group_id || session.groupId;
+          
+          conflictingSessions.push({
+            id: session.id,
+            startTime: formatTimeForDisplay(existingStartTime),
+            endTime: formatTimeForDisplay(minutesToTime(existingEndMinutes)),
+            studentName,
+            isGroup: !!groupId,
+            groupName: session.groupName
+          });
+        }
+      }
+      
+      if (conflictingSessions.length > 0) {
+        const newStartDisplay = formatTimeForDisplay(startTime);
+        const newEndDisplay = formatTimeForDisplay(minutesToTime(newEndMinutes));
+        
+        // Create a user-friendly conflict message
+        const conflictDetails = conflictingSessions
+          .map(session => {
+            const sessionType = session.isGroup ? `Group: ${session.groupName}` : session.studentName;
+            return `${sessionType} (${session.startTime} - ${session.endTime})`;
+          })
+          .join(', ');
+        
+        const conflictMessage = `This teacher already has a session scheduled from ${conflictingSessions[0].startTime} to ${conflictingSessions[0].endTime} on ${dayName}. The new session (${newStartDisplay} - ${newEndDisplay}) would overlap with: ${conflictDetails}. Please choose a different time.`;
+        
+        return {
+          hasConflict: true,
+          conflictMessage,
+          conflictingSessions
+        };
+      }
+      
+      return { hasConflict: false };
+      
     } catch (firebaseError) {
       console.error('Firebase query error:', firebaseError);
       // Return no conflict on error to allow operation to proceed
+      // This prevents blocking users if there's an issue with the query
       return { hasConflict: false };
     }
-    */
 
 
   } catch (error) {
