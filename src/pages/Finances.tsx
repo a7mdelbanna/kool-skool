@@ -74,9 +74,10 @@ const FinancesPage = () => {
           to: endOfDay(now)
         };
       case 'week':
+        // Use Sunday as start of week (weekStartsOn: 0) for consistency
         return {
-          from: startOfWeek(now),
-          to: endOfWeek(now)
+          from: startOfWeek(now, { weekStartsOn: 0 }),
+          to: endOfWeek(now, { weekStartsOn: 0 })
         };
       case 'month':
         return {
@@ -100,7 +101,40 @@ const FinancesPage = () => {
 
   // Filter function to check if a date is within the selected range
   const isDateInRange = (date: string) => {
-    const transactionDate = new Date(date);
+    if (!date) return false;
+    
+    // Handle different date formats
+    let transactionDate: Date;
+    
+    // If date is in YYYY-MM-DD format, parse it properly
+    if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      // Add time to make it a valid ISO string for proper parsing
+      transactionDate = new Date(date + 'T00:00:00');
+    } else {
+      // Otherwise try to parse as-is (handles ISO strings and other formats)
+      transactionDate = new Date(date);
+    }
+    
+    // Check if the date is valid
+    if (isNaN(transactionDate.getTime())) {
+      console.warn('Invalid date format:', date);
+      return false;
+    }
+    
+    // Debug logging for date filtering
+    if (dateFilter === 'today' || dateFilter === 'month') {
+      console.log('Date filter check:', {
+        filter: dateFilter,
+        transactionDate: transactionDate.toISOString(),
+        rangeStart: dateRange.from.toISOString(),
+        rangeEnd: dateRange.to.toISOString(),
+        inRange: isWithinInterval(transactionDate, {
+          start: dateRange.from,
+          end: dateRange.to
+        })
+      });
+    }
+    
     return isWithinInterval(transactionDate, {
       start: dateRange.from,
       end: dateRange.to
