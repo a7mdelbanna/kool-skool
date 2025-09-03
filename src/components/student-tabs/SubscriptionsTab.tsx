@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { Subscription, deleteStudentSubscriptionEnhanced, RpcResponse, supabase } from '@/integrations/supabase/client';
+import { Subscription, deleteStudentSubscriptionEnhanced, RpcResponse } from '@/integrations/supabase/client';
 import EditSubscriptionDialog from './EditSubscriptionDialog';
 import AddSubscriptionDialog from './AddSubscriptionDialog';
 import SubscriptionCard from './SubscriptionCard';
@@ -24,11 +24,11 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  // Fetch subscriptions using RPC function with real-time session progress
+  // Fetch subscriptions from Firebase with real-time session progress
   const { data: subscriptions = [], isLoading: subscriptionsLoading, error: subscriptionsError, refetch: refetchSubscriptions } = useQuery({
-    queryKey: ['student-subscriptions-rpc', studentId],
+    queryKey: ['student-subscriptions-firebase', studentId],
     queryFn: async () => {
-      console.log('🚀 FETCHING SUBSCRIPTIONS VIA RPC WITH REAL-TIME SESSION PROGRESS');
+      console.log('🚀 FETCHING SUBSCRIPTIONS FROM FIREBASE WITH REAL-TIME SESSION PROGRESS');
       console.log('Student ID:', studentId);
       
       if (!studentId) {
@@ -37,33 +37,79 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       }
       
       try {
-        // Use the updated RPC function to get subscriptions with real-time session progress
-        const { data: subscriptionsData, error } = await supabase.rpc('get_student_subscriptions', {
-          p_student_id: studentId
+        // Import databaseService
+        const { databaseService } = await import('@/services/firebase/database.service');
+        
+        // Fetch subscriptions from Firebase
+        const subscriptionsData = await databaseService.query('subscriptions', {
+          where: [{ field: 'student_id', operator: '==', value: studentId }]
         });
         
-        console.log('📊 RPC subscriptions result with real-time progress:', {
+        console.log('📊 Firebase subscriptions result with real-time progress:', {
           data: subscriptionsData,
-          error: error,
           dataLength: subscriptionsData?.length || 0
         });
-        
-        if (error) {
-          console.error('❌ RPC subscription fetch error:', error);
-          throw error;
-        }
 
         if (!subscriptionsData || subscriptionsData.length === 0) {
-          console.log('✅ No subscriptions found via RPC');
+          console.log('✅ No subscriptions found in Firebase');
           return [];
         }
+        
+        // Now fetch sessions for each subscription to calculate progress
+        const subscriptionsWithProgress = await Promise.all(
+          subscriptionsData.map(async (subscription) => {
+            try {
+              // Fetch sessions for this subscription
+              const sessions = await databaseService.query('sessions', {
+                where: [{ field: 'subscription_id', operator: '==', value: subscription.id }],
+                orderBy: [{ field: 'date', direction: 'asc' }]
+              });
+              
+              // Calculate session counts
+              const completedSessions = sessions.filter((s: any) => 
+                s.status === 'completed' || s.status === 'attended'
+              ).length;
+              
+              const attendedSessions = sessions.filter((s: any) => 
+                s.status === 'attended'
+              ).length;
+              
+              const cancelledSessions = sessions.filter((s: any) => 
+                s.status === 'cancelled'
+              ).length;
+              
+              const scheduledSessions = sessions.filter((s: any) => 
+                s.status === 'scheduled' || s.status === 'upcoming'
+              ).length;
+              
+              return {
+                ...subscription,
+                sessions_completed: completedSessions,
+                sessions_attended: attendedSessions,
+                sessions_cancelled: cancelledSessions,
+                sessions_scheduled: scheduledSessions,
+                total_sessions: sessions.length
+              };
+            } catch (error) {
+              console.error('Error fetching sessions for subscription:', subscription.id, error);
+              return {
+                ...subscription,
+                sessions_completed: 0,
+                sessions_attended: 0,
+                sessions_cancelled: 0,
+                sessions_scheduled: 0,
+                total_sessions: 0
+              };
+            }
+          })
+        );
 
         console.log('💰 Calculating total paid for each subscription with real-time progress...');
         
         // Calculate total paid for each subscription (keeping payment calculation logic)
         const subscriptionsWithPayments = await Promise.all(
-          subscriptionsData.map(async (subscription, index) => {
-            console.log(`💳 Processing subscription ${index + 1}/${subscriptionsData.length}:`, {
+          subscriptionsWithProgress.map(async (subscription, index) => {
+            console.log(`💳 Processing subscription ${index + 1}/${subscriptionsWithProgress.length}:`, {
               id: subscription.id,
               sessions_completed: subscription.sessions_completed,
               sessions_attended: subscription.sessions_attended,
@@ -72,13 +118,29 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
             });
             
             try {
-              // Get payments for this student
-              const { data: studentPayments, error: studentPaymentsError } = await supabase
-                .from('student_payments')
-                .select('amount')
-                .eq('student_id', studentId);
+              // Get payments for this student from Firebase
+              let studentPayments = [];
+              let studentPaymentsError = null;
+              
+              try {
+                // Import databaseService if not already imported
+                const { databaseService } = await import('@/services/firebase/database.service');
+                
+                // Query payments linked to this student from Firebase
+                const payments = await databaseService.query('payments', {
+                  where: [
+                    { field: 'student_id', operator: '==', value: studentId },
+                    { field: 'type', operator: '==', value: 'income' }
+                  ]
+                });
+                
+                studentPayments = payments.map((p: any) => ({ amount: p.amount }));
+              } catch (error) {
+                console.error('Error fetching student payments from Firebase:', error);
+                studentPaymentsError = error;
+              }
 
-              console.log(`💸 Student payments query result:`, {
+              console.log(`💸 Student payments query result from Firebase:`, {
                 payments: studentPayments,
                 error: studentPaymentsError,
                 paymentsCount: studentPayments?.length || 0
@@ -112,15 +174,18 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                 paymentsCount: transactionPayments?.length || 0
               });
 
-              // Calculate total from both sources
+              // Calculate total from both sources (now both from Firebase)
               const studentPaymentTotal = (studentPayments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
               const transactionPaymentTotal = (transactionPayments || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
-              const totalPaid = studentPaymentTotal + transactionPaymentTotal;
+              // Avoid double counting - use the higher of the two totals or combine if different payment types
+              const totalPaid = Math.max(studentPaymentTotal, transactionPaymentTotal);
 
-              console.log(`✅ Total calculations for subscription ${subscription.id}:`, {
+              console.log(`✅ Total calculations for subscription ${subscription.id} (Firebase only):`, {
                 studentPaymentTotal,
                 transactionPaymentTotal,
-                totalPaid,
+                totalPaid: totalPaid,
+                source: 'Firebase only',
+                subscriptionPrice: subscription.price,
                 realTimeProgress: {
                   completed: subscription.sessions_completed,
                   attended: subscription.sessions_attended,

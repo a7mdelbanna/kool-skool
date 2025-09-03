@@ -264,7 +264,7 @@ const Students = () => {
           const transactions = await databaseService.query('transactions', {
             where: [
               { field: 'subscription_id', operator: '==', value: subscription.id },
-              { field: 'transaction_type', operator: '==', value: 'income' }
+              { field: 'type', operator: '==', value: 'income' }
             ]
           });
           
@@ -273,6 +273,7 @@ const Students = () => {
             const amount = parseFloat(transaction.amount || 0);
             if (amount > 0) {
               totalPaid += amount;
+              console.log(`    Transaction ${transaction.id}: +${amount}`);
             }
           }
           
@@ -298,36 +299,36 @@ const Students = () => {
         // Calculate payment percentage
         const paymentPercentage = (totalPaid / totalPrice) * 100;
         
-        console.log(`  Payment percentage: ${paymentPercentage}%`);
+        console.log(`  💰 Payment percentage: ${paymentPercentage.toFixed(1)}% (${totalPaid}/${totalPrice})`);
         
-        // Check payment status
-        if (paymentPercentage >= 100) {
+        // Check payment status - only 3 statuses: paid, partial, overdue
+        if (paymentPercentage >= 99.9) { // Allow for small rounding differences
           // Fully paid - do nothing, this is good
-          console.log(`  ✅ Fully paid`);
-        } else if (paymentPercentage > 0) {
+          console.log(`  ✅ Subscription fully paid`);
+        } else if (paymentPercentage > 0.1) { // More than 0.1% paid
           // Partially paid
           hasPartial = true;
-          console.log(`  ⚠️ Partially paid`);
+          console.log(`  ⚠️ Subscription partially paid (${paymentPercentage.toFixed(1)}%)`);
         } else {
-          // Not paid at all
+          // Not paid at all or less than 0.1%
           hasOverdue = true;
           hasUnpaid = true;
-          console.log(`  ❌ Not paid`);
+          console.log(`  ❌ Subscription not paid or overdue`);
         }
       }
       
-      // Determine final status - only Paid, Partial, or Overdue
+      // Determine final status - only Paid, Partial, or Overdue (no pending)
       if (hasOverdue || hasUnpaid) {
-        console.log(`Final status: overdue`);
+        console.log(`📊 Final status: overdue`);
         return 'overdue';
       }
       if (hasPartial) {
-        console.log(`Final status: partial`);
+        console.log(`⚠️ Final status: partial`);
         return 'partial';
       }
       
       // If we get here, all subscriptions are fully paid
-      console.log(`Final status: paid`);
+      console.log(`✅ Final status: paid`);
       return 'paid';
     } catch (error) {
       console.error('Error calculating payment status:', error);
