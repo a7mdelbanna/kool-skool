@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { toZonedTime } from 'date-fns-tz';
 
 export interface ParentInfo {
   name: string;
@@ -69,6 +70,9 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
   // Debug log to see what data is being passed to the component
   console.log('Rendering StudentCard with data:', student);
   console.log('Subscription progress value:', student.subscriptionProgress);
+  console.log('Next payment date:', student.nextPaymentDate);
+  console.log('Next payment amount:', student.nextPaymentAmount);
+  console.log('Next payment currency:', student.nextPaymentCurrency);
   
   // ... keep existing code (getPaymentStatusColor function)
   const getPaymentStatusColor = (status: Student['paymentStatus']) => {
@@ -181,9 +185,19 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
   const formatNextPayment = (dateStr: string | null | undefined, amount: number | null | undefined, currency?: string): string => {
     if (!dateStr || !amount) return 'Not scheduled';
     
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    // Get user timezone (Cairo)
+    const userData = localStorage.getItem('user');
+    const user = userData ? JSON.parse(userData) : null;
+    const userTimezone = user?.timezone || 'Africa/Cairo';
+    
+    // Parse the date and convert to user's timezone
+    const date = toZonedTime(new Date(dateStr), userTimezone);
+    const now = toZonedTime(new Date(), userTimezone);
+    
+    // Calculate difference in days
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.ceil((startOfDate.getTime() - startOfNow.getTime()) / (1000 * 60 * 60 * 24));
     
     const currencySymbol = getCurrencySymbol(currency);
     const formattedAmount = `${currencySymbol}${amount.toFixed(0)}`;

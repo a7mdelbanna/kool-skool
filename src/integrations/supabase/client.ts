@@ -5,6 +5,7 @@ import { supabase as firebaseSupabase } from '@/services/migration/supabaseToFir
 import { auth } from '@/config/firebase';
 import { authService } from '@/services/firebase/auth.service';
 import { databaseService } from '@/services/firebase/database.service';
+import { toZonedTime } from 'date-fns-tz';
 
 // Re-export the Firebase migration layer as supabase
 export const supabase = firebaseSupabase;
@@ -221,12 +222,14 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
       // Fetch active subscriptions for progress calculation
       let subscriptionProgress = '0/0';
       let nextSessionDate = null;
-      let nextPaymentDate = null;
+      let nextPaymentDate = null;  // Keep as null initially, don't default to today
       let nextPaymentAmount = null;
       let nextPaymentCurrency = null;
       let paymentStatus = 'overdue'; // Default payment status
       
       try {
+        console.log(`🔍 Fetching subscriptions for student ${student.id}...`);
+        
         // Get active subscriptions for this student
         const subscriptions = await databaseService.query('subscriptions', {
           where: [
@@ -235,14 +238,25 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
           ]
         });
         
+        console.log(`📋 Found ${subscriptions?.length || 0} active subscriptions for student ${student.id}:`, subscriptions);
+        
         if (subscriptions && subscriptions.length > 0) {
           // Use RPC function to get accurate session progress (same as subscription tab)
           try {
+            console.log(`🔄 Calling RPC get_student_subscriptions for student ${student.id}...`);
             const { data: rpcSubscriptions, error: rpcError } = await supabase.rpc('get_student_subscriptions', {
               p_student_id: student.id
             });
             
+            if (rpcError) {
+              console.error(`❌ RPC Error for student ${student.id}:`, rpcError);
+            }
+            
+            console.log(`📊 RPC Response for student ${student.id}:`, { data: rpcSubscriptions, error: rpcError });
+            
             if (!rpcError && rpcSubscriptions && rpcSubscriptions.length > 0) {
+              console.log(`📊 RPC Subscriptions for student ${student.id}:`, rpcSubscriptions);
+              
               // Use RPC data which has the correct progress calculation
               let totalCompleted = 0;
               let totalSessions = 0;
@@ -254,6 +268,7 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
               let totalPrice = 0;
               
               for (const rpcSub of rpcSubscriptions) {
+                console.log(`📊 Processing subscription ${rpcSub.id}:`, rpcSub);
                 // Use the pre-calculated sessions_completed from RPC - THIS WORKS PERFECTLY DON'T CHANGE
                 totalCompleted += rpcSub.sessions_completed || 0;
                 totalSessions += rpcSub.session_count || 0;
@@ -293,11 +308,23 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
                 
                 // Fetch sessions for this subscription to find next scheduled session
                 try {
-                  const sessions = await databaseService.query('sessions', {
+                  // Try both field names for compatibility
+                  let sessions = await databaseService.query('sessions', {
                     where: [
-                      { field: 'subscription_id', operator: '==', value: rpcSub.id }
+                      { field: 'subscriptionId', operator: '==', value: rpcSub.id }
                     ]
                   });
+                  
+                  // If no results with camelCase, try snake_case
+                  if (!sessions || sessions.length === 0) {
+                    sessions = await databaseService.query('sessions', {
+                      where: [
+                        { field: 'subscription_id', operator: '==', value: rpcSub.id }
+                      ]
+                    });
+                  }
+                  
+                  console.log(`📅 Sessions for subscription ${rpcSub.id}:`, sessions?.length || 0, sessions);
                   
                   if (sessions && sessions.length > 0) {
                     // Find next scheduled session (using sessions tab logic)
@@ -313,39 +340,66 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
                     }
                     
                     // Calculate next payment based on last scheduled session (using finances logic)
-                    const validSessions = sessions.filter((s: any) => s.scheduled_date && s.status !== 'cancelled');
+                    // Match ExpectedPaymentsSection logic exactly
+                    const validSessions = sessions.filter((s: any) => {
+                      const scheduledDate = s.scheduledDate || s.scheduled_date;
+                      if (!scheduledDate) return false;
+                      const date = new Date(scheduledDate);
+                      return !isNaN(date.getTime()) && s.status !== 'cancelled';
+                    });
+                    
+                    const userTimezone = 'Africa/Cairo';
+                    
                     if (validSessions.length > 0 && rpcSub.schedule) {
-                      // Sort to get the last scheduled session
-                      const sortedSessions = validSessions.sort((a: any, b: any) => 
-                        new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime()
-                      );
+                      // Sort to get the last scheduled session (matching ExpectedPaymentsSection)
+                      const sortedSessions = validSessions.sort((a: any, b: any) => {
+                        const dateA = new Date(a.scheduledDate || a.scheduled_date);
+                        const dateB = new Date(b.scheduledDate || b.scheduled_date);
+                        return dateB.getTime() - dateA.getTime();
+                      });
                       const lastSession = sortedSessions[0];
-                      const lastSessionDate = new Date(lastSession.scheduled_date);
+                      const lastSessionDateUTC = new Date(lastSession.scheduledDate || lastSession.scheduled_date);
                       
-                      // Get schedule day
-                      const schedule = Array.isArray(rpcSub.schedule) ? rpcSub.schedule[0] : rpcSub.schedule;
-                      if (schedule && schedule.day) {
-                        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                        const targetDayIndex = daysOfWeek.indexOf(schedule.day);
+                      // Validate the date
+                      if (!isNaN(lastSessionDateUTC.getTime())) {
+                        // Convert to Cairo timezone
+                        const lastSessionDate = toZonedTime(lastSessionDateUTC, userTimezone);
                         
-                        if (targetDayIndex !== -1) {
-                          // Start from the day after the last session
-                          let nextPayment = new Date(lastSessionDate);
-                          nextPayment.setDate(nextPayment.getDate() + 1);
+                        // Get schedule day (matching ExpectedPaymentsSection)
+                        const schedule = Array.isArray(rpcSub.schedule) ? rpcSub.schedule[0] : rpcSub.schedule;
+                        const scheduledDay = schedule?.day;
+                        
+                        if (scheduledDay) {
+                          const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                          const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
                           
-                          // Find the next occurrence of the target day
-                          while (nextPayment.getDay() !== targetDayIndex) {
-                            nextPayment.setDate(nextPayment.getDate() + 1);
-                          }
-                          
-                          if (!earliestNextPayment || nextPayment < earliestNextPayment) {
-                            earliestNextPayment = nextPayment;
-                            // Use the remaining balance if partially paid, otherwise full price
-                            const remainingBalance = (rpcSub.total_price || 0) - (rpcSub.total_paid || 0);
-                            nextPaymentAmt = remainingBalance > 0 ? remainingBalance : 0;
-                            nextPaymentCurr = rpcSub.currency || 'USD';
+                          if (targetDayIndex !== -1) {
+                            // Start from the day after the last session (in Cairo timezone)
+                            let nextPaymentDate = new Date(lastSessionDate);
+                            nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+                            
+                            // Find the next occurrence of the target day
+                            while (nextPaymentDate.getDay() !== targetDayIndex) {
+                              nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+                            }
+                            
+                            if (!earliestNextPayment || nextPaymentDate < earliestNextPayment) {
+                              earliestNextPayment = nextPaymentDate;
+                              // For next payment, always show the full subscription price
+                              nextPaymentAmt = rpcSub.total_price || 0;
+                              nextPaymentCurr = rpcSub.currency || 'RUB';
+                            }
                           }
                         }
+                      }
+                    } else if (validSessions.length === 0 && rpcSub.schedule) {
+                      // If no sessions yet, set payment date to today (in Cairo timezone)
+                      const today = toZonedTime(new Date(), userTimezone);
+                      
+                      if (!earliestNextPayment || today < earliestNextPayment) {
+                        earliestNextPayment = today;
+                        nextPaymentAmt = rpcSub.total_price || 0;
+                        nextPaymentCurr = rpcSub.currency || 'RUB';
                       }
                     }
                   }
@@ -382,6 +436,13 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
               nextPaymentAmount = nextPaymentAmt;
               nextPaymentCurrency = nextPaymentCurr;
               
+              console.log(`💰 Next payment for student ${student.id}:`, {
+                earliestNextPayment,
+                nextPaymentDate,
+                nextPaymentAmount,
+                nextPaymentCurrency
+              });
+              
               // Calculate payment status using subscription tab logic
               if (totalPrice > 0) {
                 const paymentPercentage = (totalPaid / totalPrice) * 100;
@@ -395,8 +456,100 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
               }
             } else {
               // Fallback to manual calculation if RPC fails
-              console.log('RPC failed, falling back to manual calculation');
-              // Keep existing manual calculation logic as fallback
+              console.log('❗ RPC failed or returned no data, falling back to direct session query');
+              
+              // Directly query sessions for this student to calculate next payment like ExpectedPaymentsSection
+              try {
+                // First try to find ANY subscription for this student
+                const anySubscriptions = await databaseService.query('subscriptions', {
+                  where: [
+                    { field: 'student_id', operator: '==', value: student.id }
+                  ]
+                });
+                
+                console.log(`🔍 Found ${anySubscriptions?.length || 0} total subscriptions for student ${student.id}`);
+                
+                if (anySubscriptions && anySubscriptions.length > 0) {
+                  // Get the active subscription or the most recent one
+                  const activeSubscription = anySubscriptions.find((s: any) => s.status === 'active') || anySubscriptions[0];
+                  
+                  if (activeSubscription) {
+                    console.log(`📋 Using subscription ${activeSubscription.id} for payment calculation`);
+                    
+                    // Query sessions for this subscription
+                    const sessions = await databaseService.query('sessions', {
+                      where: [
+                        { field: 'subscription_id', operator: '==', value: activeSubscription.id }
+                      ]
+                    });
+                    
+                    const validSessions = sessions?.filter((s: any) => s.status !== 'cancelled') || [];
+                    console.log(`📅 Found ${validSessions.length} valid sessions`);
+                    
+                    if (validSessions.length > 0) {
+                      // Find the last session
+                      const sortedSessions = validSessions.sort((a: any, b: any) => {
+                        const dateA = new Date(a.scheduled_date || a.scheduledDate);
+                        const dateB = new Date(b.scheduled_date || b.scheduledDate);
+                        return dateB.getTime() - dateA.getTime();
+                      });
+                      
+                      const lastSession = sortedSessions[0];
+                      const lastSessionDateUTC = new Date(lastSession.scheduled_date || lastSession.scheduledDate);
+                      
+                      // Convert to Cairo timezone
+                      const userTimezone = 'Africa/Cairo';
+                      const lastSessionDate = toZonedTime(lastSessionDateUTC, userTimezone);
+                      
+                      console.log(`📅 Last session date: ${lastSessionDate.toISOString()}`);
+                      
+                      // Calculate next payment date using schedule
+                      const schedule = activeSubscription.schedule;
+                      if (schedule) {
+                        const firstSchedule = Array.isArray(schedule) ? schedule[0] : schedule;
+                        const scheduledDay = firstSchedule.day;
+                        
+                        if (scheduledDay) {
+                          const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                          const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
+                          
+                          if (targetDayIndex !== -1) {
+                            // Start from the day after the last session
+                            let calcNextPayment = new Date(lastSessionDate);
+                            calcNextPayment.setDate(calcNextPayment.getDate() + 1);
+                            
+                            // Find the next occurrence of the target day
+                            while (calcNextPayment.getDay() !== targetDayIndex) {
+                              calcNextPayment.setDate(calcNextPayment.getDate() + 1);
+                            }
+                            
+                            nextPaymentDate = calcNextPayment.toISOString();
+                            nextPaymentAmount = activeSubscription.total_price || activeSubscription.totalPrice || 0;
+                            nextPaymentCurrency = activeSubscription.currency || 'RUB';
+                            
+                            console.log(`💰 Calculated next payment: ${nextPaymentDate}, Amount: ${nextPaymentAmount} ${nextPaymentCurrency}`);
+                          }
+                        }
+                      }
+                    } else {
+                      // No sessions yet, payment is due today
+                      const today = toZonedTime(new Date(), 'Africa/Cairo');
+                      nextPaymentDate = today.toISOString();
+                      nextPaymentAmount = activeSubscription.total_price || activeSubscription.totalPrice || 0;
+                      nextPaymentCurrency = activeSubscription.currency || 'RUB';
+                      
+                      console.log(`💰 No sessions yet, payment due today: ${nextPaymentAmount} ${nextPaymentCurrency}`);
+                    }
+                    
+                    // Calculate subscription progress
+                    subscriptionProgress = `${validSessions.filter((s: any) => s.status === 'completed').length}/${activeSubscription.session_count || activeSubscription.sessionCount || 0}`;
+                  }
+                }
+              } catch (fallbackError) {
+                console.error('❌ Fallback calculation error:', fallbackError);
+              }
+              
+              // Keep existing manual calculation logic as secondary fallback
               let totalCompleted = 0;
               let totalSessions = 0;
               let earliestNextSession = null;

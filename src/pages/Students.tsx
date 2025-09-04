@@ -484,17 +484,79 @@ const Students = () => {
         console.error('Error fetching sessions for next date:', error);
       }
 
-      // Calculate next payment info
+      // Calculate next payment info - match ExpectedPaymentsSection logic
       const totalPaid = activeSubscription.totalPaid || activeSubscription.total_paid || 0;
       const totalPrice = activeSubscription.totalPrice || activeSubscription.total_price || activeSubscription.price || 0;
       const remaining = totalPrice - totalPaid;
+      
+      // Calculate next payment date based on schedule (same as ExpectedPaymentsSection)
+      let nextPaymentDate = null;
+      let nextPaymentAmount = 0;
+      
+      if (remaining > 0) {
+        try {
+          // Fetch sessions to find last session date
+          const { data: sessions, error: sessionsError } = await supabase.rpc('get_lesson_sessions', {
+            p_student_id: studentId
+          });
+          
+          if (!sessionsError && sessions && sessions.length > 0) {
+            // Filter sessions for this subscription
+            const subscriptionSessions = sessions
+              .filter(s => s.subscription_id === activeSubscription.id && s.status !== 'cancelled')
+              .sort((a, b) => new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime());
+            
+            if (subscriptionSessions.length > 0) {
+              // Get the last session date
+              const lastSession = subscriptionSessions[0];
+              const lastSessionDate = new Date(lastSession.scheduled_date);
+              
+              // Get the schedule to find payment day
+              const schedule = activeSubscription.schedule;
+              if (schedule) {
+                const firstSchedule = Array.isArray(schedule) ? schedule[0] : schedule;
+                const scheduledDay = firstSchedule.day; // e.g., "Monday", "Tuesday"
+                
+                const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
+                
+                if (targetDayIndex !== -1) {
+                  // Start from the day after the last session
+                  let calcNextPayment = new Date(lastSessionDate);
+                  calcNextPayment.setDate(calcNextPayment.getDate() + 1);
+                  
+                  // Find the next occurrence of the target day
+                  while (calcNextPayment.getDay() !== targetDayIndex) {
+                    calcNextPayment.setDate(calcNextPayment.getDate() + 1);
+                  }
+                  
+                  nextPaymentDate = calcNextPayment.toISOString();
+                  nextPaymentAmount = totalPrice; // Always show full subscription price for next payment
+                  
+                  console.log(`💰 Calculated next payment for student ${studentId}: ${nextPaymentDate}`);
+                }
+              }
+            } else {
+              // No sessions yet, payment is due today
+              nextPaymentDate = new Date().toISOString();
+              nextPaymentAmount = totalPrice;
+              console.log(`💰 No sessions for student ${studentId}, payment due today`);
+            }
+          }
+        } catch (error) {
+          console.error('Error calculating next payment date:', error);
+          // Fallback to today if calculation fails
+          nextPaymentDate = new Date().toISOString();
+          nextPaymentAmount = remaining;
+        }
+      }
       
       return {
         progress,
         nextSessionDate,
         completedSessions,
-        nextPaymentDate: remaining > 0 ? new Date().toISOString() : null,
-        nextPaymentAmount: remaining,
+        nextPaymentDate,
+        nextPaymentAmount: nextPaymentAmount || remaining,
         nextPaymentCurrency: activeSubscription.currency || 'USD'
       };
     } catch (error) {
