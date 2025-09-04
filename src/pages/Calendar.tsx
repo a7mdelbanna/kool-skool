@@ -10,6 +10,7 @@ import {
   List
 } from 'lucide-react';
 import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, isSameDay, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -27,7 +28,9 @@ type DisplayMode = 'calendar' | 'list';
 
 const Calendar = () => {
   const { user } = useContext(UserContext);
-  const today = new Date();
+  // Get today in user's timezone (Cairo)
+  const userTimezone = user?.timezone || 'Africa/Cairo';
+  const today = toZonedTime(new Date(), userTimezone);
   const [currentDate, setCurrentDate] = useState(today);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,8 +79,10 @@ const Calendar = () => {
   };
 
   const goToToday = () => {
-    setCurrentDate(today);
-    setCurrentWeekStart(startOfWeek(today, { weekStartsOn: 0 }));
+    // Get current time in user's timezone
+    const todayInTimezone = toZonedTime(new Date(), userTimezone);
+    setCurrentDate(todayInTimezone);
+    setCurrentWeekStart(startOfWeek(todayInTimezone, { weekStartsOn: 0 }));
   };
 
   const handleViewModeChange = (value: string) => {
@@ -122,12 +127,14 @@ const Calendar = () => {
     // Apply date filtering based on view mode (sessions are already in user timezone)
     if (viewMode === 'day') {
       filtered = filtered.filter(session => {
+        // Sessions from useAttendanceData are already in user timezone
         const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
         return isSameDay(sessionDate, currentDate);
       });
     } else if (viewMode === 'week') {
       const weekEnd = addDays(currentWeekStart, 6);
       filtered = filtered.filter(session => {
+        // Sessions from useAttendanceData are already in user timezone
         const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
         return isWithinInterval(sessionDate, { start: currentWeekStart, end: weekEnd });
       });
@@ -135,6 +142,7 @@ const Calendar = () => {
       const monthStart = startOfMonth(currentDate);
       const monthEnd = endOfMonth(currentDate);
       filtered = filtered.filter(session => {
+        // Sessions from useAttendanceData are already in user timezone
         const sessionDate = session.date instanceof Date ? session.date : new Date(session.date);
         return isWithinInterval(sessionDate, { start: monthStart, end: monthEnd });
       });

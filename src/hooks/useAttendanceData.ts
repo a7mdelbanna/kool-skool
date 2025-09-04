@@ -150,15 +150,37 @@ export const useAttendanceData = (userTimezone?: string) => {
           
           if (student) {
             const convertedSessions: Session[] = sessions.map((session: LessonSession) => {
-              const utcDate = new Date(session.scheduled_date);
-              const localDate = convertUTCToUserTimezone(utcDate, effectiveTimezone);
+              // Use scheduled_datetime if available, otherwise combine date and time
+              let sessionDateTime: Date;
+              
+              if (session.scheduled_datetime) {
+                // Use the full datetime if available (already in correct timezone)
+                sessionDateTime = new Date(session.scheduled_datetime);
+              } else if (session.scheduled_time) {
+                // Combine date and time in Cairo timezone
+                const dateStr = session.scheduled_date;
+                const timeStr = session.scheduled_time;
+                
+                // Parse the date as local Cairo time
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                
+                // Create date in local timezone (which should be Cairo)
+                sessionDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+              } else {
+                // Fallback to just the date
+                const utcDate = new Date(session.scheduled_date);
+                sessionDateTime = convertUTCToUserTimezone(utcDate, effectiveTimezone);
+              }
+              
+              const localDate = convertUTCToUserTimezone(sessionDateTime, effectiveTimezone);
               
               return {
                 id: session.id,
                 studentId: studentId,
                 studentName: `${student.firstName} ${student.lastName}`,
                 date: localDate,
-                time: formatInUserTimezone(utcDate, effectiveTimezone, 'HH:mm'),
+                time: formatInUserTimezone(sessionDateTime, effectiveTimezone, 'HH:mm'),
                 duration: `${session.duration_minutes || 60} min`,
                 status: session.status as Session['status'],
                 sessionNumber: session.index_in_sub || undefined,

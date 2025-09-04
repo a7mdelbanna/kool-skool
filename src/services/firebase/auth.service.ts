@@ -15,6 +15,7 @@ import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection } from 'fir
 import { auth, db, getUserClaims } from '@/config/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/config/firebase';
+import { createUserWithAuth } from './createUserWorkaround';
 
 export interface UserProfile {
   uid: string;
@@ -243,34 +244,11 @@ class AuthService {
     }
   }
 
-  // Create new user (Admin/Teacher creating students)
+  // Create new user (Admin/Teacher creating students/teachers)
   async createUser(userData: CreateUserData): Promise<string> {
     try {
-      // For now, create user directly without cloud function due to CORS issues
-      // This is a temporary workaround until cloud functions are properly configured
-      
-      // Generate a unique ID for the user
-      const uid = doc(collection(db, 'users')).id;
-      
-      // Create user document in Firestore
-      await setDoc(doc(db, 'users', uid), {
-        uid,
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        role: userData.role,
-        schoolId: userData.schoolId,
-        phoneNumber: userData.phoneNumber || null,
-        timezone: userData.timezone || 'UTC',
-        isActive: true,
-        metadata: {
-          lastLogin: null,
-          loginCount: 0
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-
+      // Use the workaround to create user without signing out current admin
+      const uid = await createUserWithAuth(userData);
       return uid;
     } catch (error: any) {
       console.error('Error creating user:', error);

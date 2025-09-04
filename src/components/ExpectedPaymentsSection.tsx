@@ -33,6 +33,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { databaseService } from '@/services/firebase/database.service';
 import { format, addDays, addWeeks, addMonths, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { formatInUserTimezone } from '@/utils/timezone';
 
 interface ExpectedPayment {
   student_id: string;
@@ -52,10 +54,26 @@ interface ExpectedPaymentsSectionProps {
 type FilterPeriod = 'today' | 'week' | 'month' | 'thisMonth' | 'nextMonth' | 'custom' | 'all';
 
 const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoolId }) => {
+  // Get user's timezone (Cairo)
+  const getUserTimezone = () => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.timezone || 'Africa/Cairo';
+      } catch {
+        return 'Africa/Cairo';
+      }
+    }
+    return 'Africa/Cairo';
+  };
+
+  const userTimezone = getUserTimezone();
+  
   const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>('thisMonth');
   const [customDateRange, setCustomDateRange] = useState<{ start: Date; end: Date }>({
-    start: new Date(),
-    end: addMonths(new Date(), 1),
+    start: toZonedTime(new Date(), userTimezone),
+    end: addMonths(toZonedTime(new Date(), userTimezone), 1),
   });
 
   // Fetch expected payments based on subscription completion
@@ -233,14 +251,15 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
         if (!sessions || sessions.length === 0) {
           console.log(`⚠️ No sessions found for subscription ${subscription.id} - setting payment date to today`);
           
-          // If no sessions/payments yet, expected payment is today
-          const today = new Date();
+          // If no sessions/payments yet, expected payment is today (in Cairo timezone)
+          const today = toZonedTime(new Date(), userTimezone);
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
           
           expectedPaymentsData.push({
             student_id: studentId,
             student_name: studentName,
             subscription_id: subscription.id,
-            next_payment_date: today.toISOString().split('T')[0],
+            next_payment_date: todayStr,
             next_payment_amount: paymentAmount,
             currency: subscription.currency || 'RUB',
             subscription_name: subscription.courseName || subscription.course_name || 'Subscription',
@@ -262,13 +281,14 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
         if (validSessions.length === 0) {
           console.log(`⚠️ No valid sessions found for subscription ${subscription.id} - setting payment date to today`);
           
-          const today = new Date();
+          const today = toZonedTime(new Date(), userTimezone);
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
           
           expectedPaymentsData.push({
             student_id: studentId,
             student_name: studentName,
             subscription_id: subscription.id,
-            next_payment_date: today.toISOString().split('T')[0],
+            next_payment_date: todayStr,
             next_payment_amount: paymentAmount,
             currency: subscription.currency || 'RUB',
             subscription_name: subscription.courseName || subscription.course_name || 'Subscription',
@@ -286,10 +306,13 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
         });
 
         const lastSession = sortedSessions[0];
-        const lastSessionDate = new Date(lastSession.scheduledDate || lastSession.scheduled_date);
+        const lastSessionDateUTC = new Date(lastSession.scheduledDate || lastSession.scheduled_date);
         
         // Validate the date
-        if (isNaN(lastSessionDate.getTime())) continue;
+        if (isNaN(lastSessionDateUTC.getTime())) continue;
+        
+        // Convert to Cairo timezone
+        const lastSessionDate = toZonedTime(lastSessionDateUTC, userTimezone);
 
         // Calculate next payment date (next occurrence of scheduled day after last session)
         // Note: schedule is already defined above
@@ -303,7 +326,7 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
           continue;
         }
 
-        // Start from the day after the last session
+        // Start from the day after the last session (in Cairo timezone)
         let nextPaymentDate = new Date(lastSessionDate);
         nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
 
@@ -311,16 +334,20 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
         while (nextPaymentDate.getDay() !== targetDayIndex) {
           nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
         }
+        
+        // Format dates as YYYY-MM-DD strings
+        const nextPaymentDateStr = `${nextPaymentDate.getFullYear()}-${String(nextPaymentDate.getMonth() + 1).padStart(2, '0')}-${String(nextPaymentDate.getDate()).padStart(2, '0')}`;
+        const lastSessionDateStr = `${lastSessionDate.getFullYear()}-${String(lastSessionDate.getMonth() + 1).padStart(2, '0')}-${String(lastSessionDate.getDate()).padStart(2, '0')}`;
 
         expectedPaymentsData.push({
           student_id: studentId,
           student_name: studentName,
           subscription_id: subscription.id,
-          next_payment_date: nextPaymentDate.toISOString().split('T')[0],
+          next_payment_date: nextPaymentDateStr,
           next_payment_amount: paymentAmount,
           currency: subscription.currency || 'RUB',
           subscription_name: subscription.courseName || subscription.course_name || 'Subscription',
-          last_session_date: lastSessionDate.toISOString().split('T')[0]
+          last_session_date: lastSessionDateStr
         });
       }
 
@@ -336,9 +363,9 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
     retry: 1,
   });
 
-  // Calculate date range based on selected filter
+  // Calculate date range based on selected filter (in Cairo timezone)
   const dateRange = useMemo(() => {
-    const now = new Date();
+    const now = toZonedTime(new Date(), userTimezone);
     let start: Date;
     let end: Date;
 
@@ -378,12 +405,14 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
     }
 
     return { start, end };
-  }, [filterPeriod, customDateRange]);
+  }, [filterPeriod, customDateRange, userTimezone]);
 
-  // Filter payments based on selected period
+  // Filter payments based on selected period (considering Cairo timezone)
   const filteredPayments = useMemo(() => {
     return expectedPayments.filter(payment => {
-      const paymentDate = new Date(payment.next_payment_date);
+      // Parse YYYY-MM-DD as Cairo timezone date
+      const [year, month, day] = payment.next_payment_date.split('-').map(Number);
+      const paymentDate = new Date(year, month - 1, day);
       return isWithinInterval(paymentDate, dateRange);
     });
   }, [expectedPayments, dateRange]);
@@ -398,8 +427,8 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
       case 'today': return 'Today';
       case 'week': return 'Next 7 Days';
       case 'month': return 'Next 30 Days';
-      case 'thisMonth': return format(new Date(), 'MMMM yyyy');
-      case 'nextMonth': return format(addMonths(new Date(), 1), 'MMMM yyyy');
+      case 'thisMonth': return format(toZonedTime(new Date(), userTimezone), 'MMMM yyyy');
+      case 'nextMonth': return format(addMonths(toZonedTime(new Date(), userTimezone), 1), 'MMMM yyyy');
       case 'custom': 
         return `${format(customDateRange.start, 'MMM dd')} - ${format(customDateRange.end, 'MMM dd, yyyy')}`;
       case 'all': return 'All Time';
@@ -515,8 +544,12 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                 {filteredPayments
                   .sort((a, b) => new Date(a.next_payment_date).getTime() - new Date(b.next_payment_date).getTime())
                   .map((payment) => {
-                    const paymentDate = new Date(payment.next_payment_date);
-                    const daysUntil = Math.ceil((paymentDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    // Parse YYYY-MM-DD as Cairo timezone date
+                    const [year, month, day] = payment.next_payment_date.split('-').map(Number);
+                    const paymentDate = new Date(year, month - 1, day);
+                    const nowInCairo = toZonedTime(new Date(), userTimezone);
+                    const todayInCairo = new Date(nowInCairo.getFullYear(), nowInCairo.getMonth(), nowInCairo.getDate());
+                    const daysUntil = Math.ceil((paymentDate.getTime() - todayInCairo.getTime()) / (1000 * 60 * 60 * 24));
                     
                     return (
                       <TableRow key={`${payment.subscription_id}-${payment.student_id}`}>
@@ -533,14 +566,16 @@ const ExpectedPaymentsSection: React.FC<ExpectedPaymentsSectionProps> = ({ schoo
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
-                            {payment.last_session_date ? format(new Date(payment.last_session_date), 'MMM dd') : 'N/A'}
+                            {payment.last_session_date && !payment.last_session_date.startsWith('No') ? 
+                              formatInUserTimezone(payment.last_session_date, userTimezone, 'MMM dd') : 
+                              payment.last_session_date || 'N/A'}
                           </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span>{format(paymentDate, 'MMM dd, yyyy')}</span>
+                            <span>{formatInUserTimezone(payment.next_payment_date, userTimezone, 'MMM dd, yyyy')}</span>
                             <span className="text-sm text-muted-foreground">
-                              {format(paymentDate, 'EEEE')}
+                              {formatInUserTimezone(payment.next_payment_date, userTimezone, 'EEEE')}
                             </span>
                           </div>
                         </TableCell>

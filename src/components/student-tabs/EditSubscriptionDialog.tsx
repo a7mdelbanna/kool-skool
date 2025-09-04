@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, X, Plus, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -54,6 +55,22 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [conflictMessage, setConflictMessage] = useState<string>('');
   const [studentTeacherId, setStudentTeacherId] = useState<string>('');
+
+  // Get user's timezone (Cairo)
+  const getUserTimezone = () => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.timezone || 'Africa/Cairo';
+      } catch {
+        return 'Africa/Cairo';
+      }
+    }
+    return 'Africa/Cairo';
+  };
+
+  const userTimezone = getUserTimezone();
 
   // Get school ID from localStorage
   const getSchoolId = () => {
@@ -244,7 +261,11 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         sessionCount: subscription.session_count?.toString() || '',
         durationMonths: subscription.duration_months?.toString() || '',
         sessionDuration: subscription.session_duration_minutes?.toString() || '60',
-        startDate: subscription.start_date ? new Date(subscription.start_date) : undefined,
+        startDate: subscription.start_date ? (() => {
+          // Parse YYYY-MM-DD as Cairo timezone date
+          const [year, month, day] = subscription.start_date.split('-').map(Number);
+          return new Date(year, month - 1, day);
+        })() : undefined,
         schedule: parsedSchedule,
         priceMode: subscription.price_mode,
         pricePerSession: subscription.price_per_session?.toString() || '',
@@ -460,7 +481,11 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         p_session_count: parseInt(formData.sessionCount) || 0,
         p_duration_months: parseInt(formData.durationMonths) || 0,
         p_session_duration_minutes: parseInt(formData.sessionDuration) || 60,
-        p_start_date: formData.startDate.toISOString().split('T')[0],
+        p_start_date: (() => {
+          // Format date as YYYY-MM-DD in Cairo timezone
+          const date = formData.startDate;
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        })(),
         p_schedule: scheduleForDatabase, // Pass as array, not JSON string
         p_price_mode: formData.priceMode,
         p_price_per_session: formData.priceMode === 'perSession' ? parseFloat(formData.pricePerSession) || 0 : null,

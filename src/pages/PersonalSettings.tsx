@@ -6,7 +6,9 @@ import {
   MapPin, 
   Save,
   Shield,
-  Video
+  Video,
+  Database,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,11 +25,13 @@ import { getEffectiveTimezone } from '@/utils/timezone';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { UserContext } from '@/App';
+import TimezoneMigrationDialog from '@/components/TimezoneMigrationDialog';
 
 const PersonalSettings = () => {
   const { user, setUser } = useContext(UserContext);
   const { toast } = useToast();
   const [updating, setUpdating] = useState(false);
+  const [migrationDialogOpen, setMigrationDialogOpen] = useState(false);
   const currentTimezone = getEffectiveTimezone(user?.timezone);
 
   const handleTimezoneUpdate = async (newTimezone: string) => {
@@ -235,6 +239,32 @@ const PersonalSettings = () => {
                 </div>
               </div>
               
+              <Separator />
+              
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Database Maintenance</h3>
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-amber-600" />
+                      <h4 className="font-medium text-amber-900">Timezone Data Migration</h4>
+                    </div>
+                    <p className="text-sm text-amber-800 mb-3">
+                      If you recently changed from UTC to Cairo timezone and have existing data,
+                      you may need to migrate your historical dates to display correctly.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="gap-2"
+                      onClick={() => setMigrationDialogOpen(true)}
+                    >
+                      <Database className="h-4 w-4" />
+                      Run Timezone Migration
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              
               <div className="mt-6">
                 <Button variant="destructive">Delete Account</Button>
               </div>
@@ -242,6 +272,11 @@ const PersonalSettings = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      <TimezoneMigrationDialog
+        open={migrationDialogOpen}
+        onOpenChange={setMigrationDialogOpen}
+      />
     </div>
   );
 };

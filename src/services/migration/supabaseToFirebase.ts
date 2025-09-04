@@ -573,6 +573,35 @@ async function handleAddSubscription(params: any) {
         const sessionNumber = i + 1;
         const { date, time } = sessionDates[i];
         
+        // Parse the time string (e.g., "18:00" or "6:00 PM")
+        let hours = 0;
+        let minutes = 0;
+        
+        if (time) {
+          if (time.includes(':')) {
+            const parts = time.split(':');
+            hours = parseInt(parts[0]);
+            minutes = parseInt(parts[1]) || 0;
+            
+            // Handle PM indicator if present
+            if (time.toUpperCase().includes('PM') && hours !== 12) {
+              hours += 12;
+            } else if (time.toUpperCase().includes('AM') && hours === 12) {
+              hours = 0;
+            }
+          }
+        }
+        
+        // Create a date at midnight local time (Cairo)
+        const sessionDate = new Date(date);
+        // Set to midnight in local time
+        sessionDate.setHours(0, 0, 0, 0);
+        
+        // Create the final datetime by adding hours and minutes
+        // This ensures we're working with Cairo local time
+        const sessionDateTime = new Date(sessionDate);
+        sessionDateTime.setHours(hours, minutes, 0, 0);
+        
         const sessionData = {
           subscriptionId: subscriptionId,  // Use camelCase for Firebase
           studentId: params.p_student_id,
@@ -581,7 +610,8 @@ async function handleAddSubscription(params: any) {
           sessionNumber: sessionNumber,
           scheduledDate: date.toISOString().split('T')[0],
           scheduledTime: time || '00:00',
-          durationMinutes: 60, // Default duration
+          scheduledDateTime: sessionDateTime.toISOString(), // Full datetime for proper timezone handling
+          durationMinutes: params.p_session_duration_minutes || 60,
           status: 'scheduled',
           countsTowardCompletion: true, // New sessions count toward completion
           indexInSub: sessionNumber, // Track session index in subscription
@@ -705,6 +735,33 @@ async function handleUpdateSubscriptionWithRelatedData(params: any) {
         const sessionNumber = i + 1;
         const { date, time } = sessionDates[i];
         
+        // Parse the time string to get hours and minutes
+        let hours = 0;
+        let minutes = 0;
+        
+        if (time) {
+          if (time.includes(':')) {
+            const parts = time.split(':');
+            hours = parseInt(parts[0]);
+            minutes = parseInt(parts[1]) || 0;
+            
+            // Handle PM indicator if present
+            if (time.toUpperCase().includes('PM') && hours !== 12) {
+              hours += 12;
+            } else if (time.toUpperCase().includes('AM') && hours === 12) {
+              hours = 0;
+            }
+          }
+        }
+        
+        // Create a date at midnight local time (Cairo)
+        const sessionDate = new Date(date);
+        sessionDate.setHours(0, 0, 0, 0);
+        
+        // Create the final datetime by adding hours and minutes
+        const sessionDateTime = new Date(sessionDate);
+        sessionDateTime.setHours(hours, minutes, 0, 0);
+        
         const sessionData = {
           subscriptionId: subscriptionId,
           studentId: studentId,
@@ -713,6 +770,7 @@ async function handleUpdateSubscriptionWithRelatedData(params: any) {
           sessionNumber: sessionNumber,
           scheduledDate: date.toISOString().split('T')[0],
           scheduledTime: time || '00:00',
+          scheduledDateTime: sessionDateTime.toISOString(), // Full datetime for proper timezone handling
           durationMinutes: params.p_session_duration_minutes || 60,
           status: 'scheduled',
           countsTowardCompletion: true,
@@ -1219,8 +1277,9 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
       student_id: session.studentId || session.student_id,
       teacher_id: session.teacherId || session.teacher_id || null,
       session_number: session.sessionNumber || session.session_number,
-      scheduled_date: session.scheduledDate || session.scheduled_date,
+      scheduled_date: session.scheduledDateTime || session.scheduledDate || session.scheduled_date,
       scheduled_time: session.scheduledTime || session.scheduled_time,
+      scheduled_datetime: session.scheduledDateTime || null,
       duration_minutes: session.durationMinutes || session.duration_minutes || 60,
       status: session.status || 'scheduled',
       attended: session.attended || false,

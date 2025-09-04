@@ -102,6 +102,8 @@ export interface LessonSession {
   subscription_id: string;
   student_id: string;
   scheduled_date: string;
+  scheduled_time?: string;
+  scheduled_datetime?: string;
   duration_minutes: number;
   status: string;
   payment_status: string;

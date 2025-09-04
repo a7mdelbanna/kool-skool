@@ -63,6 +63,8 @@ interface DatabaseSession {
   subscription_id: string;
   student_id: string;
   scheduled_date: string;
+  scheduled_time?: string;
+  scheduled_datetime?: string;
   duration_minutes: number | null;
   status: string;
   payment_status: string;
@@ -571,7 +573,31 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             title="Click to view session details (opens in new tab)"
           >
             <span className="font-medium underline-offset-4 hover:underline decoration-primary/50">
-              {format(new Date(session.scheduled_date), "EEEE, MMMM d, yyyy")}
+              {(() => {
+                // Use scheduled_datetime if available, otherwise combine date and time
+                let sessionDateTime: Date;
+                
+                if (session.scheduled_datetime) {
+                  // Use the full datetime if available (already in correct timezone)
+                  sessionDateTime = new Date(session.scheduled_datetime);
+                } else if (session.scheduled_time) {
+                  // Combine date and time in Cairo timezone
+                  const dateStr = session.scheduled_date;
+                  const timeStr = session.scheduled_time;
+                  
+                  // Parse the date as local Cairo time
+                  const [year, month, day] = dateStr.split('-').map(Number);
+                  const [hours, minutes] = timeStr.split(':').map(Number);
+                  
+                  // Create date in local timezone (which should be Cairo)
+                  sessionDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                } else {
+                  // Fallback to just the date (should not happen with new data)
+                  sessionDateTime = new Date(session.scheduled_date);
+                }
+                
+                return format(sessionDateTime, "EEEE, MMMM d, yyyy");
+              })()}
             </span>
             {session.index_in_sub && (
               <Badge variant="secondary" className="text-xs">
@@ -586,7 +612,33 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
             <Clock className="h-3 w-3" />
-            <span>{format(new Date(session.scheduled_date), "HH:mm")} • {session.duration_minutes || 60} min</span>
+            <span>
+              {(() => {
+                // Use scheduled_datetime if available, otherwise combine date and time
+                let sessionDateTime: Date;
+                
+                if (session.scheduled_datetime) {
+                  // Use the full datetime if available (already in correct timezone)
+                  sessionDateTime = new Date(session.scheduled_datetime);
+                } else if (session.scheduled_time) {
+                  // Combine date and time in Cairo timezone
+                  const dateStr = session.scheduled_date;
+                  const timeStr = session.scheduled_time;
+                  
+                  // Parse the date as local Cairo time
+                  const [year, month, day] = dateStr.split('-').map(Number);
+                  const [hours, minutes] = timeStr.split(':').map(Number);
+                  
+                  // Create date in local timezone (which should be Cairo)
+                  sessionDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                } else {
+                  // Fallback to just the date (should not happen with new data)
+                  sessionDateTime = new Date(session.scheduled_date);
+                }
+                
+                return format(sessionDateTime, "HH:mm");
+              })()} • {session.duration_minutes || 60} min
+            </span>
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">

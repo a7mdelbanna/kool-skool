@@ -13,6 +13,8 @@ import SchoolSetup from '@/pages/SchoolSetup';
 import StudentDashboard from '@/pages/StudentDashboard';
 import { Toaster } from "@/components/ui/toaster"
 import { PaymentProvider } from '@/contexts/PaymentContext';
+import { runTimezoneMigration } from '@/scripts/migrateToCairoTimezone';
+import { createTestTransaction } from '@/utils/createTestTransaction';
 
 interface User {
   id: string;
@@ -44,6 +46,14 @@ const queryClient = new QueryClient();
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Make utility functions available globally for console use
+  useEffect(() => {
+    (window as any).runTimezoneMigration = runTimezoneMigration;
+    (window as any).createTestTransaction = createTestTransaction;
+    console.log('💡 Timezone migration available. Run: runTimezoneMigration()');
+    console.log('💡 Test transaction creator available. Run: createTestTransaction()');
+  }, []);
 
   useEffect(() => {
     // Listen to Firebase auth state changes

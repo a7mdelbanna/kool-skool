@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
 import { toast } from 'sonner';
+import { toZonedTime } from 'date-fns-tz';
 
 interface SubscriptionFormData {
   sessionCount: number;
@@ -29,6 +30,22 @@ interface SubscriptionFormData {
 export const useSubscriptionCreation = (studentId: string, onSuccess?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
+
+  // Get user's timezone (Cairo)
+  const getUserTimezone = () => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        return user.timezone || 'Africa/Cairo';
+      }
+    } catch {
+      return 'Africa/Cairo';
+    }
+    return 'Africa/Cairo';
+  };
+
+  const userTimezone = getUserTimezone();
 
   // Get school ID from localStorage with better error handling
   const getSchoolId = () => {
@@ -129,7 +146,11 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
           p_session_count: formData.sessionCount,
           p_duration_months: formData.durationMonths,
           p_session_duration_minutes: formData.sessionDuration || 60, // Include session duration
-          p_start_date: formData.startDate.toISOString().split('T')[0],
+          p_start_date: (() => {
+            // Format date as YYYY-MM-DD in user timezone
+            const date = formData.startDate;
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          })(),
           p_schedule: formData.schedule,
           p_price_mode: formData.priceMode,
           p_price_per_session: formData.pricePerSession || null,
@@ -179,7 +200,11 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
           p_type: 'income',
           p_amount: formData.initialPayment.amount,
           p_currency: formData.currency,
-          p_transaction_date: formData.startDate.toISOString().split('T')[0],
+          p_transaction_date: (() => {
+            // Format date as YYYY-MM-DD in user timezone
+            const date = formData.startDate;
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          })(),
           p_description: `Initial payment for subscription`,
           p_notes: formData.initialPayment.notes || 'Initial subscription payment',
           p_to_account_id: formData.initialPayment.accountId,

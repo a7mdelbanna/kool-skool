@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Users, UserPlus, Mail, Key, User, AlertCircle, Loader2 } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
 import { getTeamMembers } from "@/integrations/supabase/client";
 import { authService } from "@/services/firebase/auth.service";
 import { toast } from 'sonner';
@@ -20,7 +19,6 @@ interface TeamMember {
 }
 
 const TeamAccess = () => {
-  const { toast } = useToast();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);

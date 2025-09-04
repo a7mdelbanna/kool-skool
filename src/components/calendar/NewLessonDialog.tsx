@@ -39,7 +39,8 @@ import { toast } from 'sonner';
 import { getCurrentUserInfo, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { supabase } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
-import { getSchoolTimezone, convertSchoolTimeToUTC, formatInUserTimezone, getEffectiveTimezone } from '@/utils/timezone';
+import { formatInUserTimezone, getEffectiveTimezone } from '@/utils/timezone';
+import { toZonedTime } from 'date-fns-tz';
 import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -81,7 +82,8 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   const [cost, setCost] = useState<string>('');
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [schoolTimezone, setSchoolTimezone] = useState<string>('');
+  // Use user timezone instead of school timezone
+  const sessionTimezone = user?.timezone || 'Africa/Cairo';
   const [validationError, setValidationError] = useState<string>('');
   const [isValidating, setIsValidating] = useState(false);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
@@ -107,9 +109,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         const studentsData = await getStudentsWithDetails(currentUser.user_school_id);
         setStudents(studentsData);
 
-        // Fetch school timezone
-        const timezone = await getSchoolTimezone(user.schoolId);
-        setSchoolTimezone(timezone);
+        // No need to fetch school timezone - using user timezone
         
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -207,13 +207,10 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         }
       }
 
-      // Create datetime in school timezone
+      // Create datetime in user timezone (Cairo)
       const [hours, minutes] = time.split(':').map(Number);
       const localDateTime = new Date(date);
       localDateTime.setHours(hours, minutes, 0, 0);
-      
-      // Convert to UTC for storage using school timezone
-      const utcDateTime = await convertSchoolTimeToUTC(localDateTime, user.schoolId);
       
       // Parse duration
       const durationMinutes = parseInt(duration.replace(' min', ''));
@@ -224,7 +221,15 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
         .insert({
           student_id: studentId,
           subscription_id: null, // Add this required field for standalone sessions
-          scheduled_date: utcDateTime.toISOString(),
+          scheduled_date: (() => {
+            // Format as YYYY-MM-DD HH:MM:SS in user timezone
+            const year = localDateTime.getFullYear();
+            const month = String(localDateTime.getMonth() + 1).padStart(2, '0');
+            const day = String(localDateTime.getDate()).padStart(2, '0');
+            const hour = String(localDateTime.getHours()).padStart(2, '0');
+            const minute = String(localDateTime.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hour}:${minute}:00`;
+          })(),
           duration_minutes: durationMinutes,
           status: 'scheduled',
           payment_status: 'pending',
@@ -234,7 +239,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
 
       if (error) throw error;
       
-      toast.success(`${subject} lesson with ${selectedStudent.first_name} ${selectedStudent.last_name} on ${format(date, 'MMM d')} at ${time} (${schoolTimezone})`);
+      toast.success(`${subject} lesson with ${selectedStudent.first_name} ${selectedStudent.last_name} on ${format(date, 'MMM d')} at ${time} (${sessionTimezone})`);
       
       // Reset form and close dialog
       resetForm();
@@ -273,7 +278,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
               Add New Lesson
               <div className="flex items-center text-sm text-muted-foreground ml-auto">
                 <Globe className="h-4 w-4 mr-1" />
-                School TZ: {schoolTimezone || 'Loading...'}
+                Timezone: {sessionTimezone}
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -342,7 +347,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
             {/* Time */}
             <div className="space-y-2">
               <Label htmlFor="time">
-                Time (in {schoolTimezone || 'school timezone'})
+                Time (in {sessionTimezone})
               </Label>
               <Select value={time} onValueChange={setTime}>
                 <SelectTrigger id="time" className="w-full">
@@ -360,7 +365,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Time will be created in school timezone ({schoolTimezone}) and displayed in your timezone ({userTimezone})
+                Sessions are created in your timezone ({sessionTimezone})
               </p>
             </div>
             

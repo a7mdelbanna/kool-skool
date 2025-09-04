@@ -38,6 +38,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { convertUserTimezoneToUTC, convertUTCToUserTimezone, formatInUserTimezone } from '@/utils/timezone';
+import { toZonedTime } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 
 type DateFilterType = 'today' | 'week' | 'month' | 'custom';
@@ -63,9 +65,27 @@ const FinancesPage = () => {
 
   const schoolId = getSchoolId();
 
-  // Get date range based on filter type
+  // Get user's timezone (Cairo)
+  const getUserTimezone = () => {
+    // Get from user data or default to Cairo
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.timezone || 'Africa/Cairo';
+      } catch {
+        return 'Africa/Cairo';
+      }
+    }
+    return 'Africa/Cairo';
+  };
+
+  const userTimezone = getUserTimezone();
+
+  // Get date range based on filter type (in user's timezone)
   const getDateRange = () => {
-    const now = new Date();
+    // Get current time in user's timezone (Cairo)
+    const now = toZonedTime(new Date(), userTimezone);
     
     switch (dateFilter) {
       case 'today':
@@ -99,24 +119,30 @@ const FinancesPage = () => {
 
   const dateRange = getDateRange();
 
-  // Filter function to check if a date is within the selected range
+  // Filter function to check if a date is within the selected range (using Cairo timezone)
   const isDateInRange = (date: string) => {
     if (!date) return false;
     
     // Handle different date formats
     let transactionDate: Date;
     
-    // If date is in YYYY-MM-DD format, parse it as local date (not UTC)
+    // If date is in YYYY-MM-DD format, treat it as a date in Cairo timezone
     if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      // Parse as local date by splitting and using Date constructor with year, month, day
+      // Parse as Cairo timezone date
       const [year, month, day] = date.split('-').map(Number);
-      transactionDate = new Date(year, month - 1, day); // month is 0-indexed
+      // Create date in Cairo timezone
+      const cairoDate = toZonedTime(new Date(Date.UTC(year, month - 1, day)), userTimezone);
+      transactionDate = new Date(cairoDate.getFullYear(), cairoDate.getMonth(), cairoDate.getDate());
     } else if (date.includes('T')) {
-      // If it's an ISO string with time, parse it directly
-      transactionDate = new Date(date);
+      // If it's an ISO string (UTC), convert to Cairo timezone
+      const utcDate = new Date(date);
+      const cairoDate = toZonedTime(utcDate, userTimezone);
+      transactionDate = new Date(cairoDate.getFullYear(), cairoDate.getMonth(), cairoDate.getDate());
     } else {
-      // Otherwise try to parse as-is
-      transactionDate = new Date(date);
+      // Otherwise try to parse as-is and convert to Cairo
+      const parsed = new Date(date);
+      const cairoDate = toZonedTime(parsed, userTimezone);
+      transactionDate = new Date(cairoDate.getFullYear(), cairoDate.getMonth(), cairoDate.getDate());
     }
     
     // Check if the date is valid
@@ -125,7 +151,7 @@ const FinancesPage = () => {
       return false;
     }
     
-    // For date-only comparisons, compare just the date parts (ignore time)
+    // Get date-only versions for comparison
     const transactionDateOnly = new Date(
       transactionDate.getFullYear(),
       transactionDate.getMonth(),
@@ -145,8 +171,9 @@ const FinancesPage = () => {
     
     // Debug logging for date filtering
     if (dateFilter === 'today' || dateFilter === 'month') {
-      console.log('Date filter check:', {
+      console.log('Date filter check (Cairo timezone):', {
         filter: dateFilter,
+        timezone: userTimezone,
         originalDate: date,
         transactionDate: transactionDateOnly.toLocaleDateString(),
         rangeStart: rangeStartDateOnly.toLocaleDateString(),
@@ -793,7 +820,7 @@ const FinancesPage = () => {
                         );
                       })()}
                     </TableCell>
-                    <TableCell>{format(new Date(transaction.date), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell>{formatInUserTimezone(transaction.date, userTimezone, 'MMM dd, yyyy')}</TableCell>
                     <TableCell>{transaction.method || '-'}</TableCell>
                     <TableCell>{transaction.category_name || '-'}</TableCell>
                     <TableCell className="text-muted-foreground">{transaction.notes || '-'}</TableCell>
