@@ -728,6 +728,9 @@ export const createStudent = async (studentData: {
   parent_info?: any;  // Added parent_info
   [key: string]: any;  // Allow additional fields
 }): Promise<CreateStudentResponse> => {
+  console.log('[createStudent] Received student data:', studentData);
+  console.log('[createStudent] Age group:', studentData.age_group);
+  console.log('[createStudent] Parent info:', studentData.parent_info);
   
   try {
     // Get schoolId from the user object, not from a separate localStorage item
@@ -745,6 +748,28 @@ export const createStudent = async (studentData: {
     
     // If email is provided, create a full user account
     if (studentData.student_email && studentData.student_password) {
+      // Build the student data object conditionally
+      const authStudentData: any = {
+        teacherId: studentData.teacher_id,
+        courseId: studentData.course_id,
+        courseName: studentData.course_name,
+        lessonType: studentData.lesson_type || 'individual',
+        ageGroup: studentData.age_group as any,
+        level: studentData.level as any
+      };
+      
+      // Only add parent_info if it exists and is not null
+      if (studentData.parent_info !== null && studentData.parent_info !== undefined) {
+        authStudentData.parent_info = studentData.parent_info;
+      }
+      
+      // Add phone if provided
+      if (studentData.phone) {
+        authStudentData.phone = studentData.phone;
+      }
+      
+      console.log('[createStudent] Calling authService.createStudent with:', authStudentData);
+      
       const uid = await authService.createStudent(
         {
           email: studentData.student_email,
@@ -754,16 +779,7 @@ export const createStudent = async (studentData: {
           role: 'student',
           schoolId: schoolId
         },
-        {
-          teacherId: studentData.teacher_id,
-          courseId: studentData.course_id,
-          courseName: studentData.course_name,
-          lessonType: studentData.lesson_type || 'individual',
-          ageGroup: studentData.age_group as any,
-          level: studentData.level as any,
-          parent_info: studentData.parent_info,
-          ...(studentData.phone && { phone: studentData.phone })
-        }
+        authStudentData
       );
 
       return {
@@ -794,7 +810,8 @@ export const createStudent = async (studentData: {
       if (studentData.phone) {
         studentRecord.phone = studentData.phone;
       }
-      if (studentData.parent_info) {
+      // Only add parent_info if it exists and is not null
+      if (studentData.parent_info !== null && studentData.parent_info !== undefined) {
         studentRecord.parent_info = studentData.parent_info;
       }
       if (studentData.countryCode) {

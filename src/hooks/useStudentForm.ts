@@ -422,11 +422,9 @@ export const useStudentForm = (
         return;
       }
       
-      // For adults, email is required
-      if (studentData.ageGroup === "adult" && !studentData.email) {
-        toast.error("Email is required for adult students");
-        return;
-      }
+      // For adults, email is NOT required - they can be created without accounts just like kids
+      // The system will create an account only if email is provided
+      // This matches the existing logic at line 653 where it checks if email exists
       
       // For kids, we just need parent contact info (phone is sufficient)
       // Parent validation will be handled below
@@ -536,6 +534,10 @@ export const useStudentForm = (
           
           updatePayload.parentInfo = processedParentInfo;
           console.log('[useStudentForm] Adding parent info to payload:', processedParentInfo);
+        } else if (studentData.ageGroup === 'adult' || updatePayload.ageGroup === 'Adult') {
+          // Explicitly set parentInfo to null for adults to ensure clean data
+          updatePayload.parentInfo = null;
+          console.log('[useStudentForm] Setting parent info to null for adult student');
         }
         
         // Add additional info fields using camelCase
@@ -684,6 +686,9 @@ export const useStudentForm = (
           }
           
           studentPayload.parent_info = processedParentInfo;
+        } else if (studentData.ageGroup === 'adult') {
+          // Explicitly set parent_info to null for adults to ensure clean data
+          studentPayload.parent_info = null;
         }
         
         // Add additional info fields for new student
@@ -710,6 +715,10 @@ export const useStudentForm = (
         if (studentData.income_category_id) {
           studentPayload.income_category_id = studentData.income_category_id;
         }
+        
+        console.log('[useStudentForm] Final student payload being sent:', studentPayload);
+        console.log('[useStudentForm] Age group in payload:', studentPayload.age_group);
+        console.log('[useStudentForm] Parent info in payload:', studentPayload.parent_info);
         
         const response = await createStudent(studentPayload);
         
