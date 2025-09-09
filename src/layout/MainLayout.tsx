@@ -11,6 +11,7 @@ import Students from '@/pages/Students';
 import Groups from '@/pages/Groups';
 import Courses from '@/pages/Courses';
 import Calendar from '@/pages/Calendar';
+import OnlineBooking from '@/pages/OnlineBooking';
 import Attendance from '@/pages/Attendance';
 import Payments from '@/pages/Payments';
 import Finances from '@/pages/Finances';
@@ -52,6 +53,7 @@ const MainLayout = () => {
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/courses" element={<Courses />} />
                   <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/online-booking" element={<OnlineBooking />} />
                   <Route path="/attendance" element={<Attendance />} />
                   <Route path="/birthdays" element={<Birthdays />} />
                   <Route path="/payments" element={<Payments />} />

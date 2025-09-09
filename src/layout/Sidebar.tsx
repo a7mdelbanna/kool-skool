@@ -28,7 +28,8 @@ import {
   Bell,
   Database,
   Mic,
-  Cake
+  Cake,
+  CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,7 @@ const Sidebar = () => {
     { name: 'Groups', href: '/groups', icon: UsersRound },
     { name: 'Courses', href: '/courses', icon: BookOpen },
     { name: 'Calendar', href: '/calendar', icon: Calendar },
+    { name: 'Online Booking', href: '/online-booking', icon: CalendarClock },
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
     { name: 'TODOs', href: '/todos', icon: CheckSquare },
     { name: 'Speaking Practice', href: '/speaking-topics', icon: Mic },

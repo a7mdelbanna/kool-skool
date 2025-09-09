@@ -217,12 +217,27 @@ export const useAttendanceData = (userTimezone?: string) => {
             
             const scheduledSessions = (activeSubscription as any).sessions_scheduled ?? 0;
             
-            let endDate = (activeSubscription as any).end_date;
-            if (!endDate && activeSubscription.start_date && activeSubscription.duration_months) {
+            // Calculate the end date based on duration_months (subscriptions don't have end_date field)
+            let endDate: string;
+            if (activeSubscription.start_date && activeSubscription.duration_months) {
               const startDate = new Date(activeSubscription.start_date);
               const calculatedEndDate = new Date(startDate);
               calculatedEndDate.setMonth(calculatedEndDate.getMonth() + activeSubscription.duration_months);
               endDate = calculatedEndDate.toISOString().split('T')[0];
+              console.log(`Calculated end date from duration_months (${activeSubscription.duration_months} months) for student ${studentId}: start=${activeSubscription.start_date}, end=${endDate}`);
+            } else if (activeSubscription.start_date && activeSubscription.session_count) {
+              // If no duration_months, estimate based on session count
+              const startDate = new Date(activeSubscription.start_date);
+              // Estimate end date: assume 2 sessions per week
+              const weeksNeeded = Math.ceil(activeSubscription.session_count / 2);
+              const calculatedEndDate = new Date(startDate);
+              calculatedEndDate.setDate(calculatedEndDate.getDate() + (weeksNeeded * 7));
+              endDate = calculatedEndDate.toISOString().split('T')[0];
+              console.log(`Estimated end date from session count for student ${studentId}: ${endDate}`);
+            } else {
+              // Fallback to start date if we can't calculate
+              endDate = activeSubscription.start_date;
+              console.warn(`Could not calculate end date for student ${studentId}, using start date as fallback`);
             }
 
             const subscriptionInfo: SubscriptionInfo = {
@@ -236,7 +251,7 @@ export const useAttendanceData = (userTimezone?: string) => {
               totalPrice: activeSubscription.total_price,
               currency: activeSubscription.currency,
               startDate: activeSubscription.start_date,
-              endDate: endDate || activeSubscription.start_date,
+              endDate: endDate, // Now properly calculated above
               subscriptionName: activeSubscription.notes || undefined
             };
 

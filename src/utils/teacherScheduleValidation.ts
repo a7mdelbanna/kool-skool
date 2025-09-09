@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { databaseService } from '@/services/firebase/database.service';
 import { collection, query, where, getDocs, and } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { teacherAvailabilityService } from '@/services/firebase/teacherAvailability.service';
 
 interface SessionTime {
   teacherId: string;
@@ -59,6 +60,22 @@ export const validateTeacherScheduleOverlap = async (
 ): Promise<TeacherOverlapValidationResult> => {
   try {
     const { teacherId, date, startTime, durationMinutes, excludeSessionId } = sessionTime;
+    
+    // First check teacher availability if configured
+    const availabilityCheck = await teacherAvailabilityService.checkSlotAvailability(
+      teacherId,
+      date,
+      startTime,
+      durationMinutes,
+      excludeSessionId
+    );
+    
+    if (!availabilityCheck.available) {
+      return {
+        hasConflict: true,
+        conflictMessage: availabilityCheck.reason || 'Time slot is not available'
+      };
+    }
     
     // Convert new session times to minutes
     const newStartMinutes = timeToMinutes(startTime);
