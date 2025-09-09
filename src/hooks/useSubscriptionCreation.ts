@@ -116,6 +116,12 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
 
       console.log('🎯 Creating subscription with data:', formData);
 
+      // Validate that price is set
+      if (!formData.totalPrice || formData.totalPrice <= 0) {
+        console.error('❌ Subscription price validation failed:', formData.totalPrice);
+        throw new Error('Subscription price must be greater than zero. Please enter a valid price.');
+      }
+
       // Validate that account currency matches subscription currency
       if (formData.initialPayment.accountId && formData.initialPayment.amount > 0) {
         // Use RPC function to get accounts with proper currency info

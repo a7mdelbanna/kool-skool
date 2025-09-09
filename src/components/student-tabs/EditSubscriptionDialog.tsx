@@ -411,6 +411,19 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       return;
     }
 
+    // Validate price is set
+    const totalPrice = getTotalPrice();
+    if (totalPrice <= 0) {
+      toast({
+        title: "Error",
+        description: formData.priceMode === 'perSession' 
+          ? "Please enter a price per session" 
+          : "Please enter a fixed price for the subscription",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate all schedule items are complete
     const incompleteSchedules = formData.schedule.some(s => !s.day || !s.time);
     if (incompleteSchedules) {

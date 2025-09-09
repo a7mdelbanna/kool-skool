@@ -71,6 +71,7 @@ const countryCodeData: CountryCode[] = [
   { code: "SG", country: "Singapore", flag: "🇸🇬", dialCode: "+65" },
   { code: "ID", country: "Indonesia", flag: "🇮🇩", dialCode: "+62" },
   { code: "PH", country: "Philippines", flag: "🇵🇭", dialCode: "+63" },
+  { code: "PT", country: "Portugal", flag: "🇵🇹", dialCode: "+351" },
 ];
 
 interface CountryCodeSelectorProps {

@@ -20,7 +20,7 @@ import { authService } from '@/services/firebase/auth.service';
 import { databaseService } from '@/services/firebase/database.service';
 
 // Global DEBUG flag - set to true only when debugging database issues
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 // This file provides a migration layer from Supabase to Firebase
 // It maps Supabase-like operations to Firebase operations
@@ -644,7 +644,7 @@ async function handleAddSubscription(params: any) {
 
 async function handleUpdateSubscriptionWithRelatedData(params: any) {
   try {
-    const DEBUG_MODE = false;
+    const DEBUG_MODE = true;
     if (DEBUG_MODE) {
       console.log('Updating subscription with params:', params);
     }
@@ -1433,16 +1433,120 @@ async function handleSessionActionRPC(params: any) {
         break;
       case 'rescheduled':
         if (p_new_datetime) {
-          // Get the original session to store its date
+          // Get the original session to store its date and create a replacement
           const originalSession = await databaseService.getById('sessions', p_session_id);
-          const originalDate = originalSession?.scheduled_date || 'unknown date';
+          if (!originalSession) {
+            throw new Error('Session not found');
+          }
           
-          updates.scheduled_date = p_new_datetime.split('T')[0];
-          updates.scheduled_time = p_new_datetime.split('T')[1]?.split('.')[0] || '00:00';
-          updates.status = 'scheduled'; // Keep as scheduled, not rescheduled
-          updates.counts_toward_completion = true; // Still counts
-          updates.original_date = originalDate; // Store original date
-          updates.notes = (originalSession?.notes || '') + ` [Rescheduled from ${originalDate}]`;
+          // Get the original date for the note
+          const originalDate = originalSession.scheduled_date || originalSession.scheduledDate || originalSession.scheduled_datetime || null;
+          const originalDateFormatted = originalDate 
+            ? new Date(originalDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+            : 'unknown date';
+          
+          // Parse the new datetime
+          const newDate = new Date(p_new_datetime);
+          const newDateFormatted = newDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+          
+          // Mark original session as rescheduled (doesn't count toward completion)
+          updates.status = 'rescheduled';
+          updates.counts_toward_completion = false;
+          updates.original_date = originalDate;
+          updates.notes = (originalSession.notes || '') + ` [Rescheduled to ${newDateFormatted}]`;
+          
+          // Update the original session
+          await databaseService.update('sessions', p_session_id, updates);
+          
+          // Create the replacement session at the new date/time
+          const replacementSession: any = {
+            // Use both field naming conventions for subscription ID
+            subscription_id: originalSession.subscription_id || originalSession.subscriptionId,
+            subscriptionId: originalSession.subscription_id || originalSession.subscriptionId,
+            
+            // New schedule information
+            scheduled_date: p_new_datetime.split('T')[0],
+            scheduledDate: p_new_datetime.split('T')[0],
+            scheduled_time: p_new_datetime.split('T')[1]?.split('.')[0] || '00:00',
+            scheduledTime: p_new_datetime.split('T')[1]?.split('.')[0] || '00:00',
+            
+            // Session metadata
+            status: 'scheduled',
+            attended: false,
+            counts_toward_completion: true,
+            countsTowardCompletion: true,
+            
+            // Reference to original rescheduled session
+            moved_from_session_id: p_session_id,
+            
+            // Descriptive note about the reschedule
+            notes: `[Rescheduled from ${originalDateFormatted}]`,
+            
+            // Timestamps
+            created_at: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          
+          // Add student_id in both formats
+          const studentId = originalSession.student_id || originalSession.studentId;
+          if (studentId) {
+            replacementSession.student_id = studentId;
+            replacementSession.studentId = studentId;
+          }
+          
+          // Add school_id in both formats
+          const schoolId = originalSession.school_id || originalSession.schoolId;
+          if (schoolId) {
+            replacementSession.school_id = schoolId;
+            replacementSession.schoolId = schoolId;
+          }
+          
+          // Add teacher_id in both formats
+          const teacherId = originalSession.teacher_id || originalSession.teacherId;
+          if (teacherId) {
+            replacementSession.teacher_id = teacherId;
+            replacementSession.teacherId = teacherId;
+          }
+          
+          // Add cost if it exists
+          if (originalSession.cost !== undefined && originalSession.cost !== null) {
+            replacementSession.cost = originalSession.cost;
+          }
+          
+          // Add payment_status if it exists
+          if (originalSession.payment_status || originalSession.paymentStatus) {
+            replacementSession.payment_status = originalSession.payment_status || originalSession.paymentStatus;
+            replacementSession.paymentStatus = originalSession.payment_status || originalSession.paymentStatus;
+          }
+          
+          // Keep the original session number and index
+          const sessionNumber = originalSession.session_number || originalSession.sessionNumber || originalSession.index_in_sub || originalSession.indexInSub;
+          if (sessionNumber !== undefined && sessionNumber !== null) {
+            replacementSession.session_number = sessionNumber;
+            replacementSession.sessionNumber = sessionNumber;
+            replacementSession.index_in_sub = sessionNumber;
+            replacementSession.indexInSub = sessionNumber;
+          }
+          
+          // Store original date if available
+          if (originalDate) {
+            replacementSession.original_date = originalDate;
+            replacementSession.originalDate = originalDate;
+          }
+          
+          const newSessionId = await databaseService.create('sessions', replacementSession);
+          if (DEBUG_MODE) console.log('✅ Created rescheduled replacement session:', newSessionId);
+          
+          return { 
+            data: { 
+              success: true, 
+              message: `Session rescheduled successfully to ${replacementSession.scheduled_date} at ${replacementSession.scheduled_time}`,
+              new_session_id: newSessionId
+            }, 
+            error: null 
+          };
         }
         break;
       case 'moved':
@@ -1452,66 +1556,356 @@ async function handleSessionActionRPC(params: any) {
           throw new Error('Session not found');
         }
         
+        // Log session structure for debugging
+        if (DEBUG_MODE) {
+          console.log('📋 Session data for move operation:', {
+            id: p_session_id,
+            has_scheduled_date: !!session.scheduled_date,
+            has_scheduled_datetime: !!session.scheduled_datetime,
+            scheduled_date: session.scheduled_date,
+            scheduled_datetime: session.scheduled_datetime
+          });
+        }
+        
         // Mark original session as moved (doesn't count toward completion)
         updates.status = 'rescheduled';
         updates.counts_toward_completion = false;
-        updates.original_date = session.scheduled_date; // Store for display
-        updates.notes = (session.notes || '') + ` [Moved to another date]`;
         
-        // Update the original session
-        await databaseService.update('sessions', p_session_id, updates);
+        // Only set original_date if we have a valid date value
+        if (session.scheduled_date) {
+          updates.original_date = session.scheduled_date;
+        } else if (session.scheduled_datetime) {
+          // Try alternative date field
+          updates.original_date = session.scheduled_datetime;
+        }
+        // If no date is available, we simply don't set original_date
+        
+        // We'll update this note after calculating the next date
+        let movedToNote = ` [Moved to another date]`; // Will be updated later
+        updates.notes = (session.notes || '') + movedToNote;
+        
+        // Store the update but don't apply it yet - we'll update after calculating the date
+        const pendingUpdate = { ...updates };
+        
+        // Get the subscription ID (handle both naming conventions)
+        const subscriptionId = session.subscription_id || session.subscriptionId;
+        if (DEBUG_MODE) {
+          console.log('📋 Looking for subscription with ID:', subscriptionId);
+          console.log('📋 Session fields:', Object.keys(session));
+        }
+        
+        if (!subscriptionId) {
+          console.warn('⚠️ No subscription ID found in session, cannot create replacement');
+          return { 
+            data: { 
+              success: true, 
+              message: 'Session marked as moved (no replacement created - subscription ID not found)' 
+            }, 
+            error: null 
+          };
+        }
         
         // Find the next available date that matches the subscription schedule
-        const subscription = await databaseService.getById('subscriptions', session.subscription_id);
+        const subscription = await databaseService.getById('subscriptions', subscriptionId);
         if (subscription && subscription.schedule && subscription.schedule.length > 0) {
-          const schedule = subscription.schedule[0];
-          const scheduledDay = schedule.day;
-          const scheduledTime = schedule.time || '00:00';
-          
           // Get all sessions for this subscription to find the last date
-          const allSessions = await databaseService.query('sessions', {
-            where: [{ field: 'subscription_id', operator: '==', value: session.subscription_id }]
+          // Query BOTH field naming conventions and combine results
+          const sessionsWithUnderscore = await databaseService.query('sessions', {
+            where: [{ field: 'subscription_id', operator: '==', value: subscriptionId }]
           });
           
-          // Find the latest scheduled date
-          let latestDate = new Date();
-          allSessions.forEach((s: any) => {
-            const sessionDate = new Date(s.scheduled_date);
-            if (sessionDate > latestDate && s.status === 'scheduled') {
-              latestDate = sessionDate;
+          const sessionsWithCamelCase = await databaseService.query('sessions', {
+            where: [{ field: 'subscriptionId', operator: '==', value: subscriptionId }]
+          });
+          
+          if (DEBUG_MODE) {
+            console.log('📊 Session query results:');
+            console.log('  Sessions with subscription_id:', sessionsWithUnderscore.length);
+            console.log('  Sessions with subscriptionId:', sessionsWithCamelCase.length);
+          }
+          
+          // Combine both results, avoiding duplicates based on session ID
+          const sessionMap = new Map();
+          [...sessionsWithUnderscore, ...sessionsWithCamelCase].forEach(session => {
+            sessionMap.set(session.id, session);
+          });
+          const allSessions = Array.from(sessionMap.values());
+          
+          // Calculate when the subscription ends based on total sessions and schedule
+          // This is more reliable than looking at session dates which might be missing
+          
+          const totalSessions = subscription.session_count || subscription.sessionCount || 12;
+          const startDate = subscription.start_date || subscription.startDate;
+          
+          if (DEBUG_MODE) {
+            console.log('📊 Calculating subscription end date:');
+            console.log('  Total sessions in subscription:', totalSessions);
+            console.log('  Start date:', startDate);
+            console.log('  Schedule:', subscription.schedule);
+            console.log('  Sessions found in database:', allSessions.length);
+          }
+          
+          let latestDate: Date;
+          
+          // Method 1: Calculate based on subscription parameters (most reliable)
+          if (startDate && subscription.schedule && subscription.schedule.length > 0) {
+            const start = new Date(startDate);
+            const scheduleDays = subscription.schedule.map((s: any) => {
+              const dayIndex = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+                .findIndex(d => d === s.day.toLowerCase());
+              return dayIndex;
+            }).filter(d => d !== -1).sort((a, b) => a - b);
+            
+            if (scheduleDays.length > 0) {
+              // Calculate the date of each session sequentially
+              let currentDate = new Date(start);
+              let sessionCount = 0;
+              let lastSessionDate = new Date(start);
+              
+              // Move to the first scheduled day from start date
+              while (!scheduleDays.includes(currentDate.getDay())) {
+                currentDate.setDate(currentDate.getDate() + 1);
+              }
+              
+              // Count through all sessions to find the last one
+              while (sessionCount < totalSessions) {
+                if (scheduleDays.includes(currentDate.getDay())) {
+                  sessionCount++;
+                  lastSessionDate = new Date(currentDate);
+                  if (DEBUG_MODE && sessionCount <= 3) {
+                    console.log(`  Session ${sessionCount}: ${currentDate.toDateString()}`);
+                  }
+                }
+                if (sessionCount < totalSessions) {
+                  currentDate.setDate(currentDate.getDate() + 1);
+                }
+              }
+              
+              latestDate = new Date(lastSessionDate);
+              
+              if (DEBUG_MODE) {
+                console.log('  Last session date (session #' + totalSessions + '):', latestDate.toDateString());
+                console.log('  Sessions per week:', scheduleDays.length);
+                console.log('  Total sessions:', totalSessions);
+                console.log('  Schedule days:', scheduleDays.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', '));
+              }
+            } else {
+              // Fallback if schedule parsing fails
+              latestDate = new Date(start);
+              latestDate.setDate(latestDate.getDate() + 90); // Default 3 months
             }
+          } else {
+            // Method 2: Fallback to finding latest session date if available
+            latestDate = null;
+            let sessionDates: string[] = [];
+            
+            allSessions.forEach((s: any) => {
+              if (s.scheduled_date) {
+                sessionDates.push(`${s.scheduled_date} (status: ${s.status}, id: ${s.id})`);
+                const sessionDate = new Date(s.scheduled_date);
+                if (!latestDate || sessionDate > latestDate) {
+                  latestDate = sessionDate;
+                }
+              }
+            });
+            
+            // If still no date found, use today
+            if (!latestDate) {
+              latestDate = new Date();
+              if (DEBUG_MODE) {
+                console.log('  ⚠️ Warning: Could not calculate end date, using today');
+              }
+            }
+            
+            if (DEBUG_MODE && sessionDates.length > 0) {
+              console.log('  Found session dates:', sessionDates.sort());
+            }
+          }
+          
+          if (DEBUG_MODE) {
+            console.log('🔍 Finding next available date for moved session:');
+            console.log('  Subscription ID:', subscriptionId);
+            console.log('  Total sessions found:', allSessions.length);
+            console.log('  Latest session date determined:', latestDate.toISOString());
+            console.log('  Subscription schedule:', subscription.schedule);
+          }
+          
+          // Get all scheduled days from the subscription
+          const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+          const scheduledDays = subscription.schedule.map((s: any) => ({
+            dayIndex: daysOfWeek.findIndex(d => d === s.day.toLowerCase()),
+            time: s.time || '00:00'
+          })).filter((s: any) => s.dayIndex !== -1);
+          
+          // Also check for any existing moved sessions (replacement sessions) after the subscription end date
+          // These sessions will have the same subscription_id but will be after the original subscription period
+          let actualLatestDate = new Date(latestDate);
+          
+          // Find any replacement sessions that are after the calculated end date
+          const replacementSessions = allSessions.filter((s: any) => {
+            // Check if this is a replacement session (has moved_from_session_id or notes indicating it was moved)
+            const isReplacement = s.moved_from_session_id || 
+                                (s.notes && s.notes.includes('[Moved from'));
+            if (!isReplacement) return false;
+            
+            // Check if it has a scheduled date
+            const sessionDate = s.scheduled_date || s.scheduledDate;
+            if (!sessionDate) return false;
+            
+            // Check if it's after the original subscription end date
+            const sDate = new Date(sessionDate);
+            return sDate >= latestDate;
           });
           
-          // Calculate next occurrence of the scheduled day after the latest date
-          const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-          const targetDayIndex = daysOfWeek.findIndex(d => d === scheduledDay.toLowerCase());
+          if (replacementSessions.length > 0) {
+            // Find the latest replacement session date
+            replacementSessions.forEach((s: any) => {
+              const sessionDate = new Date(s.scheduled_date || s.scheduledDate);
+              if (sessionDate > actualLatestDate) {
+                actualLatestDate = sessionDate;
+                if (DEBUG_MODE) {
+                  console.log('  Found later replacement session:', s.id, 'on', sessionDate.toDateString());
+                }
+              }
+            });
+          }
           
-          let nextDate = new Date(latestDate);
-          nextDate.setDate(nextDate.getDate() + 7); // Start from next week
+          if (DEBUG_MODE && replacementSessions.length > 0) {
+            console.log('  Found', replacementSessions.length, 'existing replacement sessions');
+            console.log('  Updated latest date to:', actualLatestDate.toDateString());
+          }
           
-          // Find the next occurrence of the target day
-          while (nextDate.getDay() !== targetDayIndex) {
-            nextDate.setDate(nextDate.getDate() + 1);
+          // Find the next available day that matches any of the scheduled days
+          let nextDate = new Date(actualLatestDate);
+          nextDate.setDate(nextDate.getDate() + 1); // Start from the day after the latest session (including moved sessions)
+          
+          let foundNextDate = false;
+          let daysChecked = 0;
+          let selectedTime = '00:00';
+          
+          while (!foundNextDate && daysChecked < 14) { // Check up to 2 weeks ahead
+            const currentDayIndex = nextDate.getDay();
+            const matchingSchedule = scheduledDays.find((s: any) => s.dayIndex === currentDayIndex);
+            
+            if (matchingSchedule) {
+              foundNextDate = true;
+              selectedTime = matchingSchedule.time;
+            } else {
+              nextDate.setDate(nextDate.getDate() + 1);
+              daysChecked++;
+            }
+          }
+          
+          // If no matching day found in 2 weeks, fallback to first scheduled day
+          if (!foundNextDate && scheduledDays.length > 0) {
+            const firstSchedule = scheduledDays[0];
+            while (nextDate.getDay() !== firstSchedule.dayIndex) {
+              nextDate.setDate(nextDate.getDate() + 1);
+            }
+            selectedTime = firstSchedule.time;
+          }
+          
+          if (DEBUG_MODE) {
+            console.log('📅 Calculated next available date for moved session:');
+            console.log('  Next date:', nextDate.toISOString());
+            console.log('  Selected time:', selectedTime);
+            console.log('  Day of week:', daysOfWeek[nextDate.getDay()]);
           }
           
           // Create the replacement session
-          const replacementSession = {
-            subscription_id: session.subscription_id,
-            student_id: session.student_id,
-            school_id: session.school_id,
-            teacher_id: session.teacher_id,
-            session_number: session.session_number,
+          // Get the original session date for the note
+          const originalDate = session.scheduled_date || session.scheduledDate || session.scheduled_datetime || null;
+          const originalDateFormatted = originalDate 
+            ? new Date(originalDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+            : 'unknown date';
+          
+          // Format the date where the session is being moved to
+          const movedToDateFormatted = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+          
+          // Update the original session with the actual date it was moved to
+          pendingUpdate.notes = (session.notes || '') + ` [Moved to ${movedToDateFormatted}]`;
+          await databaseService.update('sessions', p_session_id, pendingUpdate);
+          
+          // Build replacement session with BOTH field naming conventions for compatibility
+          const replacementSession: any = {
+            // Use both field naming conventions for subscription ID
+            subscription_id: subscriptionId,
+            subscriptionId: subscriptionId,
+            
+            // Schedule information
             scheduled_date: nextDate.toISOString().split('T')[0],
-            scheduled_time: scheduledTime,
-            duration_minutes: session.duration_minutes || 60,
+            scheduledDate: nextDate.toISOString().split('T')[0],
+            scheduled_time: selectedTime,
+            scheduledTime: selectedTime,
+            
+            // Duration in both formats
+            duration_minutes: session.duration_minutes || session.durationMinutes || 60,
+            durationMinutes: session.duration_minutes || session.durationMinutes || 60,
+            
+            // Status and completion
             status: 'scheduled',
             counts_toward_completion: true,
+            countsTowardCompletion: true,
+            
+            // Reference to original moved session
             moved_from_session_id: p_session_id,
-            notes: `[Moved from ${session.scheduled_date}]`,
-            original_date: session.scheduled_date,
+            
+            // Descriptive note about the move
+            notes: `[Moved from ${originalDateFormatted}]`,
+            
+            // Timestamps
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           };
+          
+          // Add student_id in both formats
+          const studentId = session.student_id || session.studentId;
+          if (studentId) {
+            replacementSession.student_id = studentId;
+            replacementSession.studentId = studentId;
+          }
+          
+          // Add school_id in both formats
+          const schoolId = session.school_id || session.schoolId;
+          if (schoolId) {
+            replacementSession.school_id = schoolId;
+            replacementSession.schoolId = schoolId;
+          }
+          
+          // Add teacher_id in both formats
+          const teacherId = session.teacher_id || session.teacherId;
+          if (teacherId) {
+            replacementSession.teacher_id = teacherId;
+            replacementSession.teacherId = teacherId;
+          }
+          
+          // Add cost if it exists
+          if (session.cost !== undefined && session.cost !== null) {
+            replacementSession.cost = session.cost;
+          }
+          
+          // Add payment_status if it exists
+          if (session.payment_status || session.paymentStatus) {
+            replacementSession.payment_status = session.payment_status || session.paymentStatus;
+            replacementSession.paymentStatus = session.payment_status || session.paymentStatus;
+          }
+          
+          // Keep the original session number and index
+          const sessionNumber = session.session_number || session.sessionNumber || session.index_in_sub || session.indexInSub;
+          if (sessionNumber !== undefined && sessionNumber !== null) {
+            replacementSession.session_number = sessionNumber;
+            replacementSession.sessionNumber = sessionNumber;
+            replacementSession.index_in_sub = sessionNumber;
+            replacementSession.indexInSub = sessionNumber;
+          }
+          
+          // Store original date if available
+          if (originalDate) {
+            replacementSession.original_date = originalDate;
+            replacementSession.originalDate = originalDate;
+          }
           
           const newSessionId = await databaseService.create('sessions', replacementSession);
           if (DEBUG_MODE) console.log('✅ Created replacement session:', newSessionId);
@@ -1534,6 +1928,56 @@ async function handleSessionActionRPC(params: any) {
           }, 
           error: null 
         };
+      case 'restore':
+        // Restore a moved session back to scheduled state
+        const restoredSession = await databaseService.getById('sessions', p_session_id);
+        if (!restoredSession) {
+          throw new Error('Session not found');
+        }
+        
+        // Only allow restoring sessions that were moved (status = 'rescheduled')
+        if (restoredSession.status !== 'rescheduled') {
+          throw new Error('Only moved sessions can be restored');
+        }
+        
+        // Find and delete the replacement session that was created when this session was moved
+        // The replacement session will have moved_from_session_id pointing to this session
+        const replacementSessions = await databaseService.query('sessions', {
+          where: [{ field: 'moved_from_session_id', operator: '==', value: p_session_id }]
+        });
+        
+        if (replacementSessions.length > 0) {
+          // Delete the replacement session(s)
+          for (const replacementSession of replacementSessions) {
+            if (DEBUG_MODE) console.log('🗑️ Deleting replacement session:', replacementSession.id);
+            await databaseService.delete('sessions', replacementSession.id);
+          }
+        }
+        
+        // Restore the session to scheduled state
+        updates.status = 'scheduled';
+        updates.counts_toward_completion = true;
+        
+        // Clean up the notes - remove the "[Moved to ...]" or "[Rescheduled to ...]" text
+        if (restoredSession.notes) {
+          // Handle both moved and rescheduled formats
+          updates.notes = restoredSession.notes
+            .replace(/ \[Moved to [^\]]+\]/g, '') // Moved format with date
+            .replace(/ \[Rescheduled to [^\]]+\]/g, '') // Rescheduled format with date
+            .replace(' [Moved to another date]', '') // Old moved format
+            .replace('[Moved to another date]', '')
+            .trim();
+          if (updates.notes === '') {
+            updates.notes = null;
+          }
+        }
+        
+        // Remove the original_date field since we're restoring
+        updates.original_date = null;
+        
+        if (DEBUG_MODE) console.log('✅ Restoring session to scheduled state:', p_session_id);
+        
+        break;
       default:
         throw new Error(`Unknown action: ${p_action}`);
     }
@@ -1551,9 +1995,21 @@ async function handleSessionActionRPC(params: any) {
       const session = await databaseService.getById('sessions', p_session_id);
       if (session && session.subscription_id) {
         // Get all sessions for this subscription to recalculate counts
-        const allSessions = await databaseService.query('sessions', {
+        // Query BOTH field naming conventions and combine results
+        const sessionsWithUnderscore = await databaseService.query('sessions', {
           where: [{ field: 'subscription_id', operator: '==', value: session.subscription_id }]
         });
+        
+        const sessionsWithCamelCase = await databaseService.query('sessions', {
+          where: [{ field: 'subscriptionId', operator: '==', value: session.subscription_id }]
+        });
+        
+        // Combine both results, avoiding duplicates
+        const sessionMap = new Map();
+        [...sessionsWithUnderscore, ...sessionsWithCamelCase].forEach(s => {
+          sessionMap.set(s.id, s);
+        });
+        const allSessions = Array.from(sessionMap.values());
         
         // Calculate new counts
         const sessionsAttended = allSessions.filter((s: any) => s.status === 'completed' && s.counts_toward_completion).length;

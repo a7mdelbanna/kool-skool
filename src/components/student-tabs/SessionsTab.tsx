@@ -15,7 +15,8 @@ import {
   RefreshCcw,
   CalendarClock,
   Eye,
-  FileText
+  FileText,
+  Undo2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
@@ -394,6 +395,36 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     }
   };
 
+  const handleRestoreSession = async (sessionId: string) => {
+    try {
+      setLoading(true);
+      console.log(`↩️ Restoring session ${sessionId} to scheduled state`);
+      
+      const rawResult = await handleSessionAction(sessionId, 'restore');
+      const result = rawResult as unknown as SessionActionResponse;
+      
+      if (result.success) {
+        toast({
+          title: "Session Restored",
+          description: "Session has been restored to its original scheduled state",
+        });
+        
+        await loadSubscriptionsWithSessions();
+      } else {
+        throw new Error(result.message || 'Failed to restore session');
+      }
+    } catch (error) {
+      console.error('❌ Error restoring session:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to restore session",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRescheduleSession = async () => {
     if (!selectedSession || !rescheduleDate || !rescheduleTime) {
       toast({
@@ -765,6 +796,19 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                 <CalendarClock className="h-3.5 w-3.5 mr-1" />
                 Reschedule
               </Button>
+              {session.status === "rescheduled" && (session.notes?.includes("[Moved to") || session.notes?.includes("[Rescheduled to") || session.notes?.includes("[Moved to another date]")) && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="border-green-500 text-green-500 hover:bg-green-50 flex-1"
+                  onClick={() => handleRestoreSession(session.id)}
+                  disabled={loading}
+                  title="Restore session to its original scheduled state"
+                >
+                  <Undo2 className="h-3.5 w-3.5 mr-1" />
+                  Restore
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -841,7 +885,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                           )}
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {format(new Date(subscription.start_date), 'MMMM dd, yyyy')} - {subscription.currency} {subscription.total_price.toFixed(2)}
+                          {format(new Date(subscription.start_date), 'MMMM dd, yyyy')} - {subscription.currency} {subscription.total_price ? subscription.total_price.toFixed(2) : '0.00'}
                         </p>
                       </div>
                       <div className="flex items-center gap-4 text-sm">
