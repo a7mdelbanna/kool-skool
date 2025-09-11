@@ -261,7 +261,8 @@ class TeacherAvailabilityService {
     date: string,
     startTime: string,
     duration: number,
-    excludeSessionId?: string
+    excludeSessionId?: string,
+    isAdmin?: boolean
   ): Promise<{ available: boolean; reason?: string }> {
     try {
       // Get teacher availability
@@ -308,19 +309,21 @@ class TeacherAvailabilityService {
         }
       }
 
-      // Check minimum booking notice
-      const now = new Date();
-      const bookingTime = parseISO(`${date}T${startTime}`);
-      const hoursUntilBooking = (bookingTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-      
-      if (hoursUntilBooking < availability.min_booking_notice) {
-        return { available: false, reason: `Requires ${availability.min_booking_notice} hours advance notice` };
-      }
+      // Check minimum booking notice (skip for admins)
+      if (!isAdmin) {
+        const now = new Date();
+        const bookingTime = parseISO(`${date}T${startTime}`);
+        const hoursUntilBooking = (bookingTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursUntilBooking < availability.min_booking_notice) {
+          return { available: false, reason: `Requires ${availability.min_booking_notice} hours advance notice` };
+        }
 
-      // Check maximum booking advance
-      const daysUntilBooking = hoursUntilBooking / 24;
-      if (daysUntilBooking > availability.max_booking_advance) {
-        return { available: false, reason: `Cannot book more than ${availability.max_booking_advance} days in advance` };
+        // Check maximum booking advance
+        const daysUntilBooking = hoursUntilBooking / 24;
+        if (daysUntilBooking > availability.max_booking_advance) {
+          return { available: false, reason: `Cannot book more than ${availability.max_booking_advance} days in advance` };
+        }
       }
 
       return { available: true };

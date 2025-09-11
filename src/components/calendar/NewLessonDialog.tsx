@@ -74,6 +74,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
   initialDate = new Date() 
 }) => {
   const { user } = useContext(UserContext);
+  const isAdmin = user?.role === 'admin';
   const [date, setDate] = useState<Date | undefined>(initialDate);
   const [studentId, setStudentId] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
@@ -153,7 +154,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
           date: dateStr,
           startTime: time,
           durationMinutes
-        });
+        }, isAdmin);
 
         if (result.hasConflict && result.conflictMessage) {
           setValidationError(result.conflictMessage);
@@ -197,7 +198,7 @@ const NewLessonDialog: React.FC<NewLessonDialogProps> = ({
           date: dateStr,
           startTime: time,
           durationMinutes
-        });
+        }, isAdmin);
 
         if (result.hasConflict && result.conflictMessage) {
           setConflictMessage(result.conflictMessage);

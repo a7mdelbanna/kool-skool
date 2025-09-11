@@ -80,15 +80,16 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     return user.schoolId;
   };
 
-  const getCurrentUserId = () => {
+  const getUserData = () => {
     const userData = localStorage.getItem('user');
     if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.user_id || user.id || user.userId;
+    return JSON.parse(userData);
   };
 
+  const userData = getUserData();
   const schoolId = getSchoolId();
-  const currentUserId = getCurrentUserId();
+  const currentUserId = userData?.user_id || userData?.id || userData?.userId;
+  const isAdmin = userData?.role === 'admin';
 
   // Fetch student details to get teacher ID
   const { data: studentData } = useQuery({
@@ -329,7 +330,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
             startTime: scheduleItem.time,
             durationMinutes: parseInt(formData.sessionDuration) || 60,
             excludeSessionId: subscription.id // Exclude current subscription's sessions
-          });
+          }, isAdmin);
 
           if (result.hasConflict && result.conflictMessage) {
             setValidationError(result.conflictMessage);
@@ -449,7 +450,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
             startTime: scheduleItem.time,
             durationMinutes: parseInt(formData.sessionDuration) || 60,
             excludeSessionId: subscription.id
-          });
+          }, isAdmin);
 
           if (result.hasConflict && result.conflictMessage) {
             setConflictMessage(result.conflictMessage);

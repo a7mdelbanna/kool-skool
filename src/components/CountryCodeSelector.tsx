@@ -37,6 +37,7 @@ const countryCodeData: CountryCode[] = [
   { code: "MX", country: "Mexico", flag: "🇲🇽", dialCode: "+52" },
   { code: "AR", country: "Argentina", flag: "🇦🇷", dialCode: "+54" },
   { code: "RU", country: "Russia", flag: "🇷🇺", dialCode: "+7" },
+  { code: "BY", country: "Belarus", flag: "🇧🇾", dialCode: "+375" },
   { code: "TR", country: "Turkey", flag: "🇹🇷", dialCode: "+90" },
   { code: "EG", country: "Egypt", flag: "🇪🇬", dialCode: "+20" },
   { code: "ZA", country: "South Africa", flag: "🇿🇦", dialCode: "+27" },

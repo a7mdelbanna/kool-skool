@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Calendar, Clock, Plus, Loader2, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -73,15 +73,16 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
   const [conflictMessage, setConflictMessage] = useState<string>('');
   const [studentTeacherId, setStudentTeacherId] = useState<string>('');
 
-  // Get school ID from localStorage
-  const getSchoolId = () => {
+  // Get user data from localStorage
+  const getUserData = () => {
     const userData = localStorage.getItem('user');
     if (!userData) return null;
-    const user = JSON.parse(userData);
-    return user.schoolId;
+    return JSON.parse(userData);
   };
 
-  const schoolId = getSchoolId();
+  const userData = getUserData();
+  const schoolId = userData?.schoolId;
+  const isAdmin = userData?.role === 'admin';
 
   // Fetch student details to get teacher ID
   const { data: studentData } = useQuery({
@@ -202,29 +203,63 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     }
   }, [currencies]);
 
-  // Clear validation error when form fields change
+  // Clear validation error when dialog closes
   useEffect(() => {
-    if (validationError) {
+    if (!open) {
       setValidationError('');
+      setIsValidating(false);
     }
-  }, [formData.startDate, formData.schedule]);
+  }, [open]);
 
-  // Validate teacher schedule when schedule or date changes
+  // Use a ref to track validation state without causing re-renders
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const validationInProgressRef = useRef(false);
+
+  // Create a stable schedule key for comparison
+  const scheduleKey = useMemo(() => {
+    return formData.schedule
+      .map(s => `${s.day}-${s.time}`)
+      .join('|');
+  }, [formData.schedule]);
+
+  // Automatic validation with proper debouncing
   useEffect(() => {
-    const validateSchedule = async () => {
-      if (!formData.startDate || !formData.schedule.length || !studentTeacherId) {
-        return;
-      }
+    // Clear any existing timeout
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+      validationTimeoutRef.current = null;
+    }
 
-      // Check if all schedule items are complete
-      const incompleteSchedules = formData.schedule.some(s => !s.day || !s.time);
-      if (incompleteSchedules) {
-        return;
-      }
-
-      setIsValidating(true);
+    // Skip if no teacher or incomplete data
+    if (!studentTeacherId || !formData.startDate || formData.schedule.length === 0) {
+      setIsValidating(false);
       setValidationError('');
+      validationInProgressRef.current = false;
+      return;
+    }
 
+    // Check if all schedule items are complete
+    const incompleteSchedules = formData.schedule.some(s => !s.day || !s.time);
+    if (incompleteSchedules) {
+      setIsValidating(false);
+      setValidationError('');
+      validationInProgressRef.current = false;
+      return;
+    }
+
+    // Show validating state
+    setIsValidating(true);
+    setValidationError('');
+
+    // Set up debounced validation
+    validationTimeoutRef.current = setTimeout(async () => {
+      // Skip if already validating
+      if (validationInProgressRef.current) {
+        return;
+      }
+      
+      validationInProgressRef.current = true;
+      
       try {
         const dateStr = format(formData.startDate, 'yyyy-MM-dd');
         
@@ -249,7 +284,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
             date: dateStr,
             startTime: timeIn24Hour,
             durationMinutes: parseInt(formData.sessionDuration) || 60
-          });
+          }, isAdmin);
 
           if (result.hasConflict && result.conflictMessage) {
             setValidationError(result.conflictMessage);
@@ -258,15 +293,21 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
         }
       } catch (error) {
         console.error('Error validating schedule:', error);
+        setValidationError('');
       } finally {
         setIsValidating(false);
+        validationInProgressRef.current = false;
+      }
+    }, 1500); // Wait 1.5 seconds after last change before validating
+
+    // Cleanup function
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+        validationTimeoutRef.current = null;
       }
     };
-
-    // Debounce validation to avoid too many API calls
-    const timeoutId = setTimeout(validateSchedule, 500);
-    return () => clearTimeout(timeoutId);
-  }, [formData.startDate, formData.schedule, studentTeacherId]);
+  }, [formData.startDate, scheduleKey, studentTeacherId, formData.sessionDuration, isAdmin]);
 
   const addScheduleItem = () => {
     setFormData({
@@ -351,54 +392,21 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       return;
     }
 
-    // Final validation before submission
-    if (studentTeacherId) {
-      setIsValidating(true);
-      
-      try {
-        const dateStr = format(formData.startDate, 'yyyy-MM-dd');
-        
-        for (const scheduleItem of formData.schedule) {
-          // Convert 12-hour format to 24-hour format if needed
-          let timeIn24Hour = scheduleItem.time;
-          if (scheduleItem.time.includes('AM') || scheduleItem.time.includes('PM')) {
-            const [time, modifier] = scheduleItem.time.split(' ');
-            let [hours, minutes] = time.split(':');
-            if (hours === '12') {
-              hours = '00';
-            }
-            if (modifier === 'PM') {
-              hours = (parseInt(hours, 10) + 12).toString();
-            }
-            timeIn24Hour = `${hours.toString().padStart(2, '0')}:${minutes}`;
-          }
+    // Check if there's a validation error
+    if (validationError) {
+      setConflictMessage(validationError);
+      setShowConflictDialog(true);
+      return;
+    }
 
-          const result = await validateTeacherScheduleOverlap({
-            teacherId: studentTeacherId,
-            date: dateStr,
-            startTime: timeIn24Hour,
-            durationMinutes: parseInt(formData.sessionDuration) || 60
-          });
-
-          if (result.hasConflict && result.conflictMessage) {
-            setConflictMessage(result.conflictMessage);
-            setShowConflictDialog(true);
-            setIsValidating(false);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Error validating schedule:', error);
-        toast({
-          title: "Error",
-          description: "Failed to validate schedule. Please try again.",
-          variant: "destructive",
-        });
-        setIsValidating(false);
-        return;
-      }
-      
-      setIsValidating(false);
+    // Wait for any ongoing validation to complete
+    if (isValidating) {
+      toast({
+        title: "Please wait",
+        description: "Checking teacher availability...",
+        variant: "default",
+      });
+      return;
     }
 
     const subscriptionData = {
@@ -582,22 +590,22 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                 ))}
               </div>
 
-              {/* Validation Error Alert */}
-              {validationError && (
-                <Alert variant="destructive" className="border-red-200 bg-red-50">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-red-800 font-medium">
-                    {validationError}
+              {/* Validation Loading */}
+              {isValidating && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Clock className="h-4 w-4 animate-spin" />
+                  <AlertDescription className="text-blue-800">
+                    Checking teacher availability...
                   </AlertDescription>
                 </Alert>
               )}
 
-              {/* Validation Loading */}
-              {isValidating && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <Clock className="h-4 w-4" />
-                  <AlertDescription className="text-blue-800">
-                    Checking teacher availability...
+              {/* Validation Error Alert */}
+              {validationError && !isValidating && (
+                <Alert variant="destructive" className="border-red-200 bg-red-50">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-red-800 font-medium">
+                    {validationError}
                   </AlertDescription>
                 </Alert>
               )}
