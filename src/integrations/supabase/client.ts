@@ -752,6 +752,7 @@ export const createStudent = async (studentData: {
       const authStudentData: any = {
         firstName: studentData.first_name,  // Add firstName to student document
         lastName: studentData.last_name,    // Add lastName to student document
+        email: studentData.student_email,   // Add email to student document
         teacherId: studentData.teacher_id,
         courseId: studentData.course_id,
         courseName: studentData.course_name,
@@ -819,6 +820,9 @@ export const createStudent = async (studentData: {
       };
       
       // Add optional fields
+      if (studentData.student_email) {
+        studentRecord.email = studentData.student_email;
+      }
       if (studentData.phone) {
         studentRecord.phone = studentData.phone;
       }
