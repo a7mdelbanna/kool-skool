@@ -11,6 +11,7 @@ import {
 } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTeachers } from "./useTeachers";
+import { databaseService } from "@/services/firebase/database.service";
 
 export const useStudentForm = (
   student: Student | null | undefined,
@@ -590,13 +591,67 @@ export const useStudentForm = (
         
         // Call onStudentAdded with updated data to refresh the list
         if (onStudentAdded) {
-          const updatedStudent: Student = {
-            ...student,
-            ...studentData,
-            phone: updatePayload.phone, // Use the formatted phone from the payload
-            countryCode: updatePayload.country_code || studentData.countryCode  // Use snake_case field
-          };
-          onStudentAdded(updatedStudent);
+          // Fetch the updated student data from Firebase to ensure we have the latest data
+          // This is important because the update might have changed fields we don't track locally
+          try {
+            const updatedStudentData = await databaseService.getById('students', student.id);
+            console.log('[useStudentForm] Fetched updated student data:', updatedStudentData);
+            
+            if (updatedStudentData) {
+              // Format the student data properly for the StudentCard component
+              const updatedStudent: Student = {
+                id: updatedStudentData.id,
+                firstName: updatedStudentData.firstName || updatedStudentData.first_name || '',
+                lastName: updatedStudentData.lastName || updatedStudentData.last_name || '',
+                email: updatedStudentData.email || updatedStudentData.student_email || '',
+                lessonType: updatedStudentData.lessonType || updatedStudentData.lesson_type || 'individual',
+                ageGroup: (updatedStudentData.ageGroup || updatedStudentData.age_group || 'adult').toLowerCase() as 'adult' | 'kid',
+                courseName: updatedStudentData.courseName || updatedStudentData.course_name || '',
+                level: updatedStudentData.level || '',
+                paymentStatus: updatedStudentData.paymentStatus || updatedStudentData.payment_status || 'pending',
+                teacherId: updatedStudentData.teacherId || updatedStudentData.teacher_id || '',
+                phone: updatedStudentData.phone || '',
+                countryCode: updatedStudentData.countryCode || updatedStudentData.country_code || '+7',
+                parentInfo: updatedStudentData.parentInfo || updatedStudentData.parent_info || null,
+                socialLinks: updatedStudentData.socialLinks || updatedStudentData.social_links || null,
+                birthday: updatedStudentData.birthday || null,
+                teacherPreference: updatedStudentData.teacherPreference || updatedStudentData.teacher_preference || null,
+                additionalNotes: updatedStudentData.additionalNotes || updatedStudentData.additional_notes || null,
+                interests: updatedStudentData.interests || null,
+                image: updatedStudentData.image || null,
+                income_category_id: updatedStudentData.income_category_id || null,
+                status: updatedStudentData.status || 'active',
+                subscriptionProgress: updatedStudentData.subscriptionProgress || updatedStudentData.subscription_progress || 0,
+                nextSessionDate: updatedStudentData.nextSessionDate || updatedStudentData.next_session_date || null,
+                completedSessions: updatedStudentData.completedSessions || updatedStudentData.completed_sessions || 0,
+                nextPaymentDue: updatedStudentData.nextPaymentDue || updatedStudentData.next_payment_due || null,
+                nextPaymentAmount: updatedStudentData.nextPaymentAmount || updatedStudentData.next_payment_amount || null,
+                nextPaymentCurrency: updatedStudentData.nextPaymentCurrency || updatedStudentData.next_payment_currency || null
+              };
+              
+              console.log('[useStudentForm] Calling onStudentAdded with:', updatedStudent);
+              onStudentAdded(updatedStudent);
+            } else {
+              // Fallback to local data if fetch fails
+              const updatedStudent: Student = {
+                ...student,
+                ...studentData,
+                phone: updatePayload.phone, // Use the formatted phone from the payload
+                countryCode: updatePayload.country_code || studentData.countryCode  // Use snake_case field
+              };
+              onStudentAdded(updatedStudent);
+            }
+          } catch (fetchError) {
+            console.error('[useStudentForm] Error fetching updated student:', fetchError);
+            // Fallback to local data if fetch fails
+            const updatedStudent: Student = {
+              ...student,
+              ...studentData,
+              phone: updatePayload.phone, // Use the formatted phone from the payload
+              countryCode: updatePayload.country_code || studentData.countryCode  // Use snake_case field
+            };
+            onStudentAdded(updatedStudent);
+          }
         }
       } else {
         const userData = getUserData();
