@@ -187,6 +187,7 @@ const StudentDashboard = () => {
         
         // Calculate subscription progress from active subscription
         let progressText = '0/0';
+        let progressPercentage = 0;
         const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
         
         if (activeSubscription) {
