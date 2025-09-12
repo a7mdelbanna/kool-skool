@@ -473,9 +473,9 @@ export const useStudentForm = (
           // User fields (will be updated in users collection)
           first_name: studentData.firstName,
           last_name: studentData.lastName,
-          // Student fields (will be updated in students collection)
-          lessonType: studentData.lessonType || 'individual',
-          ageGroup: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
+          // Student fields (will be updated in students collection) - use snake_case
+          lesson_type: studentData.lessonType || 'individual',
+          age_group: studentData.ageGroup === 'adult' ? 'Adult' : 'Kid',
         };
         
         // Only add these fields if they have values (for bulk-uploaded students they might be empty)
@@ -483,13 +483,13 @@ export const useStudentForm = (
           updatePayload.email = studentData.email;
         }
         if (studentData.courseName) {
-          updatePayload.courseName = studentData.courseName;
+          updatePayload.course_name = studentData.courseName;  // Use snake_case
         }
         if (studentData.level) {
           updatePayload.level = studentData.level;
         }
         if (studentData.teacherId) {
-          updatePayload.teacherId = studentData.teacherId;
+          updatePayload.teacher_id = studentData.teacherId;  // Use snake_case
         }
         
         console.log('[useStudentForm] Initial update payload:', updatePayload);
@@ -510,7 +510,7 @@ export const useStudentForm = (
         }
         // Store country code separately for UI display
         if (studentData.countryCode) {
-          updatePayload.countryCode = studentData.countryCode;
+          updatePayload.country_code = studentData.countryCode;  // Use snake_case
         }
         
         console.log('[useStudentForm] Final update payload before sending:', updatePayload);
@@ -532,26 +532,26 @@ export const useStudentForm = (
             }
           }
           
-          updatePayload.parentInfo = processedParentInfo;
+          updatePayload.parent_info = processedParentInfo;  // Use snake_case
           console.log('[useStudentForm] Adding parent info to payload:', processedParentInfo);
-        } else if (studentData.ageGroup === 'adult' || updatePayload.ageGroup === 'Adult') {
-          // Explicitly set parentInfo to null for adults to ensure clean data
-          updatePayload.parentInfo = null;
+        } else if (studentData.ageGroup === 'adult' || updatePayload.age_group === 'Adult') {
+          // Explicitly set parent_info to null for adults to ensure clean data
+          updatePayload.parent_info = null;  // Use snake_case
           console.log('[useStudentForm] Setting parent info to null for adult student');
         }
         
-        // Add additional info fields using camelCase
+        // Add additional info fields using snake_case for Firebase
         if (studentData.socialLinks) {
-          updatePayload.socialLinks = studentData.socialLinks;
+          updatePayload.social_links = studentData.socialLinks;  // Use snake_case
         }
         if (studentData.birthday) {
           updatePayload.birthday = studentData.birthday;
         }
         if (studentData.teacherPreference) {
-          updatePayload.teacherPreference = studentData.teacherPreference;
+          updatePayload.teacher_preference = studentData.teacherPreference;  // Use snake_case
         }
         if (studentData.additionalNotes) {
-          updatePayload.additionalNotes = studentData.additionalNotes;
+          updatePayload.additional_notes = studentData.additionalNotes;  // Use snake_case
         }
         if (studentData.interests) {
           updatePayload.interests = studentData.interests;
@@ -594,7 +594,7 @@ export const useStudentForm = (
             ...student,
             ...studentData,
             phone: updatePayload.phone, // Use the formatted phone from the payload
-            countryCode: updatePayload.countryCode || studentData.countryCode
+            countryCode: updatePayload.country_code || studentData.countryCode  // Use snake_case field
           };
           onStudentAdded(updatedStudent);
         }
