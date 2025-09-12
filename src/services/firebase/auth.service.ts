@@ -522,17 +522,19 @@ class AuthService {
 
         console.log('Student auth account created successfully');
       } catch (authError: any) {
-        console.error('Error creating Firebase Auth account:', authError);
-        // If auth creation fails (e.g., email already exists), try to link the existing account
-        if (authError.code === 'auth/email-already-in-use') {
+        // If auth creation fails (e.g., email already exists), it might mean the account already exists
+        if (authError.code === 'auth/email-already-in-use' || authError.message?.includes('email-already-in-use')) {
           // Just update the document to indicate account exists
           await updateDoc(doc(db, 'users', studentId), {
             needsAuthAccount: false,
             tempPassword: null,
             updatedAt: serverTimestamp()
           });
-          console.log('Email already has an auth account, updated student record');
+          console.log(`✓ Student ${studentData.firstName} ${studentData.lastName} already has an auth account, updated record`);
+          // Don't throw error - this is actually a success case
+          return;
         } else {
+          console.error('Error creating Firebase Auth account:', authError);
           throw authError;
         }
       }

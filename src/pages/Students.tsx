@@ -905,8 +905,12 @@ const Students = () => {
       }
       
       if (results.failed > 0) {
-        console.error('Failed accounts:', results.errors);
-        toast.error(`Failed to create accounts for ${results.failed} student${results.failed > 1 ? 's' : ''}. Check console for details.`);
+        // Check if all failures are because accounts already exist
+        const realFailures = results.errors.filter(err => !err.includes('email-already-in-use'));
+        if (realFailures.length > 0) {
+          console.error('Failed accounts:', realFailures);
+          toast.error(`Failed to create accounts for ${realFailures.length} student${realFailures.length > 1 ? 's' : ''}. Check console for details.`);
+        }
       }
       
       if (results.success === 0 && results.failed === 0) {
