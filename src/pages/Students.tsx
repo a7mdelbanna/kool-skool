@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
-import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, Upload, LayoutGrid, List } from 'lucide-react';
+import { PlusCircle, Search, Filter, CheckCircle, X, ChevronDown, Plus, Upload, LayoutGrid, List, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { authService } from '@/services/firebase/auth.service';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -879,6 +880,50 @@ const Students = () => {
     });
   };
   
+  const handleFixStudentAuth = async () => {
+    if (!user?.schoolId) {
+      toast.error('School ID not found');
+      return;
+    }
+    
+    const confirmed = window.confirm(
+      'This will create Firebase Auth accounts for all students who have email addresses but no auth accounts. Continue?'
+    );
+    
+    if (!confirmed) return;
+    
+    setIsLoading(true);
+    toast.loading('Creating auth accounts for students...');
+    
+    try {
+      const results = await authService.createAuthAccountsForAllStudents(user.schoolId);
+      
+      toast.dismiss();
+      
+      if (results.success > 0) {
+        toast.success(`Created auth accounts for ${results.success} student${results.success > 1 ? 's' : ''}`);
+      }
+      
+      if (results.failed > 0) {
+        console.error('Failed accounts:', results.errors);
+        toast.error(`Failed to create accounts for ${results.failed} student${results.failed > 1 ? 's' : ''}. Check console for details.`);
+      }
+      
+      if (results.success === 0 && results.failed === 0) {
+        toast.info('All students already have auth accounts or no email addresses');
+      }
+      
+      // Refresh the students list
+      await refetchStudents();
+    } catch (error: any) {
+      console.error('Error fixing student auth:', error);
+      toast.dismiss();
+      toast.error(`Error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   const filteredStudents = filterStudents();
   
   return (
@@ -908,6 +953,15 @@ const Students = () => {
             >
               <Upload className="h-4 w-4" />
               <span>Bulk Upload</span>
+            </Button>
+            <Button 
+              className="gap-2 shrink-0" 
+              variant="outline"
+              onClick={handleFixStudentAuth}
+              title="Create auth accounts for students with emails"
+            >
+              <Key className="h-4 w-4" />
+              <span className="hidden sm:inline">Fix Auth</span>
             </Button>
             <Button 
               className="gap-2 shrink-0" 
