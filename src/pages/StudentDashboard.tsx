@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserContext } from '@/App';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle, Settings, Globe } from 'lucide-react';
+import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle, Settings, Globe, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { databaseService } from '@/services/firebase/database.service';
 import { format } from 'date-fns';
@@ -20,6 +20,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface StudentData {
   id: string;
@@ -64,6 +74,8 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
+  const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   // Force re-render when user timezone changes
   const currentUserTimezone = getEffectiveTimezone(user?.timezone);
@@ -356,6 +368,44 @@ const StudentDashboard = () => {
     navigate('/student-login');
   };
 
+  const handleCancellationRequest = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    setCancellationDialogOpen(true);
+  };
+
+  const confirmCancellation = async () => {
+    if (!selectedSessionId) return;
+    
+    try {
+      // Update session status to cancellation_requested
+      await databaseService.update('lesson_sessions', selectedSessionId, {
+        status: 'cancellation_requested',
+        cancellation_requested_at: new Date().toISOString(),
+        cancellation_reason: 'Student requested cancellation',
+        updatedAt: new Date().toISOString()
+      });
+      
+      toast.success('Cancellation request sent to your teacher');
+      
+      // Refresh sessions
+      if (studentData) {
+        await fetchSessions(studentData.id);
+      }
+    } catch (error) {
+      console.error('Error requesting cancellation:', error);
+      toast.error('Failed to request cancellation');
+    } finally {
+      setCancellationDialogOpen(false);
+      setSelectedSessionId(null);
+    }
+  };
+
+  const handleMakePayment = (subscriptionId: string) => {
+    // Navigate to payment page or open payment modal
+    toast.info('Payment feature coming soon!');
+    // TODO: Implement payment integration
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
@@ -585,6 +635,16 @@ const StudentDashboard = () => {
                           {subscription.session_count || subscription.sessionCount || 0}
                         </span>
                       </div>
+                      {subscription.status === 'active' && (subscription.payment_status === 'pending' || subscription.payment_status === 'partial') && (
+                        <Button 
+                          className="w-full mt-3" 
+                          variant="default"
+                          onClick={() => handleMakePayment(subscription.id)}
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Make Payment
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -622,7 +682,20 @@ const StudentDashboard = () => {
                             /> • {session.duration_minutes} min
                           </p>
                         </div>
-                        {getStatusBadge(session.status)}
+                        <div className="flex flex-col gap-2 items-end">
+                          {getStatusBadge(session.status)}
+                          {session.status === 'scheduled' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleCancellationRequest(session.id)}
+                              className="text-xs"
+                            >
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       {session.notes && (
                         <p className="text-xs text-gray-500 mt-2">{session.notes}</p>
@@ -663,7 +736,20 @@ const StudentDashboard = () => {
                             /> • {session.duration_minutes} min
                           </p>
                         </div>
-                        {getStatusBadge(session.status)}
+                        <div className="flex flex-col gap-2 items-end">
+                          {getStatusBadge(session.status)}
+                          {session.status === 'scheduled' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleCancellationRequest(session.id)}
+                              className="text-xs"
+                            >
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       {session.notes && (
                         <p className="text-xs text-gray-500 mt-2">{session.notes}</p>
@@ -695,6 +781,25 @@ const StudentDashboard = () => {
           </Card>
         </div>
       </div>
+
+      {/* Cancellation Confirmation Dialog */}
+      <AlertDialog open={cancellationDialogOpen} onOpenChange={setCancellationDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request Session Cancellation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will send a cancellation request to your teacher. The teacher will review and confirm the cancellation.
+              Please note that cancellation policies may apply based on your agreement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Session</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancellation}>
+              Send Cancellation Request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
