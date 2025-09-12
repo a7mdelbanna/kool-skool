@@ -113,7 +113,7 @@ const StudentLogin = () => {
       
       toast({
         title: "Welcome back!",
-        description: `Hello, ${result.first_name}! You're now logged in.`,
+        description: `Hello, ${userProfile.firstName}! You're now logged in.`,
       });
       
       console.log("✅ Redirecting to dashboard...");
