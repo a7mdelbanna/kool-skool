@@ -11,7 +11,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, updateDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import { auth, db, getUserClaims } from '@/config/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/config/firebase';
@@ -265,41 +265,77 @@ class AuthService {
     try {
       let uid: string;
       
-      // For now, always create students without Firebase Auth to avoid logout issues
-      // Students can be given auth accounts later when they need to log in
-      
-      // Generate a unique ID for the student
-      uid = doc(collection(db, 'users')).id;
-      
-      // Create user document in Firestore
-      const userDocument: any = {
-        uid,
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        role: userData.role || 'student',
-        schoolId: userData.schoolId,
-        timezone: userData.timezone || 'UTC',
-        isActive: true,
-        needsAuthAccount: true,
-        metadata: {
-          lastLogin: null,
-          loginCount: 0
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-      
-      // Only add optional fields if they have values
-      if (userData.phoneNumber) {
-        userDocument.phoneNumber = userData.phoneNumber;
+      // If email and password are provided, create a proper Firebase Auth account
+      if (userData.email && userData.password) {
+        try {
+          // Use the workaround to create user without signing out current admin
+          uid = await createUserWithAuth(userData);
+          console.log('Created student with Firebase Auth account:', uid);
+        } catch (authError) {
+          console.error('Error creating Firebase Auth account:', authError);
+          // Fall back to creating without auth if the workaround fails
+          uid = doc(collection(db, 'users')).id;
+          
+          // Create user document in Firestore without auth
+          const userDocument: any = {
+            uid,
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            role: userData.role || 'student',
+            schoolId: userData.schoolId,
+            timezone: userData.timezone || 'UTC',
+            isActive: true,
+            needsAuthAccount: true,
+            tempPassword: userData.password,
+            metadata: {
+              lastLogin: null,
+              loginCount: 0
+            },
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+          
+          if (userData.phoneNumber) {
+            userDocument.phoneNumber = userData.phoneNumber;
+          }
+          
+          await setDoc(doc(db, 'users', uid), userDocument);
+        }
+      } else {
+        // For students without email (e.g., kids), create without Firebase Auth
+        uid = doc(collection(db, 'users')).id;
+        
+        // Create user document in Firestore
+        const userDocument: any = {
+          uid,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          role: userData.role || 'student',
+          schoolId: userData.schoolId,
+          timezone: userData.timezone || 'UTC',
+          isActive: true,
+          needsAuthAccount: !userData.email, // Only need auth account if no email provided
+          metadata: {
+            lastLogin: null,
+            loginCount: 0
+          },
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        
+        // Only add optional fields if they have values
+        if (userData.phoneNumber) {
+          userDocument.phoneNumber = userData.phoneNumber;
+        }
+        
+        if (userData.password && !userData.email) {
+          userDocument.tempPassword = userData.password;
+        }
+        
+        await setDoc(doc(db, 'users', uid), userDocument);
       }
-      
-      if (userData.password) {
-        userDocument.tempPassword = userData.password;
-      }
-      
-      await setDoc(doc(db, 'users', uid), userDocument);
 
       // Create student profile
       // Clean the studentData to remove undefined values
@@ -434,7 +470,7 @@ class AuthService {
   }
 
   // Create Firebase Auth account for existing student (Admin only)
-  async createAuthAccountForStudent(studentId: string): Promise<void> {
+  async createAuthAccountForStudent(studentId: string, password?: string): Promise<void> {
     try {
       // Get student document
       const studentDoc = await getDoc(doc(db, 'users', studentId));
@@ -443,21 +479,105 @@ class AuthService {
       }
 
       const studentData = studentDoc.data();
+      
+      // Check if student already has an auth account
       if (!studentData.needsAuthAccount) {
-        throw new Error('Student already has an auth account');
+        console.log('Student already has an auth account');
+        return;
       }
 
-      // Use cloud function to create auth account if available
-      // For now, we'll just mark that the account needs to be created manually
-      
-      // Update the document to mark auth account as created
-      await updateDoc(doc(db, 'users', studentId), {
-        needsAuthAccount: false,
-        tempPassword: null, // Clear the temporary password
-        updatedAt: serverTimestamp()
-      });
+      // Check if student has email
+      if (!studentData.email) {
+        throw new Error('Student does not have an email address');
+      }
+
+      // Use provided password or temp password from database
+      const userPassword = password || studentData.tempPassword;
+      if (!userPassword) {
+        throw new Error('No password available for student');
+      }
+
+      try {
+        // Create Firebase Auth account using the workaround
+        const uid = await createUserWithAuth({
+          email: studentData.email,
+          password: userPassword,
+          firstName: studentData.firstName,
+          lastName: studentData.lastName,
+          role: studentData.role || 'student',
+          schoolId: studentData.schoolId,
+          phoneNumber: studentData.phoneNumber,
+          timezone: studentData.timezone
+        });
+
+        console.log('Created Firebase Auth account for student:', uid);
+
+        // Update the document to mark auth account as created
+        await updateDoc(doc(db, 'users', studentId), {
+          needsAuthAccount: false,
+          tempPassword: null, // Clear the temporary password for security
+          uid: uid, // Update UID if it changed
+          updatedAt: serverTimestamp()
+        });
+
+        console.log('Student auth account created successfully');
+      } catch (authError: any) {
+        console.error('Error creating Firebase Auth account:', authError);
+        // If auth creation fails (e.g., email already exists), try to link the existing account
+        if (authError.code === 'auth/email-already-in-use') {
+          // Just update the document to indicate account exists
+          await updateDoc(doc(db, 'users', studentId), {
+            needsAuthAccount: false,
+            tempPassword: null,
+            updatedAt: serverTimestamp()
+          });
+          console.log('Email already has an auth account, updated student record');
+        } else {
+          throw authError;
+        }
+      }
     } catch (error: any) {
       throw new Error(error.message || 'Failed to create auth account for student');
+    }
+  }
+  
+  // Batch create Firebase Auth accounts for all students missing them (Admin only)
+  async createAuthAccountsForAllStudents(schoolId: string): Promise<{ success: number; failed: number; errors: string[] }> {
+    const results = { success: 0, failed: 0, errors: [] as string[] };
+    
+    try {
+      // Query all students in the school who need auth accounts
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('schoolId', '==', schoolId),
+        where('role', '==', 'student'),
+        where('needsAuthAccount', '==', true)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`Found ${querySnapshot.size} students needing auth accounts`);
+      
+      for (const doc of querySnapshot.docs) {
+        const studentData = doc.data();
+        const studentId = doc.id;
+        
+        try {
+          console.log(`Creating auth account for ${studentData.firstName} ${studentData.lastName}`);
+          await this.createAuthAccountForStudent(studentId);
+          results.success++;
+        } catch (error: any) {
+          console.error(`Failed to create auth for student ${studentId}:`, error);
+          results.failed++;
+          results.errors.push(`${studentData.firstName} ${studentData.lastName}: ${error.message}`);
+        }
+      }
+      
+      console.log(`Auth account creation complete. Success: ${results.success}, Failed: ${results.failed}`);
+      return results;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to create auth accounts for students');
     }
   }
 
