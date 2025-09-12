@@ -7,7 +7,7 @@ import { UserContext } from '@/App';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle, Settings, Globe } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 import { format } from 'date-fns';
 import { formatInUserTimezone, getEffectiveTimezone, getBrowserTimezone } from '@/utils/timezone';
 import TimezoneSelector from '@/components/TimezoneSelector';
@@ -94,40 +94,84 @@ const StudentDashboard = () => {
       console.log('User ID:', user.id);
       console.log('School ID:', user.schoolId);
       
-      // First, get the student record to get the student ID
-      const { data: students, error: studentsError } = await supabase
-        .from('students')
-        .select(`
-          id,
-          school_id,
-          user_id,
-          course_id,
-          teacher_id,
-          age_group,
-          level,
-          phone,
-          next_payment_date,
-          next_payment_amount,
-          courses:course_id (
-            name,
-            lesson_type
-          ),
-          users!students_teacher_id_fkey (
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('user_id', user.id)
-        .single();
+      // First, get the student record by checking both userId and id fields
+      // The student document ID might be the same as the user ID, or it might have a userId field
+      let studentDoc = null;
       
-      if (studentsError) {
-        console.error('Error fetching student:', studentsError);
-        toast.error('Failed to load student data');
+      // First try to get student by document ID matching user ID
+      try {
+        studentDoc = await databaseService.getById('students', user.id);
+        console.log('Found student by document ID:', studentDoc);
+      } catch (error) {
+        console.log('Student not found by document ID, trying by userId field...');
+      }
+      
+      // If not found, query by userId field
+      if (!studentDoc) {
+        const studentsQuery = await databaseService.query('students', {
+          where: [{ field: 'userId', operator: '==', value: user.id }]
+        });
+        
+        if (studentsQuery && studentsQuery.length > 0) {
+          studentDoc = studentsQuery[0];
+          console.log('Found student by userId field:', studentDoc);
+        }
+      }
+      
+      // If still not found, query by user_id field (for backward compatibility)
+      if (!studentDoc) {
+        const studentsQuery = await databaseService.query('students', {
+          where: [{ field: 'user_id', operator: '==', value: user.id }]
+        });
+        
+        if (studentsQuery && studentsQuery.length > 0) {
+          studentDoc = studentsQuery[0];
+          console.log('Found student by user_id field:', studentDoc);
+        }
+      }
+      
+      if (!studentDoc) {
+        console.error('No student record found for user:', user.id);
+        toast.error('Student profile not found. Please contact your administrator.');
         return;
       }
       
-      console.log('Student data:', students);
+      console.log('Student data:', studentDoc);
+      
+      // Fetch teacher data if teacher ID exists
+      let teacherData = null;
+      if (studentDoc.teacherId || studentDoc.teacher_id) {
+        const teacherId = studentDoc.teacherId || studentDoc.teacher_id;
+        try {
+          teacherData = await databaseService.getById('users', teacherId);
+          console.log('Teacher data:', teacherData);
+        } catch (error) {
+          console.error('Error fetching teacher:', error);
+        }
+      }
+      
+      // Format the student data to match the expected structure
+      const students = {
+        id: studentDoc.id,
+        school_id: studentDoc.schoolId || studentDoc.school_id,
+        user_id: studentDoc.userId || studentDoc.user_id || user.id,
+        course_id: studentDoc.courseId || studentDoc.course_id,
+        teacher_id: studentDoc.teacherId || studentDoc.teacher_id,
+        age_group: studentDoc.ageGroup || studentDoc.age_group,
+        level: studentDoc.level,
+        phone: studentDoc.phone,
+        next_payment_date: studentDoc.nextPaymentDate || studentDoc.next_payment_date,
+        next_payment_amount: studentDoc.nextPaymentAmount || studentDoc.next_payment_amount,
+        courses: {
+          name: studentDoc.courseName || studentDoc.course_name,
+          lesson_type: studentDoc.lessonType || studentDoc.lesson_type
+        },
+        users: teacherData ? {
+          first_name: teacherData.firstName || teacherData.first_name,
+          last_name: teacherData.lastName || teacherData.last_name,
+          email: teacherData.email
+        } : null
+      };
       
       if (students) {
         // Fetch subscriptions for this student to get progress info
@@ -191,15 +235,25 @@ const StudentDashboard = () => {
       console.log('=== FETCHING SUBSCRIPTIONS ===');
       console.log('Student ID:', studentId);
       
-      const { data: subscriptionsData, error: subscriptionsError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
+      // Query subscriptions by student_id or studentId field
+      let subscriptionsData = await databaseService.query('subscriptions', {
+        where: [{ field: 'student_id', operator: '==', value: studentId }]
+      });
       
-      if (subscriptionsError) {
-        console.error('Error fetching subscriptions:', subscriptionsError);
-        return [];
+      // If no results, try with camelCase field name
+      if (!subscriptionsData || subscriptionsData.length === 0) {
+        subscriptionsData = await databaseService.query('subscriptions', {
+          where: [{ field: 'studentId', operator: '==', value: studentId }]
+        });
+      }
+      
+      // Sort by created_at descending
+      if (subscriptionsData && subscriptionsData.length > 0) {
+        subscriptionsData.sort((a: any, b: any) => {
+          const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
+          const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
+          return dateB - dateA; // Descending order
+        });
       }
       
       console.log('Subscriptions data:', subscriptionsData);
@@ -217,15 +271,25 @@ const StudentDashboard = () => {
       console.log('=== FETCHING SESSIONS ===');
       console.log('Student ID:', studentId);
       
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('lesson_sessions')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('scheduled_date', { ascending: true });
+      // Query sessions by student_id or studentId field
+      let sessionsData = await databaseService.query('lesson_sessions', {
+        where: [{ field: 'student_id', operator: '==', value: studentId }]
+      });
       
-      if (sessionsError) {
-        console.error('Error fetching sessions:', sessionsError);
-        return [];
+      // If no results, try with camelCase field name
+      if (!sessionsData || sessionsData.length === 0) {
+        sessionsData = await databaseService.query('lesson_sessions', {
+          where: [{ field: 'studentId', operator: '==', value: studentId }]
+        });
+      }
+      
+      // Sort by scheduled_date ascending
+      if (sessionsData && sessionsData.length > 0) {
+        sessionsData.sort((a: any, b: any) => {
+          const dateA = new Date(a.scheduled_date || a.scheduledDate || 0).getTime();
+          const dateB = new Date(b.scheduled_date || b.scheduledDate || 0).getTime();
+          return dateA - dateB; // Ascending order
+        });
       }
       
       console.log('Sessions data:', sessionsData);
