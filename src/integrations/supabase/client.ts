@@ -750,6 +750,8 @@ export const createStudent = async (studentData: {
     if (studentData.student_email && studentData.student_password) {
       // Build the student data object conditionally
       const authStudentData: any = {
+        firstName: studentData.first_name,  // Add firstName to student document
+        lastName: studentData.last_name,    // Add lastName to student document
         teacherId: studentData.teacher_id,
         courseId: studentData.course_id,
         courseName: studentData.course_name,
@@ -766,6 +768,16 @@ export const createStudent = async (studentData: {
       // Add phone if provided
       if (studentData.phone) {
         authStudentData.phone = studentData.phone;
+      }
+      
+      // Add country code if provided
+      if (studentData.countryCode) {
+        authStudentData.countryCode = studentData.countryCode;
+      }
+      
+      // Add income category if provided
+      if (studentData.income_category_id) {
+        authStudentData.income_category_id = studentData.income_category_id;
       }
       
       console.log('[createStudent] Calling authService.createStudent with:', authStudentData);
