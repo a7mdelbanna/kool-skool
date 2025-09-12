@@ -191,7 +191,8 @@ const StudentDashboard = () => {
         
         if (activeSubscription) {
           console.log('Active subscription found:', activeSubscription);
-          console.log('Total sessions in subscription:', activeSubscription.session_count);
+          const totalSessions = activeSubscription.session_count || activeSubscription.sessionCount || 0;
+          console.log('Total sessions in subscription:', totalSessions);
           
           // Count sessions that are marked as completed or cancelled for this specific subscription
           const completedSessions = sessionsData.filter(session => 
@@ -199,7 +200,8 @@ const StudentDashboard = () => {
           ).length;
           
           console.log('Completed/cancelled sessions:', completedSessions);
-          progressText = `${completedSessions}/${activeSubscription.session_count}`;
+          progressText = `${completedSessions}/${totalSessions}`;
+          progressPercentage = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
         } else {
           console.log('No active subscription found');
         }
@@ -555,15 +557,15 @@ const StudentDashboard = () => {
                 <Card key={subscription.id}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span>{subscription.session_count} Sessions - {subscription.duration_months} Month(s)</span>
-                      <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
-                        {subscription.status}
+                      <span>{subscription.session_count || subscription.sessionCount || 0} Sessions - {subscription.duration_months || subscription.durationMonths || 0} Month(s)</span>
+                      <Badge variant={(subscription.status || 'pending') === 'active' ? 'default' : 'secondary'}>
+                        {subscription.status || 'pending'}
                       </Badge>
                     </CardTitle>
                     <CardDescription>
-                      Start Date: <SessionTimeDisplay date={subscription.start_date} showTime={false} key={`sub-start-${subscription.id}-${userTimezone}`} />
-                      {subscription.end_date && (
-                        <span> - End Date: <SessionTimeDisplay date={subscription.end_date} showTime={false} key={`sub-end-${subscription.id}-${userTimezone}`} /></span>
+                      Start Date: <SessionTimeDisplay date={subscription.start_date || subscription.startDate} showTime={false} key={`sub-start-${subscription.id}-${userTimezone}`} />
+                      {(subscription.end_date || subscription.endDate) && (
+                        <span> - End Date: <SessionTimeDisplay date={subscription.end_date || subscription.endDate} showTime={false} key={`sub-end-${subscription.id}-${userTimezone}`} /></span>
                       )}
                     </CardDescription>
                   </CardHeader>
@@ -571,11 +573,16 @@ const StudentDashboard = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-500">Total Price:</span>
-                        <span className="text-sm font-semibold">{subscription.currency} {subscription.total_price.toFixed(2)}</span>
+                        <span className="text-sm font-semibold">
+                          {subscription.currency || 'USD'} {((subscription.total_price || subscription.totalPrice || 0)).toFixed(2)}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-500">Progress:</span>
-                        <span className="text-sm">{subscription.sessions_completed || 0}/{subscription.session_count}</span>
+                        <span className="text-sm">
+                          {subscription.sessions_completed || subscription.sessionsCompleted || 0}/
+                          {subscription.session_count || subscription.sessionCount || 0}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
