@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background Circle -->
+  <circle cx="50" cy="50" r="45" fill="#4CAF50"/>
+  
+  <!-- Letter K -->
+  <path d="M 25 25 L 25 75 M 25 50 L 45 30 M 25 50 L 45 70" 
+        stroke="white" 
+        stroke-width="6" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        fill="none"/>
+  
+  <!-- Letter S -->
+  <path d="M 55 35 Q 55 25, 65 25 Q 75 25, 75 35 Q 75 45, 65 50 Q 55 55, 55 65 Q 55 75, 65 75 Q 75 75, 75 65" 
+        stroke="white" 
+        stroke-width="6" 
+        stroke-linecap="round" 
+        fill="none"/>
+</svg>

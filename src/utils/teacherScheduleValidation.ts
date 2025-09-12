@@ -56,7 +56,8 @@ const getDayName = (dateStr: string): string => {
 };
 
 export const validateTeacherScheduleOverlap = async (
-  sessionTime: SessionTime
+  sessionTime: SessionTime,
+  isAdmin?: boolean
 ): Promise<TeacherOverlapValidationResult> => {
   try {
     const { teacherId, date, startTime, durationMinutes, excludeSessionId } = sessionTime;
@@ -67,7 +68,8 @@ export const validateTeacherScheduleOverlap = async (
       date,
       startTime,
       durationMinutes,
-      excludeSessionId
+      excludeSessionId,
+      isAdmin
     );
     
     if (!availabilityCheck.available) {
@@ -128,22 +130,32 @@ export const validateTeacherScheduleOverlap = async (
         const sessionQuery = query(
           sessionsRef,
           and(
-            where('student_id', 'in', batch),
+            where('studentId', 'in', batch),  // Fixed: use 'studentId' not 'student_id'
             where('status', '==', 'scheduled')
           )
         );
         
+        console.log(`Querying sessions for students:`, batch);
         const sessionSnapshot = await getDocs(sessionQuery);
+        console.log(`Found ${sessionSnapshot.size} scheduled sessions for this batch`);
         
         sessionSnapshot.forEach((doc) => {
           const session = { id: doc.id, ...doc.data() };
           
           // Check if this session is on the same date
-          const sessionDate = session.scheduled_date || session.scheduledDate;
-          if (sessionDate && sessionDate >= dateStart && sessionDate <= dateEnd) {
-            // Exclude the session being rescheduled
-            if (session.id !== excludeSessionId) {
-              existingSessions.push(session);
+          // Handle different date field formats
+          const sessionDateField = session.scheduledDateTime || session.scheduled_date || session.scheduledDate;
+          if (sessionDateField) {
+            // Parse the date properly
+            const sessionDate = new Date(sessionDateField);
+            const targetDate = new Date(date);
+            
+            // Check if it's the same day
+            if (sessionDate.toDateString() === targetDate.toDateString()) {
+              // Exclude the session being rescheduled
+              if (session.id !== excludeSessionId) {
+                existingSessions.push(session);
+              }
             }
           }
         });
@@ -161,11 +173,20 @@ export const validateTeacherScheduleOverlap = async (
       const dayName = getDayName(date);
       
       for (const session of existingSessions) {
-        const sessionDateStr = session.scheduled_date || session.scheduledDate;
+        // Get the session date/time
+        const sessionDateStr = session.scheduledDateTime || session.scheduled_date || session.scheduledDate;
         const sessionDate = new Date(sessionDateStr);
-        const existingStartTime = format(sessionDate, 'HH:mm');
+        
+        // Extract time from the date or use scheduledTime if available
+        let existingStartTime;
+        if (session.scheduledTime) {
+          existingStartTime = session.scheduledTime;
+        } else {
+          existingStartTime = format(sessionDate, 'HH:mm');
+        }
+        
         const existingStartMinutes = timeToMinutes(existingStartTime);
-        const existingEndMinutes = existingStartMinutes + (session.duration_minutes || session.durationMinutes || 60);
+        const existingEndMinutes = existingStartMinutes + (session.durationMinutes || session.duration_minutes || 60);
         
         // Check for overlap
         const hasOverlap = (

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -33,21 +33,40 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useState, useContext } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { UserContext } from '@/App';
 import { useToast } from '@/hooks/use-toast';
 import UserProfile from '@/components/sidebar/UserProfile';
+import { schoolLogoService } from '@/services/firebase/schoolLogo.service';
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { setUser } = useContext(UserContext);
+  const { user, setUser } = useContext(UserContext);
   const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(
     location.pathname.startsWith('/settings')
   );
+  const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
+
+  // Load school logo on mount
+  useEffect(() => {
+    if (user?.schoolId) {
+      loadSchoolLogo();
+    }
+  }, [user?.schoolId]);
+
+  const loadSchoolLogo = async () => {
+    if (!user?.schoolId) return;
+    
+    try {
+      const logoUrl = await schoolLogoService.getLogoUrl(user.schoolId, 'icon');
+      setSchoolLogo(logoUrl);
+    } catch (error) {
+      console.error('Error loading school logo:', error);
+    }
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -116,33 +135,49 @@ const Sidebar = () => {
       isCollapsed ? "w-16" : "w-64"
     )}>
       {/* Header with Logo */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-blue-50">
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-green-50 to-green-100">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-blue-500 rounded-lg flex items-center justify-center shadow-sm">
-              <BookOpen className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-sm border border-green-200">
+              {schoolLogo ? (
+                <img 
+                  src={schoolLogo} 
+                  alt="School Logo" 
+                  className="h-8 w-8 object-contain"
+                />
+              ) : (
+                <BookOpen className="h-6 w-6 text-green-600" />
+              )}
             </div>
             <div>
-              <span className="font-bold text-xl text-blue-900">TutorPro</span>
-              <p className="text-xs text-blue-600">Management System</p>
+              <span className="font-bold text-xl text-green-900">Kool-Skool</span>
+              <p className="text-xs text-green-600">Management System</p>
             </div>
           </div>
         )}
         {isCollapsed && (
-          <div className="h-10 w-10 bg-blue-500 rounded-lg flex items-center justify-center shadow-sm mx-auto">
-            <BookOpen className="h-6 w-6 text-white" />
+          <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-sm border border-green-200 mx-auto">
+            {schoolLogo ? (
+              <img 
+                src={schoolLogo} 
+                alt="School Logo" 
+                className="h-8 w-8 object-contain"
+              />
+            ) : (
+              <BookOpen className="h-6 w-6 text-green-600" />
+            )}
           </div>
         )}
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8 hover:bg-blue-100"
+          className="h-8 w-8 hover:bg-green-100"
         >
           {isCollapsed ? (
-            <ChevronRight className="h-4 w-4 text-blue-600" />
+            <ChevronRight className="h-4 w-4 text-green-600" />
           ) : (
-            <ChevronLeft className="h-4 w-4 text-blue-600" />
+            <ChevronLeft className="h-4 w-4 text-green-600" />
           )}
         </Button>
       </div>
