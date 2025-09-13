@@ -8,6 +8,9 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle, Settings, Globe, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { databaseService } from '@/services/firebase/database.service';
+import { sessionGeneratorService } from '@/services/firebase/sessionGenerator.service';
+import { createTestSession } from '@/utils/testSessionCreator';
+import { StudentPaymentUpload } from '@/components/StudentPaymentUpload';
 import { format } from 'date-fns';
 import { formatInUserTimezone, getEffectiveTimezone, getBrowserTimezone } from '@/utils/timezone';
 import TimezoneSelector from '@/components/TimezoneSelector';
@@ -65,6 +68,102 @@ interface Session {
   notes: string | null;
 }
 
+// Session Card Component
+const SessionCard = ({ 
+  session, 
+  userTimezone, 
+  onCancelRequest 
+}: { 
+  session: any; 
+  userTimezone: string; 
+  onCancelRequest: (id: string) => void;
+}) => {
+  const [expanded, setExpanded] = React.useState(false);
+  const canCancel = sessionGeneratorService.canCancelSession(session);
+  const cancellationMessage = sessionGeneratorService.getCancellationDeadlineMessage(session);
+  
+  return (
+    <div className="border rounded-md p-3">
+      <div 
+        className="cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <SessionTimeDisplay 
+              date={session.scheduled_date || session.scheduledDate} 
+              className="font-medium"
+              showTime={false}
+              key={`date-${session.id}-${userTimezone}`}
+            />
+            <p className="text-sm text-gray-500">
+              <SessionTimeDisplay 
+                date={session.scheduled_date || session.scheduledDate} 
+                showDate={false}
+                key={`time-${session.id}-${userTimezone}`}
+              /> • {session.duration_minutes || session.durationMinutes || 60} min
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Session {session.session_number || session.sessionNumber || '?'} of {session.total_sessions || session.totalSessions || '?'}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 items-end">
+            <Badge variant={session.status === 'scheduled' ? 'default' : 'secondary'}>
+              {session.status}
+            </Badge>
+            {session.status === 'scheduled' && (
+              <div className="text-right">
+                <p className="text-xs text-gray-500">{cancellationMessage}</p>
+                <Button 
+                  size="sm" 
+                  variant={canCancel ? "outline" : "ghost"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (canCancel) {
+                      onCancelRequest(session.id);
+                    }
+                  }}
+                  disabled={!canCancel}
+                  className="text-xs mt-1"
+                >
+                  <XCircle className="h-3 w-3 mr-1" />
+                  {canCancel ? 'Request Cancellation' : 'Past Deadline'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {expanded && (
+        <div className="mt-3 pt-3 border-t space-y-2">
+          {session.notes && (
+            <div>
+              <p className="text-xs font-medium text-gray-600">Notes:</p>
+              <p className="text-xs text-gray-500">{session.notes}</p>
+            </div>
+          )}
+          {session.materials && (
+            <div>
+              <p className="text-xs font-medium text-gray-600">Materials:</p>
+              <p className="text-xs text-gray-500">{session.materials}</p>
+            </div>
+          )}
+          {session.homework && (
+            <div>
+              <p className="text-xs font-medium text-gray-600">Homework:</p>
+              <p className="text-xs text-gray-500">{session.homework}</p>
+            </div>
+          )}
+          {!session.notes && !session.materials && !session.homework && (
+            <p className="text-xs text-gray-400 italic">No additional details available</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const StudentDashboard = () => {
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
@@ -76,6 +175,8 @@ const StudentDashboard = () => {
   const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
   const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [paymentUploadOpen, setPaymentUploadOpen] = useState(false);
+  const [selectedSubscriptionForPayment, setSelectedSubscriptionForPayment] = useState<any>(null);
 
   // Force re-render when user timezone changes
   const currentUserTimezone = getEffectiveTimezone(user?.timezone);
@@ -286,16 +387,39 @@ const StudentDashboard = () => {
       console.log('=== FETCHING SESSIONS ===');
       console.log('Student ID:', studentId);
       
+      // Try to fetch ALL sessions first to debug
+      console.log('Fetching all sessions from lesson_sessions collection...');
+      const allSessions = await databaseService.getAll('lesson_sessions');
+      console.log('Total sessions in collection:', allSessions?.length || 0);
+      
+      if (allSessions && allSessions.length > 0) {
+        console.log('Sample session structure:', allSessions[0]);
+        console.log('Student IDs in sessions:', allSessions.map((s: any) => s.student_id || s.studentId));
+      }
+      
       // Query sessions by student_id or studentId field
       let sessionsData = await databaseService.query('lesson_sessions', {
         where: [{ field: 'student_id', operator: '==', value: studentId }]
       });
       
+      console.log('Sessions found with student_id query:', sessionsData?.length || 0);
+      
       // If no results, try with camelCase field name
       if (!sessionsData || sessionsData.length === 0) {
+        console.log('Trying with camelCase field name...');
         sessionsData = await databaseService.query('lesson_sessions', {
           where: [{ field: 'studentId', operator: '==', value: studentId }]
         });
+        console.log('Sessions found with studentId query:', sessionsData?.length || 0);
+      }
+      
+      // Filter sessions manually as a fallback
+      if ((!sessionsData || sessionsData.length === 0) && allSessions) {
+        console.log('Filtering sessions manually...');
+        sessionsData = allSessions.filter((s: any) => 
+          s.student_id === studentId || s.studentId === studentId
+        );
+        console.log('Sessions found with manual filter:', sessionsData?.length || 0);
       }
       
       // Sort by scheduled_date ascending
@@ -307,12 +431,13 @@ const StudentDashboard = () => {
         });
       }
       
-      console.log('Sessions data:', sessionsData);
+      console.log('Final sessions data:', sessionsData);
       setSessions(sessionsData || []);
       return sessionsData || [];
       
     } catch (error) {
       console.error('Error in fetchSessions:', error);
+      console.error('Error details:', error);
       return [];
     }
   };
@@ -401,23 +526,15 @@ const StudentDashboard = () => {
   };
 
   const handleMakePayment = (subscriptionId: string) => {
-    // Navigate to payment page or open payment modal
-    toast.info('Payment feature coming soon!');
-    // TODO: Implement payment integration
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
-      case 'scheduled':
-        return <Badge className="bg-blue-100 text-blue-800"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
-      case 'cancelled':
-        return <Badge className="bg-red-100 text-red-800"><AlertCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+    const subscription = subscriptions.find(s => s.id === subscriptionId);
+    if (subscription) {
+      setSelectedSubscriptionForPayment(subscription);
+      setPaymentUploadOpen(true);
+    } else {
+      toast.error('Subscription not found');
     }
   };
+
 
   if (loading) {
     return (
@@ -442,12 +559,12 @@ const StudentDashboard = () => {
   }
 
   const upcomingSessions = sessions.filter(
-    session => session.status === 'scheduled' && new Date(session.scheduled_date) >= new Date()
-  ).slice(0, 3);
+    session => session.status === 'scheduled' && new Date(session.scheduled_date || session.scheduledDate) >= new Date()
+  );
 
   const recentSessions = sessions.filter(
-    session => session.status !== 'scheduled' || new Date(session.scheduled_date) < new Date()
-  ).slice(0, 3);
+    session => session.status !== 'scheduled' || new Date(session.scheduled_date || session.scheduledDate) < new Date()
+  );
 
   console.log('StudentDashboard - Rendering with timezone:', userTimezone);
   console.log('StudentDashboard - Upcoming sessions:', upcomingSessions);
@@ -464,7 +581,7 @@ const StudentDashboard = () => {
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">
-                  Welcome, {studentData.first_name}!
+                  Welcome, {studentData?.first_name || studentData?.firstName || 'Student'}!
                 </h1>
                 <p className="text-sm text-gray-500">Student Portal</p>
               </div>
@@ -635,7 +752,10 @@ const StudentDashboard = () => {
                           {subscription.session_count || subscription.sessionCount || 0}
                         </span>
                       </div>
-                      {subscription.status === 'active' && (subscription.payment_status === 'pending' || subscription.payment_status === 'partial') && (
+                      {/* Show payment button if subscription is active or if there's an outstanding balance */}
+                      {(subscription.status === 'active' || subscription.status === 'overdue' || 
+                        subscription.payment_status === 'pending' || subscription.payment_status === 'partial' ||
+                        subscription.payment_status === 'unpaid' || !subscription.payment_status) && (
                         <Button 
                           className="w-full mt-3" 
                           variant="default"
@@ -645,6 +765,13 @@ const StudentDashboard = () => {
                           Make Payment
                         </Button>
                       )}
+                      
+                      {/* Show session count for this subscription */}
+                      <div className="mt-2 text-xs text-gray-500">
+                        Sessions: {sessions.filter(s => 
+                          (s.subscription_id === subscription.id || s.subscriptionId === subscription.id)
+                        ).length} found
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -658,49 +785,53 @@ const StudentDashboard = () => {
           {/* Upcoming Sessions */}
           <Card>
             <CardHeader>
-              <CardTitle>Upcoming Sessions</CardTitle>
-              <CardDescription>Your scheduled lessons</CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Upcoming Sessions</CardTitle>
+                  <CardDescription>Your scheduled lessons</CardDescription>
+                </div>
+                {/* Debug button - remove in production */}
+                {process.env.NODE_ENV === 'development' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const activeSubscription = subscriptions.find(sub => sub.status === 'active') || subscriptions[0];
+                      if (studentData && activeSubscription) {
+                        try {
+                          const sessionId = await createTestSession(
+                            studentData.id,
+                            activeSubscription.id,
+                            studentData.school_id || studentData.schoolId || ''
+                          );
+                          toast.success('Test session created!');
+                          await fetchSessions(studentData.id);
+                        } catch (error) {
+                          toast.error('Failed to create test session');
+                        }
+                      } else {
+                        toast.error('No subscription found for test session');
+                      }
+                    }}
+                  >
+                    Test Session
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {upcomingSessions.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Showing {upcomingSessions.length} upcoming session{upcomingSessions.length !== 1 ? 's' : ''}
+                  </p>
                   {upcomingSessions.map((session) => (
-                    <div key={session.id} className="border rounded-md p-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <SessionTimeDisplay 
-                            date={session.scheduled_date} 
-                            className="font-medium"
-                            showTime={false}
-                            key={`upcoming-date-${session.id}-${userTimezone}`}
-                          />
-                          <p className="text-sm text-gray-500">
-                            <SessionTimeDisplay 
-                              date={session.scheduled_date} 
-                              showDate={false}
-                              key={`upcoming-time-${session.id}-${userTimezone}`}
-                            /> • {session.duration_minutes} min
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2 items-end">
-                          {getStatusBadge(session.status)}
-                          {session.status === 'scheduled' && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleCancellationRequest(session.id)}
-                              className="text-xs"
-                            >
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Cancel
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      {session.notes && (
-                        <p className="text-xs text-gray-500 mt-2">{session.notes}</p>
-                      )}
-                    </div>
+                    <SessionCard 
+                      key={session.id}
+                      session={session}
+                      userTimezone={userTimezone}
+                      onCancelRequest={handleCancellationRequest}
+                    />
                   ))}
                 </div>
               ) : (
@@ -717,44 +848,17 @@ const StudentDashboard = () => {
             </CardHeader>
             <CardContent>
               {recentSessions.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Showing {recentSessions.length} past/completed session{recentSessions.length !== 1 ? 's' : ''}
+                  </p>
                   {recentSessions.map((session) => (
-                    <div key={session.id} className="border rounded-md p-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <SessionTimeDisplay 
-                            date={session.scheduled_date} 
-                            className="font-medium"
-                            showTime={false}
-                            key={`recent-date-${session.id}-${userTimezone}`}
-                          />
-                          <p className="text-sm text-gray-500">
-                            <SessionTimeDisplay 
-                              date={session.scheduled_date} 
-                              showDate={false}
-                              key={`recent-time-${session.id}-${userTimezone}`}
-                            /> • {session.duration_minutes} min
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2 items-end">
-                          {getStatusBadge(session.status)}
-                          {session.status === 'scheduled' && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleCancellationRequest(session.id)}
-                              className="text-xs"
-                            >
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Cancel
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      {session.notes && (
-                        <p className="text-xs text-gray-500 mt-2">{session.notes}</p>
-                      )}
-                    </div>
+                    <SessionCard 
+                      key={session.id}
+                      session={session}
+                      userTimezone={userTimezone}
+                      onCancelRequest={handleCancellationRequest}
+                    />
                   ))}
                 </div>
               ) : (
@@ -800,6 +904,25 @@ const StudentDashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Payment Upload Dialog */}
+      {selectedSubscriptionForPayment && (
+        <StudentPaymentUpload
+          open={paymentUploadOpen}
+          onOpenChange={setPaymentUploadOpen}
+          subscriptionId={selectedSubscriptionForPayment.id}
+          studentId={studentData?.id || ''}
+          amount={selectedSubscriptionForPayment.total_price || selectedSubscriptionForPayment.totalPrice || 0}
+          currency={selectedSubscriptionForPayment.currency || 'USD'}
+          onSuccess={() => {
+            // Refresh payment data
+            if (studentData) {
+              fetchSubscriptions(studentData.id);
+            }
+            toast.success('Payment submitted successfully!');
+          }}
+        />
+      )}
     </div>
   );
 };

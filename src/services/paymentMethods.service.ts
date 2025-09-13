@@ -150,8 +150,16 @@ class PaymentMethodsService {
       const existingMethods = await this.getPaymentMethods(methodData.schoolId);
       const maxOrder = Math.max(0, ...existingMethods.map(m => m.displayOrder || 0));
 
+      // Clean undefined values from the data (Firebase doesn't accept undefined)
+      const cleanedData = Object.entries(methodData).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as any);
+
       const docData = {
-        ...methodData,
+        ...cleanedData,
         displayOrder: methodData.displayOrder ?? maxOrder + 1,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()

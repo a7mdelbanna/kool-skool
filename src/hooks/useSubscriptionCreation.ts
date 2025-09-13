@@ -3,8 +3,11 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
+import { sessionGeneratorService } from '@/services/firebase/sessionGenerator.service';
 import { toast } from 'sonner';
 import { toZonedTime } from 'date-fns-tz';
+import { doc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 interface SubscriptionFormData {
   sessionCount: number;
@@ -184,6 +187,57 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
       }
 
       console.log('✅ Subscription created with ID:', subscriptionId);
+
+      // Generate sessions for the subscription
+      try {
+        console.log('📅 Generating sessions for subscription...');
+        console.log('  Subscription ID:', subscriptionId);
+        console.log('  Student ID:', studentId);
+        console.log('  Session count:', formData.sessionCount);
+        console.log('  Start date:', formData.startDate);
+        
+        // Get student details to find teacher and course info
+        const student = await databaseService.getById('students', studentId);
+        if (!student) {
+          console.error('❌ Student not found for session generation');
+          throw new Error('Student not found');
+        }
+        
+        const teacherId = student.teacherId || student.teacher_id || '';
+        const courseId = student.courseId || student.course_id || '';
+        
+        console.log('  Teacher ID:', teacherId);
+        console.log('  Course ID:', courseId);
+        console.log('  School ID:', schoolId);
+        
+        // Generate sessions based on subscription details
+        const sessionIds = await sessionGeneratorService.generateWeeklySessions(
+          subscriptionId,
+          studentId,
+          teacherId,
+          schoolId,
+          courseId,
+          formData.sessionCount,
+          formData.startDate,
+          formData.schedule?.length || 2 // Default to 2 sessions per week
+        );
+        
+        console.log(`✅ Generated ${sessionIds.length} sessions for subscription`);
+        console.log('  Session IDs:', sessionIds);
+        
+        if (sessionIds.length === 0) {
+          console.warn('⚠️ No sessions were generated!');
+          toast.warning('Warning: No sessions were generated for this subscription');
+        } else {
+          toast.success(`Created ${sessionIds.length} sessions for the subscription`);
+        }
+      } catch (sessionError: any) {
+        console.error('❌ Error generating sessions:', sessionError);
+        console.error('  Error message:', sessionError.message);
+        console.error('  Error stack:', sessionError.stack);
+        // Don't fail the whole subscription if session generation fails
+        toast.warning('Subscription created but sessions could not be generated. Please create them manually.');
+      }
 
       // If there's an initial payment, create it as a transaction
       if (formData.initialPayment.amount > 0 && formData.initialPayment.accountId) {
