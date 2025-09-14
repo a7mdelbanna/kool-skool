@@ -11,6 +11,8 @@ import SuperAdminLogin from '@/pages/SuperAdminLogin';
 import MainLayout from '@/layout/MainLayout';
 import SchoolSetup from '@/pages/SchoolSetup';
 import StudentDashboard from '@/pages/StudentDashboard';
+import StudentPortal from '@/pages/student/StudentPortal';
+import EnhancedStudentDashboard from '@/pages/student/EnhancedStudentDashboard';
 import { Toaster } from "@/components/ui/toaster"
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { runTimezoneMigration } from '@/scripts/migrateToCairoTimezone';
@@ -121,8 +123,10 @@ const App = () => {
             <Route path="/student-login" element={<StudentLogin />} />
             <Route path="/superadmin-login" element={<SuperAdminLogin />} />
             <Route path="/school-setup" element={<SchoolSetup />} />
+            
+            {/* Legacy Student Dashboard (for backwards compatibility) */}
             <Route 
-              path="/student-dashboard" 
+              path="/student-dashboard-old" 
               element={
                 user && user.role === 'student' ? (
                   <StudentDashboard />
@@ -131,6 +135,21 @@ const App = () => {
                 )
               } 
             />
+            
+            {/* New Enhanced Student Portal */}
+            <Route path="/student-dashboard" element={<StudentPortal />}>
+              <Route index element={<EnhancedStudentDashboard />} />
+              <Route path="learning" element={<div>Learning Hub - Coming Soon</div>} />
+              <Route path="practice" element={<div>Practice Center - Coming Soon</div>} />
+              <Route path="practice/vocabulary" element={<div>Vocabulary Practice - Coming Soon</div>} />
+              <Route path="practice/speaking" element={<div>Speaking Practice - Coming Soon</div>} />
+              <Route path="progress" element={<div>Progress Analytics - Coming Soon</div>} />
+              <Route path="resources" element={<div>Resources Library - Coming Soon</div>} />
+              <Route path="messages" element={<div>Messages - Coming Soon</div>} />
+              <Route path="homework" element={<div>Homework - Coming Soon</div>} />
+              <Route path="schedule" element={<div>Schedule - Coming Soon</div>} />
+              <Route path="settings" element={<div>Settings - Coming Soon</div>} />
+            </Route>
             <Route
               path="/*"
               element={
