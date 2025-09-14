@@ -42,7 +42,7 @@ const TimezoneSelector: React.FC<TimezoneSelectorProps> = ({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="timezone">{label}</Label>
+      {label && <Label htmlFor="timezone">{label}</Label>}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button

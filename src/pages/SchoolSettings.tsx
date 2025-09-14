@@ -3,7 +3,9 @@ import {
   Briefcase, 
   Globe,
   Save,
-  Palette
+  Palette,
+  Clock,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,9 +16,67 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import SchoolTimezoneManagement from '@/components/SchoolTimezoneManagement';
 import SchoolLogoUpload from '@/components/SchoolLogoUpload';
 import { UserContext } from '@/App';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import { databaseService } from '@/services/firebase/database.service';
+import { useState, useEffect } from 'react';
 
 const SchoolSettings = () => {
   const { user } = useContext(UserContext);
+  const [cancellationHours, setCancellationHours] = useState(48);
+  const [allowStudentCancellation, setAllowStudentCancellation] = useState(true);
+  const [maxCancellationsPerSubscription, setMaxCancellationsPerSubscription] = useState(2);
+  const [savingPolicies, setSavingPolicies] = useState(false);
+  const [loadingPolicies, setLoadingPolicies] = useState(true);
+  
+  useEffect(() => {
+    if (user?.schoolId) {
+      loadCancellationPolicies();
+    }
+  }, [user?.schoolId]);
+  
+  const loadCancellationPolicies = async () => {
+    if (!user?.schoolId) return;
+    
+    try {
+      setLoadingPolicies(true);
+      const schoolData = await databaseService.getById('schools', user.schoolId);
+      
+      if (schoolData?.cancellationPolicy) {
+        setCancellationHours(schoolData.cancellationPolicy.hoursNotice || 48);
+        setAllowStudentCancellation(schoolData.cancellationPolicy.allowStudentCancellation !== false);
+        setMaxCancellationsPerSubscription(schoolData.cancellationPolicy.maxCancellations || 2);
+      }
+    } catch (error) {
+      console.error('Error loading cancellation policies:', error);
+    } finally {
+      setLoadingPolicies(false);
+    }
+  };
+  
+  const saveCancellationPolicies = async () => {
+    if (!user?.schoolId) return;
+    
+    try {
+      setSavingPolicies(true);
+      
+      await databaseService.update('schools', user.schoolId, {
+        cancellationPolicy: {
+          hoursNotice: cancellationHours,
+          allowStudentCancellation,
+          maxCancellations: maxCancellationsPerSubscription,
+          updatedAt: new Date().toISOString()
+        }
+      });
+      
+      toast.success('Cancellation policies saved successfully');
+    } catch (error) {
+      console.error('Error saving cancellation policies:', error);
+      toast.error('Failed to save cancellation policies');
+    } finally {
+      setSavingPolicies(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -26,7 +86,7 @@ const SchoolSettings = () => {
       </div>
       
       <Tabs defaultValue="branding" className="w-full">
-        <TabsList className="grid grid-cols-3 mb-6">
+        <TabsList className="grid grid-cols-4 mb-6">
           <TabsTrigger value="branding" className="gap-2">
             <Palette className="h-4 w-4" />
             <span>Branding</span>
@@ -38,6 +98,10 @@ const SchoolSettings = () => {
           <TabsTrigger value="school-timezone" className="gap-2">
             <Globe className="h-4 w-4" />
             <span>School Timezone</span>
+          </TabsTrigger>
+          <TabsTrigger value="policies" className="gap-2">
+            <Shield className="h-4 w-4" />
+            <span>Policies</span>
           </TabsTrigger>
         </TabsList>
         
@@ -198,6 +262,115 @@ const SchoolSettings = () => {
 
         <TabsContent value="school-timezone" className="mt-0 space-y-6">
           {user?.schoolId && <SchoolTimezoneManagement schoolId={user.schoolId} />}
+        </TabsContent>
+        
+        <TabsContent value="policies" className="mt-0 space-y-6">
+          <Card className="glass glass-hover">
+            <CardHeader>
+              <CardTitle>Cancellation Policies</CardTitle>
+              <CardDescription>Configure how students can cancel their sessions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {loadingPolicies ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="allowCancellation">Allow Student Cancellations</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Enable students to request session cancellations
+                        </p>
+                      </div>
+                      <Switch
+                        id="allowCancellation"
+                        checked={allowStudentCancellation}
+                        onCheckedChange={setAllowStudentCancellation}
+                      />
+                    </div>
+                    
+                    {allowStudentCancellation && (
+                      <>
+                        <Separator />
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="cancellationHours">
+                            Cancellation Notice Period (hours)
+                          </Label>
+                          <Input
+                            id="cancellationHours"
+                            type="number"
+                            min="1"
+                            max="168"
+                            value={cancellationHours}
+                            onChange={(e) => setCancellationHours(parseInt(e.target.value) || 48)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Students must cancel at least {cancellationHours} hours before the session
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="maxCancellations">
+                            Maximum Cancellations per Subscription
+                          </Label>
+                          <Input
+                            id="maxCancellations"
+                            type="number"
+                            min="0"
+                            max="10"
+                            value={maxCancellationsPerSubscription}
+                            onChange={(e) => setMaxCancellationsPerSubscription(parseInt(e.target.value) || 2)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Limit the number of cancellations allowed per subscription (0 = unlimited)
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <div className="flex items-start gap-2">
+                      <Clock className="h-4 w-4 text-amber-600 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-amber-900">Policy Summary</p>
+                        <p className="text-xs text-amber-800">
+                          {allowStudentCancellation
+                            ? `Students can cancel sessions with ${cancellationHours} hours notice. ${maxCancellationsPerSubscription > 0 ? `Maximum ${maxCancellationsPerSubscription} cancellations per subscription.` : 'Unlimited cancellations allowed.'}`
+                            : 'Students cannot cancel sessions. Only teachers and admins can manage cancellations.'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <Button 
+                      onClick={saveCancellationPolicies}
+                      disabled={savingPolicies}
+                      className="gap-2"
+                    >
+                      {savingPolicies ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          Save Policies
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

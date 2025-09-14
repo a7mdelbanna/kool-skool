@@ -1345,19 +1345,96 @@ export const addStudentSubscription = async (subscriptionData: any) => {
 
 export const deleteStudentSubscriptionEnhanced = async (subscriptionId: string) => {
   try {
-    // Delete related sessions first
-    const sessions = await databaseService.query('sessions', {
-      where: [{ field: 'subscriptionId', operator: '==', value: subscriptionId }]
-    });
+    console.log('🗑️ Starting cascade deletion for subscription:', subscriptionId);
     
-    for (const session of sessions) {
-      await databaseService.delete('sessions', session.id);
+    // 1. Delete related sessions from lesson_sessions collection
+    // First, fetch ALL sessions to ensure we don't miss any
+    const allSessions = await databaseService.getAll('lesson_sessions');
+    console.log('Total sessions in collection:', allSessions?.length || 0);
+    
+    // Filter sessions that belong to this subscription
+    const sessionsToDelete = allSessions?.filter((session: any) => 
+      session.subscription_id === subscriptionId || 
+      session.subscriptionId === subscriptionId
+    ) || [];
+    
+    console.log(`Found ${sessionsToDelete.length} sessions to delete for subscription ${subscriptionId}`);
+    
+    if (sessionsToDelete.length > 0) {
+      console.log('Sessions to delete:', sessionsToDelete.map((s: any) => ({ 
+        id: s.id, 
+        subscription_id: s.subscription_id || s.subscriptionId,
+        scheduled_date: s.scheduled_date 
+      })));
+      
+      // Delete all sessions in parallel for efficiency
+      const deletePromises = sessionsToDelete.map(async (session: any) => {
+        console.log(`Deleting session ${session.id}`);
+        try {
+          await databaseService.delete('lesson_sessions', session.id);
+          console.log(`✅ Deleted session ${session.id}`);
+        } catch (error) {
+          console.error(`❌ Failed to delete session ${session.id}:`, error);
+        }
+      });
+      
+      await Promise.all(deletePromises);
+      console.log(`✅ Deleted all ${sessionsToDelete.length} sessions`);
     }
     
-    // Delete the subscription
-    await databaseService.delete('subscriptions', subscriptionId);
+    // 2. Delete related payments/transactions
+    // Fetch all transactions and filter
+    const allTransactions = await databaseService.getAll('transactions');
+    const transactionsToDelete = allTransactions?.filter((transaction: any) => 
+      transaction.subscription_id === subscriptionId || 
+      transaction.subscriptionId === subscriptionId
+    ) || [];
     
-    return { success: true, message: 'Subscription deleted successfully' };
+    if (transactionsToDelete.length > 0) {
+      console.log(`Found ${transactionsToDelete.length} transactions to delete`);
+      const transDeletePromises = transactionsToDelete.map(async (transaction: any) => {
+        console.log(`Deleting transaction ${transaction.id}`);
+        try {
+          await databaseService.delete('transactions', transaction.id);
+          console.log(`✅ Deleted transaction ${transaction.id}`);
+        } catch (error) {
+          console.error(`❌ Failed to delete transaction ${transaction.id}:`, error);
+        }
+      });
+      await Promise.all(transDeletePromises);
+    }
+    
+    // 3. Also check for payments in the payments collection (legacy)
+    const allPayments = await databaseService.getAll('payments');
+    const paymentsToDelete = allPayments?.filter((payment: any) => 
+      payment.subscription_id === subscriptionId || 
+      payment.subscriptionId === subscriptionId
+    ) || [];
+    
+    if (paymentsToDelete.length > 0) {
+      console.log(`Found ${paymentsToDelete.length} legacy payments to delete`);
+      const payDeletePromises = paymentsToDelete.map(async (payment: any) => {
+        console.log(`Deleting payment ${payment.id}`);
+        try {
+          await databaseService.delete('payments', payment.id);
+          console.log(`✅ Deleted payment ${payment.id}`);
+        } catch (error) {
+          console.error(`❌ Failed to delete payment ${payment.id}:`, error);
+        }
+      });
+      await Promise.all(payDeletePromises);
+    }
+    
+    // 4. Finally, delete the subscription itself
+    console.log(`Deleting subscription ${subscriptionId}`);
+    await databaseService.delete('subscriptions', subscriptionId);
+    console.log(`✅ Deleted subscription ${subscriptionId}`);
+    
+    // 5. Add a small delay to ensure Firebase has propagated the changes
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    console.log('✅ Successfully deleted subscription and all related data');
+    return { success: true, message: 'Subscription and all related data deleted successfully' };
   } catch (error) {
     console.error('Error deleting subscription:', error);
     throw error;

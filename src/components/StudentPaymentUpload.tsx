@@ -156,9 +156,11 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
             linked_account_id: acc.id
           }));
         } catch (error) {
-          console.error('Error fetching accounts:', error);
+          console.error('Error fetching accounts fallback:', error);
         }
-      } else {
+      }
+      
+      if (paymentMethods && paymentMethods.length > 0) {
         // For each payment method, get the linked account's currency
         const paymentMethodsWithCurrency = await Promise.all(
           paymentMethods.map(async (pm: any) => {

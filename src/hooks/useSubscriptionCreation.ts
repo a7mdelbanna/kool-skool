@@ -211,6 +211,26 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
         console.log('  School ID:', schoolId);
         
         // Generate sessions based on subscription details
+        // Parse the schedule to extract time and days
+        let sessionHour = 10; // Default to 10 AM
+        let sessionMinute = 0;
+        
+        // If schedule has time information, use it
+        if (formData.schedule && formData.schedule.length > 0 && formData.schedule[0].time) {
+          const timeStr = formData.schedule[0].time;
+          // Parse time string (e.g., "8:00" or "08:00")
+          const timeParts = timeStr.split(':');
+          if (timeParts.length === 2) {
+            sessionHour = parseInt(timeParts[0]) || 10;
+            sessionMinute = parseInt(timeParts[1]) || 0;
+          }
+        }
+        
+        const startDate = new Date(formData.startDate);
+        startDate.setHours(sessionHour, sessionMinute, 0, 0); // Set to scheduled time
+        
+        console.log('Creating sessions with time:', sessionHour + ':' + sessionMinute);
+        
         const sessionIds = await sessionGeneratorService.generateWeeklySessions(
           subscriptionId,
           studentId,
@@ -218,7 +238,7 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
           schoolId,
           courseId,
           formData.sessionCount,
-          formData.startDate,
+          startDate,
           formData.schedule?.length || 2 // Default to 2 sessions per week
         );
         

@@ -168,8 +168,14 @@ class SessionGeneratorService {
     startDate: Date,
     sessionsPerWeek: number = 2
   ): Promise<string[]> {
-    // Default schedule: Tuesday and Thursday at 10:00 AM
+    // Default schedule: Tuesday and Thursday
     const defaultDays = sessionsPerWeek === 1 ? [2] : [2, 4]; // Tuesday, Thursday
+    
+    // Extract hour and minute from the startDate (which should already have the correct time)
+    const sessionHour = startDate.getHours() || 10; // Default to 10 AM if not set
+    const sessionMinute = startDate.getMinutes() || 0;
+    
+    console.log(`Generating sessions at ${sessionHour}:${sessionMinute.toString().padStart(2, '0')}`);
     
     const config: SessionGenerationConfig = {
       subscriptionId,
@@ -182,7 +188,7 @@ class SessionGeneratorService {
       schedule: {
         frequency: 'weekly',
         daysOfWeek: defaultDays,
-        timeSlots: [{ hour: 10, minute: 0, duration: 60 }]
+        timeSlots: [{ hour: sessionHour, minute: sessionMinute, duration: 60 }]
       }
     };
     

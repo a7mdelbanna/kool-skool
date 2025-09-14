@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserContext } from '@/App';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle, Settings, Globe, X, XCircle } from 'lucide-react';
+import { LogOut, User, BookOpen, Calendar, CreditCard, Clock, CheckCircle, AlertCircle, Settings, Globe, X, XCircle, Video, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { databaseService } from '@/services/firebase/database.service';
 import { sessionGeneratorService } from '@/services/firebase/sessionGenerator.service';
 import { createTestSession } from '@/utils/testSessionCreator';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import { supabase } from '@/integrations/supabase/client';
 import { StudentPaymentUpload } from '@/components/StudentPaymentUpload';
 import { format } from 'date-fns';
 import { formatInUserTimezone, getEffectiveTimezone, getBrowserTimezone } from '@/utils/timezone';
@@ -61,11 +64,31 @@ interface Subscription {
 
 interface Session {
   id: string;
+  student_id?: string;
+  subscription_id?: string;
+  teacher_id?: string;
+  course_id?: string;
   scheduled_date: string;
   duration_minutes: number;
   status: string;
+  session_number?: number;
+  total_sessions?: number;
+  cancellation_deadline?: string;
   cost: number;
   notes: string | null;
+  materials?: string;
+  homework?: string;
+  // Enhanced fields
+  teacher?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    zoomLink?: string;
+  };
+  course?: {
+    id: string;
+    name?: string;
+  };
 }
 
 // Session Card Component
@@ -81,6 +104,14 @@ const SessionCard = ({
   const [expanded, setExpanded] = React.useState(false);
   const canCancel = sessionGeneratorService.canCancelSession(session);
   const cancellationMessage = sessionGeneratorService.getCancellationDeadlineMessage(session);
+  
+  const handleJoinLesson = () => {
+    if (session.teacher?.zoomLink) {
+      window.open(session.teacher.zoomLink, '_blank');
+    } else {
+      toast.error('No Zoom link available for this session. Please contact your teacher.');
+    }
+  };
   
   return (
     <div className="border rounded-md p-3">
@@ -103,6 +134,20 @@ const SessionCard = ({
                 key={`time-${session.id}-${userTimezone}`}
               /> • {session.duration_minutes || session.durationMinutes || 60} min
             </p>
+            {/* Display teacher and course info */}
+            {(session.teacher || session.course) && (
+              <div className="text-xs text-gray-600 mt-1 space-y-0.5">
+                {session.course?.name && (
+                  <p><BookOpen className="inline h-3 w-3 mr-1" />{session.course.name}</p>
+                )}
+                {session.teacher && (
+                  <p>
+                    <User className="inline h-3 w-3 mr-1" />
+                    {session.teacher.firstName || ''} {session.teacher.lastName || 'Teacher'}
+                  </p>
+                )}
+              </div>
+            )}
             <p className="text-xs text-gray-400 mt-1">
               Session {session.session_number || session.sessionNumber || '?'} of {session.total_sessions || session.totalSessions || '?'}
             </p>
@@ -112,7 +157,20 @@ const SessionCard = ({
               {session.status}
             </Badge>
             {session.status === 'scheduled' && (
-              <div className="text-right">
+              <div className="text-right space-y-1">
+                {/* Join button for scheduled sessions */}
+                <Button 
+                  size="sm" 
+                  variant="default"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleJoinLesson();
+                  }}
+                  className="text-xs w-full"
+                >
+                  <Video className="h-3 w-3 mr-1" />
+                  Join Lesson
+                </Button>
                 <p className="text-xs text-gray-500">{cancellationMessage}</p>
                 <Button 
                   size="sm" 
@@ -124,10 +182,10 @@ const SessionCard = ({
                     }
                   }}
                   disabled={!canCancel}
-                  className="text-xs mt-1"
+                  className="text-xs w-full"
                 >
                   <XCircle className="h-3 w-3 mr-1" />
-                  {canCancel ? 'Request Cancellation' : 'Past Deadline'}
+                  {canCancel ? 'Cancel Session' : 'Past Deadline'}
                 </Button>
               </div>
             )}
@@ -198,11 +256,68 @@ const StudentDashboard = () => {
     fetchStudentData();
   }, [user, navigate]);
 
+  // Real-time listener for session changes
+  useEffect(() => {
+    if (!studentData?.id) return;
+
+    console.log('Setting up real-time listener for sessions...');
+    
+    // Create queries for both field name variations
+    const unsubscribers: (() => void)[] = [];
+    
+    // Listen for sessions with student_id field
+    const q1 = query(
+      collection(db, 'lesson_sessions'),
+      where('student_id', '==', studentData.id)
+    );
+    
+    const unsubscribe1 = onSnapshot(q1, (snapshot) => {
+      console.log('Real-time update: Sessions changed (student_id)');
+      // Re-fetch all data when sessions change
+      fetchSessions(studentData.id);
+    });
+    unsubscribers.push(unsubscribe1);
+    
+    // Listen for sessions with studentId field
+    const q2 = query(
+      collection(db, 'lesson_sessions'),
+      where('studentId', '==', studentData.id)
+    );
+    
+    const unsubscribe2 = onSnapshot(q2, (snapshot) => {
+      console.log('Real-time update: Sessions changed (studentId)');
+      // Re-fetch all data when sessions change
+      fetchSessions(studentData.id);
+    });
+    unsubscribers.push(unsubscribe2);
+    
+    // Listen for subscription changes
+    const q3 = query(
+      collection(db, 'subscriptions'),
+      where('student_id', '==', studentData.id)
+    );
+    
+    const unsubscribe3 = onSnapshot(q3, (snapshot) => {
+      console.log('Real-time update: Subscriptions changed');
+      // Re-fetch subscriptions when they change
+      fetchSubscriptions(studentData.id);
+    });
+    unsubscribers.push(unsubscribe3);
+    
+    return () => {
+      // Clean up all listeners
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [studentData?.id]);
+
   const fetchStudentData = async () => {
     if (!user?.id) return;
     
     try {
       setLoading(true);
+      // Clear cached data to ensure fresh fetch
+      setSessions([]);
+      setSubscriptions([]);
       console.log('=== FETCHING STUDENT DATA ===');
       console.log('User ID:', user.id);
       console.log('School ID:', user.schoolId);
@@ -302,6 +417,59 @@ const StudentDashboard = () => {
         let progressText = '0/0';
         let progressPercentage = 0;
         const activeSubscription = subscriptionsData.find(sub => sub.status === 'active');
+        
+        // AUTO-GENERATE SESSIONS if subscription exists but has no sessions
+        if (activeSubscription && (!sessionsData || sessionsData.length === 0)) {
+          console.log('⚠️ Active subscription found with no sessions - auto-generating...');
+          try {
+            // Get student's teacher and course info
+            const teacherId = students.teacher_id || students.teacherId || 'default-teacher';
+            const courseId = students.course_id || students.courseId || 'default-course';
+            const schoolId = students.school_id || students.schoolId || user.schoolId || '';
+            
+            console.log('Auto-generating sessions with:', {
+              subscriptionId: activeSubscription.id,
+              studentId: students.id,
+              teacherId,
+              courseId,
+              schoolId,
+              sessionCount: activeSubscription.session_count || activeSubscription.sessionCount || 10
+            });
+            
+            // Generate all sessions for the subscription
+            // Parse the date string correctly to avoid timezone issues
+            const startDateStr = activeSubscription.start_date || activeSubscription.startDate;
+            let startDate: Date;
+            if (startDateStr && typeof startDateStr === 'string') {
+              // If it's a YYYY-MM-DD format, parse it as local date
+              const [year, month, day] = startDateStr.split('-').map(Number);
+              startDate = new Date(year, month - 1, day, 10, 0, 0); // 10 AM local time
+            } else {
+              startDate = new Date(startDateStr || new Date());
+            }
+            
+            const sessionIds = await sessionGeneratorService.generateWeeklySessions(
+              activeSubscription.id,
+              students.id,
+              teacherId,
+              schoolId,
+              courseId,
+              activeSubscription.session_count || activeSubscription.sessionCount || 10,
+              startDate,
+              2 // sessions per week
+            );
+            
+            console.log('✅ Auto-generated', sessionIds.length, 'sessions');
+            toast.success(`Automatically created ${sessionIds.length} sessions for your subscription!`);
+            
+            // Re-fetch sessions to include the newly generated ones
+            const newSessionsData = await fetchSessions(students.id);
+            sessionsData.push(...newSessionsData);
+          } catch (error) {
+            console.error('Failed to auto-generate sessions:', error);
+            // Don't show error to user - they can still use manual button if needed
+          }
+        }
         
         if (activeSubscription) {
           console.log('Active subscription found:', activeSubscription);
@@ -429,6 +597,53 @@ const StudentDashboard = () => {
           const dateB = new Date(b.scheduled_date || b.scheduledDate || 0).getTime();
           return dateA - dateB; // Ascending order
         });
+        
+        // Enhance sessions with teacher and course details
+        console.log('Fetching teacher details for sessions...');
+        const enhancedSessions = await Promise.all(sessionsData.map(async (session: any) => {
+          const enhancedSession = { ...session };
+          
+          // Fetch teacher details if teacher_id exists
+          if (session.teacher_id || session.teacherId) {
+            const teacherId = session.teacher_id || session.teacherId;
+            try {
+              const teacherData = await databaseService.getById('users', teacherId);
+              if (teacherData) {
+                enhancedSession.teacher = {
+                  id: teacherId,
+                  firstName: teacherData.firstName || teacherData.first_name,
+                  lastName: teacherData.lastName || teacherData.last_name,
+                  zoomLink: teacherData.zoomLink || teacherData.zoom_link
+                };
+                console.log(`Teacher data for session ${session.id}:`, enhancedSession.teacher);
+              }
+            } catch (error) {
+              console.error(`Error fetching teacher ${teacherId}:`, error);
+            }
+          }
+          
+          // Fetch course details if course_id exists
+          if (session.course_id || session.courseId) {
+            const courseId = session.course_id || session.courseId;
+            try {
+              const courseData = await databaseService.getById('courses', courseId);
+              if (courseData) {
+                enhancedSession.course = {
+                  id: courseId,
+                  name: courseData.name || courseData.courseName || courseData.course_name
+                };
+              }
+            } catch (error) {
+              console.error(`Error fetching course ${courseId}:`, error);
+            }
+          }
+          
+          return enhancedSession;
+        }));
+        
+        console.log('Enhanced sessions with teacher/course data:', enhancedSessions);
+        setSessions(enhancedSessions);
+        return enhancedSessions;
       }
       
       console.log('Final sessions data:', sessionsData);
@@ -482,6 +697,102 @@ const StudentDashboard = () => {
     } catch (error) {
       console.error('Error in handleTimezoneChange:', error);
       toast.error('Failed to update timezone');
+    }
+  };
+
+  const fixSessionTimes = async () => {
+    if (!studentData?.id) return;
+    
+    try {
+      console.log('🔧 Fixing session times...');
+      toast.info('Fixing session times...');
+      
+      // Get all sessions for this student
+      const allStudentSessions = sessions;
+      
+      let fixedCount = 0;
+      for (const session of allStudentSessions) {
+        const sessionDate = new Date(session.scheduled_date || session.scheduledDate);
+        const currentHour = sessionDate.getHours();
+        
+        // If session is at 10 AM, change it to 8 AM
+        if (currentHour === 10) {
+          sessionDate.setHours(8, 0, 0, 0);
+          
+          try {
+            // Update the session in Firebase
+            await databaseService.update('lesson_sessions', session.id, {
+              scheduled_date: sessionDate.toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            fixedCount++;
+            console.log(`✅ Fixed session ${session.id} time from 10 AM to 8 AM`);
+          } catch (error) {
+            console.error(`Failed to fix session ${session.id}:`, error);
+          }
+        }
+      }
+      
+      // Refresh sessions
+      await fetchSessions(studentData.id);
+      
+      if (fixedCount > 0) {
+        toast.success(`Fixed ${fixedCount} session${fixedCount !== 1 ? 's' : ''} to correct time!`);
+      } else {
+        toast.success('All sessions already have correct times!');
+      }
+    } catch (error) {
+      console.error('Error fixing session times:', error);
+      toast.error('Failed to fix session times');
+    }
+  };
+  
+  const cleanupOrphanedSessions = async () => {
+    if (!studentData?.id) return;
+    
+    try {
+      console.log('🧹 Starting cleanup of orphaned sessions...');
+      toast.info('Checking for orphaned sessions...');
+      
+      // Get all sessions for this student
+      const allStudentSessions = sessions;
+      
+      // Get all subscription IDs
+      const validSubscriptionIds = subscriptions.map(sub => sub.id);
+      console.log('Valid subscription IDs:', validSubscriptionIds);
+      
+      // Find orphaned sessions (sessions without valid subscription)
+      const orphanedSessions = allStudentSessions.filter(session => {
+        const subId = session.subscription_id || session.subscriptionId;
+        return subId && !validSubscriptionIds.includes(subId);
+      });
+      
+      console.log(`Found ${orphanedSessions.length} orphaned sessions to delete`);
+      
+      if (orphanedSessions.length === 0) {
+        toast.success('No orphaned sessions found!');
+        return;
+      }
+      
+      // Delete each orphaned session
+      let deletedCount = 0;
+      for (const session of orphanedSessions) {
+        try {
+          await databaseService.delete('lesson_sessions', session.id);
+          deletedCount++;
+          console.log(`✅ Deleted orphaned session ${session.id}`);
+        } catch (error) {
+          console.error(`Failed to delete session ${session.id}:`, error);
+        }
+      }
+      
+      // Refresh sessions
+      await fetchSessions(studentData.id);
+      
+      toast.success(`Cleaned up ${deletedCount} orphaned session${deletedCount !== 1 ? 's' : ''}!`);
+    } catch (error) {
+      console.error('Error cleaning up orphaned sessions:', error);
+      toast.error('Failed to cleanup orphaned sessions');
     }
   };
 
@@ -606,6 +917,7 @@ const StudentDashboard = () => {
                       value={userTimezone}
                       onValueChange={handleTimezoneChange}
                       placeholder="Select your timezone"
+                      label=""
                     />
                   </div>
                 </DialogContent>
@@ -790,33 +1102,59 @@ const StudentDashboard = () => {
                   <CardTitle>Upcoming Sessions</CardTitle>
                   <CardDescription>Your scheduled lessons</CardDescription>
                 </div>
-                {/* Debug button - remove in production */}
-                {process.env.NODE_ENV === 'development' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      const activeSubscription = subscriptions.find(sub => sub.status === 'active') || subscriptions[0];
-                      if (studentData && activeSubscription) {
-                        try {
-                          const sessionId = await createTestSession(
-                            studentData.id,
-                            activeSubscription.id,
-                            studentData.school_id || studentData.schoolId || ''
-                          );
-                          toast.success('Test session created!');
-                          await fetchSessions(studentData.id);
-                        } catch (error) {
-                          toast.error('Failed to create test session');
+                <div className="flex gap-2">
+                  {/* Fix times button */}
+                  {sessions.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={fixSessionTimes}
+                      className="text-blue-600 hover:text-blue-700"
+                    >
+                      <Clock className="h-4 w-4 mr-1" />
+                      Fix Times
+                    </Button>
+                  )}
+                  {/* Cleanup button for orphaned sessions */}
+                  {sessions.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={cleanupOrphanedSessions}
+                      className="text-orange-600 hover:text-orange-700"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Clean Up
+                    </Button>
+                  )}
+                  {/* Debug button - only in development */}
+                  {process.env.NODE_ENV === 'development' && subscriptions.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const activeSubscription = subscriptions.find(sub => sub.status === 'active') || subscriptions[0];
+                        if (studentData && activeSubscription) {
+                          try {
+                            const sessionId = await createTestSession(
+                              studentData.id,
+                              activeSubscription.id,
+                              studentData.school_id || studentData.schoolId || ''
+                            );
+                            toast.success('Test session created!');
+                            await fetchSessions(studentData.id);
+                          } catch (error) {
+                            toast.error('Failed to create test session');
+                          }
+                        } else {
+                          toast.error('No subscription found for test session');
                         }
-                      } else {
-                        toast.error('No subscription found for test session');
-                      }
-                    }}
-                  >
-                    Test Session
-                  </Button>
-                )}
+                      }}
+                    >
+                      Test Session
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
