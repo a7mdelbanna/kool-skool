@@ -24,26 +24,41 @@ const StudentPortal: React.FC = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const studentAuth = localStorage.getItem('studentAuth');
+      // Check both user context and localStorage for authentication
+      const storedUser = localStorage.getItem('user');
       
-      if (!studentAuth) {
+      if (!user && !storedUser) {
         navigate('/student-login');
         return;
       }
 
       try {
-        const { studentId } = JSON.parse(studentAuth);
+        // Use user from context or parse from localStorage
+        const currentUser = user || (storedUser ? JSON.parse(storedUser) : null);
+        
+        if (!currentUser || currentUser.role !== 'student') {
+          navigate('/student-login');
+          return;
+        }
+
+        // For students, the user ID is their student ID
+        const studentId = currentUser.id;
         
         // Fetch student data
         const student = await databaseService.getById('students', studentId);
         
         if (!student) {
-          localStorage.removeItem('studentAuth');
-          navigate('/student-login');
-          return;
+          // If student document doesn't exist, create basic student data from user
+          setStudentData({
+            id: currentUser.id,
+            first_name: currentUser.firstName,
+            last_name: currentUser.lastName,
+            email: currentUser.email,
+            school_id: currentUser.schoolId
+          });
+        } else {
+          setStudentData(student);
         }
-
-        setStudentData(student);
         
         // Here you would fetch real stats from Firebase
         // For now using mock data
@@ -51,14 +66,17 @@ const StudentPortal: React.FC = () => {
         
       } catch (error) {
         console.error('Error checking auth:', error);
-        navigate('/student-login');
+        // Don't immediately redirect on error, user might still be valid
+        if (!user && !storedUser) {
+          navigate('/student-login');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [navigate, user]);
 
   const fetchStudentStats = async (studentId: string) => {
     try {

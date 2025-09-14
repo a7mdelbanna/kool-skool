@@ -96,7 +96,6 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem('studentAuth');
     localStorage.removeItem('user');
     setUser(null);
     navigate('/student-login');
