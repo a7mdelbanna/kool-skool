@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { UserContext } from '@/App';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/providers/theme-provider';
 
 interface StudentSidebarProps {
   studentData?: any;
@@ -111,7 +111,10 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
   return (
     <motion.div 
       className={cn(
-        "relative flex flex-col h-screen bg-gradient-to-b from-background to-muted/20 border-r transition-all duration-300",
+        "relative flex flex-col h-screen transition-all duration-300",
+        "bg-gradient-to-b from-slate-50 via-white to-slate-50/80",
+        "dark:from-slate-900 dark:via-gray-900 dark:to-black/90",
+        "border-r border-slate-200 dark:border-slate-800",
         isCollapsed ? "w-20" : "w-72"
       )}
       initial={{ x: -100, opacity: 0 }}
@@ -123,7 +126,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
         variant="ghost"
         size="icon"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-4 top-20 z-50 rounded-full bg-background shadow-md hover:shadow-lg transition-all"
+        className="absolute -right-4 top-20 z-50 rounded-full bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-all border border-slate-200 dark:border-slate-700"
       >
         {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </Button>
@@ -138,8 +141,8 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
             transition={{ type: "spring", stiffness: 300 }}
           >
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg blur-md opacity-75"></div>
-              <div className="relative bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-2">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg blur-md opacity-75 dark:opacity-50"></div>
+              <div className="relative bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-2 shadow-lg">
                 <BookOpen className="h-6 w-6 text-white" />
               </div>
             </div>
@@ -153,15 +156,28 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
           {/* Theme Toggle & Notifications */}
           {!isCollapsed && (
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="icon" onClick={toggleTheme} className="relative">
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={toggleTheme} 
+                className="relative hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-4 w-4 text-yellow-500" />
+                ) : (
+                  <Moon className="h-4 w-4 text-slate-600" />
+                )}
               </Button>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="relative hover:bg-slate-100 dark:hover:bg-slate-800">
+                <Bell className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                 {notifications > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center shadow-lg"
+                  >
                     {notifications}
-                  </span>
+                  </motion.span>
                 )}
               </Button>
             </div>
@@ -172,15 +188,15 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
         <AnimatePresence>
           {!isCollapsed && (
             <motion.div 
-              className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl p-4 space-y-3"
+              className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 dark:from-blue-600/20 dark:to-purple-600/20 rounded-xl p-4 space-y-3 backdrop-blur-sm border border-blue-200/20 dark:border-blue-800/30"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
               <div className="flex items-center space-x-3">
-                <Avatar className="h-12 w-12 ring-2 ring-blue-500/20">
+                <Avatar className="h-12 w-12 ring-2 ring-blue-500/20 dark:ring-blue-400/30 shadow-lg">
                   <AvatarImage src={studentData?.avatar} />
-                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold">
                     {initials || 'ST'}
                   </AvatarFallback>
                 </Avatar>
@@ -209,8 +225,13 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
                   </span>
                   <span>{stats?.nextLevelXp || 100} XP</span>
                 </div>
-                <Progress value={xpProgress} className="h-2 bg-blue-100 dark:bg-blue-900">
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all" />
+                <Progress value={xpProgress} className="h-2 bg-slate-200 dark:bg-slate-700">
+                  <motion.div 
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-sm"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${xpProgress}%` }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                  />
                 </Progress>
               </div>
 
@@ -237,7 +258,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
         </AnimatePresence>
       </div>
 
-      <Separator />
+      <Separator className="bg-slate-200 dark:bg-slate-800" />
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
@@ -257,8 +278,8 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
                 className={cn(
                   "group flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-all",
                   isActive 
-                    ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-600 dark:text-blue-400" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 dark:from-blue-600/30 dark:to-purple-600/30 text-blue-600 dark:text-blue-400 shadow-sm" 
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
                 )}
               >
                 <div className="flex items-center space-x-3">
@@ -289,7 +310,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
         })}
       </nav>
 
-      <Separator />
+      <Separator className="bg-slate-200 dark:bg-slate-800" />
 
       {/* Footer Actions */}
       <div className="p-4 space-y-2">

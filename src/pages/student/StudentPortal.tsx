@@ -5,7 +5,7 @@ import StudentSidebar from '@/components/student-portal/layout/StudentSidebar';
 import { databaseService } from '@/services/firebase/database.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from '@/components/ui/toaster';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider } from '@/providers/theme-provider';
 
 const StudentPortal: React.FC = () => {
   const { user } = useContext(UserContext);
@@ -111,8 +111,8 @@ const StudentPortal: React.FC = () => {
   }
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <div className="flex h-screen overflow-hidden bg-background">
+    <ThemeProvider defaultTheme="system" storageKey="tutorflow-theme">
+      <div className="flex h-screen overflow-hidden bg-gradient-to-br from-background via-background to-background/95 dark:from-gray-950 dark:via-gray-900 dark:to-black">
         {/* Sidebar */}
         <StudentSidebar studentData={studentData} stats={stats} />
         
@@ -120,7 +120,7 @@ const StudentPortal: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar */}
           <motion.header 
-            className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4"
+            className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 px-6 py-4"
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
           >
@@ -154,7 +154,7 @@ const StudentPortal: React.FC = () => {
           </motion.header>
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
+          <main className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 via-white to-slate-50/50 dark:from-slate-950 dark:via-gray-900 dark:to-black">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}

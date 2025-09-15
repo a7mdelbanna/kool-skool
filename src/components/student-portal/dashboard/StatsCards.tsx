@@ -105,13 +105,13 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
             whileHover={{ scale: 1.02 }}
             className="relative"
           >
-            <Card className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all">
+            <Card className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all dark:bg-slate-900/50 dark:border dark:border-slate-800">
               {/* Gradient Background */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${card.bgColor} opacity-50`} />
+              <div className={`absolute inset-0 bg-gradient-to-br ${card.bgColor} opacity-50 dark:opacity-30`} />
               
               <CardHeader className="relative pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
                     {card.title}
                   </CardTitle>
                   <div className={`p-2 rounded-lg bg-gradient-to-r ${card.color}`}>
@@ -131,11 +131,11 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
                       decimals={card.suffix === '%' ? 1 : 0}
                     />
                   </span>
-                  <span className="text-sm text-muted-foreground">{card.suffix}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">{card.suffix}</span>
                 </div>
                 
                 {card.progress !== undefined && (
-                  <Progress value={card.progress} className="h-2">
+                  <Progress value={card.progress} className="h-2 bg-slate-200 dark:bg-slate-700">
                     <div 
                       className={`h-full bg-gradient-to-r ${card.color} rounded-full transition-all`}
                       style={{ width: `${card.progress}%` }}
@@ -143,7 +143,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
                   </Progress>
                 )}
                 
-                <p className="text-xs text-muted-foreground">{card.description}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">{card.description}</p>
                 
                 {card.trend && (
                   <div className="flex items-center space-x-1">

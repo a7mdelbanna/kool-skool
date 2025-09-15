@@ -122,7 +122,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ nextSession }) => {
   };
 
   return (
-    <Card>
+    <Card className="shadow-lg dark:bg-slate-900/50 dark:border-slate-800">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
@@ -144,10 +144,10 @@ const QuickActions: React.FC<QuickActionsProps> = ({ nextSession }) => {
                 <Button
                   onClick={action.action}
                   disabled={action.disabled}
-                  className="relative w-full h-auto p-0 overflow-hidden group hover:shadow-lg transition-all"
+                  className="relative w-full h-auto p-0 overflow-hidden group hover:shadow-xl transition-all border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
                   variant="ghost"
                 >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${action.bgGradient} opacity-90 group-hover:opacity-100 transition-opacity`} />
+                  <div className={`absolute inset-0 bg-gradient-to-br ${action.bgGradient} opacity-90 group-hover:opacity-100 transition-opacity dark:opacity-80 dark:group-hover:opacity-90`} />
                   
                   <div className="relative p-4 w-full text-left space-y-2">
                     <div className="flex items-start justify-between">
@@ -168,7 +168,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ nextSession }) => {
                   </div>
                   
                   {/* Hover Effect */}
-                  <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform" />
+                  <div className="absolute inset-0 bg-white/10 dark:bg-white/5 translate-y-full group-hover:translate-y-0 transition-transform" />
                 </Button>
               </motion.div>
             );

@@ -126,9 +126,9 @@ const EnhancedStudentDashboard: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-8 text-white"
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-700 dark:via-purple-700 dark:to-pink-700 p-8 text-white shadow-2xl"
       >
-        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
         <div className="relative z-10 max-w-3xl">
           <h1 className="text-4xl font-bold mb-4">
             Welcome back, {studentData?.first_name}! 🚀
@@ -171,7 +171,7 @@ const EnhancedStudentDashboard: React.FC = () => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
             >
-              <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20">
+              <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/30 dark:to-purple-950/30 backdrop-blur-sm shadow-lg">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Next Session</CardTitle>
@@ -225,7 +225,7 @@ const EnhancedStudentDashboard: React.FC = () => {
       </div>
 
       {/* Progress Overview */}
-      <Card>
+      <Card className="shadow-lg dark:bg-slate-900/50 dark:border-slate-800">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Weekly Progress</CardTitle>
@@ -248,7 +248,7 @@ const EnhancedStudentDashboard: React.FC = () => {
                   <span className="font-medium">{skill.label}</span>
                   <span className="text-muted-foreground">{skill.value}%</span>
                 </div>
-                <Progress value={skill.value} className="h-3">
+                <Progress value={skill.value} className="h-3 bg-slate-200 dark:bg-slate-700">
                   <div 
                     className={`h-full bg-gradient-to-r ${skill.color} rounded-full transition-all`}
                     style={{ width: `${skill.value}%` }}

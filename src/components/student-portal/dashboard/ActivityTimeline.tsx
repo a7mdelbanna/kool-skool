@@ -117,7 +117,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
   };
 
   return (
-    <Card className="h-full">
+    <Card className="h-full shadow-lg dark:bg-slate-900/50 dark:border-slate-800">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold">Recent Activity</CardTitle>
@@ -131,7 +131,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
         <ScrollArea className="h-[400px] pr-4">
           <div className="relative">
             {/* Timeline line */}
-            <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500/20 via-purple-500/20 to-transparent"></div>
+            <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500/20 via-purple-500/20 to-transparent dark:from-blue-400/20 dark:via-purple-400/20"></div>
             
             {/* Timeline items */}
             <div className="space-y-6">
@@ -150,8 +150,8 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
                     <div className="relative z-10">
                       <motion.div
                         whileHover={{ scale: 1.1 }}
-                        className={`p-2.5 rounded-full bg-background border-2 ${
-                          index === 0 ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-muted'
+                        className={`p-2.5 rounded-full bg-white dark:bg-slate-800 border-2 ${
+                          index === 0 ? 'border-blue-500 shadow-lg shadow-blue-500/20 dark:shadow-blue-400/20' : 'border-slate-300 dark:border-slate-700'
                         }`}
                       >
                         <Icon className={`h-4 w-4 ${activity.color}`} />
@@ -169,7 +169,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
                             <p className="font-medium text-sm">{activity.title}</p>
                             {getActivityBadge(activity.type)}
                           </div>
-                          <p className="text-xs text-muted-foreground">{activity.description}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400">{activity.description}</p>
                         </div>
                         
                         {activity.points && (
@@ -187,7 +187,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
                         )}
                       </div>
                       
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-slate-500 dark:text-slate-500">
                         {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
                       </p>
                     </div>
