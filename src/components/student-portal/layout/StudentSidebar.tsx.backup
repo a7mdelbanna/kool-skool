@@ -76,47 +76,47 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
   );
 
   const navigation = [
-    {
-      name: t('navigation:dashboard'),
-      href: '/student-dashboard',
+    { 
+      name: 'Dashboard', 
+      href: '/student-dashboard', 
       icon: LayoutDashboard,
-      badge: null
+      badge: null 
     },
-    {
-      name: t('navigation:mySubscriptions'),
-      href: '/student-dashboard/subscriptions',
+    { 
+      name: 'My Subscriptions', 
+      href: '/student-dashboard/subscriptions', 
       icon: Calendar,
-      badge: t('navigation:active')
+      badge: 'Active' 
     },
-    {
-      name: t('navigation:myLearning'),
-      href: '/student-dashboard/learning',
+    { 
+      name: 'My Learning', 
+      href: '/student-dashboard/learning', 
       icon: BookOpen,
-      badge: t('navigation:new')
+      badge: 'New' 
     },
-    {
-      name: t('navigation:practiceCenter'),
-      href: '/student-dashboard/practice',
+    { 
+      name: 'Practice Center', 
+      href: '/student-dashboard/practice', 
       icon: Brain,
-      badge: null
+      badge: null 
     },
-    {
-      name: t('navigation:myProgress'),
-      href: '/student-dashboard/progress',
+    { 
+      name: 'My Progress', 
+      href: '/student-dashboard/progress', 
       icon: TrendingUp,
-      badge: null
+      badge: null 
     },
-    {
-      name: t('navigation:resources'),
-      href: '/student-dashboard/resources',
+    { 
+      name: 'Resources', 
+      href: '/student-dashboard/resources', 
       icon: FolderOpen,
-      badge: '5'
+      badge: '5' 
     },
-    {
-      name: t('navigation:messages'),
-      href: '/student-dashboard/messages',
+    { 
+      name: 'Messages', 
+      href: '/student-dashboard/messages', 
       icon: MessageSquare,
-      badge: '2'
+      badge: '2' 
     },
   ];
 
@@ -261,7 +261,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
                     <h3 className="font-bold text-lg text-white">
                       {fullName}
                     </h3>
-                    <p className="text-xs text-slate-400">{t('common:activeStudent')}</p>
+                    <p className="text-xs text-slate-400">Active Student</p>
                   </div>
                   
                   {/* Badges */}
@@ -298,11 +298,6 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
                       label=""
                       placeholder="Select your timezone"
                     />
-                  </div>
-
-                  {/* Language Selector */}
-                  <div className="relative z-50">
-                    <LanguageSelector />
                   </div>
 
                   <div className="flex items-center text-slate-400">

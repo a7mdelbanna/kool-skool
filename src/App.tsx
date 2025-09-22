@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/config/firebase';
+import './i18n'; // Initialize i18n
 import Login from '@/pages/Login';
 import StudentLogin from '@/pages/StudentLogin';
 import SuperAdminLogin from '@/pages/SuperAdminLogin';
