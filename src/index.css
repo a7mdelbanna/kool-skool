@@ -21,29 +21,13 @@
   }
 }
 
-/* Timezone Selector Dark Mode Styles */
-.timezone-selector-dark button {
-  @apply bg-slate-800/50 border-slate-700 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600 cursor-pointer;
+/* Timezone Selector Dark Mode Styles - Applied to StudentSidebar */
+.dark .student-portal-sidebar button[role="combobox"] {
+  @apply bg-slate-800/50 border-slate-700 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600;
 }
 
-.dark .timezone-selector-dark button {
-  @apply bg-slate-800/50 border-slate-700 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600 cursor-pointer;
-}
-
-.timezone-selector-dark button:disabled {
-  @apply opacity-50 cursor-not-allowed;
-}
-
-.timezone-selector-dark [role="combobox"][aria-expanded="true"] {
-  @apply bg-slate-700/50 border-slate-600;
-}
-
-.dark .timezone-selector-dark [role="combobox"][aria-expanded="true"] {
-  @apply bg-slate-700/50 border-slate-600;
-}
-
-/* Make sure the dropdown is above other elements */
-.timezone-selector-dark [role="presentation"] {
+/* Ensure dropdowns appear above everything */
+[data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }
 

@@ -145,7 +145,7 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
   return (
     <motion.div 
       className={cn(
-        "relative flex flex-col h-screen transition-all duration-300",
+        "student-portal-sidebar relative flex flex-col h-screen transition-all duration-300",
         "bg-gradient-to-b from-slate-50 via-white to-slate-50/80",
         "dark:from-slate-900 dark:via-gray-900 dark:to-black/90",
         "border-r border-slate-200 dark:border-slate-800",
@@ -284,19 +284,17 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
                   </div>
 
                   {/* Timezone Selector */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative z-50">
                     <div className="flex items-center text-slate-400 mb-2">
                       <Globe className="h-4 w-4 mr-2 text-slate-500" />
                       <span className="text-xs">Your Timezone</span>
                     </div>
-                    <div className="timezone-selector-dark">
-                      <TimezoneSelector
-                        value={selectedTimezone}
-                        onValueChange={handleTimezoneChange}
-                        label=""
-                        placeholder="Select your timezone"
-                      />
-                    </div>
+                    <TimezoneSelector
+                      value={selectedTimezone}
+                      onValueChange={handleTimezoneChange}
+                      label=""
+                      placeholder="Select your timezone"
+                    />
                   </div>
 
                   <div className="flex items-center text-slate-400">
