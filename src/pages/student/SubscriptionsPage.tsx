@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -108,6 +109,7 @@ const SubscriptionsPage: React.FC = () => {
   const { studentData } = useOutletContext<any>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation(['subscription', 'common']);
   const [activeSubscriptions, setActiveSubscriptions] = useState<SubscriptionInfo[]>([]);
   const [pastSubscriptions, setPastSubscriptions] = useState<SubscriptionInfo[]>([]);
   const [upcomingLessons, setUpcomingLessons] = useState<DatabaseSession[]>([]);
@@ -465,15 +467,15 @@ const SubscriptionsPage: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400"><CheckCircle className="h-3 w-3 mr-1" />{t('subscription:completed')}</Badge>;
       case 'cancelled':
-        return <Badge className="bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400"><XCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
+        return <Badge className="bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400"><XCircle className="h-3 w-3 mr-1" />{t('subscription:cancelled')}</Badge>;
       case 'rescheduled':
-        return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400"><RefreshCw className="h-3 w-3 mr-1" />Rescheduled</Badge>;
+        return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400"><RefreshCw className="h-3 w-3 mr-1" />{t('subscription:rescheduled')}</Badge>;
       case 'moved':
-        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400"><ArrowRight className="h-3 w-3 mr-1" />Moved</Badge>;
+        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400"><ArrowRight className="h-3 w-3 mr-1" />{t('subscription:moved')}</Badge>;
       case 'scheduled':
-        return <Badge className="bg-purple-500/10 text-purple-600 border-purple-500/20 dark:bg-purple-500/20 dark:text-purple-400"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
+        return <Badge className="bg-purple-500/10 text-purple-600 border-purple-500/20 dark:bg-purple-500/20 dark:text-purple-400"><Clock className="h-3 w-3 mr-1" />{t('subscription:scheduled')}</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -570,8 +572,8 @@ const SubscriptionsPage: React.FC = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Subscriptions</h1>
-          <p className="text-muted-foreground mt-2 dark:text-gray-400">Manage your course subscriptions and upcoming sessions</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('subscription:title')}</h1>
+          <p className="text-muted-foreground mt-2 dark:text-gray-400">{t('subscription:description')}</p>
         </div>
         <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0 px-4 py-2">
           <Sparkles className="h-4 w-4 mr-2" />
@@ -583,8 +585,7 @@ const SubscriptionsPage: React.FC = () => {
       <Alert className="dark:bg-gray-800 dark:border-gray-700">
         <AlertCircle className="h-4 w-4 dark:text-gray-400" />
         <AlertDescription className="dark:text-gray-300">
-          Sessions must be cancelled at least {cancellationNotice} hours in advance.
-          Late cancellations may incur charges.
+          {t('subscription:cancellationNotice')}
         </AlertDescription>
       </Alert>
 
@@ -646,7 +647,7 @@ const SubscriptionsPage: React.FC = () => {
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <h4 className="font-semibold text-gray-900 dark:text-white">
-                                {subscription.course_name || 'General Course'}
+                                {subscription.course_name || t('subscription:generalCourse')}
                               </h4>
                               {subscription.teacher_name && (
                                 <p className="text-xs text-muted-foreground dark:text-gray-400">
@@ -654,7 +655,7 @@ const SubscriptionsPage: React.FC = () => {
                                 </p>
                               )}
                               <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                {subscription.session_count} Sessions • {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
+                                {subscription.session_count} {t('subscription:sessions')} • {subscription.duration_months} {subscription.duration_months !== 1 ? t('subscription:months') : t('subscription:month')}
                               </p>
                             </div>
                             <Badge className={cn(
@@ -669,10 +670,10 @@ const SubscriptionsPage: React.FC = () => {
                           <div className="space-y-2 text-sm">
                             <div className="flex items-center text-muted-foreground dark:text-gray-400">
                               <CalendarDays className="h-4 w-4 mr-2" />
-                              <span>{format(new Date(subscription.start_date), 'MMM d')} - {subscription.end_date ? format(new Date(subscription.end_date), 'MMM d, yyyy') : 'Ongoing'}</span>
+                              <span>{format(new Date(subscription.start_date), 'MMM d')} - {subscription.end_date ? format(new Date(subscription.end_date), 'MMM d, yyyy') : t('subscription:ongoing')}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground dark:text-gray-400">Sessions</span>
+                              <span className="text-muted-foreground dark:text-gray-400">{t('subscription:sessions')}</span>
                               <span className="font-medium text-gray-900 dark:text-white">
                                 {completedSessions}/{subscription.session_count}
                               </span>
@@ -901,7 +902,7 @@ const SubscriptionsPage: React.FC = () => {
                             onClick={() => handleJoinSession(session)}
                           >
                             <Video className="h-4 w-4 mr-2" />
-                            Join
+                            {t('subscription:join')}
                           </Button>
                           {canCancelSession(session) ? (
                             <Button
@@ -914,12 +915,12 @@ const SubscriptionsPage: React.FC = () => {
                               }}
                             >
                               <X className="h-4 w-4 mr-2" />
-                              Cancel
+                              {t('subscription:cancel')}
                             </Button>
                           ) : (
                             <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-gray-500">
                               <AlertCircle className="h-3 w-3" />
-                              <span>Cannot cancel (less than {cancellationNotice}h notice)</span>
+                              <span>{t('subscription:cannotCancel', { hours: cancellationNotice })}</span>
                             </div>
                           )}
                         </div>

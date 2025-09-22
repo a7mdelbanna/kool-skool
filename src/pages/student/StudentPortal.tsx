@@ -6,11 +6,13 @@ import { databaseService } from '@/services/firebase/database.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/providers/theme-provider';
+import { useTranslation } from 'react-i18next';
 
 const StudentPortal: React.FC = () => {
   const { user } = useContext(UserContext);
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation(['common', 'dashboard']);
   const [studentData, setStudentData] = useState<any>(null);
   const [stats, setStats] = useState({
     streak: 7,
@@ -127,7 +129,7 @@ const StudentPortal: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Welcome back, {studentData?.first_name || studentData?.firstName || 'Student'}! 👋
+                  {t('common:welcome', { name: studentData?.first_name || studentData?.firstName || 'Student' })}
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   {new Date().toLocaleDateString('en-US', { 
@@ -147,7 +149,7 @@ const StudentPortal: React.FC = () => {
                   className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all"
                   onClick={() => navigate('/student-dashboard/practice')}
                 >
-                  Start Practice
+                  {t('common:startPractice')}
                 </motion.button>
               </div>
             </div>
