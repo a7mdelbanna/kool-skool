@@ -47,6 +47,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import TimezoneSelector from '@/components/TimezoneSelector';
 
 interface StudentSidebarProps {
   studentData?: any;
@@ -67,6 +68,9 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
   const { theme, setTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [notifications, setNotifications] = useState(3);
+  const [selectedTimezone, setSelectedTimezone] = useState(
+    localStorage.getItem('userTimezone') || Intl.DateTimeFormat().resolvedOptions().timeZone
+  );
 
   const navigation = [
     { 
@@ -121,6 +125,12 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  const handleTimezoneChange = (timezone: string) => {
+    setSelectedTimezone(timezone);
+    localStorage.setItem('userTimezone', timezone);
+    // You can add an API call here to save the timezone to the user's profile
   };
 
   const xpProgress = stats ? (stats.xp / stats.nextLevelXp) * 100 : 0;
@@ -266,15 +276,28 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
               
               {/* Profile Details */}
               <div className="px-5 pb-4 space-y-3 border-t border-slate-700/50 pt-4">
-                <div className="space-y-2 text-sm">
+                <div className="space-y-3 text-sm">
                   <div className="flex items-center text-slate-400">
                     <Mail className="h-4 w-4 mr-2 text-slate-500" />
                     <span className="truncate">{studentData?.email || 'student@tutorflow.com'}</span>
                   </div>
-                  <div className="flex items-center text-slate-400">
-                    <Globe className="h-4 w-4 mr-2 text-slate-500" />
-                    <span>{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+
+                  {/* Timezone Selector */}
+                  <div className="space-y-2">
+                    <div className="flex items-center text-slate-400 mb-2">
+                      <Globe className="h-4 w-4 mr-2 text-slate-500" />
+                      <span className="text-xs">Your Timezone</span>
+                    </div>
+                    <div className="timezone-selector-dark">
+                      <TimezoneSelector
+                        value={selectedTimezone}
+                        onValueChange={handleTimezoneChange}
+                        label=""
+                        placeholder="Select your timezone"
+                      />
+                    </div>
                   </div>
+
                   <div className="flex items-center text-slate-400">
                     <MapPin className="h-4 w-4 mr-2 text-slate-500" />
                     <span>{studentData?.location || 'United States'}</span>

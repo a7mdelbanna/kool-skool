@@ -92,7 +92,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
       {cards.map((card, index) => {
         const Icon = card.icon;
         
@@ -105,9 +105,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
             whileHover={{ scale: 1.02 }}
             className="relative"
           >
-            <Card className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all dark:bg-slate-900/50 dark:border dark:border-slate-800">
+            <Card className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all bg-white dark:bg-slate-900/80 dark:border dark:border-slate-700/50 backdrop-blur-sm">
               {/* Gradient Background */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${card.bgColor} opacity-50 dark:opacity-30`} />
+              <div className={`absolute inset-0 bg-gradient-to-br ${card.bgColor} opacity-40 dark:opacity-20`} />
               
               <CardHeader className="relative pb-2">
                 <div className="flex items-center justify-between">
@@ -122,7 +122,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
               
               <CardContent className="relative space-y-2">
                 <div className="flex items-baseline space-x-2">
-                  <span className="text-3xl font-bold">
+                  <span className="text-3xl font-bold text-gray-900 dark:text-white">
                     <CountUp
                       start={0}
                       end={card.value}
@@ -131,7 +131,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
                       decimals={card.suffix === '%' ? 1 : 0}
                     />
                   </span>
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{card.suffix}</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-300">{card.suffix}</span>
                 </div>
                 
                 {card.progress !== undefined && (
@@ -143,12 +143,12 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
                   </Progress>
                 )}
                 
-                <p className="text-xs text-slate-600 dark:text-slate-400">{card.description}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300">{card.description}</p>
                 
                 {card.trend && (
                   <div className="flex items-center space-x-1">
-                    <TrendingUp className="h-3 w-3 text-green-500" />
-                    <span className="text-xs text-green-500 font-medium">{card.trend}</span>
+                    <TrendingUp className="h-3 w-3 text-green-500 dark:text-green-400" />
+                    <span className="text-xs text-green-500 dark:text-green-400 font-medium">{card.trend}</span>
                   </div>
                 )}
               </CardContent>

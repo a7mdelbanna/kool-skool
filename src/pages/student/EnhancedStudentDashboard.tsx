@@ -121,7 +121,7 @@ const EnhancedStudentDashboard: React.FC = () => {
   }, []);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-8">
       {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -162,20 +162,20 @@ const EnhancedStudentDashboard: React.FC = () => {
       <StatsCards stats={dashboardStats} />
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Quick Actions & Next Session */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-8">
           {/* Next Session Card */}
           {nextSession && (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
             >
-              <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/30 dark:to-purple-950/30 backdrop-blur-sm shadow-lg">
+              <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-r from-blue-50/80 to-purple-50/80 dark:from-slate-800/60 dark:to-purple-900/40 backdrop-blur-sm shadow-lg">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Next Session</CardTitle>
-                    <Badge className="bg-blue-500 text-white">
+                    <CardTitle className="text-lg text-gray-900 dark:text-gray-100">Next Session</CardTitle>
+                    <Badge className="bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700">
                       <Clock className="h-3 w-3 mr-1" />
                       Upcoming
                     </Badge>
@@ -185,21 +185,21 @@ const EnhancedStudentDashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <Calendar className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                         <SessionTimeDisplay date={nextSession.scheduled_date} />
                       </div>
                       <div className="flex items-center space-x-2">
-                        <BookOpen className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{nextSession.course?.name || 'General Course'}</span>
+                        <BookOpen className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                        <span className="text-sm text-gray-900 dark:text-gray-100">{nextSession.course?.name || 'General Course'}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Video className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">with {nextSession.teacher?.firstName || 'Your Teacher'}</span>
+                        <Video className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                        <span className="text-sm text-gray-900 dark:text-gray-100">with {nextSession.teacher?.firstName || 'Your Teacher'}</span>
                       </div>
                     </div>
                     <Button 
                       size="lg"
-                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all"
                     >
                       Join Session
                       <ChevronRight className="ml-2 h-4 w-4" />
@@ -225,11 +225,11 @@ const EnhancedStudentDashboard: React.FC = () => {
       </div>
 
       {/* Progress Overview */}
-      <Card className="shadow-lg dark:bg-slate-900/50 dark:border-slate-800">
+      <Card className="shadow-lg bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700/50 backdrop-blur-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Weekly Progress</CardTitle>
-            <Button variant="outline" size="sm">
+            <CardTitle className="text-gray-900 dark:text-gray-100">Weekly Progress</CardTitle>
+            <Button variant="outline" size="sm" className="hover:bg-slate-100 dark:hover:bg-slate-800">
               View Details
               <TrendingUp className="ml-2 h-4 w-4" />
             </Button>
@@ -245,8 +245,8 @@ const EnhancedStudentDashboard: React.FC = () => {
             ].map((skill) => (
               <div key={skill.label} className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">{skill.label}</span>
-                  <span className="text-muted-foreground">{skill.value}%</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{skill.label}</span>
+                  <span className="text-slate-600 dark:text-slate-400">{skill.value}%</span>
                 </div>
                 <Progress value={skill.value} className="h-3 bg-slate-200 dark:bg-slate-700">
                   <div 

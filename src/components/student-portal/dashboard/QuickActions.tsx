@@ -122,19 +122,19 @@ const QuickActions: React.FC<QuickActionsProps> = ({ nextSession }) => {
   };
 
   return (
-    <Card className="shadow-lg dark:bg-slate-900/50 dark:border-slate-800">
-      <CardHeader>
+    <Card className="shadow-lg bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700/50 backdrop-blur-sm">
+      <CardHeader className="p-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
+          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">Quick Actions</CardTitle>
           <Sparkles className="h-5 w-5 text-yellow-500" />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         <motion.div
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
         >
           {actions.map((action) => {
             const Icon = action.icon;
@@ -151,11 +151,11 @@ const QuickActions: React.FC<QuickActionsProps> = ({ nextSession }) => {
                   
                   <div className="relative p-4 w-full text-left space-y-2">
                     <div className="flex items-start justify-between">
-                      <div className="p-2 rounded-lg bg-white/20 backdrop-blur-sm">
+                      <div className="p-2 rounded-lg bg-white/20 dark:bg-white/10 backdrop-blur-sm">
                         <Icon className={`h-5 w-5 ${action.color}`} />
                       </div>
                       {action.badge && (
-                        <Badge className="bg-white/20 text-white border-white/30 text-xs">
+                        <Badge className="bg-white/20 dark:bg-white/10 text-white border-white/30 dark:border-white/20 text-xs">
                           {action.badge}
                         </Badge>
                       )}
@@ -163,7 +163,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ nextSession }) => {
                     
                     <div>
                       <h3 className="font-semibold text-white text-sm">{action.title}</h3>
-                      <p className="text-xs text-white/80 mt-1">{action.description}</p>
+                      <p className="text-xs text-white/90 dark:text-white/80 mt-1">{action.description}</p>
                     </div>
                   </div>
                   

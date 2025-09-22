@@ -36,6 +36,7 @@ import SpeakingTopics from '@/pages/SpeakingTopics';
 import StudentSpeaking from '@/pages/StudentSpeaking';
 import AssignSpeakingTopic from '@/pages/AssignSpeakingTopic';
 import Birthdays from '@/pages/Birthdays';
+import SubscriptionsPage from '@/pages/SubscriptionsPage';
 
 const MainLayout = () => {
   return (
@@ -52,6 +53,7 @@ const MainLayout = () => {
                   <Route path="/students" element={<Students />} />
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/courses" element={<Courses />} />
+                  <Route path="/subscriptions" element={<SubscriptionsPage />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/online-booking" element={<OnlineBooking />} />
                   <Route path="/attendance" element={<Attendance />} />

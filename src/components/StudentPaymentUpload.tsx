@@ -379,10 +379,10 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] dark:bg-gray-800 dark:border-gray-700">
         <DialogHeader>
-          <DialogTitle>Submit Payment</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="dark:text-white">Submit Payment</DialogTitle>
+          <DialogDescription className="dark:text-gray-400">
             Choose your payment method and submit payment for your subscription
           </DialogDescription>
         </DialogHeader>
@@ -393,7 +393,9 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
             <Button
               variant={paymentMethod === 'manual' ? 'default' : 'outline'}
               onClick={() => setPaymentMethod('manual')}
-              className="w-full"
+              className={paymentMethod === 'manual'
+                ? "w-full bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-600 dark:hover:bg-blue-700"
+                : "w-full bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600 border"}
             >
               <FileImage className="h-4 w-4 mr-2" />
               Manual Payment
@@ -401,7 +403,9 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
             <Button
               variant={paymentMethod === 'stripe' ? 'default' : 'outline'}
               onClick={() => setPaymentMethod('stripe')}
-              className="w-full"
+              className={paymentMethod === 'stripe'
+                ? "w-full bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-600 dark:hover:bg-blue-700"
+                : "w-full bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600 border"}
             >
               <CreditCard className="h-4 w-4 mr-2" />
               Card Payment
@@ -411,14 +415,16 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
           {/* Currency Selection */}
           {availableCurrencies.length > 1 && (
             <div className="space-y-2">
-              <Label>Select Currency</Label>
-              <div className="flex gap-2">
+              <Label className="dark:text-gray-300">Select Currency</Label>
+              <div className="flex gap-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 {availableCurrencies.map((curr) => (
                   <Button
                     key={curr}
                     variant={selectedCurrency === curr ? 'default' : 'outline'}
                     onClick={() => setSelectedCurrency(curr)}
-                    className="flex-1"
+                    className={selectedCurrency === curr
+                      ? "flex-1 bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-600 dark:hover:bg-blue-700"
+                      : "flex-1 bg-white dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200 dark:hover:bg-gray-500"}
                     size="sm"
                   >
                     {curr}
@@ -426,8 +432,8 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
                 ))}
               </div>
               {selectedCurrency !== currency && (
-                <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                  Note: Original amount is <strong>{amount} {currency}</strong>. Please ensure correct amount in <strong>{selectedCurrency}</strong>.
+                <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400 p-2 rounded border border-amber-200 dark:border-amber-800">
+                  <span className="font-medium">Note:</span> Original amount is <strong>{amount} {currency}</strong>. Please ensure correct amount in <strong>{selectedCurrency}</strong>.
                 </p>
               )}
             </div>
@@ -435,9 +441,9 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
           
           {/* Payment Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Payment Amount</Label>
+            <Label htmlFor="amount" className="dark:text-gray-300">Payment Amount</Label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
+              <span className="absolute left-3 top-2.5 text-sm text-muted-foreground dark:text-gray-400">
                 {selectedCurrency === 'USD' ? '$' : 
                  selectedCurrency === 'EUR' ? '€' : 
                  selectedCurrency === 'GBP' ? '£' : 
@@ -483,9 +489,9 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
                 placeholder="0.00"
-                className="pl-10"
+                className="pl-10 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
               />
-              <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">
+              <span className="absolute right-3 top-2.5 text-sm text-muted-foreground dark:text-gray-400">
                 {selectedCurrency}
               </span>
             </div>
@@ -500,22 +506,22 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
                   <span className="ml-2 text-sm">Loading payment methods...</span>
                 </div>
               ) : availableCurrencies.length === 0 ? (
-                <div className="text-center py-4 text-sm text-gray-500">
+                <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
                   No payment methods configured in the school.
                   <br />
                   Please contact your administrator.
                 </div>
               ) : manualPaymentAccounts.length > 0 ? (
                 <div className="space-y-2">
-                  <Label>Select Payment Method</Label>
-                  <div className="space-y-2">
+                  <Label className="dark:text-gray-300">Select Payment Method</Label>
+                  <div className="space-y-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     {manualPaymentAccounts.map((account) => (
                       <div 
                         key={account.id}
                         className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                          selectedAccount === account.id 
-                            ? 'border-primary bg-primary/5' 
-                            : 'border-gray-200 hover:border-gray-300'
+                          selectedAccount === account.id
+                            ? 'border-primary bg-primary/5 dark:bg-primary/10 dark:border-primary'
+                            : 'border-gray-200 hover:border-gray-300 dark:border-gray-600 dark:hover:border-gray-500'
                         }`}
                         onClick={() => setSelectedAccount(account.id)}
                       >
@@ -524,38 +530,38 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
                             type="radio"
                             checked={selectedAccount === account.id}
                             onChange={() => setSelectedAccount(account.id)}
-                            className="mt-1"
+                            className="mt-1 accent-blue-500 dark:accent-blue-400"
                           />
                           <div className="flex-1">
                             <div className="flex items-start justify-between">
                               <div>
-                                <p className="font-medium text-sm">
+                                <p className="font-medium text-sm dark:text-white">
                                   {account.account_name || account.name}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                   {account.bank_name || 'Bank Account'}
                                 </p>
                               </div>
-                              <span className="text-xs font-medium text-gray-500">
+                              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                                 {account.currency_code || account.currency}
                               </span>
                             </div>
                             {account.payment_instructions && (
-                              <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                                <p className="font-medium text-blue-900 mb-1">Payment Instructions:</p>
-                                <p className="text-blue-700 whitespace-pre-wrap">
+                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+                                <p className="font-medium text-blue-900 dark:text-blue-400 mb-1">Payment Instructions:</p>
+                                <p className="text-blue-700 dark:text-blue-300 whitespace-pre-wrap">
                                   {account.payment_instructions}
                                 </p>
                               </div>
                             )}
                             <div className="mt-2 space-y-1">
                               {account.account_number && (
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-600 dark:text-gray-300">
                                   <span className="font-medium">Account:</span> {account.account_number}
                                 </p>
                               )}
                               {account.routing_code && (
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-600 dark:text-gray-300">
                                   <span className="font-medium">Routing/SWIFT:</span> {account.routing_code}
                                 </p>
                               )}
@@ -567,7 +573,7 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-4 text-sm text-gray-500">
+                <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
                   No payment methods available for {selectedCurrency}.
                   {availableCurrencies.length > 0 && (
                     <>
@@ -580,11 +586,11 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
               
               {/* File Upload */}
               <div className="space-y-2">
-                <Label htmlFor="screenshot">Payment Screenshot</Label>
+                <Label htmlFor="screenshot" className="dark:text-gray-300">Payment Screenshot</Label>
                 {!selectedFile ? (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Upload className="h-10 w-10 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
+                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center bg-gray-50 dark:bg-gray-700/50">
+                    <Upload className="h-10 w-10 mx-auto text-gray-400 dark:text-gray-500 mb-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                       Upload a screenshot of your payment
                     </p>
                     <Input
@@ -596,13 +602,13 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
                     />
                     <Label
                       htmlFor="screenshot"
-                      className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                      className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
                     >
                       Choose File
                     </Label>
                   </div>
                 ) : (
-                  <div className="relative border rounded-lg p-2">
+                  <div className="relative border dark:border-gray-600 rounded-lg p-2">
                     {previewUrl && (
                       <img
                         src={previewUrl}
@@ -614,11 +620,11 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={handleRemoveFile}
-                      className="absolute top-2 right-2"
+                      className="absolute top-2 right-2 dark:text-gray-400 dark:hover:text-gray-200"
                     >
                       <X className="h-4 w-4" />
                     </Button>
-                    <p className="text-xs text-center mt-2 text-gray-600">
+                    <p className="text-xs text-center mt-2 text-gray-600 dark:text-gray-400">
                       {selectedFile.name}
                     </p>
                   </div>
@@ -627,23 +633,26 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
               
               {/* Payment Notes */}
               <div className="space-y-2">
-                <Label htmlFor="notes">Payment Notes (Optional)</Label>
-                <Textarea
-                  id="notes"
-                  value={paymentNotes}
-                  onChange={(e) => setPaymentNotes(e.target.value)}
-                  placeholder="Add any additional information about this payment..."
-                  rows={3}
-                />
+                <Label htmlFor="notes" className="dark:text-gray-300">Payment Notes (Optional)</Label>
+                <div className="p-1 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <Textarea
+                    id="notes"
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="Add any additional information about this payment..."
+                    rows={3}
+                    className="w-full bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                  />
+                </div>
               </div>
             </>
           ) : (
             <div className="text-center py-8">
-              <CreditCard className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-sm text-gray-600">
+              <CreditCard className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 mb-4" />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Secure card payment powered by Stripe
               </p>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 Coming soon...
               </p>
             </div>
@@ -651,7 +660,7 @@ export const StudentPaymentUpload: React.FC<PaymentUploadProps> = ({
         </div>
         
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
             Cancel
           </Button>
           {paymentMethod === 'manual' ? (

@@ -102,39 +102,39 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
   const getActivityBadge = (type: string) => {
     switch (type) {
       case 'achievement':
-        return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Achievement</Badge>;
+        return <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20">Achievement</Badge>;
       case 'lesson':
-        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">Lesson</Badge>;
+        return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">Lesson</Badge>;
       case 'homework':
-        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Homework</Badge>;
+        return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">Homework</Badge>;
       case 'practice':
-        return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">Practice</Badge>;
+        return <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">Practice</Badge>;
       case 'feedback':
-        return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Feedback</Badge>;
+        return <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20">Feedback</Badge>;
       default:
         return <Badge variant="outline">Activity</Badge>;
     }
   };
 
   return (
-    <Card className="h-full shadow-lg dark:bg-slate-900/50 dark:border-slate-800">
-      <CardHeader>
+    <Card className="h-full shadow-lg bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700/50 backdrop-blur-sm">
+      <CardHeader className="p-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Recent Activity</CardTitle>
-          <Badge variant="outline" className="text-xs">
+          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">Recent Activity</CardTitle>
+          <Badge variant="outline" className="text-xs border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400">
             <Clock className="h-3 w-3 mr-1" />
             Last 7 days
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         <ScrollArea className="h-[400px] pr-4">
           <div className="relative">
             {/* Timeline line */}
             <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500/20 via-purple-500/20 to-transparent dark:from-blue-400/20 dark:via-purple-400/20"></div>
             
             {/* Timeline items */}
-            <div className="space-y-6">
+            <div className="space-y-8">
               {timelineActivities.map((activity, index) => {
                 const Icon = activity.icon;
                 
@@ -166,7 +166,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <p className="font-medium text-sm">{activity.title}</p>
+                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{activity.title}</p>
                             {getActivityBadge(activity.type)}
                           </div>
                           <p className="text-xs text-slate-600 dark:text-slate-400">{activity.description}</p>
@@ -177,9 +177,9 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ activities }) => {
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{ delay: index * 0.1 + 0.2 }}
-                            className="flex items-center space-x-1 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 px-2 py-1 rounded-md"
+                            className="flex items-center space-x-1 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 dark:from-yellow-500/20 dark:to-amber-500/20 px-2 py-1 rounded-md"
                           >
-                            <Zap className="h-3 w-3 text-yellow-500" />
+                            <Zap className="h-3 w-3 text-yellow-500 dark:text-yellow-400" />
                             <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400">
                               +{activity.points} XP
                             </span>

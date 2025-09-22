@@ -73,6 +73,7 @@ const Sidebar = () => {
     { name: 'Students', href: '/students', icon: Users },
     { name: 'Groups', href: '/groups', icon: UsersRound },
     { name: 'Courses', href: '/courses', icon: BookOpen },
+    { name: 'Subscriptions', href: '/subscriptions', icon: CalendarClock },
     { name: 'Calendar', href: '/calendar', icon: Calendar },
     { name: 'Online Booking', href: '/online-booking', icon: CalendarClock },
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
@@ -172,12 +173,12 @@ const Sidebar = () => {
           variant="ghost"
           size="icon"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8 hover:bg-green-100"
+          className="h-8 w-8 hover:bg-green-100 dark:hover:bg-green-900/20"
         >
           {isCollapsed ? (
-            <ChevronRight className="h-4 w-4 text-green-600" />
+            <ChevronRight className="h-4 w-4 text-green-600 dark:text-green-400" />
           ) : (
-            <ChevronLeft className="h-4 w-4 text-green-600" />
+            <ChevronLeft className="h-4 w-4 text-green-600 dark:text-green-400" />
           )}
         </Button>
       </div>

@@ -12,7 +12,7 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
-  
+
   .line-clamp-3 {
     overflow: hidden;
     display: -webkit-box;
@@ -21,7 +21,29 @@
   }
 }
 
+/* Timezone Selector Dark Mode Styles */
+.timezone-selector-dark button {
+  @apply bg-slate-800/50 border-slate-700 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600;
+}
+
+.dark .timezone-selector-dark button {
+  @apply bg-slate-800/50 border-slate-700 text-slate-200 hover:bg-slate-700/50 hover:border-slate-600;
+}
+
+.timezone-selector-dark [role="combobox"][aria-expanded="true"] {
+  @apply bg-slate-700/50 border-slate-600;
+}
+
+.dark .timezone-selector-dark [role="combobox"][aria-expanded="true"] {
+  @apply bg-slate-700/50 border-slate-600;
+}
+
 @layer base {
+  /* Smooth theme transitions */
+  * {
+    transition: background-color 200ms ease-in-out, border-color 200ms ease-in-out;
+  }
+  
   :root {
     --background: 210 20% 98%;
     --foreground: 224 71.4% 4.1%;
