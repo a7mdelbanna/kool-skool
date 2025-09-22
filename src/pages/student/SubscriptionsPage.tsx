@@ -502,7 +502,12 @@ const SubscriptionsPage: React.FC = () => {
         <div className="flex items-center gap-3 flex-1">
           <div className="text-sm">
             <p className="font-medium dark:text-white">
-              {format(sessionDate, "MMM d, yyyy")} at {format(sessionDate, "h:mm a")}
+              <SessionTimeDisplay
+                date={sessionDate}
+                showDate={true}
+                showTime={true}
+                className=""
+              />
             </p>
             {session.notes && (
               <p className="text-xs text-muted-foreground dark:text-gray-400">{session.notes}</p>
@@ -869,11 +874,24 @@ const SubscriptionsPage: React.FC = () => {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-gray-400 mb-3">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            <span>{format(getSessionDateTime(session), "EEEE, MMMM d, yyyy")}</span>
+                            <SessionTimeDisplay
+                              date={getSessionDateTime(session)}
+                              showDate={true}
+                              showTime={false}
+                              className=""
+                            />
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            <span>{format(getSessionDateTime(session), "h:mm a")} • {session.duration_minutes || 60} min</span>
+                            <span>
+                              <SessionTimeDisplay
+                                date={getSessionDateTime(session)}
+                                showDate={false}
+                                showTime={true}
+                                className="inline"
+                              />
+                              {' '}• {session.duration_minutes || 60} min
+                            </span>
                           </div>
                         </div>
                         <div className="flex gap-2">

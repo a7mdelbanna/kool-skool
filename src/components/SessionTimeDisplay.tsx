@@ -19,7 +19,9 @@ const SessionTimeDisplay: React.FC<SessionTimeDisplayProps> = ({
   className = ''
 }) => {
   const { user } = useContext(UserContext);
-  const userTimezone = getEffectiveTimezone(user?.timezone);
+  // First check localStorage, then user context, then browser default
+  const storedTimezone = localStorage.getItem('userTimezone');
+  const userTimezone = getEffectiveTimezone(storedTimezone || user?.timezone);
   
   console.log('SessionTimeDisplay - Input date:', date);
   console.log('SessionTimeDisplay - User timezone:', userTimezone);

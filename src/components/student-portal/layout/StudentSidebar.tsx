@@ -130,7 +130,8 @@ const StudentSidebar: React.FC<StudentSidebarProps> = ({ studentData, stats }) =
   const handleTimezoneChange = (timezone: string) => {
     setSelectedTimezone(timezone);
     localStorage.setItem('userTimezone', timezone);
-    // You can add an API call here to save the timezone to the user's profile
+    // Reload the page to update all times with the new timezone
+    window.location.reload();
   };
 
   const xpProgress = stats ? (stats.xp / stats.nextLevelXp) * 100 : 0;
