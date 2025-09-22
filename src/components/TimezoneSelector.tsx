@@ -64,14 +64,14 @@ const TimezoneSelector: React.FC<TimezoneSelectorProps> = ({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[400px] p-0" align="start">
-          <Command>
-            <CommandInput 
-              placeholder="Search timezones..." 
-              className="h-9"
+        <PopoverContent className="w-[400px] p-0 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" align="start">
+          <Command className="bg-transparent">
+            <CommandInput
+              placeholder="Search timezones..."
+              className="h-9 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-400"
             />
-            <CommandList>
-              <CommandEmpty>No timezone found.</CommandEmpty>
+            <CommandList className="dark:bg-slate-800">
+              <CommandEmpty className="dark:text-slate-400">No timezone found.</CommandEmpty>
               <CommandGroup>
                 {COMMON_TIMEZONES.map((timezone) => (
                   <CommandItem
@@ -81,17 +81,17 @@ const TimezoneSelector: React.FC<TimezoneSelectorProps> = ({
                       onValueChange(timezone.value);
                       setOpen(false);
                     }}
-                    className="flex items-center gap-2 px-2 py-3"
+                    className="flex items-center gap-2 px-2 py-3 dark:text-slate-200 dark:hover:bg-slate-700 dark:aria-selected:bg-slate-700"
                   >
                     <Check
                       className={cn(
-                        "h-4 w-4",
+                        "h-4 w-4 dark:text-slate-200",
                         value === timezone.value ? "opacity-100" : "opacity-0"
                       )}
                     />
                     <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-medium text-sm">{timezone.label}</span>
-                      <span className="text-xs text-muted-foreground">{timezone.offset}</span>
+                      <span className="font-medium text-sm dark:text-slate-200">{timezone.label}</span>
+                      <span className="text-xs text-muted-foreground dark:text-slate-400">{timezone.offset}</span>
                     </div>
                   </CommandItem>
                 ))}
