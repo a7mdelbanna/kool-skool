@@ -120,14 +120,14 @@ const StudentPortal: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar */}
           <motion.header 
-            className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 px-6 py-4"
+            className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 px-8 lg:px-10 py-6"
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
           >
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Welcome back, {studentData?.first_name}! 👋
+                  Welcome back, {studentData?.first_name || studentData?.firstName || 'Student'}! 👋
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   {new Date().toLocaleDateString('en-US', { 
@@ -162,9 +162,11 @@ const StudentPortal: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
-                className="h-full"
+                className="h-full p-8 lg:p-10"
               >
-                <Outlet context={{ studentData, stats }} />
+                <div className="max-w-[1600px] mx-auto">
+                  <Outlet context={{ studentData, stats }} />
+                </div>
               </motion.div>
             </AnimatePresence>
           </main>
