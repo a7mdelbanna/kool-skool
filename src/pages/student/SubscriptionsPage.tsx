@@ -29,7 +29,8 @@ import {
   Info,
   X,
   Loader2,
-  DollarSign
+  DollarSign,
+  Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, isAfter, isBefore, addDays, parseISO, isFuture, isToday, isPast, addMinutes } from 'date-fns';
@@ -59,6 +60,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { StudentPaymentUpload } from '@/components/StudentPaymentUpload';
+import SessionDetailsDialog from '@/components/student-tabs/SessionDetailsDialog';
 
 interface DatabaseSession {
   id: string;
@@ -126,6 +128,9 @@ const SubscriptionsPage: React.FC = () => {
   const [teachers, setTeachers] = useState<Map<string, TeacherInfo>>(new Map());
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPaymentSubscription, setSelectedPaymentSubscription] = useState<SubscriptionInfo | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedDetailsSessionId, setSelectedDetailsSessionId] = useState<string>('');
+  const [selectedDetailsSessionData, setSelectedDetailsSessionData] = useState<any>(null);
 
   useEffect(() => {
     if (studentData?.id) {
@@ -671,6 +676,19 @@ const SubscriptionsPage: React.FC = () => {
     setPaymentDialogOpen(true);
   };
 
+  const handleOpenSessionDetails = (sessionId: string, sessionData?: DatabaseSession, subscription?: SubscriptionInfo) => {
+    // Enhance session data with subscription info
+    const enhancedSessionData = {
+      ...sessionData,
+      student_name: studentData?.firstName ? `${studentData.firstName} ${studentData.lastName || ''}`.trim() : 'N/A',
+      course_name: subscription?.course_name || 'General Course'
+    };
+
+    setSelectedDetailsSessionId(sessionId);
+    setSelectedDetailsSessionData(enhancedSessionData);
+    setDetailsDialogOpen(true);
+  };
+
   const renderSessionRow = (session: DatabaseSession, subscription?: SubscriptionInfo) => {
     const sessionDate = getSessionDateTime(session);
     const status = getSessionStatus(session);
@@ -703,6 +721,14 @@ const SubscriptionsPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           {getStatusBadge(session.status)}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleOpenSessionDetails(session.id, session, subscription)}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            Details
+          </Button>
           {session.status === 'scheduled' && isFuture(sessionDate) && (
             <>
               <Button
@@ -1114,6 +1140,14 @@ const SubscriptionsPage: React.FC = () => {
                         </div>
                         <div className="flex gap-2">
                           <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenSessionDetails(session.id, session, subscription)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            {t('subscription:details')}
+                          </Button>
+                          <Button
                             size="sm"
                             className="bg-green-500 hover:bg-green-600 text-white"
                             onClick={() => handleJoinSession(session)}
@@ -1190,6 +1224,14 @@ const SubscriptionsPage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Session Details Dialog */}
+      <SessionDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        sessionId={selectedDetailsSessionId}
+        sessionData={selectedDetailsSessionData}
+      />
     </div>
   );
 };

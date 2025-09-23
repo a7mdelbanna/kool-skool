@@ -2,12 +2,12 @@
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  X, 
-  AlertTriangle, 
+import {
+  Calendar,
+  Clock,
+  CheckCircle,
+  X,
+  AlertTriangle,
   CalendarX,
   ArrowRight,
   Check,
@@ -18,6 +18,7 @@ import {
   FileText,
   Undo2
 } from "lucide-react";
+import SessionDetailsDialog from "./SessionDetailsDialog";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +116,8 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = React.useState(false);
   const [rescheduleDate, setRescheduleDate] = React.useState("");
   const [rescheduleTime, setRescheduleTime] = React.useState("");
+  const [detailsDialogOpen, setDetailsDialogOpen] = React.useState(false);
+  const [selectedSessionId, setSelectedSessionId] = React.useState<string>("");
   
   // Load sessions when component mounts or studentData changes
   useEffect(() => {
@@ -572,20 +575,17 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     }
   };
 
-  const handleOpenSessionDetails = (sessionId: string, event?: React.MouseEvent) => {
-    // Check if we're in a modal context by looking for dialog elements
-    const isInModal = document.querySelector('[role="dialog"]') !== null;
-    
-    if (isInModal) {
-      // Open in new tab when inside a modal to avoid closing the modal
-      if (event) {
-        event.stopPropagation();
-      }
-      window.open(`/student-dashboard/session/${sessionId}`, '_blank');
-    } else {
-      // Navigate normally when not in a modal
-      navigate(`/student-dashboard/session/${sessionId}`);
+  const handleOpenSessionDetails = (sessionId: string, session?: DatabaseSession, event?: React.MouseEvent) => {
+    if (event) {
+      event.stopPropagation();
     }
+
+    // Set the selected session for the dialog
+    setSelectedSessionId(sessionId);
+    if (session) {
+      setSelectedSession(session);
+    }
+    setDetailsDialogOpen(true);
   };
 
   const renderSession = (session: DatabaseSession) => (
@@ -598,10 +598,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     >
       <div className="flex flex-wrap justify-between gap-2">
         <div className="flex-1">
-          <div 
+          <div
             className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
-            onClick={(e) => handleOpenSessionDetails(session.id, e)}
-            title="Click to view session details (opens in new tab)"
+            onClick={(e) => handleOpenSessionDetails(session.id, session, e)}
+            title="Click to view session details"
           >
             <span className="font-medium underline-offset-4 hover:underline decoration-primary/50">
               {(() => {
@@ -677,8 +677,8 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
             variant="outline"
             size="sm"
             className="h-8 px-3 text-xs font-medium border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
-            onClick={(e) => handleOpenSessionDetails(session.id, e)}
-            title="View session details (opens in new tab)"
+            onClick={(e) => handleOpenSessionDetails(session.id, session, e)}
+            title="View session details"
           >
             <FileText className="h-3.5 w-3.5 mr-1.5" />
             Details
@@ -1121,6 +1121,14 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Session Details Dialog */}
+      <SessionDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        sessionId={selectedSessionId}
+        sessionData={selectedSession}
+      />
     </div>
   );
 };
