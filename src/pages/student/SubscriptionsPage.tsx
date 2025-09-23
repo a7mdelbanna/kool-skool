@@ -927,7 +927,7 @@ const SubscriptionsPage: React.FC = () => {
                             <p className="text-sm text-muted-foreground dark:text-gray-400">{t('subscription:teacher')}</p>
                             {selectedSubscription.teacher_id && selectedSubscription.teacher_name ? (
                               <Link
-                                to={`/teacher/${selectedSubscription.teacher_id}`}
+                                to={`/student-dashboard/teacher/${selectedSubscription.teacher_id}`}
                                 className="font-medium dark:text-white text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1"
                               >
                                 {selectedSubscription.teacher_name}

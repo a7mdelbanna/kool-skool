@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Comprehensive list of timezones
 export const TIMEZONES = [
@@ -449,8 +444,25 @@ export function TimezoneSelect({
   className
 }: TimezoneSelectProps) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredTimezones = useMemo(() => {
+    if (!searchQuery) return TIMEZONES;
+
+    const query = searchQuery.toLowerCase();
+    return TIMEZONES.filter(
+      tz => tz.label.toLowerCase().includes(query) ||
+           tz.value.toLowerCase().includes(query)
+    );
+  }, [searchQuery]);
 
   const selectedTimezone = TIMEZONES.find(tz => tz.value === value);
+
+  const handleSelect = (timezone: typeof TIMEZONES[0]) => {
+    onChange(timezone.value);
+    setOpen(false);
+    setSearchQuery('');
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -466,19 +478,30 @@ export function TimezoneSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search timezone..." />
-          <CommandEmpty>No timezone found.</CommandEmpty>
-          <div className="max-h-[300px] overflow-y-auto">
-            <CommandGroup>
-              {TIMEZONES.map((timezone) => (
-                <CommandItem
+        <div className="flex items-center border-b px-3 pb-2 pt-3">
+          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <Input
+            placeholder="Search timezone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex h-8 w-full border-0 bg-transparent p-0 text-sm outline-none placeholder:text-muted-foreground focus:ring-0"
+          />
+        </div>
+        <ScrollArea className="h-[300px]">
+          <div className="p-1">
+            {filteredTimezones.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No timezone found.
+              </div>
+            ) : (
+              filteredTimezones.map((timezone) => (
+                <button
                   key={timezone.value}
-                  value={timezone.label}
-                  onSelect={() => {
-                    onChange(timezone.value === value ? '' : timezone.value);
-                    setOpen(false);
-                  }}
+                  onClick={() => handleSelect(timezone)}
+                  className={cn(
+                    "relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                    value === timezone.value && "bg-accent text-accent-foreground"
+                  )}
                 >
                   <Check
                     className={cn(
@@ -487,11 +510,11 @@ export function TimezoneSelect({
                     )}
                   />
                   {timezone.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+                </button>
+              ))
+            )}
           </div>
-        </Command>
+        </ScrollArea>
       </PopoverContent>
     </Popover>
   );

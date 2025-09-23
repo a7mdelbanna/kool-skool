@@ -15,6 +15,7 @@ import StudentDashboard from '@/pages/StudentDashboard';
 import StudentPortal from '@/pages/student/StudentPortal';
 import EnhancedStudentDashboard from '@/pages/student/EnhancedStudentDashboard';
 import SubscriptionsPage from '@/pages/student/SubscriptionsPage';
+import TeacherProfile from '@/pages/student/TeacherProfile';
 import { Toaster } from "@/components/ui/toaster"
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { runTimezoneMigration } from '@/scripts/migrateToCairoTimezone';
@@ -142,6 +143,7 @@ const App = () => {
             <Route path="/student-dashboard" element={<StudentPortal />}>
               <Route index element={<EnhancedStudentDashboard />} />
               <Route path="subscriptions" element={<SubscriptionsPage />} />
+              <Route path="teacher/:teacherId" element={<TeacherProfile />} />
               <Route path="learning" element={<div>Learning Hub - Coming Soon</div>} />
               <Route path="practice" element={<div>Practice Center - Coming Soon</div>} />
               <Route path="practice/vocabulary" element={<div>Vocabulary Practice - Coming Soon</div>} />
