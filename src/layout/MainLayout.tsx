@@ -10,6 +10,7 @@ import Index from '@/pages/Index';
 import Students from '@/pages/Students';
 import Teachers from '@/pages/Teachers';
 import TeacherProfile from '@/pages/TeacherProfile';
+import TeacherProfileEdit from '@/pages/TeacherProfileEdit';
 import Groups from '@/pages/Groups';
 import Courses from '@/pages/Courses';
 import Calendar from '@/pages/Calendar';
@@ -56,6 +57,7 @@ const MainLayout = () => {
                   <Route path="/students" element={<Students />} />
                   <Route path="/teachers" element={<Teachers />} />
                   <Route path="/teacher/:teacherId" element={<TeacherProfile />} />
+                  <Route path="/teacher/:teacherId/edit" element={<TeacherProfileEdit />} />
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/courses" element={<Courses />} />
                   <Route path="/subscriptions" element={<SubscriptionsPage />} />
