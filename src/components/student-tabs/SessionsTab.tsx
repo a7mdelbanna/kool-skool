@@ -581,10 +581,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       if (event) {
         event.stopPropagation();
       }
-      window.open(`/session/${sessionId}`, '_blank');
+      window.open(`/student-dashboard/session/${sessionId}`, '_blank');
     } else {
       // Navigate normally when not in a modal
-      navigate(`/session/${sessionId}`);
+      navigate(`/student-dashboard/session/${sessionId}`);
     }
   };
 

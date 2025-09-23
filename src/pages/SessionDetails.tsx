@@ -71,62 +71,158 @@ const SessionDetailsPage: React.FC = () => {
   const loadSessionData = async () => {
     try {
       setLoading(true);
-      
-      // Load session info from Supabase
+
+      // First, load the session data
       const { data: sessionData, error: sessionError } = await supabase
         .from('lesson_sessions')
         .select('*')
         .eq('id', sessionId)
         .single();
-      
+
       if (sessionError) {
         console.error('Error loading session:', sessionError);
         toast.error('Failed to load session information');
         return;
       }
-      
-      // Load student data from Firebase
+
+      console.log('Session data loaded:', sessionData);
+
+      // Initialize variables for session info
       let studentName = 'Unknown';
       let courseName = '';
       let level = '';
       let teacherId = '';
       let teacherName = '';
-      
-      if (sessionData.student_id) {
-        const studentData = await studentsService.getById(sessionData.student_id);
-        if (studentData) {
-          studentName = `${studentData.firstName} ${studentData.lastName}`;
-          courseName = studentData.courseName || '';
-          level = studentData.level || '';
-          teacherId = studentData.teacherId || '';
-          
-          // Get teacher name if available
-          if (studentData.teacherId) {
-            const { data: teacherData } = await supabase
-              .from('users')
-              .select('first_name, last_name')
-              .eq('id', studentData.teacherId)
-              .single();
-            
-            if (teacherData) {
-              teacherName = `${teacherData.first_name} ${teacherData.last_name}`;
-            }
+
+      // Check for subscription_id in both snake_case and camelCase
+      const subscriptionId = sessionData.subscription_id || sessionData.subscriptionId;
+
+      // If there's a subscription_id, fetch the subscription separately
+      if (subscriptionId) {
+        const { data: subscriptionData, error: subError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('id', subscriptionId)
+          .single();
+
+        console.log('Subscription data:', subscriptionData);
+
+        if (subscriptionData && !subError) {
+          // Get student name from subscription
+          if (subscriptionData.student_name) {
+            studentName = subscriptionData.student_name;
+          }
+          // Get subject/course from subscription
+          if (subscriptionData.subject) {
+            courseName = subscriptionData.subject;
+          }
+          // Get teacher_id from subscription
+          if (subscriptionData.teacher_id) {
+            teacherId = subscriptionData.teacher_id;
           }
         }
       }
+
+      // Check for student_id in both snake_case and camelCase
+      const studentId = sessionData.student_id || sessionData.studentId;
+
+      // If we still need student info and have a student_id, fetch it
+      if (studentId) {
+        // First try the students table in Supabase
+        const { data: studentRecord } = await supabase
+          .from('students')
+          .select('*')
+          .eq('id', studentId)
+          .single();
+
+        console.log('Student record:', studentRecord);
+
+        if (studentRecord) {
+          // Check if this student has a user_id
+          if (studentRecord.user_id) {
+            // Get user details
+            const { data: userData } = await supabase
+              .from('users')
+              .select('first_name, last_name')
+              .eq('id', studentRecord.user_id)
+              .single();
+
+            if (userData) {
+              const fullName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim();
+              if (fullName && studentName === 'Unknown') {
+                studentName = fullName;
+              }
+            }
+          }
+
+          // Use student record name if available
+          if (!studentRecord.user_id && studentRecord.first_name) {
+            const fullName = `${studentRecord.first_name || ''} ${studentRecord.last_name || ''}`.trim();
+            if (fullName && studentName === 'Unknown') {
+              studentName = fullName;
+            }
+          }
+        }
+
+        // Also try Firebase for additional details
+        try {
+          const firebaseStudent = await studentsService.getById(studentId);
+          console.log('Firebase student:', firebaseStudent);
+
+          if (firebaseStudent) {
+            // Get name if still unknown
+            if (studentName === 'Unknown' && (firebaseStudent.firstName || firebaseStudent.lastName)) {
+              studentName = `${firebaseStudent.firstName || ''} ${firebaseStudent.lastName || ''}`.trim();
+            }
+            // Get course and level
+            if (!courseName && firebaseStudent.courseName) {
+              courseName = firebaseStudent.courseName;
+            }
+            if (!level && firebaseStudent.level) {
+              level = firebaseStudent.level;
+            }
+            if (!teacherId && firebaseStudent.teacherId) {
+              teacherId = firebaseStudent.teacherId;
+            }
+          }
+        } catch (error) {
+          console.log('Student not found in Firebase:', error);
+        }
+      }
+
+      // Get teacher name if we have a teacher ID
+      if (teacherId) {
+        const { data: teacherData } = await supabase
+          .from('users')
+          .select('first_name, last_name')
+          .eq('id', teacherId)
+          .single();
+
+        if (teacherData) {
+          teacherName = `${teacherData.first_name || ''} ${teacherData.last_name || ''}`.trim();
+        }
+      }
       
-      // Format session info
+      // Format session info - ensure date is properly set
+      // Check for various date field names (camelCase and snake_case)
+      const sessionDate = sessionData.scheduled_date ||
+                         sessionData.scheduledDate ||
+                         sessionData.scheduled_datetime ||
+                         sessionData.scheduledDateTime ||
+                         sessionData.created_at ||
+                         sessionData.createdAt;
+
       const sessionInfoData: SessionInfo = {
         id: sessionData.id,
-        scheduled_date: sessionData.scheduled_date,
-        duration_minutes: sessionData.duration_minutes,
-        status: sessionData.status,
-        student_id: sessionData.student_id,
-        subscription_id: sessionData.subscription_id,
+        scheduled_date: sessionDate,
+        duration_minutes: sessionData.duration_minutes || sessionData.durationMinutes || 60,
+        status: sessionData.status || 'scheduled',
+        student_id: studentId,
+        subscription_id: subscriptionId,
         student_name: studentName,
         course_name: courseName,
         level: level,
-        teacher_id: teacherId,
+        teacher_id: teacherId || sessionData.teacher_id || sessionData.teacherId,
         teacher_name: teacherName
       };
       
@@ -142,8 +238,8 @@ const SessionDetailsPage: React.FC = () => {
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
         setSessionDetails({
           session_id: sessionId!,
-          teacher_id: userData.id || '',
-          student_id: sessionInfoData.student_id,
+          teacher_id: userData.id || teacherId || '',
+          student_id: studentId || '',
           topic: '',
           notes: '',
           vocabulary: [],
@@ -305,7 +401,19 @@ const SessionDetailsPage: React.FC = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Date</p>
                 <p className="font-medium">
-                  {format(new Date(sessionInfo.scheduled_date), 'PPP')}
+                  {(() => {
+                    try {
+                      if (sessionInfo.scheduled_date) {
+                        const date = new Date(sessionInfo.scheduled_date);
+                        if (!isNaN(date.getTime())) {
+                          return format(date, 'PPP');
+                        }
+                      }
+                    } catch (error) {
+                      console.log('Error formatting date:', error);
+                    }
+                    return `Session #${sessionInfo.id?.slice(-6) || 'N/A'}`;
+                  })()}
                 </p>
               </div>
             </div>
