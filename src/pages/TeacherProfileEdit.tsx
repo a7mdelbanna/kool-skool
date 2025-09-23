@@ -269,7 +269,7 @@ const TeacherProfileEdit = () => {
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
                     id="firstName"
-                    value={formData.firstName}
+                    value={formData.firstName || ''}
                     onChange={(e) => handleInputChange('firstName', e.target.value)}
                   />
                 </div>
@@ -277,7 +277,7 @@ const TeacherProfileEdit = () => {
                   <Label htmlFor="lastName">Last Name</Label>
                   <Input
                     id="lastName"
-                    value={formData.lastName}
+                    value={formData.lastName || ''}
                     onChange={(e) => handleInputChange('lastName', e.target.value)}
                   />
                 </div>
@@ -288,7 +288,7 @@ const TeacherProfileEdit = () => {
                 <Input
                   id="email"
                   type="email"
-                  value={formData.email}
+                  value={formData.email || ''}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                 />
               </div>
@@ -299,7 +299,7 @@ const TeacherProfileEdit = () => {
                   <Input
                     id="countryCode"
                     placeholder="+1"
-                    value={formData.countryCode}
+                    value={formData.countryCode || ''}
                     onChange={(e) => handleInputChange('countryCode', e.target.value)}
                   />
                 </div>
@@ -307,7 +307,7 @@ const TeacherProfileEdit = () => {
                   <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
-                    value={formData.phone}
+                    value={formData.phone || ''}
                     onChange={(e) => handleInputChange('phone', e.target.value)}
                   />
                 </div>
@@ -319,7 +319,7 @@ const TeacherProfileEdit = () => {
                   id="bio"
                   rows={4}
                   placeholder="Tell students about yourself..."
-                  value={formData.bio}
+                  value={formData.bio || ''}
                   onChange={(e) => handleInputChange('bio', e.target.value)}
                 />
               </div>
@@ -327,7 +327,7 @@ const TeacherProfileEdit = () => {
               <div>
                 <Label htmlFor="timezone">Timezone</Label>
                 <Select
-                  value={formData.timezone}
+                  value={formData.timezone || ''}
                   onValueChange={(value) => handleInputChange('timezone', value)}
                 >
                   <SelectTrigger>
@@ -347,7 +347,7 @@ const TeacherProfileEdit = () => {
                   id="zoomLink"
                   type="url"
                   placeholder="https://zoom.us/j/..."
-                  value={formData.zoomLink}
+                  value={formData.zoomLink || ''}
                   onChange={(e) => handleInputChange('zoomLink', e.target.value)}
                 />
               </div>
@@ -358,7 +358,7 @@ const TeacherProfileEdit = () => {
                   <div className="flex items-center gap-2">
                     <Switch
                       id="isActive"
-                      checked={formData.isActive}
+                      checked={formData.isActive !== undefined ? formData.isActive : true}
                       onCheckedChange={(checked) => handleInputChange('isActive', checked)}
                     />
                     <span className="text-sm">
@@ -424,7 +424,7 @@ const TeacherProfileEdit = () => {
                   id="experience"
                   rows={4}
                   placeholder="Describe your teaching experience..."
-                  value={formData.experience}
+                  value={formData.experience || ''}
                   onChange={(e) => handleInputChange('experience', e.target.value)}
                 />
               </div>
@@ -530,7 +530,7 @@ const TeacherProfileEdit = () => {
                     <>
                       <Input
                         type="time"
-                        value={slot.startTime}
+                        value={slot.startTime || '09:00'}
                         onChange={(e) =>
                           handleAvailabilityChange(index, 'startTime', e.target.value)
                         }
@@ -539,7 +539,7 @@ const TeacherProfileEdit = () => {
                       <span>to</span>
                       <Input
                         type="time"
-                        value={slot.endTime}
+                        value={slot.endTime || '17:00'}
                         onChange={(e) =>
                           handleAvailabilityChange(index, 'endTime', e.target.value)
                         }
@@ -568,7 +568,7 @@ const TeacherProfileEdit = () => {
                   id="profilePicture"
                   type="url"
                   placeholder="https://example.com/profile.jpg"
-                  value={formData.profilePicture}
+                  value={formData.profilePicture || ''}
                   onChange={(e) => handleInputChange('profilePicture', e.target.value)}
                 />
               </div>
@@ -578,7 +578,7 @@ const TeacherProfileEdit = () => {
                   id="bannerImage"
                   type="url"
                   placeholder="https://example.com/banner.jpg"
-                  value={formData.bannerImage}
+                  value={formData.bannerImage || ''}
                   onChange={(e) => handleInputChange('bannerImage', e.target.value)}
                 />
               </div>
