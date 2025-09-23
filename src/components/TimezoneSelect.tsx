@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -449,17 +449,6 @@ export function TimezoneSelect({
   className
 }: TimezoneSelectProps) {
   const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const filteredTimezones = useMemo(() => {
-    if (!searchQuery) return TIMEZONES;
-
-    const query = searchQuery.toLowerCase();
-    return TIMEZONES.filter(
-      tz => tz.label.toLowerCase().includes(query) ||
-           tz.value.toLowerCase().includes(query)
-    );
-  }, [searchQuery]);
 
   const selectedTimezone = TIMEZONES.find(tz => tz.value === value);
 
@@ -478,33 +467,30 @@ export function TimezoneSelect({
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Command>
-          <CommandInput
-            placeholder="Search timezone..."
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-          />
+          <CommandInput placeholder="Search timezone..." />
           <CommandEmpty>No timezone found.</CommandEmpty>
-          <CommandGroup className="max-h-[300px] overflow-y-auto">
-            {filteredTimezones.map((timezone) => (
-              <CommandItem
-                key={timezone.value}
-                value={timezone.value}
-                onSelect={(currentValue) => {
-                  onChange(currentValue === value ? '' : currentValue);
-                  setOpen(false);
-                  setSearchQuery('');
-                }}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    value === timezone.value ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                {timezone.label}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+          <div className="max-h-[300px] overflow-y-auto">
+            <CommandGroup>
+              {TIMEZONES.map((timezone) => (
+                <CommandItem
+                  key={timezone.value}
+                  value={timezone.label}
+                  onSelect={() => {
+                    onChange(timezone.value === value ? '' : timezone.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === timezone.value ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {timezone.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>
