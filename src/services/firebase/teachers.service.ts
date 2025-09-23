@@ -67,7 +67,7 @@ export interface Teacher {
 }
 
 class TeachersService {
-  private collectionName = 'teachers';
+  private collectionName = 'users';  // Teachers are stored in users collection with role='teacher'
 
   // Create a new teacher
   async create(teacherData: Omit<Teacher, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
@@ -96,17 +96,28 @@ class TeachersService {
   // Get all teachers for a school
   async getBySchoolId(schoolId: string): Promise<Teacher[]> {
     try {
+      // First fetch all users from the school
       const q = query(
         collection(db, this.collectionName),
-        where('schoolId', '==', schoolId),
-        orderBy('createdAt', 'desc')
+        where('schoolId', '==', schoolId)
       );
 
       const snapshot = await getDocs(q);
-      const teachers = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      } as Teacher));
+
+      // Then filter for teachers in memory to avoid compound index requirement
+      const teachers = snapshot.docs
+        .map(doc => ({
+          ...doc.data(),
+          id: doc.id
+        } as any))
+        .filter(user => user.role === 'teacher')
+        .map(teacher => ({
+          ...teacher,
+          // Map fields from users collection to Teacher interface
+          firstName: teacher.firstName || teacher.first_name || '',
+          lastName: teacher.lastName || teacher.last_name || '',
+          isActive: teacher.isActive !== false // Default to true if not set
+        } as Teacher));
 
       return teachers;
     } catch (error) {
@@ -118,18 +129,33 @@ class TeachersService {
   // Get active teachers for a school (for dropdowns)
   async getActiveTeachers(schoolId: string): Promise<Teacher[]> {
     try {
+      // First fetch all users from the school
       const q = query(
         collection(db, this.collectionName),
-        where('schoolId', '==', schoolId),
-        where('isActive', '==', true),
-        orderBy('firstName', 'asc')
+        where('schoolId', '==', schoolId)
       );
 
       const snapshot = await getDocs(q);
-      const teachers = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      } as Teacher));
+
+      // Filter for active teachers in memory
+      const teachers = snapshot.docs
+        .map(doc => ({
+          ...doc.data(),
+          id: doc.id
+        } as any))
+        .filter(user => user.role === 'teacher' && user.isActive !== false)
+        .map(teacher => ({
+          ...teacher,
+          // Map fields from users collection to Teacher interface
+          firstName: teacher.firstName || teacher.first_name || '',
+          lastName: teacher.lastName || teacher.last_name || '',
+          isActive: true
+        } as Teacher))
+        .sort((a, b) => {
+          const nameA = a.firstName.toLowerCase();
+          const nameB = b.firstName.toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
 
       return teachers;
     } catch (error) {
