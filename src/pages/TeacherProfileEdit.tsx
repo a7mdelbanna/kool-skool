@@ -22,14 +22,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { teachersService, Teacher, SocialLink, TeacherAvailability } from '@/services/firebase/teachers.service';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TimezoneSelect } from '@/components/TimezoneSelect';
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SOCIAL_PLATFORMS = ['LinkedIn', 'Twitter', 'Facebook', 'Instagram', 'Github', 'Youtube', 'Website'];
-const TIMEZONES = [
-  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Dubai',
-  'Asia/Singapore', 'Australia/Sydney'
-];
 
 const TeacherProfileEdit = () => {
   const { teacherId } = useParams<{ teacherId: string }>();
@@ -326,19 +322,11 @@ const TeacherProfileEdit = () => {
 
               <div>
                 <Label htmlFor="timezone">Timezone</Label>
-                <Select
+                <TimezoneSelect
                   value={formData.timezone || ''}
-                  onValueChange={(value) => handleInputChange('timezone', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMEZONES.map(tz => (
-                      <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => handleInputChange('timezone', value)}
+                  placeholder="Select timezone"
+                />
               </div>
 
               <div>
