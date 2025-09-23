@@ -29,7 +29,8 @@ import {
   Database,
   Mic,
   Cake,
-  CalendarClock
+  CalendarClock,
+  Wrench
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -68,9 +69,11 @@ const Sidebar = () => {
     }
   };
 
-  const navigation = [
+  // Filter navigation based on user role
+  const baseNavigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Students', href: '/students', icon: Users },
+    { name: 'Teachers', href: '/teachers', icon: GraduationCap, adminOnly: true },
     { name: 'Groups', href: '/groups', icon: UsersRound },
     { name: 'Courses', href: '/courses', icon: BookOpen },
     { name: 'Subscriptions', href: '/subscriptions', icon: CalendarClock },
@@ -86,6 +89,15 @@ const Sidebar = () => {
     { name: 'Reports', href: '/states-reports', icon: BarChart3 },
   ];
 
+  // Filter navigation based on user role
+  const navigation = baseNavigation.filter(item => {
+    // If item is marked as adminOnly and user is not admin/superadmin, hide it
+    if (item.adminOnly && user?.role !== 'admin' && user?.role !== 'superadmin') {
+      return false;
+    }
+    return true;
+  });
+
   const settingsSubItems = [
     { name: 'Personal', href: '/settings/personal', icon: User },
     { name: 'School', href: '/settings/school', icon: Briefcase },
@@ -94,6 +106,7 @@ const Sidebar = () => {
     { name: 'Notifications', href: '/settings/notifications', icon: Bell },
     { name: 'Communications', href: '/settings/communications', icon: MessageSquare },
     { name: 'Data Management', href: '/settings/data-management', icon: Database },
+    { name: 'Migration Tools', href: '/settings/migration-tools', icon: Wrench, adminOnly: true },
   ];
 
   const adminNavigation = [
@@ -282,7 +295,13 @@ const Sidebar = () => {
                 {/* Sub Items */}
                 {item.hasSubItems && settingsExpanded && !isCollapsed && (
                   <div className="ml-6 mt-1 space-y-1">
-                    {item.subItems?.map((subItem) => {
+                    {item.subItems?.filter(subItem => {
+                      // Filter out admin-only items for non-admin users
+                      if ((subItem as any).adminOnly && user?.role !== 'admin' && user?.role !== 'superadmin') {
+                        return false;
+                      }
+                      return true;
+                    }).map((subItem) => {
                       const isSubActive = location.pathname === subItem.href;
                       return (
                         <NavLink

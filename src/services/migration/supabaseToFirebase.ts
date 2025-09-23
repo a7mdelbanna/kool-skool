@@ -668,6 +668,7 @@ async function handleUpdateSubscriptionWithRelatedData(params: any) {
       currency: params.p_currency,
       notes: params.p_notes || '',
       status: params.p_status || 'active',
+      teacherId: params.p_teacher_id || null,
       updatedAt: new Date().toISOString()
     };
     
@@ -1373,8 +1374,10 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
       return {
         id: subscription.id,
         student_id: subscription.studentId || subscription.student_id,
+        teacher_id: subscription.teacherId || subscription.teacher_id,
         session_count: subscription.sessionCount || subscription.session_count,
         duration_months: subscription.durationMonths || subscription.duration_months,
+        session_duration_minutes: subscription.sessionDurationMinutes || subscription.session_duration_minutes,
         start_date: subscription.startDate || subscription.start_date,
         schedule: subscription.schedule,
         price_mode: subscription.priceMode || subscription.price_mode,

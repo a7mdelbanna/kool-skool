@@ -42,5 +42,8 @@
   "cancelSessionConfirm": "Are you sure you want to cancel this session?",
   "cancelSessionWarning": "This action cannot be undone and may affect your subscription progress.",
   "keepSession": "Keep Session",
-  "yesCancelSession": "Yes, Cancel Session"
+  "yesCancelSession": "Yes, Cancel Session",
+  "upcomingLessons": "Upcoming Sessions ({{count}})",
+  "showingLessons": "Showing {{shown}} of {{total}} upcoming sessions.",
+  "viewActiveToSeeAll": "View your active subscriptions above to see all sessions."
 }

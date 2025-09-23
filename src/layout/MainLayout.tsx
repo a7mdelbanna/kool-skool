@@ -8,6 +8,8 @@ import Sidebar from './Sidebar';
 // Import all the pages
 import Index from '@/pages/Index';
 import Students from '@/pages/Students';
+import Teachers from '@/pages/Teachers';
+import TeacherProfile from '@/pages/TeacherProfile';
 import Groups from '@/pages/Groups';
 import Courses from '@/pages/Courses';
 import Calendar from '@/pages/Calendar';
@@ -28,6 +30,7 @@ import AcademicSettings from '@/pages/AcademicSettings';
 import FinancialSettings from '@/pages/FinancialSettings';
 import NotificationSettings from '@/pages/NotificationSettings';
 import DataManagement from '@/pages/DataManagement';
+import MigrationTools from '@/pages/MigrationTools';
 import SessionDetails from '@/pages/SessionDetails';
 import Todos from '@/pages/Todos';
 import StudentDetail from '@/pages/StudentDetail';
@@ -51,6 +54,8 @@ const MainLayout = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/students" element={<Students />} />
+                  <Route path="/teachers" element={<Teachers />} />
+                  <Route path="/teacher/:teacherId" element={<TeacherProfile />} />
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/courses" element={<Courses />} />
                   <Route path="/subscriptions" element={<SubscriptionsPage />} />
@@ -73,6 +78,7 @@ const MainLayout = () => {
                   <Route path="/settings/financial" element={<FinancialSettings />} />
                   <Route path="/settings/notifications" element={<NotificationSettings />} />
                   <Route path="/settings/data-management" element={<DataManagement />} />
+                  <Route path="/settings/migration-tools" element={<MigrationTools />} />
                   <Route path="/session/:sessionId" element={<SessionDetails />} />
                   <Route path="/todos" element={<Todos />} />
                   <Route path="/student/:studentId" element={<StudentDetail />} />

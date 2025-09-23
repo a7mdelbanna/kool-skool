@@ -22,6 +22,7 @@ interface SubscriptionFormData {
   currency: string;
   notes?: string;
   status: string;
+  teacherId?: string; // Add teacher ID field
   initialPayment: {
     amount: number;
     method: string;
@@ -188,6 +189,29 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
 
       console.log('✅ Subscription created with ID:', subscriptionId);
 
+      // Save teacher assignment in Firebase subscription collection
+      if (formData.teacherId) {
+        try {
+          await databaseService.create('subscriptions', {
+            id: subscriptionId,
+            studentId: studentId,
+            teacherId: formData.teacherId,
+            schoolId: schoolId,
+            sessionCount: formData.sessionCount,
+            durationMonths: formData.durationMonths,
+            startDate: formData.startDate,
+            schedule: formData.schedule,
+            totalPrice: formData.totalPrice,
+            currency: formData.currency,
+            status: formData.status,
+            createdBy: currentUserId
+          });
+          console.log('✅ Teacher assignment saved in Firebase');
+        } catch (error) {
+          console.warn('⚠️ Could not save teacher assignment in Firebase:', error);
+        }
+      }
+
       // Generate sessions for the subscription
       try {
         console.log('📅 Generating sessions for subscription...');
@@ -196,14 +220,15 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
         console.log('  Session count:', formData.sessionCount);
         console.log('  Start date:', formData.startDate);
         
-        // Get student details to find teacher and course info
+        // Get student details to find course info (teacher now comes from form)
         const student = await databaseService.getById('students', studentId);
         if (!student) {
           console.error('❌ Student not found for session generation');
           throw new Error('Student not found');
         }
-        
-        const teacherId = student.teacherId || student.teacher_id || '';
+
+        // Use teacher from form data, fall back to student's teacher if not provided
+        const teacherId = formData.teacherId || student.teacherId || student.teacher_id || '';
         const courseId = student.courseId || student.course_id || '';
         
         console.log('  Teacher ID:', teacherId);

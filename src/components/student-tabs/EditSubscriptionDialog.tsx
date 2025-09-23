@@ -29,6 +29,10 @@ import TimePicker from '@/components/ui/time-picker';
 import SchedulePreview from './SchedulePreview';
 import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { User } from 'lucide-react';
+import { teachersService } from '@/services/firebase/teachers.service';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 interface ScheduleItem {
   day: string;
@@ -54,7 +58,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   const [isValidating, setIsValidating] = useState(false);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [conflictMessage, setConflictMessage] = useState<string>('');
-  const [studentTeacherId, setStudentTeacherId] = useState<string>('');
+  const [teachers, setTeachers] = useState<any[]>([]);
 
   // Get user's timezone (Cairo)
   const getUserTimezone = () => {
@@ -90,28 +94,31 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   const schoolId = getSchoolId();
   const currentUserId = userData?.user_id || userData?.id || userData?.userId;
   const isAdmin = userData?.role === 'admin';
+  const userSchoolId = userData?.schoolId;
 
-  // Fetch student details to get teacher ID
-  const { data: studentData } = useQuery({
-    queryKey: ['student-details', subscription?.student_id],
-    queryFn: async () => {
-      if (!subscription?.student_id) return null;
-      const { data, error } = await supabase
-        .from('students')
-        .select('teacher_id')
-        .eq('id', subscription.student_id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!subscription?.student_id && open,
-  });
-
+  // Fetch teachers from Firebase
   useEffect(() => {
-    if (studentData?.teacher_id) {
-      setStudentTeacherId(studentData.teacher_id);
-    }
-  }, [studentData]);
+    const fetchTeachers = async () => {
+      if (!userSchoolId || !open) return;
+
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('schoolId', '==', userSchoolId), where('role', '==', 'teacher'));
+        const snapshot = await getDocs(q);
+
+        const teachersList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        setTeachers(teachersList);
+      } catch (error) {
+        console.error('Error fetching teachers:', error);
+      }
+    };
+
+    fetchTeachers();
+  }, [userSchoolId, open]);
 
   // Utility function to convert 12-hour format to 24-hour format
   const convertTo24Hour = (time12h: string): string => {
@@ -218,6 +225,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     currency: '',
     notes: '',
     status: 'active',
+    teacherId: '',
     initialPayment: {
       amount: '',
       method: 'Cash',
@@ -274,6 +282,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         currency: subscription.currency,
         notes: subscription.notes || '',
         status: subscription.status,
+        teacherId: subscription.teacher_id || '',
         initialPayment: {
           amount: initialPaymentData?.amount?.toString() || '',
           method: initialPaymentData?.payment_method || 'Cash',
@@ -306,7 +315,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   // Validate teacher schedule when schedule or date changes
   useEffect(() => {
     const validateSchedule = async () => {
-      if (!formData.startDate || !formData.schedule.length || !studentTeacherId || !subscription?.id) {
+      if (!formData.startDate || !formData.schedule.length || !formData.teacherId || !subscription?.id) {
         return;
       }
 
@@ -325,7 +334,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         // Validate each schedule item
         for (const scheduleItem of formData.schedule) {
           const result = await validateTeacherScheduleOverlap({
-            teacherId: studentTeacherId,
+            teacherId: formData.teacherId,
             date: dateStr,
             startTime: scheduleItem.time,
             durationMinutes: parseInt(formData.sessionDuration) || 60,
@@ -347,7 +356,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     // Debounce validation to avoid too many API calls
     const timeoutId = setTimeout(validateSchedule, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.startDate, formData.schedule, studentTeacherId, subscription?.id]);
+  }, [formData.startDate, formData.schedule, formData.teacherId, subscription?.id]);
 
   const addScheduleItem = () => {
     setFormData({
@@ -437,7 +446,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     }
 
     // Final validation before submission
-    if (studentTeacherId) {
+    if (formData.teacherId) {
       setIsValidating(true);
       
       try {
@@ -445,7 +454,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         
         for (const scheduleItem of formData.schedule) {
           const result = await validateTeacherScheduleOverlap({
-            teacherId: studentTeacherId,
+            teacherId: formData.teacherId,
             date: dateStr,
             startTime: scheduleItem.time,
             durationMinutes: parseInt(formData.sessionDuration) || 60,
@@ -508,6 +517,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         p_currency: formData.currency,
         p_notes: formData.notes,
         p_status: formData.status,
+        p_teacher_id: formData.teacherId || null,
         p_current_user_id: currentUserId,
         p_current_school_id: schoolId
       });
@@ -780,6 +790,26 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Teacher */}
+              <div>
+                <Label className="text-sm font-semibold text-gray-700">
+                  <User className="h-4 w-4 inline mr-1" />
+                  Teacher
+                </Label>
+                <Select value={formData.teacherId} onValueChange={(value) => setFormData({ ...formData, teacherId: value })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select teacher" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teachers.map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.firstName} {teacher.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Status */}

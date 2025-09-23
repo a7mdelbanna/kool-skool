@@ -35,6 +35,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format, isAfter, isBefore, addDays, parseISO, isFuture, isToday, isPast, addMinutes } from 'date-fns';
 import { supabase, handleSessionAction } from '@/integrations/supabase/client';
 import SessionTimeDisplay from '@/components/SessionTimeDisplay';
+import { teachersService } from '@/services/firebase/teachers.service';
+import { databaseService } from '@/services/firebase/database.service';
+import { Link } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -128,6 +131,44 @@ const SubscriptionsPage: React.FC = () => {
     if (studentData?.id) {
       loadSubscriptions();
       loadCancellationSettings();
+
+      // Set up Firebase real-time listeners for subscriptions and sessions
+      const setupFirebaseListeners = async () => {
+        const { collection, query: firebaseQuery, where, onSnapshot } = await import('firebase/firestore');
+        const { db } = await import('@/config/firebase');
+
+        // Listen for subscription changes
+        const subscriptionsRef = collection(db, 'subscriptions');
+        const subQuery = firebaseQuery(subscriptionsRef, where('studentId', '==', studentData.id));
+
+        const unsubscribeSubscriptions = onSnapshot(subQuery, (snapshot) => {
+          snapshot.docChanges().forEach(change => {
+            if (change.type === 'modified') {
+              console.log('Firebase subscription modified:', change.doc.id);
+              loadSubscriptions();
+            }
+          });
+        });
+
+        // Listen for session changes (when subscriptions are updated)
+        const sessionsRef = collection(db, 'sessions');
+        const sessionQuery = firebaseQuery(sessionsRef, where('studentId', '==', studentData.id));
+
+        const unsubscribeSessions = onSnapshot(sessionQuery, (snapshot) => {
+          console.log(`Firebase sessions changed (${snapshot.docChanges().length} changes), reloading...`);
+          loadSubscriptions();
+        });
+
+        return () => {
+          unsubscribeSubscriptions();
+          unsubscribeSessions();
+        };
+      };
+
+      const cleanupPromise = setupFirebaseListeners();
+      return () => {
+        cleanupPromise.then(cleanup => cleanup && cleanup());
+      };
     }
   }, [studentData]);
 
@@ -207,7 +248,77 @@ const SubscriptionsPage: React.FC = () => {
         return;
       }
 
-      const sessionsArray = Array.isArray(sessionsData) ? sessionsData as DatabaseSession[] : [];
+      let sessionsArray = Array.isArray(sessionsData) ? sessionsData as DatabaseSession[] : [];
+
+      // Also fetch sessions from Firebase to get the latest regenerated sessions
+      try {
+        const { collection, query: firebaseQuery, where, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/config/firebase');
+
+        // Get all subscription IDs for this student
+        const subscriptionIds = subscriptionData.map((sub: any) => sub.id);
+
+        // Fetch sessions from Firebase for all subscriptions
+        const sessionsRef = collection(db, 'sessions');
+        const sessionsPromises = subscriptionIds.map(async (subId: string) => {
+          // Try both field names for subscription ID
+          let q = firebaseQuery(sessionsRef, where('subscriptionId', '==', subId));
+          let snapshot = await getDocs(q);
+
+          // If no results with camelCase, try snake_case
+          if (snapshot.empty) {
+            q = firebaseQuery(sessionsRef, where('subscription_id', '==', subId));
+            snapshot = await getDocs(q);
+          }
+          return snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              subscription_id: data.subscriptionId || subId,
+              student_id: data.studentId || studentData.id,
+              scheduled_date: data.scheduledDate || data.scheduled_date,
+              scheduled_time: data.scheduledTime || data.scheduled_time,
+              scheduled_datetime: data.scheduledDateTime || data.scheduled_datetime,
+              duration_minutes: data.durationMinutes || data.duration_minutes || 60,
+              status: data.status || 'scheduled',
+              attended: data.attended || false,
+              counts_toward_completion: data.countsTowardCompletion ?? data.counts_toward_completion ?? true,
+              session_number: data.sessionNumber || data.session_number,
+              teacher_id: data.teacherId || data.teacher_id,
+              created_at: data.createdAt || data.created_at,
+              updated_at: data.updatedAt || data.updated_at
+            };
+          });
+        });
+
+        const firebaseSessionsArrays = await Promise.all(sessionsPromises);
+        const firebaseSessions = firebaseSessionsArrays.flat();
+
+        console.log(`Firebase sessions for subscriptions:`, subscriptionIds);
+        console.log(`Found ${firebaseSessions.length} Firebase sessions`);
+        if (firebaseSessions.length > 0) {
+          console.log('Sample Firebase session:', firebaseSessions[0]);
+        }
+
+        // If we have Firebase sessions for a subscription, use them exclusively (don't merge)
+        // This ensures we get the regenerated sessions
+        const firebaseSubscriptionIds = new Set(firebaseSessions.map(s => s.subscription_id));
+
+        // Keep only Supabase sessions for subscriptions that don't have Firebase sessions
+        const supabaseSessionsToKeep = sessionsArray.filter(session =>
+          !firebaseSubscriptionIds.has(session.subscription_id)
+        );
+
+        // Combine: Firebase sessions + Supabase sessions (for subscriptions without Firebase data)
+        sessionsArray = [...firebaseSessions, ...supabaseSessionsToKeep];
+
+        console.log(`Loaded ${firebaseSessions.length} sessions from Firebase`);
+        console.log(`Kept ${supabaseSessionsToKeep.length} Supabase sessions for other subscriptions`);
+        console.log(`Total sessions: ${sessionsArray.length}`);
+      } catch (error) {
+        console.warn('Could not fetch Firebase sessions:', error);
+        // Continue with Supabase sessions if Firebase fails
+      }
 
       // Get course and teacher information for each subscription
       const subscriptionIds = subscriptionData.map((sub: any) => sub.id);
@@ -254,6 +365,65 @@ const SubscriptionsPage: React.FC = () => {
 
       setTeachers(teacherMap);
 
+      // Also fetch teacher info from Firebase subscriptions collection
+      try {
+        // Use Firebase query instead of non-existent getByField
+        const { collection, query: firebaseQuery, where, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/config/firebase');
+
+        const subscriptionsRef = collection(db, 'subscriptions');
+        const q = firebaseQuery(subscriptionsRef, where('studentId', '==', studentData.id));
+        const snapshot = await getDocs(q);
+
+        const firebaseSubscriptions = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        // Get unique teacher IDs from Firebase
+        const firebaseTeacherIds = [...new Set(firebaseSubscriptions
+          .map(sub => sub.teacherId)
+          .filter(Boolean))];
+
+        // Fetch teacher details from Firebase users collection
+        const { doc, getDoc } = await import('firebase/firestore');
+        for (const teacherId of firebaseTeacherIds) {
+          if (!teacherMap.has(teacherId)) {
+            try {
+              const userDocRef = doc(db, 'users', teacherId);
+              const userSnapshot = await getDoc(userDocRef);
+
+              if (userSnapshot.exists()) {
+                const teacher = userSnapshot.data();
+                teacherMap.set(teacherId, {
+                  id: teacherId,
+                  first_name: teacher.firstName || teacher.first_name,
+                  last_name: teacher.lastName || teacher.last_name,
+                  zoom_link: teacher.zoomLink || teacher.zoom_link
+                });
+                console.log(`Loaded teacher from Firebase: ${teacher.firstName} ${teacher.lastName}`);
+              }
+            } catch (error) {
+              console.warn(`Could not fetch teacher ${teacherId} from Firebase:`, error);
+            }
+          }
+        }
+
+        // Update subscription data with Firebase teacher IDs
+        subscriptionData.forEach((sub: any) => {
+          const fbSub = firebaseSubscriptions.find(fs => fs.id === sub.id);
+          if (fbSub && fbSub.teacherId) {
+            sub.teacher_id = fbSub.teacherId;
+            console.log(`Added teacher_id ${fbSub.teacherId} to subscription ${sub.id}`);
+          }
+        });
+
+        // Update the teachers state with the complete teacher map
+        setTeachers(new Map(teacherMap));
+      } catch (error) {
+        console.warn('Could not fetch Firebase subscription data:', error);
+      }
+
       // Get payment information for subscriptions
       const { data: paymentData } = await supabase
         .from('payments')
@@ -281,10 +451,25 @@ const SubscriptionsPage: React.FC = () => {
           session.subscription_id === sub.id
         );
 
+        console.log(`Subscription ${sub.id} has ${subscriptionSessions.length} sessions:`,
+          subscriptionSessions.map(s => ({
+            date: s.scheduled_date,
+            time: s.scheduled_time,
+            status: s.status
+          })));
+
         const courseInfo = courseMap.get(sub.id);
         const paymentInfo = paymentMap.get(sub.id) || { paid_amount: 0, payment_status: 'unpaid' };
         const subscriptionDetail = subscriptionDetails?.find((s: any) => s.id === sub.id);
-        const teacher = subscriptionDetail?.teacher_id ? teacherMap.get(subscriptionDetail.teacher_id) : null;
+
+        // Try to get teacher_id from multiple sources
+        const teacherId = sub.teacher_id || subscriptionDetail?.teacher_id;
+        const teacher = teacherId ? teacherMap.get(teacherId) : null;
+
+        console.log(`Subscription ${sub.id}: teacher_id=${teacherId}, teacher found=${!!teacher}, teacherMap size=${teacherMap.size}`);
+      if (teacherId && !teacher) {
+        console.log('Available teachers in map:', Array.from(teacherMap.keys()));
+      }
 
         return {
           id: sub.id,
@@ -303,8 +488,8 @@ const SubscriptionsPage: React.FC = () => {
           payment_status: paymentInfo.paid_amount >= sub.total_price ? 'paid' :
                           paymentInfo.paid_amount > 0 ? 'partial' : 'unpaid',
           paid_amount: paymentInfo.paid_amount,
-          teacher_id: subscriptionDetail?.teacher_id,
-          teacher_name: teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Not assigned' : null,
+          teacher_id: teacherId,
+          teacher_name: teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : 'Не назначен',
           teacher_zoom_link: teacher?.zoom_link
         };
       });
@@ -452,11 +637,11 @@ const SubscriptionsPage: React.FC = () => {
       if (typeof schedule === 'string') {
         const parsed = JSON.parse(schedule);
         return Array.isArray(parsed)
-          ? parsed.map(s => `${s.day} at ${s.time}`).join(', ')
+          ? parsed.map(s => `${s.day} ${t('subscription:at')} ${s.time}`).join(', ')
           : schedule;
       }
       if (Array.isArray(schedule)) {
-        return schedule.map(s => `${s.day} at ${s.time}`).join(', ');
+        return schedule.map(s => `${s.day} ${t('subscription:at')} ${s.time}`).join(', ');
       }
       return JSON.stringify(schedule);
     } catch {
@@ -593,7 +778,7 @@ const SubscriptionsPage: React.FC = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2 dark:bg-gray-800">
           <TabsTrigger value="active" className="relative dark:text-gray-300 dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white">
-            Active Subscriptions
+            {t('subscription:activeSubscriptions')}
             {activeSubscriptions.length > 0 && (
               <span className="ml-2 text-xs bg-blue-500 text-white rounded-full px-2">
                 {activeSubscriptions.length}
@@ -601,7 +786,7 @@ const SubscriptionsPage: React.FC = () => {
             )}
           </TabsTrigger>
           <TabsTrigger value="past" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white">
-            Past Subscriptions
+            {t('subscription:pastSubscriptions')}
             {pastSubscriptions.length > 0 && (
               <span className="ml-2 text-xs bg-slate-500 text-white rounded-full px-2">
                 {pastSubscriptions.length}
@@ -615,8 +800,8 @@ const SubscriptionsPage: React.FC = () => {
           {activeSubscriptions.length === 0 ? (
             <Card className="p-12 text-center dark:bg-gray-800 dark:border-gray-700">
               <Calendar className="h-12 w-12 mx-auto text-muted-foreground dark:text-gray-500 mb-4" />
-              <h3 className="text-lg font-semibold mb-2 dark:text-white">No Active Subscriptions</h3>
-              <p className="text-muted-foreground dark:text-gray-400">You don't have any active subscriptions at the moment.</p>
+              <h3 className="text-lg font-semibold mb-2 dark:text-white">{t('subscription:noActiveSubscriptions')}</h3>
+              <p className="text-muted-foreground dark:text-gray-400">{t('subscription:noActiveSubscriptionsDesc')}</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -649,8 +834,18 @@ const SubscriptionsPage: React.FC = () => {
                               <h4 className="font-semibold text-gray-900 dark:text-white">
                                 {subscription.course_name || t('subscription:generalCourse')}
                               </h4>
-                              {subscription.teacher_name && (
-                                <p className="text-xs text-muted-foreground dark:text-gray-400">
+                              {subscription.teacher_name && subscription.teacher_id && (
+                                <Link
+                                  to={`/teacher/${subscription.teacher_id}`}
+                                  className="text-xs text-muted-foreground dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1"
+                                >
+                                  <User className="h-3 w-3" />
+                                  {subscription.teacher_name}
+                                </Link>
+                              )}
+                              {subscription.teacher_name && !subscription.teacher_id && (
+                                <p className="text-xs text-muted-foreground dark:text-gray-400 inline-flex items-center gap-1">
+                                  <User className="h-3 w-3" />
                                   {subscription.teacher_name}
                                 </p>
                               )}
@@ -697,11 +892,11 @@ const SubscriptionsPage: React.FC = () => {
                                   }}
                                 >
                                   <DollarSign className="h-4 w-4 mr-2" />
-                                  Pay {subscription.currency} {(subscription.total_price - (subscription.paid_amount || 0)).toFixed(2)}
+                                  {t('subscription:pay')} {subscription.currency} {(subscription.total_price - (subscription.paid_amount || 0)).toFixed(2)}
                                 </Button>
                                 {subscription.paid_amount && subscription.paid_amount > 0 && (
                                   <p className="text-xs text-muted-foreground dark:text-gray-400 text-center mt-1">
-                                    Paid: {subscription.currency} {subscription.paid_amount.toFixed(2)}
+                                    {t('subscription:paid')}: {subscription.currency} {subscription.paid_amount.toFixed(2)}
                                   </p>
                                 )}
                               </div>
@@ -719,29 +914,39 @@ const SubscriptionsPage: React.FC = () => {
                 <div className="lg:col-span-2">
                   <Card className="dark:bg-gray-800 dark:border-gray-700">
                     <CardHeader>
-                      <CardTitle className="dark:text-white">Subscription Details</CardTitle>
+                      <CardTitle className="dark:text-white">{t('subscription:subscriptionDetails')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-sm text-muted-foreground dark:text-gray-400">Course</p>
-                            <p className="font-medium dark:text-white">{selectedSubscription.course_name || 'General Course'}</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">{t('subscription:course')}</p>
+                            <p className="font-medium dark:text-white">{selectedSubscription.course_name || t('subscription:generalCourse')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground dark:text-gray-400">Teacher</p>
-                            <p className="font-medium dark:text-white">{selectedSubscription.teacher_name || 'Not assigned'}</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">{t('subscription:teacher')}</p>
+                            {selectedSubscription.teacher_id && selectedSubscription.teacher_name ? (
+                              <Link
+                                to={`/teacher/${selectedSubscription.teacher_id}`}
+                                className="font-medium dark:text-white text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors inline-flex items-center gap-1"
+                              >
+                                {selectedSubscription.teacher_name}
+                                <ChevronRight className="h-3 w-3" />
+                              </Link>
+                            ) : (
+                              <p className="font-medium dark:text-white">{selectedSubscription.teacher_name || t('subscription:notAssigned')}</p>
+                            )}
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground dark:text-gray-400">Status</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">{t('subscription:status')}</p>
                             <p className="font-medium dark:text-white">{selectedSubscription.status.charAt(0).toUpperCase() + selectedSubscription.status.slice(1)}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground dark:text-gray-400">Schedule</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">{t('subscription:schedule')}</p>
                             <p className="font-medium dark:text-white">{formatSchedule(selectedSubscription.schedule)}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground dark:text-gray-400">Total Price</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">{t('subscription:totalPrice')}</p>
                             <p className="font-medium dark:text-white">{selectedSubscription.currency} {selectedSubscription.total_price.toFixed(2)}</p>
                           </div>
                         </div>
@@ -749,12 +954,12 @@ const SubscriptionsPage: React.FC = () => {
                         <Separator className="dark:bg-gray-700" />
 
                         <div>
-                          <h4 className="font-semibold mb-3 dark:text-white">Sessions</h4>
+                          <h4 className="font-semibold mb-3 dark:text-white">{t('subscription:sessions')}</h4>
                           <ScrollArea className="h-[400px] pr-4">
                             <div className="space-y-2">
                               {selectedSubscription.sessions.length === 0 ? (
                                 <p className="text-sm text-muted-foreground dark:text-gray-400 text-center py-4">
-                                  No sessions scheduled yet
+                                  {t('subscription:noSessionsScheduled')}
                                 </p>
                               ) : (
                                 selectedSubscription.sessions
@@ -778,8 +983,8 @@ const SubscriptionsPage: React.FC = () => {
           {pastSubscriptions.length === 0 ? (
             <Card className="p-12 text-center dark:bg-gray-800 dark:border-gray-700">
               <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground dark:text-gray-500 mb-4" />
-              <h3 className="text-lg font-semibold mb-2 dark:text-white">No Past Subscriptions</h3>
-              <p className="text-muted-foreground dark:text-gray-400">You don't have any completed subscriptions yet.</p>
+              <h3 className="text-lg font-semibold mb-2 dark:text-white">{t('subscription:noPastSubscriptions')}</h3>
+              <p className="text-muted-foreground dark:text-gray-400">{t('subscription:noPastSubscriptionsDesc')}</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -794,7 +999,7 @@ const SubscriptionsPage: React.FC = () => {
                       <div className="flex items-start justify-between">
                         <div>
                           <CardTitle className="text-lg dark:text-white">
-                            {subscription.course_name || 'General Course'}
+                            {subscription.course_name || t('subscription:generalCourse')}
                           </CardTitle>
                           <p className="text-sm text-muted-foreground dark:text-gray-400">
                             {subscription.session_count} Sessions • {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
@@ -808,14 +1013,14 @@ const SubscriptionsPage: React.FC = () => {
                     <CardContent>
                       <div className="space-y-3">
                         <div className="text-sm">
-                          <p className="text-muted-foreground dark:text-gray-400">Duration</p>
+                          <p className="text-muted-foreground dark:text-gray-400">{t('common:duration')}</p>
                           <p className="font-medium dark:text-white">
                             {format(new Date(subscription.start_date), 'MMM d, yyyy')} -
                             {subscription.end_date ? format(new Date(subscription.end_date), 'MMM d, yyyy') : 'N/A'}
                           </p>
                         </div>
                         <div className="text-sm">
-                          <p className="text-muted-foreground dark:text-gray-400">Completed Sessions</p>
+                          <p className="text-muted-foreground dark:text-gray-400">{t('subscription:completedSessions')}</p>
                           <p className="font-medium dark:text-white">{completedSessions} / {subscription.session_count}</p>
                         </div>
                         <Button
@@ -827,7 +1032,7 @@ const SubscriptionsPage: React.FC = () => {
                             setActiveTab('active');
                           }}
                         >
-                          View Details
+                          {t('common:viewDetails')}
                         </Button>
                       </div>
                     </CardContent>
@@ -844,12 +1049,12 @@ const SubscriptionsPage: React.FC = () => {
         <div>
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 dark:text-white">
             <CalendarDays className="h-5 w-5" />
-            Upcoming Lessons ({upcomingLessons.length})
+            {t('subscription:upcomingLessons', { count: upcomingLessons.length })}
           </h2>
           <Alert className="mb-4 dark:bg-gray-800 dark:border-gray-700">
             <AlertDescription className="dark:text-gray-300">
-              Showing {Math.min(3, upcomingLessons.length)} of {upcomingLessons.length} upcoming lessons.
-              View your active subscriptions above to see all sessions.
+              {t('subscription:showingLessons', { shown: Math.min(3, upcomingLessons.length), total: upcomingLessons.length })}
+              {t('subscription:viewActiveToSeeAll')}
             </AlertDescription>
           </Alert>
           <div className="space-y-4">
@@ -864,13 +1069,25 @@ const SubscriptionsPage: React.FC = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h4 className="font-semibold text-lg mb-1 dark:text-white">
-                          {subscription?.course_name || 'General Course'}
+                          {subscription?.course_name || t('subscription:generalCourse')}
                         </h4>
                         {subscription?.teacher_name && (
-                          <p className="text-sm text-muted-foreground dark:text-gray-400 mb-1">
-                            <User className="h-3 w-3 inline mr-1" />
-                            Teacher: {subscription.teacher_name}
-                          </p>
+                          <div className="mb-1">
+                            {subscription?.teacher_id ? (
+                              <Link
+                                to={`/teacher/${subscription.teacher_id}`}
+                                className="text-sm text-muted-foreground dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1"
+                              >
+                                <User className="h-3 w-3" />
+                                {t('subscription:teacher')}: {subscription.teacher_name}
+                              </Link>
+                            ) : (
+                              <p className="text-sm text-muted-foreground dark:text-gray-400 inline-flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {t('subscription:teacher')}: {subscription.teacher_name}
+                              </p>
+                            )}
+                          </div>
                         )}
                         <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-gray-400 mb-3">
                           <div className="flex items-center gap-1">
@@ -891,7 +1108,7 @@ const SubscriptionsPage: React.FC = () => {
                                 showTime={true}
                                 className="inline"
                               />
-                              {' '}• {session.duration_minutes || 60} min
+                              {' '}• {session.duration_minutes || 60} {t('subscription:min')}
                             </span>
                           </div>
                         </div>
@@ -938,21 +1155,21 @@ const SubscriptionsPage: React.FC = () => {
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <AlertDialogContent className="dark:bg-gray-800 dark:border-gray-700">
           <AlertDialogHeader>
-            <AlertDialogTitle className="dark:text-white">Cancel Session</AlertDialogTitle>
+            <AlertDialogTitle className="dark:text-white">{t('subscription:cancelSession')}</AlertDialogTitle>
             <AlertDialogDescription className="dark:text-gray-400">
-              Are you sure you want to cancel this session?
-              This action cannot be undone and may affect your subscription progress.
+              {t('subscription:cancelSessionConfirm')}
+              {t('subscription:cancelSessionWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:border-gray-600">
-              Keep Session
+              {t('subscription:keepSession')}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCancelSession}
               className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
             >
-              Yes, Cancel Session
+              {t('subscription:yesCancelSession')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

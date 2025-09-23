@@ -28,6 +28,8 @@ import TimePicker from '@/components/ui/time-picker';
 import SchedulePreview from './SchedulePreview';
 import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { teachersService } from '@/services/firebase/teachers.service';
+import { User } from 'lucide-react';
 
 interface ScheduleItem {
   day: string;
@@ -135,6 +137,16 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     enabled: !!schoolId,
   });
 
+  // Fetch active teachers for dropdown
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['active-teachers', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      return await teachersService.getActiveTeachers(schoolId);
+    },
+    enabled: !!schoolId && open,
+  });
+
   const [formData, setFormData] = useState({
     sessionCount: '',
     durationMonths: '',
@@ -147,6 +159,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     currency: '',
     notes: '',
     status: 'active',
+    teacherId: '', // Add teacher ID field
     initialPayment: {
       amount: '',
       method: 'Cash',
@@ -279,8 +292,9 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
             timeIn24Hour = `${hours.toString().padStart(2, '0')}:${minutes}`;
           }
 
+          const teacherIdToValidate = formData.teacherId || studentTeacherId;
           const result = await validateTeacherScheduleOverlap({
-            teacherId: studentTeacherId,
+            teacherId: teacherIdToValidate,
             date: dateStr,
             startTime: timeIn24Hour,
             durationMinutes: parseInt(formData.sessionDuration) || 60
@@ -505,6 +519,30 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Teacher Selection */}
+              <div>
+                <Label htmlFor="teacher" className="text-sm font-semibold text-gray-700">
+                  <User className="inline h-4 w-4 mr-1" />
+                  Assign Teacher
+                </Label>
+                <Select
+                  value={formData.teacherId}
+                  onValueChange={(value) => setFormData({ ...formData, teacherId: value })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select a teacher for this subscription" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No teacher assigned</SelectItem>
+                    {teachers.map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.firstName} {teacher.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Start Date */}

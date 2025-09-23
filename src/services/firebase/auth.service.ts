@@ -256,6 +256,29 @@ class AuthService {
     }
   }
 
+  // Create teacher account
+  async createTeacher(userData: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    schoolId: string;
+  }): Promise<{ uid: string }> {
+    try {
+      // Use the workaround to create user without signing out current admin
+      const uid = await createUserWithAuth({
+        ...userData,
+        role: 'teacher' as const
+      });
+
+      console.log('Created teacher with Firebase Auth account:', uid);
+      return { uid };
+    } catch (error: any) {
+      console.error('Error creating teacher:', error);
+      throw error;
+    }
+  }
+
   // Create student with extended profile
   async createStudent(
     userData: CreateUserData,
