@@ -7,13 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "build:prod": "vite build --mode production",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "echo 'No tests configured yet' && exit 0",
-    "deploy:production": "./scripts/deploy-production.sh",
-    "netlify:deploy": "netlify deploy",
-    "netlify:deploy:prod": "netlify deploy --prod"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
