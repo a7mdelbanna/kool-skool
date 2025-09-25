@@ -37,6 +37,7 @@ import Todos from '@/pages/Todos';
 import StudentDetail from '@/pages/StudentDetail';
 import VocabularyPractice from '@/pages/VocabularyPractice';
 import SpeakingTopics from '@/pages/SpeakingTopics';
+import EnhancedSpeakingTopics from '@/pages/EnhancedSpeakingTopics';
 import StudentSpeaking from '@/pages/StudentSpeaking';
 import AssignSpeakingTopic from '@/pages/AssignSpeakingTopic';
 import Birthdays from '@/pages/Birthdays';
@@ -85,7 +86,8 @@ const MainLayout = () => {
                   <Route path="/todos" element={<Todos />} />
                   <Route path="/student/:studentId" element={<StudentDetail />} />
                   <Route path="/student/:studentId/practice" element={<VocabularyPractice />} />
-                  <Route path="/speaking-topics" element={<SpeakingTopics />} />
+                  <Route path="/speaking-topics" element={<EnhancedSpeakingTopics />} />
+                  <Route path="/speaking-topics/classic" element={<SpeakingTopics />} />
                   <Route path="/speaking-topics/:topicId/assign" element={<AssignSpeakingTopic />} />
                   <Route path="/student/:studentId/speaking" element={<StudentSpeaking />} />
                 </Routes>

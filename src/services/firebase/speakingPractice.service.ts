@@ -32,10 +32,12 @@ export interface SpeakingTopic {
   id?: string;
   teacher_id: string;
   school_id: string;
+  parent_id?: string; // For hierarchical tree structure
   name: string;
   description?: string;
   genre: 'conversation' | 'presentation' | 'debate' | 'storytelling' | 'interview' | 'other';
   difficulty: 'beginner' | 'intermediate' | 'advanced';
+  cefr_level?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'; // CEFR language levels
   materials: string[]; // URLs to attached files
   video_urls: string[];
   scheduled_release?: Date;
@@ -46,8 +48,41 @@ export interface SpeakingTopic {
   rubric_template?: RubricTemplate;
   estimated_duration?: number; // in minutes
   tags?: string[];
+  interests_tags?: string[]; // Student interests (e.g., 'sports', 'technology', 'travel')
+  learning_objectives?: string[]; // Clear learning goals
+  pre_recorded_prompts?: PreRecordedPrompt[]; // Teacher's pre-recorded voice prompts
+  ai_config?: AIConfig; // AI assistant configuration
+  children_topics?: string[]; // IDs of child topics
+  order_index?: number; // For ordering within same parent
   created_at: Date;
   updated_at: Date;
+}
+
+export interface PreRecordedPrompt {
+  id: string;
+  audio_url: string;
+  transcript: string;
+  order: number;
+  prompt_type: 'introduction' | 'question' | 'follow_up' | 'conclusion';
+  expected_response_duration?: number; // Expected student response time in seconds
+}
+
+export interface AIConfig {
+  enabled: boolean;
+  model: 'gpt-4' | 'gpt-3.5-turbo';
+  voice_id?: string; // Eleven Labs voice ID
+  voice_settings?: {
+    stability: number;
+    similarity_boost: number;
+    style?: number;
+    use_speaker_boost?: boolean;
+  };
+  system_prompt?: string; // Custom instructions for AI behavior
+  temperature?: number; // AI creativity level (0-1)
+  max_tokens?: number;
+  conversation_style?: 'formal' | 'casual' | 'encouraging' | 'challenging';
+  correction_mode?: 'immediate' | 'end_of_session' | 'subtle' | 'none';
+  vocabulary_focus?: string[]; // Words to emphasize in conversation
 }
 
 export interface SpeakingConversation {
