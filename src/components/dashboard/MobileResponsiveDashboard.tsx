@@ -45,6 +45,7 @@ import NewStudentsStats from '../NewStudentsStats';
 import RecentStudents from './RecentStudents';
 import UpcomingLessons, { Lesson } from '../UpcomingLessons';
 import UpcomingPayments, { Payment } from '../UpcomingPayments';
+import CashFlowWidget from './CashFlowWidget';
 
 interface MobileWidget {
   id: string;
@@ -109,6 +110,14 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
       icon: Calendar,
       component: TodaysFocusWidget,
       priority: 'medium',
+      defaultOpen: false
+    },
+    {
+      id: 'cash-flow',
+      title: 'Cash Flow',
+      icon: DollarSign,
+      component: CashFlowWidget,
+      priority: 'high',
       defaultOpen: false
     },
     {
@@ -240,9 +249,13 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
 
       <BusinessHealthMonitor />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         <UrgentActionsWidget />
         <TodaysFocusWidget />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+        <CashFlowWidget />
         <InsightsWidget />
       </div>
 
@@ -282,13 +295,13 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
 
         <TabsContent value="overview" className="space-y-3">
           {mobileWidgets
-            .filter(w => ['live-updates', 'quick-actions', 'business-health', 'urgent-actions'].includes(w.id))
+            .filter(w => ['live-updates', 'quick-actions', 'business-health', 'urgent-actions', 'cash-flow'].includes(w.id))
             .map(renderMobileWidget)}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-3">
           {mobileWidgets
-            .filter(w => ['insights', 'revenue', 'todays-focus'].includes(w.id))
+            .filter(w => ['insights', 'revenue', 'todays-focus', 'cash-flow'].includes(w.id))
             .map(renderMobileWidget)}
         </TabsContent>
 
