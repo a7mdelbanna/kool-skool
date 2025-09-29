@@ -23,33 +23,65 @@
 
 @layer base {
   :root {
-    /* Refined Dark Theme with Depth */
+    /* Core Theme Colors - Dark Mode */
     --background: 222 47% 11%;
-    --foreground: 210 40% 96%;
+    --foreground: 210 40% 98%;
 
+    /* Surface colors for layering */
+    --surface: 217 33% 14%;
+    --surface-hover: 217 33% 17%;
+    --surface-active: 217 33% 20%;
+
+    /* Card and Dialog backgrounds */
     --card: 217 33% 17%;
-    --card-foreground: 210 40% 96%;
+    --card-foreground: 210 40% 98%;
+    --dialog: 217 33% 15%;
+    --dialog-foreground: 210 40% 98%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
 
+    /* Primary brand color */
     --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    --primary-hover: 217 91% 65%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 96%;
+    /* Secondary color */
+    --secondary: 217 33% 20%;
+    --secondary-hover: 217 33% 25%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 215 20% 65%;
+    /* Muted colors for less emphasis */
+    --muted: 217 20% 25%;
     --muted-foreground: 215 20% 65%;
 
+    /* Accent color */
     --accent: 217 91% 60%;
-    --accent-foreground: 222 47% 11%;
+    --accent-hover: 217 91% 65%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 96%;
+    /* Status colors */
+    --destructive: 0 84% 50%;
+    --destructive-hover: 0 84% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
+    --success: 142 71% 45%;
+    --success-hover: 142 71% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-hover: 38 92% 45%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 89% 48%;
+    --info-hover: 199 89% 43%;
+    --info-foreground: 0 0% 100%;
+
+    /* Form elements */
+    --border: 217 33% 25%;
+    --input: 217 33% 18%;
+    --input-hover: 217 33% 20%;
+    --input-focus: 217 33% 22%;
     --ring: 217 91% 60%;
 
     --radius: 0.75rem;
@@ -57,24 +89,32 @@
     /* Sidebar specific colors */
     --sidebar-background: 217 33% 14%;
     --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-hover: 217 33% 18%;
+    --sidebar-active: 217 91% 60%;
+    --sidebar-active-foreground: 0 0% 100%;
     --sidebar-accent: 217 33% 20%;
-    --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 217 33% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 25%;
     --sidebar-ring: 217 91% 60%;
 
     /* Chart colors */
-    --chart-1: 262 83% 58%;
+    --chart-1: 217 91% 60%;
     --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 0 84% 50%;
 
-    /* Success, Warning, Info colors */
-    --success: 142 71% 45%;
-    --warning: 38 92% 50%;
-    --info: 217 91% 60%;
+    /* Badge/Pill colors */
+    --badge-default: 217 33% 20%;
+    --badge-default-foreground: 210 40% 98%;
+    --badge-primary: 217 91% 60%;
+    --badge-primary-foreground: 0 0% 100%;
+    --badge-success: 142 71% 45%;
+    --badge-success-foreground: 0 0% 100%;
+    --badge-warning: 38 92% 50%;
+    --badge-warning-foreground: 0 0% 100%;
+    --badge-danger: 0 84% 50%;
+    --badge-danger-foreground: 0 0% 100%;
   }
 
   .light {

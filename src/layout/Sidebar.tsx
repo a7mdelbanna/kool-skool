@@ -201,21 +201,21 @@ const Sidebar = () => {
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative sidebar-item group",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group",
                   isActive
-                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg sidebar-item-active"
-                    : "text-gray-400 hover:text-white hover:bg-white/10",
+                    ? "bg-primary text-white shadow-md"
+                    : "text-gray-400 hover:text-gray-200 hover:bg-white/5",
                   isCollapsed && "justify-center"
                 )}
                 title={isCollapsed ? item.name : undefined}
               >
                 <item.icon className={cn(
-                  "h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110",
-                  isActive && "drop-shadow-md"
+                  "h-5 w-5 flex-shrink-0 transition-transform",
+                  isActive && "text-white"
                 )} />
-                {!isCollapsed && <span className="font-medium">{item.name}</span>}
+                {!isCollapsed && <span>{item.name}</span>}
                 {isActive && (
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-600/20 to-indigo-600/20 blur-xl -z-10" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
                 )}
               </NavLink>
             );
@@ -250,10 +250,10 @@ const Sidebar = () => {
                       }
                     }}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative sidebar-item group",
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group",
                       isActive
-                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg sidebar-item-active"
-                        : "text-gray-400 hover:text-white hover:bg-white/10",
+                        ? "bg-primary text-white shadow-md"
+                        : "text-gray-400 hover:text-gray-200 hover:bg-white/5",
                       isCollapsed && "justify-center"
                     )}
                     title={isCollapsed ? item.name : undefined}
@@ -274,10 +274,10 @@ const Sidebar = () => {
                   <NavLink
                     to={item.href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative sidebar-item group",
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group",
                       isActive
-                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg sidebar-item-active"
-                        : "text-gray-400 hover:text-white hover:bg-white/10",
+                        ? "bg-primary text-white shadow-md"
+                        : "text-gray-400 hover:text-gray-200 hover:bg-white/5",
                       isCollapsed && "justify-center"
                     )}
                     title={isCollapsed ? item.name : undefined}

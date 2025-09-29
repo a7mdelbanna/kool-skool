@@ -93,7 +93,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
       <div className="flex flex-col items-center space-y-2">
         <Avatar className="h-8 w-8">
           <AvatarImage src={user?.avatar} alt={displayName} />
-          <AvatarFallback className="bg-blue-500 text-white text-xs">
+          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
             {getInitials(displayName)}
           </AvatarFallback>
         </Avatar>
@@ -103,7 +103,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+              className="h-8 w-8 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
               title="Settings"
             >
               <Settings className="h-4 w-4" />
@@ -114,23 +114,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={user?.avatar} alt={displayName} />
-                  <AvatarFallback className="bg-blue-500 text-white text-sm">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                     {getInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {displayName}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-muted-foreground truncate">
                     {userEmail}
                   </p>
                 </div>
               </div>
               
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-blue-900 text-sm mb-2">Timezone Preference</h4>
-                <p className="text-xs text-blue-800 mb-3">
+              <div className="p-3 bg-sidebar-accent rounded-lg border border-sidebar-border">
+                <h4 className="font-medium text-foreground text-sm mb-2">Timezone Preference</h4>
+                <p className="text-xs text-muted-foreground mb-3">
                   All session times across the application will display in your selected timezone.
                 </p>
                 <TimezoneSelector
@@ -148,7 +148,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
           onClick={onLogout}
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-gray-700 hover:bg-red-50 hover:text-red-600"
+          className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           title="Logout"
         >
           <LogOut className="h-4 w-4" />
@@ -160,21 +160,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
   return (
     <div className="space-y-3">
       {/* User Info Section */}
-      <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-gray-200">
+      <div className="flex items-center gap-3 px-3 py-2 bg-sidebar-accent/50 rounded-lg border border-sidebar-border">
         <Avatar className="h-10 w-10">
           <AvatarImage src={user?.avatar} alt={displayName} />
-          <AvatarFallback className="bg-blue-500 text-white text-sm">
+          <AvatarFallback className="bg-primary text-primary-foreground text-sm">
             {getInitials(displayName)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className="text-sm font-medium text-foreground truncate">
             {displayName}
           </p>
-          <p className="text-xs text-gray-500 truncate">
+          <p className="text-xs text-muted-foreground truncate">
             {userEmail}
           </p>
-          <p className="text-xs text-blue-600 truncate">
+          <p className="text-xs text-primary truncate">
             TZ: {currentTimezone}
           </p>
         </div>
@@ -184,7 +184,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+              className="h-8 w-8 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
               title="Settings"
             >
               <Settings className="h-4 w-4" />
@@ -194,9 +194,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
             <div className="space-y-4">
               <h3 className="font-medium">Personal Settings</h3>
               
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-blue-900 text-sm mb-2">Timezone Preference</h4>
-                <p className="text-xs text-blue-800 mb-3">
+              <div className="p-3 bg-sidebar-accent rounded-lg border border-sidebar-border">
+                <h4 className="font-medium text-foreground text-sm mb-2">Timezone Preference</h4>
+                <p className="text-xs text-muted-foreground mb-3">
                   All session times across the application (Calendar, Attendance, etc.) will display in your selected timezone.
                 </p>
                 <TimezoneSelector
@@ -215,7 +215,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isCollapsed, onLogout }) => {
       <Button
         onClick={onLogout}
         variant="ghost"
-        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-gray-700 hover:bg-red-50 hover:text-red-600 hover:shadow-sm border border-transparent hover:border-red-200"
+        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:shadow-sm border border-transparent hover:border-destructive/20"
       >
         <LogOut className="h-4 w-4" />
         <span>Sign Out</span>

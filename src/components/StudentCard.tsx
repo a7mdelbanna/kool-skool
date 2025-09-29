@@ -78,13 +78,13 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
   const getPaymentStatusColor = (status: Student['paymentStatus']) => {
     switch (status) {
       case 'paid':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-success/20 text-success border-success/30';
       case 'partial':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-warning/20 text-warning border-warning/30';
       case 'pending':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted/20 text-muted-foreground border-muted/30';
       case 'overdue':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-destructive/20 text-destructive border-destructive/30';
       default:
         return '';
     }
@@ -120,7 +120,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
   // Get level style object for dynamic colors
   const getLevelStyle = (levelName: string | undefined) => {
     if (!levelName) return {};
-    
+
     const level = studentLevels.find((l: any) => l.name === levelName);
     if (level && level.color) {
       return {
@@ -129,10 +129,8 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
         borderColor: level.color
       };
     }
-    return {
-      backgroundColor: '#F3F4F6',
-      color: '#6B7280'
-    };
+    // Use theme variables for default style
+    return {}; // Will use default badge styling
   };
 
   // Currency symbol mapping

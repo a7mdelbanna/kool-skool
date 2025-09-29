@@ -246,9 +246,9 @@ const Index = () => {
         
         <div className="flex gap-2">
           <Tabs defaultValue="enhanced" className="hidden md:block" onValueChange={(value) => setView(value as 'standard' | 'enhanced')}>
-            <TabsList>
-              <TabsTrigger value="enhanced">Enhanced View</TabsTrigger>
-              <TabsTrigger value="standard">Standard View</TabsTrigger>
+            <TabsList className="bg-white/10 backdrop-blur-sm">
+              <TabsTrigger value="enhanced" className="data-[state=active]:bg-primary data-[state=active]:text-white text-gray-300">Enhanced View</TabsTrigger>
+              <TabsTrigger value="standard" className="data-[state=active]:bg-primary data-[state=active]:text-white text-gray-300">Standard View</TabsTrigger>
             </TabsList>
           </Tabs>
           

@@ -211,9 +211,9 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
     const totalPaid = subscription.total_paid || 0;
     const totalPrice = subscription.total_price || 0;
     
-    if (totalPaid >= totalPrice) return { status: 'Fully Paid', color: 'bg-green-100 text-green-800' };
-    if (totalPaid > 0) return { status: 'Partially Paid', color: 'bg-yellow-100 text-yellow-800' };
-    return { status: 'Unpaid', color: 'bg-red-100 text-red-800' };
+    if (totalPaid >= totalPrice) return { status: 'Fully Paid', color: 'bg-success/20 text-success' };
+    if (totalPaid > 0) return { status: 'Partially Paid', color: 'bg-warning/20 text-warning' };
+    return { status: 'Unpaid', color: 'bg-destructive/20 text-destructive' };
   };
 
   const formatSchedule = (schedule: any) => {
@@ -246,10 +246,10 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   const sessionCount = subscription.session_count || 0;
 
   return (
-    <Card className="border border-gray-200 hover:shadow-md transition-shadow">
+    <Card className="border hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium text-gray-900">
+          <CardTitle className="text-base font-medium">
             {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
           </CardTitle>
           <div className="flex items-center space-x-2">
@@ -257,7 +257,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
               variant="outline"
               size="sm"
               onClick={() => onEdit(subscription)}
-              className="text-blue-600 border-blue-300 hover:bg-blue-50"
+              className="text-primary hover:text-primary/80"
             >
               <Edit className="h-4 w-4" />
             </Button>
@@ -268,7 +268,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                   variant="outline"
                   size="sm"
                   disabled={isRenewing}
-                  className="text-green-600 border-green-300 hover:bg-green-50"
+                  className="text-success hover:text-success/80"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
@@ -286,7 +286,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                   <AlertDialogAction
                     disabled={isRenewing}
                     onClick={handleRenewSubscription}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-success hover:bg-success/90 text-success-foreground"
                   >
                     {isRenewing ? 'Renewing...' : 'Renew Subscription'}
                   </AlertDialogAction>
@@ -300,7 +300,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                   variant="outline" 
                   size="sm" 
                   disabled={isDeleting}
-                  className="text-red-600 border-red-300 hover:bg-red-50"
+                  className="text-destructive hover:text-destructive/80"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -317,7 +317,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                   <AlertDialogAction
                     disabled={isDeleting}
                     onClick={() => onDelete(subscription.id)}
-                    className="bg-red-600 hover:bg-red-700"
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                   >
                     {isDeleting ? 'Deleting...' : 'Delete'}
                   </AlertDialogAction>
@@ -326,31 +326,31 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             </AlertDialog>
           </div>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Start Date: {format(new Date(subscription.start_date), 'MMMM dd, yyyy')}
         </p>
       </CardHeader>
       
       <CardContent className="space-y-4">
         {/* Payment Information */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 mb-3">Payment Information</h4>
+        <div className="bg-surface rounded-lg p-4">
+          <h4 className="font-medium text-foreground mb-3">Payment Information</h4>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-xs text-gray-600 mb-1">Total Subscription</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-xs text-muted-foreground mb-1">Total Subscription</p>
+              <p className="font-semibold text-foreground">
                 {subscription.currency} {totalPrice.toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-600 mb-1">Total Paid</p>
-              <p className="font-semibold text-green-600">
+              <p className="text-xs text-muted-foreground mb-1">Total Paid</p>
+              <p className="font-semibold text-success">
                 {subscription.currency} {totalPaid.toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-600 mb-1">Remaining</p>
-              <p className="font-semibold text-red-600">
+              <p className="text-xs text-muted-foreground mb-1">Remaining</p>
+              <p className="font-semibold text-destructive">
                 {subscription.currency} {remaining.toFixed(2)}
               </p>
             </div>
@@ -363,20 +363,20 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         </div>
 
         {/* Enhanced Session Progress with Real-time Data */}
-        <div className="bg-blue-50 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 mb-3">Session Progress</h4>
+        <div className="bg-primary/10 rounded-lg p-4">
+          <h4 className="font-medium text-foreground mb-3">Session Progress</h4>
           
           {/* Main Progress Bar */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-900">Overall Progress</span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm font-medium text-foreground">Overall Progress</span>
+              <span className="text-sm text-muted-foreground">
                 {sessionsCompleted} / {sessionCount} completed
               </span>
             </div>
-            <div className="bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+            <div className="bg-muted rounded-full h-3">
+              <div
+                className="bg-primary h-3 rounded-full transition-all duration-300"
                 style={{ 
                   width: `${Math.min((sessionsCompleted / sessionCount) * 100, 100)}%` 
                 }}
@@ -387,41 +387,41 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           {/* Session Breakdown */}
           <div className="grid grid-cols-3 gap-3">
             <div className="text-center">
-              <p className="text-sm font-semibold text-green-600">{sessionsAttended}</p>
-              <p className="text-xs text-gray-600">Attended</p>
+              <p className="text-sm font-semibold text-success">{sessionsAttended}</p>
+              <p className="text-xs text-muted-foreground">Attended</p>
             </div>
             <div className="text-center">
-              <p className="text-sm font-semibold text-red-600">{sessionsCancelled}</p>
-              <p className="text-xs text-gray-600">Cancelled</p>
+              <p className="text-sm font-semibold text-destructive">{sessionsCancelled}</p>
+              <p className="text-xs text-muted-foreground">Cancelled</p>
             </div>
             <div className="text-center">
-              <p className="text-sm font-semibold text-blue-600">{sessionsScheduled}</p>
-              <p className="text-xs text-gray-600">Scheduled</p>
+              <p className="text-sm font-semibold text-primary">{sessionsScheduled}</p>
+              <p className="text-xs text-muted-foreground">Scheduled</p>
             </div>
           </div>
         </div>
 
         {/* Schedule */}
         <div>
-          <p className="text-sm font-medium text-gray-900 mb-1">Schedule</p>
-          <p className="text-sm text-gray-600">{formatSchedule(subscription.schedule)}</p>
+          <p className="text-sm font-medium text-foreground mb-1">Schedule</p>
+          <p className="text-sm text-muted-foreground">{formatSchedule(subscription.schedule)}</p>
         </div>
 
         {/* Status */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+        <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-gray-900">Status:</span>
+            <span className="text-sm font-medium text-foreground">Status:</span>
             <Badge variant="outline" className={
-              subscription.status === 'active' ? 'border-green-300 text-green-700' :
-              subscription.status === 'paused' ? 'border-yellow-300 text-yellow-700' :
-              subscription.status === 'completed' ? 'border-blue-300 text-blue-700' :
-              'border-red-300 text-red-700'
+              subscription.status === 'active' ? 'border-success text-success' :
+              subscription.status === 'paused' ? 'border-warning text-warning' :
+              subscription.status === 'completed' ? 'border-primary text-primary' :
+              'border-destructive text-destructive'
             }>
               {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
             </Badge>
           </div>
           {subscription.price_mode === 'perSession' && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               {subscription.currency} {subscription.price_per_session}/session
             </p>
           )}

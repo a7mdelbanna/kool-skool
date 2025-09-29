@@ -241,8 +241,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center space-x-2">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            <p className="text-gray-600">Loading subscriptions with real-time progress...</p>
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground">Loading subscriptions with real-time progress...</p>
           </div>
         </div>
       </div>
@@ -256,8 +256,8 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center space-x-2">
-            <AlertCircle className="h-6 w-6 text-red-400" />
-            <p className="text-red-600">Failed to load subscriptions. Please try refreshing.</p>
+            <AlertCircle className="h-6 w-6 text-destructive" />
+            <p className="text-destructive">Failed to load subscriptions. Please try refreshing.</p>
           </div>
         </div>
       </div>
@@ -271,20 +271,19 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   return (
     <div className="space-y-8">
       {/* Create New Subscription Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+      <div className="bg-primary/10 border border-primary/20 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-blue-900">Create New Subscription</h3>
+            <Calendar className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Create New Subscription</h3>
           </div>
         </div>
-        <p className="text-blue-700 mb-4">Set up a new subscription plan for this student with scheduled sessions and payment details.</p>
-        <Button 
+        <p className="text-muted-foreground mb-4">Set up a new subscription plan for this student with scheduled sessions and payment details.</p>
+        <Button
           onClick={() => {
             console.log('➕ Create subscription button clicked');
             setAddDialogOpen(true);
-          }} 
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          }}
         >
           <Plus className="mr-2 h-4 w-4" />
           Create Subscription
@@ -294,30 +293,29 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
       {/* Current Subscriptions Section */}
       <div>
         <div className="flex items-center space-x-2 mb-4">
-          <Calendar className="h-5 w-5 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Current Subscriptions</h3>
+          <Calendar className="h-5 w-5 text-muted-foreground" />
+          <h3 className="text-lg font-semibold text-foreground">Current Subscriptions</h3>
           {subscriptions && subscriptions.length > 0 && (
-            <span className="text-sm text-gray-500">({subscriptions.length} total with real-time progress)</span>
+            <span className="text-sm text-muted-foreground">({subscriptions.length} total with real-time progress)</span>
           )}
         </div>
 
         {!subscriptions || subscriptions.length === 0 ? (
           <>
             {console.log('🔸 Rendering empty state')}
-            <Card className="border-dashed border-2 border-gray-300">
+            <Card className="border-dashed border-2 border-muted">
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Calendar className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No subscriptions found</h3>
-                <p className="text-gray-600 mb-4 text-center">
+                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No subscriptions found</h3>
+                <p className="text-muted-foreground mb-4 text-center">
                   This student doesn't have any subscriptions yet.<br/>
                   Create a subscription to get started with scheduled sessions and payments.
                 </p>
-                <Button 
+                <Button
                   onClick={() => {
                     console.log('➕ Create first subscription button clicked');
                     setAddDialogOpen(true);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Create First Subscription
