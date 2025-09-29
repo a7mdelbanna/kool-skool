@@ -87,9 +87,9 @@ const LessonItem = ({ lesson }: { lesson: Lesson }) => {
   );
 };
 
-const UpcomingLessons = ({ lessons, className }: UpcomingLessonsProps) => {
-  const todayLessons = lessons.filter(l => l.date === 'Today');
-  const tomorrowLessons = lessons.filter(l => l.date === 'Tomorrow');
+const UpcomingLessons = ({ lessons = [], className }: UpcomingLessonsProps) => {
+  const todayLessons = lessons?.filter(l => l.date === 'Today') || [];
+  const tomorrowLessons = lessons?.filter(l => l.date === 'Tomorrow') || [];
   
   return (
     <Card className={cn("overflow-hidden", className)}>

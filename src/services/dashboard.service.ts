@@ -51,6 +51,23 @@ export interface UpcomingLesson {
   status: 'upcoming' | 'completed' | 'cancelled';
 }
 
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  amount: number;
+  percentage: number;
+  color?: string;
+}
+
+export interface CashFlowData {
+  totalIncome: number;
+  totalExpenses: number;
+  netCashFlow: number;
+  topCategories: ExpenseCategory[];
+  trend: number;
+  currency: string;
+}
+
 class DashboardService {
   async getDashboardMetrics(schoolId: string): Promise<DashboardMetrics> {
     try {
@@ -477,6 +494,37 @@ class DashboardService {
     }
   }
 
+  async getTodaysSessionsCount(schoolId: string): Promise<number> {
+    try {
+      const now = new Date();
+      const todayStart = startOfDay(now);
+      const todayEnd = endOfDay(now);
+
+      // Get all sessions for the school
+      const sessions = await databaseService.query('sessions', {
+        where: [
+          { field: 'schoolId', operator: '==', value: schoolId }
+        ]
+      });
+
+      if (!sessions || sessions.length === 0) {
+        return 0;
+      }
+
+      // Filter for today's sessions that are not cancelled
+      const todaysSessions = sessions.filter((session: any) => {
+        const sessionDate = new Date(session.scheduled_date);
+        return isWithinInterval(sessionDate, { start: todayStart, end: todayEnd }) &&
+               session.status !== 'cancelled';
+      });
+
+      return todaysSessions.length;
+    } catch (error) {
+      console.error('Error fetching today\'s sessions count:', error);
+      return 0;
+    }
+  }
+
   async getUpcomingLessons(schoolId: string, limit: number = 5): Promise<UpcomingLesson[]> {
     try {
       // First get all sessions for the school
@@ -531,6 +579,164 @@ class DashboardService {
     } catch (error) {
       console.error('Error fetching upcoming lessons:', error);
       return [];
+    }
+  }
+
+  async getCashFlowData(schoolId: string, period: 'week' | 'month' = 'month'): Promise<CashFlowData> {
+    try {
+      const now = new Date();
+      let periodStart: Date;
+      let periodEnd: Date;
+      let lastPeriodStart: Date;
+      let lastPeriodEnd: Date;
+
+      if (period === 'week') {
+        periodStart = startOfWeek(now);
+        periodEnd = endOfWeek(now);
+        lastPeriodStart = startOfWeek(subWeeks(now, 1));
+        lastPeriodEnd = endOfWeek(subWeeks(now, 1));
+      } else {
+        periodStart = startOfMonth(now);
+        periodEnd = endOfMonth(now);
+        lastPeriodStart = startOfMonth(subMonths(now, 1));
+        lastPeriodEnd = endOfMonth(subMonths(now, 1));
+      }
+
+      // Get transactions for current and last period
+      const transactions = await databaseService.query('transactions', {
+        where: [{ field: 'school_id', operator: '==', value: schoolId }]
+      });
+
+      // Get transaction categories
+      const categories = await databaseService.query('transaction_categories', {
+        where: [
+          { field: 'school_id', operator: '==', value: schoolId },
+          { field: 'type', operator: '==', value: 'expense' }
+        ]
+      });
+
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      let lastPeriodIncome = 0;
+      let lastPeriodExpenses = 0;
+      const categoryExpenses: Map<string, { amount: number; name: string; color?: string }> = new Map();
+
+      // Process transactions
+      if (transactions && transactions.length > 0) {
+        transactions.forEach((transaction: any) => {
+          const amount = Number(transaction.amount) || 0;
+          const transactionDate = new Date(transaction.date);
+
+          // Current period
+          if (isWithinInterval(transactionDate, { start: periodStart, end: periodEnd })) {
+            if (transaction.type === 'income') {
+              totalIncome += amount;
+            } else if (transaction.type === 'expense') {
+              totalExpenses += amount;
+
+              // Track by category
+              const categoryId = transaction.category_id || 'uncategorized';
+              const current = categoryExpenses.get(categoryId) || { amount: 0, name: 'Uncategorized', color: '#808080' };
+
+              // Find category details
+              const category = categories?.find((c: any) => c.id === categoryId);
+              if (category) {
+                current.name = category.name;
+                current.color = category.color;
+              }
+
+              current.amount += amount;
+              categoryExpenses.set(categoryId, current);
+            }
+          }
+
+          // Last period for trend calculation
+          if (isWithinInterval(transactionDate, { start: lastPeriodStart, end: lastPeriodEnd })) {
+            if (transaction.type === 'income') {
+              lastPeriodIncome += amount;
+            } else if (transaction.type === 'expense') {
+              lastPeriodExpenses += amount;
+            }
+          }
+        });
+      }
+
+      // Also include payments as income
+      const payments = await databaseService.query('payments', {
+        where: [{ field: 'school_id', operator: '==', value: schoolId }]
+      });
+
+      if (payments && payments.length > 0) {
+        payments.forEach((payment: any) => {
+          if (payment.status === 'completed' || payment.status === 'paid') {
+            const paymentDate = payment.payment_date ? new Date(payment.payment_date) :
+                               payment.date ? new Date(payment.date) : null;
+
+            if (paymentDate) {
+              const amount = Number(payment.amount) || 0;
+
+              if (isWithinInterval(paymentDate, { start: periodStart, end: periodEnd })) {
+                totalIncome += amount;
+              }
+              if (isWithinInterval(paymentDate, { start: lastPeriodStart, end: lastPeriodEnd })) {
+                lastPeriodIncome += amount;
+              }
+            }
+          }
+        });
+      }
+
+      // Calculate net cash flow
+      const netCashFlow = totalIncome - totalExpenses;
+      const lastPeriodNetCashFlow = lastPeriodIncome - lastPeriodExpenses;
+
+      // Calculate trend
+      let trend = 0;
+      if (lastPeriodNetCashFlow !== 0) {
+        trend = Math.round(((netCashFlow - lastPeriodNetCashFlow) / Math.abs(lastPeriodNetCashFlow)) * 100);
+      } else if (netCashFlow > 0) {
+        trend = 100;
+      }
+
+      // Sort categories by amount and calculate percentages
+      const topCategories: ExpenseCategory[] = Array.from(categoryExpenses.entries())
+        .map(([id, data]) => ({
+          id,
+          name: data.name,
+          amount: data.amount,
+          percentage: totalExpenses > 0 ? (data.amount / totalExpenses) * 100 : 0,
+          color: data.color
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      // Get currency
+      const currencies = await databaseService.query('currencies', {
+        where: [
+          { field: 'school_id', operator: '==', value: schoolId },
+          { field: 'is_default', operator: '==', value: true }
+        ]
+      });
+
+      const currency = currencies && currencies.length > 0 ? currencies[0].symbol || currencies[0].code : '₱';
+
+      return {
+        totalIncome,
+        totalExpenses,
+        netCashFlow,
+        topCategories,
+        trend,
+        currency
+      };
+    } catch (error) {
+      console.error('Error fetching cash flow data:', error);
+      return {
+        totalIncome: 0,
+        totalExpenses: 0,
+        netCashFlow: 0,
+        topCategories: [],
+        trend: 0,
+        currency: '₱'
+      };
     }
   }
 

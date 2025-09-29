@@ -4,6 +4,9 @@ import { Routes, Route } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import MobileNavbar from '@/components/Navbar';
 import Sidebar from './Sidebar';
+import GlobalCommandCenter from '@/components/GlobalCommandCenter';
+import SearchBar from '@/components/SearchBar';
+import { useGlobalShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 // Import all the pages
 import Index from '@/pages/Index';
@@ -39,15 +42,21 @@ import AssignSpeakingTopic from '@/pages/AssignSpeakingTopic';
 import Birthdays from '@/pages/Birthdays';
 
 const MainLayout = () => {
+  // Initialize global keyboard shortcuts
+  useGlobalShortcuts();
+
   return (
     <SidebarProvider>
+      {/* Global Command Center */}
+      <GlobalCommandCenter />
+
       <div className="h-screen flex w-full bg-background overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 h-screen">
           <MobileNavbar />
           <main className="flex-1 overflow-y-auto bg-background ml-0">
-            <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 transition-all duration-300 page-transition">
-              <div className="w-full">
+            <div className="w-full transition-all duration-300 page-transition">
+              <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6">
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/students" element={<Students />} />

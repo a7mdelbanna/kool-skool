@@ -74,12 +74,12 @@ const PaymentItem = ({ payment }: { payment: Payment }) => {
   );
 };
 
-const UpcomingPayments = ({ payments, className }: UpcomingPaymentsProps) => {
-  const sortedPayments = [...payments].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-  
+const UpcomingPayments = ({ payments = [], className }: UpcomingPaymentsProps) => {
+  const sortedPayments = payments ? [...payments].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime()) : [];
+
   const todayPayments = sortedPayments.filter(payment => isToday(payment.dueDate));
   const tomorrowPayments = sortedPayments.filter(payment => isTomorrow(payment.dueDate));
-  const thisWeekPayments = sortedPayments.filter(payment => 
+  const thisWeekPayments = sortedPayments.filter(payment =>
     isThisWeek(payment.dueDate) && !isToday(payment.dueDate) && !isTomorrow(payment.dueDate)
   );
   

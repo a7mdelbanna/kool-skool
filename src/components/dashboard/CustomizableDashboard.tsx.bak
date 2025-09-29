@@ -1,0 +1,452 @@
+import React, { useState, useCallback, useContext, lazy, Suspense } from 'react';
+import { Responsive, WidthProvider, Layout, Layouts } from 'react-grid-layout';
+import {
+  Settings,
+  Save,
+  RotateCcw,
+  Lock,
+  Unlock,
+  Plus,
+  X,
+  GripVertical,
+  Maximize2,
+  Minimize2,
+  Download,
+  Upload
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { UserContext } from '@/App';
+import {
+  dashboardLayoutService,
+  DashboardLayout,
+  WidgetConfig
+} from '@/services/dashboardLayout.service';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+
+// Lazy load dashboard widgets
+const QuickActionsBar = lazy(() => import('./QuickActionsBar'));
+const BusinessHealthMonitor = lazy(() => import('./BusinessHealthMonitor'));
+const UrgentActionsWidget = lazy(() => import('./UrgentActionsWidget'));
+const TodaysFocusWidget = lazy(() => import('./TodaysFocusWidget'));
+const InsightsWidget = lazy(() => import('./InsightsWidget'));
+const LiveUpdatesIndicator = lazy(() => import('./LiveUpdatesIndicator'));
+const RevenueExpensesChart = lazy(() => import('../RevenueExpensesChart'));
+const NewStudentsStats = lazy(() => import('../NewStudentsStats'));
+
+// Widget component map
+const widgetComponents: Record<string, React.ComponentType<any>> = {
+  QuickActionsBar,
+  BusinessHealthMonitor,
+  UrgentActionsWidget,
+  TodaysFocusWidget,
+  InsightsWidget,
+  LiveUpdatesIndicator,
+  RevenueExpensesChart,
+  NewStudentsStats,
+};
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+interface CustomizableDashboardProps {
+  className?: string;
+}
+
+const CustomizableDashboard: React.FC<CustomizableDashboardProps> = ({ className }) => {
+  const { user } = useContext(UserContext);
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [layouts, setLayouts] = useState<Layouts>(() => {
+    const activeLayout = dashboardLayoutService.getActiveLayout();
+    return activeLayout.layouts;
+  });
+  const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
+    const activeLayout = dashboardLayoutService.getActiveLayout();
+    return activeLayout.widgets;
+  });
+  const [visibleWidgets, setVisibleWidgets] = useState<Set<string>>(() => {
+    return new Set(widgets.map(w => w.id));
+  });
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [layoutName, setLayoutName] = useState('');
+  const [isDraggable, setIsDraggable] = useState(true);
+  const [isResizable, setIsResizable] = useState(true);
+
+  // Handle layout change
+  const handleLayoutChange = useCallback((currentLayout: Layout[], allLayouts: Layouts) => {
+    if (isCustomizing) {
+      setLayouts(allLayouts);
+    }
+  }, [isCustomizing]);
+
+  // Save current layout
+  const saveLayout = useCallback(() => {
+    if (!layoutName.trim()) {
+      toast.error('Please enter a layout name');
+      return;
+    }
+
+    const newLayout: DashboardLayout = {
+      id: `layout-${Date.now()}`,
+      name: layoutName,
+      layouts,
+      widgets: widgets.filter(w => visibleWidgets.has(w.id)),
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    dashboardLayoutService.saveLayout(newLayout);
+    dashboardLayoutService.setActiveLayout(newLayout.id);
+    toast.success('Layout saved successfully');
+    setSaveDialogOpen(false);
+    setLayoutName('');
+  }, [layoutName, layouts, widgets, visibleWidgets]);
+
+  // Reset to default layout
+  const resetToDefault = useCallback(() => {
+    const defaultLayout = dashboardLayoutService.getDefaultLayout();
+    const defaultWidgets = dashboardLayoutService.getDefaultWidgets();
+
+    setLayouts(defaultLayout);
+    setWidgets(defaultWidgets);
+    setVisibleWidgets(new Set(defaultWidgets.map(w => w.id)));
+    dashboardLayoutService.resetToDefault();
+    toast.success('Reset to default layout');
+  }, []);
+
+  // Toggle widget visibility
+  const toggleWidget = useCallback((widgetId: string) => {
+    setVisibleWidgets(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(widgetId)) {
+        newSet.delete(widgetId);
+      } else {
+        newSet.add(widgetId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Export layout
+  const exportLayout = useCallback(() => {
+    const currentLayout: DashboardLayout = {
+      id: 'exported',
+      name: 'Exported Layout',
+      layouts,
+      widgets: widgets.filter(w => visibleWidgets.has(w.id)),
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const dataStr = JSON.stringify(currentLayout, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+    const exportFileDefaultName = `dashboard-layout-${Date.now()}.json`;
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+
+    toast.success('Layout exported successfully');
+  }, [layouts, widgets, visibleWidgets]);
+
+  // Import layout
+  const importLayout = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const imported = JSON.parse(content);
+
+        setLayouts(imported.layouts);
+        setWidgets(imported.widgets);
+        setVisibleWidgets(new Set(imported.widgets.map((w: WidgetConfig) => w.id)));
+
+        toast.success('Layout imported successfully');
+      } catch (error) {
+        toast.error('Failed to import layout');
+        console.error('Import error:', error);
+      }
+    };
+    reader.readAsText(file);
+  }, []);
+
+  // Render widget content
+  const renderWidget = useCallback((widget: WidgetConfig) => {
+    const Component = widgetComponents[widget.component];
+
+    if (!Component) {
+      return (
+        <div className="flex items-center justify-center h-full text-muted-foreground">
+          Widget not found: {widget.component}
+        </div>
+      );
+    }
+
+    return (
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      }>
+        <Component />
+      </Suspense>
+    );
+  }, []);
+
+  // Generate layout items
+  const generateDOM = useCallback(() => {
+    return widgets.filter(w => visibleWidgets.has(w.id)).map((widget) => (
+      <div key={widget.id} className="dashboard-widget">
+        <Card className={cn(
+          "h-full overflow-hidden transition-all",
+          isCustomizing && "ring-2 ring-primary/20"
+        )}>
+          {isCustomizing && (
+            <div className="absolute top-2 right-2 z-10 flex gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 bg-background/80 backdrop-blur-sm"
+                onClick={() => toggleWidget(widget.id)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+              <div className="h-6 w-6 bg-background/80 backdrop-blur-sm rounded flex items-center justify-center cursor-move">
+                <GripVertical className="h-3 w-3" />
+              </div>
+            </div>
+          )}
+          <div className="h-full">
+            {renderWidget(widget)}
+          </div>
+        </Card>
+      </div>
+    ));
+  }, [widgets, visibleWidgets, isCustomizing, toggleWidget, renderWidget]);
+
+  return (
+    <div className={cn("space-y-4", className)}>
+      {/* Customization Toolbar */}
+      <div className="flex items-center justify-between p-4 glass-card backdrop-blur-xl rounded-lg">
+        <div className="flex items-center gap-4">
+          <Button
+            variant={isCustomizing ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsCustomizing(!isCustomizing)}
+            className="gap-2"
+          >
+            {isCustomizing ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+            {isCustomizing ? 'Lock Layout' : 'Customize Layout'}
+          </Button>
+
+          {isCustomizing && (
+            <>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={isDraggable}
+                  onCheckedChange={setIsDraggable}
+                  id="draggable"
+                />
+                <Label htmlFor="draggable" className="text-sm">Draggable</Label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={isResizable}
+                  onCheckedChange={setIsResizable}
+                  id="resizable"
+                />
+                <Label htmlFor="resizable" className="text-sm">Resizable</Label>
+              </div>
+            </>
+          )}
+        </div>
+
+        {isCustomizing && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSaveDialogOpen(true)}
+              className="gap-2"
+            >
+              <Save className="h-4 w-4" />
+              Save Layout
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Layout Options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={resetToDefault}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset to Default
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportLayout}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Layout
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <label className="cursor-pointer">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Layout
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={importLayout}
+                      className="hidden"
+                    />
+                  </label>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+
+      {/* Widget Selector (shown when customizing) */}
+      {isCustomizing && (
+        <Card className="p-4">
+          <h3 className="text-sm font-semibold mb-3">Available Widgets</h3>
+          <div className="flex flex-wrap gap-2">
+            {widgets.map(widget => (
+              <Badge
+                key={widget.id}
+                variant={visibleWidgets.has(widget.id) ? "default" : "secondary"}
+                className="cursor-pointer"
+                onClick={() => toggleWidget(widget.id)}
+              >
+                {visibleWidgets.has(widget.id) && <CheckCircle className="h-3 w-3 mr-1" />}
+                {widget.title}
+              </Badge>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Responsive Grid Layout */}
+      <ResponsiveGridLayout
+        className="layout"
+        layouts={layouts}
+        onLayoutChange={handleLayoutChange}
+        breakpoints={dashboardLayoutService.getBreakpoints()}
+        cols={dashboardLayoutService.getCols()}
+        rowHeight={60}
+        isDraggable={isCustomizing && isDraggable}
+        isResizable={isCustomizing && isResizable}
+        compactType="vertical"
+        preventCollision={false}
+        margin={[16, 16]}
+      >
+        {generateDOM()}
+      </ResponsiveGridLayout>
+
+      {/* Save Layout Dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Dashboard Layout</DialogTitle>
+            <DialogDescription>
+              Give your custom layout a name to save it for future use.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={layoutName}
+                onChange={(e) => setLayoutName(e.target.value)}
+                className="col-span-3"
+                placeholder="My Custom Dashboard"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveLayout}>Save Layout</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom styles for grid layout */}
+      <style jsx global>{`
+        .react-grid-item {
+          transition: all 200ms ease;
+        }
+
+        .react-grid-item.react-grid-placeholder {
+          background: hsl(var(--primary) / 0.2);
+          border-radius: 0.5rem;
+          opacity: 0.5;
+          transition-duration: 100ms;
+        }
+
+        .react-grid-item.resizing {
+          opacity: 0.8;
+        }
+
+        .react-grid-item.react-draggable-dragging {
+          opacity: 0.8;
+          z-index: 100;
+        }
+
+        .react-resizable-handle {
+          background: none;
+        }
+
+        .react-resizable-handle::after {
+          content: '';
+          position: absolute;
+          right: 3px;
+          bottom: 3px;
+          width: 5px;
+          height: 5px;
+          border-right: 2px solid hsl(var(--primary) / 0.5);
+          border-bottom: 2px solid hsl(var(--primary) / 0.5);
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default CustomizableDashboard;
