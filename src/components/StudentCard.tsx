@@ -225,25 +225,25 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
   }
 
   return (
-    <Card 
+    <Card
       className={cn(
-        "overflow-hidden transition-all duration-300 hover:shadow-md cursor-pointer", 
+        "overflow-hidden transition-all duration-300 cursor-pointer group relative",
         className
       )}
       onClick={() => onEdit?.(student)}
     >
-      <CardContent className="p-6">
+      <CardContent className="p-6 relative z-10">
         <div className="flex items-center gap-4">
-          <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+          <Avatar className="h-12 w-12 border-2 border-primary/20 shadow-lg">
             <AvatarImage src={student.image} alt={`${student.firstName} ${student.lastName}`} />
-            <AvatarFallback className="bg-primary/10 text-primary">
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
               {`${student.firstName?.[0] || ''}${student.lastName?.[0] || ''}`}
             </AvatarFallback>
           </Avatar>
-          
+
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-start">
-              <h3 className="font-semibold text-base truncate">{`${student.firstName || 'Unnamed'} ${student.lastName || 'Student'}`}</h3>
+              <h3 className="font-semibold text-base truncate text-foreground">{`${student.firstName || 'Unnamed'} ${student.lastName || 'Student'}`}</h3>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 

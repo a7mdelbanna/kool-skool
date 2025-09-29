@@ -27,35 +27,35 @@ type StatCardProps = {
   onClick?: () => void;
 }
 
-const StatCard = ({ 
-  title, 
-  value, 
-  icon, 
-  description, 
-  trend, 
+const StatCard = ({
+  title,
+  value,
+  icon,
+  description,
+  trend,
   className,
   linkText,
   onClick
 }: StatCardProps) => {
   return (
-    <Card className={cn("overflow-hidden", className)}>
-      <CardContent className="p-6 pb-2">
+    <Card className={cn("glass-card glass-card-hover overflow-hidden relative group", className)}>
+      <CardContent className="p-6 pb-2 relative z-10">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
-            <h3 className="text-2xl font-bold">{value}</h3>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">{title}</p>
+            <h3 className="text-3xl font-bold text-foreground">{value}</h3>
             {description && (
-              <p className="text-xs text-muted-foreground mt-1">{description}</p>
+              <p className="text-sm text-muted-foreground mt-2">{description}</p>
             )}
             {trend !== undefined && (
-              <div className="flex items-center gap-1 mt-2">
+              <div className="flex items-center gap-1 mt-3">
                 <TrendingUp className={cn(
-                  "h-3 w-3",
+                  "h-4 w-4",
                   trend > 0 ? "text-green-500" : "text-red-500",
                   trend === 0 && "text-muted-foreground"
                 )} />
                 <span className={cn(
-                  "text-xs font-medium",
+                  "text-sm font-medium",
                   trend > 0 ? "text-green-500" : "text-red-500",
                   trend === 0 && "text-muted-foreground"
                 )}>
@@ -64,16 +64,18 @@ const StatCard = ({
               </div>
             )}
           </div>
-          <div className="rounded-full p-2 bg-primary/10">
-            {icon}
+          <div className="rounded-xl p-3 bg-primary/10 backdrop-blur-sm transition-transform">
+            <div className="text-primary">
+              {icon}
+            </div>
           </div>
         </div>
       </CardContent>
       {linkText && (
-        <CardFooter className="p-4 pt-0">
-          <Button 
-            variant="link" 
-            className="p-0 h-auto flex items-center gap-1 text-primary"
+        <CardFooter className="p-4 pt-0 relative z-10">
+          <Button
+            variant="link"
+            className="p-0 h-auto flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
             onClick={onClick}
           >
             {linkText}

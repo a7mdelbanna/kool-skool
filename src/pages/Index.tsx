@@ -237,11 +237,11 @@ const Index = () => {
   }, [user?.schoolId]);
   
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Welcome back, let's manage your tutoring business!</p>
+          <h1 className="text-4xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-2">Welcome back, let's manage your tutoring business!</p>
         </div>
         
         <div className="flex gap-2">
@@ -283,7 +283,7 @@ const Index = () => {
             </PopoverContent>
           </Popover>
           
-          <Button className="gap-2" variant="default" onClick={() => setIsAddStudentOpen(true)}>
+          <Button className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => setIsAddStudentOpen(true)}>
             <PlusCircle className="h-4 w-4" />
             <span>New Student</span>
           </Button>
@@ -295,10 +295,14 @@ const Index = () => {
       {view === 'enhanced' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 element-transition">
           <div className="lg:col-span-2">
-            <RevenueExpensesChart />
+            <div className="glass-card glass-card-hover p-6 rounded-xl">
+              <RevenueExpensesChart />
+            </div>
           </div>
           <div>
-            <NewStudentsStats />
+            <div className="glass-card glass-card-hover p-6 rounded-xl">
+              <NewStudentsStats />
+            </div>
           </div>
         </div>
       )}
@@ -306,30 +310,30 @@ const Index = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Recent Students</h2>
-            <Button variant="link" className="text-primary" onClick={() => navigate('/students')}>View All</Button>
+            <h2 className="text-xl font-semibold text-foreground">Recent Students</h2>
+            <Button variant="link" className="text-primary hover:text-primary/80" onClick={() => navigate('/students')}>View All</Button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 element-transition">
             {loadingStudents ? (
               [...Array(4)].map((_, i) => (
-                <div key={i} className="glass animate-pulse h-[150px] rounded-lg"></div>
+                <div key={i} className="glass-card animate-pulse h-[150px] rounded-xl"></div>
               ))
             ) : recentStudents.length > 0 ? (
               recentStudents.map(student => (
-                <StudentCard key={student.id} student={student} className="glass glass-hover" />
+                <StudentCard key={student.id} student={student} className="glass-card glass-card-hover" />
               ))
             ) : (
               <div className="col-span-2 text-center py-8 text-muted-foreground">
-                No students found. <Button variant="link" onClick={() => navigate('/students')}>Add your first student</Button>
+                No students found. <Button variant="link" className="text-primary hover:text-primary/80" onClick={() => navigate('/students')}>Add your first student</Button>
               </div>
             )}
           </div>
         </div>
         
         <div className="space-y-6">
-          <UpcomingLessons lessons={loadingLessons ? [] : upcomingLessons} className="glass glass-hover" />
-          <UpcomingPayments payments={samplePayments} className="glass glass-hover" />
+          <UpcomingLessons lessons={loadingLessons ? [] : upcomingLessons} className="glass-card glass-card-hover" />
+          <UpcomingPayments payments={samplePayments} className="glass-card glass-card-hover" />
         </div>
       </div>
       

@@ -131,40 +131,43 @@ const Sidebar = () => {
 
   return (
     <div className={cn(
-      "bg-white border-r border-gray-200 shadow-sm flex flex-col transition-all duration-300",
+      "bg-sidebar-background/95 backdrop-blur-xl border-r border-sidebar-border flex flex-col transition-all duration-300 relative overflow-hidden",
       isCollapsed ? "w-16" : "w-64"
     )}>
+      {/* Subtle Background Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-blue-500/[0.03] via-transparent to-blue-500/[0.03] pointer-events-none" />
+
       {/* Header with Logo */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-green-50 to-green-100">
+      <div className="p-4 border-b border-sidebar-border/50 flex items-center justify-between relative z-10">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-sm border border-green-200">
+            <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
               {schoolLogo ? (
-                <img 
-                  src={schoolLogo} 
-                  alt="School Logo" 
-                  className="h-8 w-8 object-contain"
+                <img
+                  src={schoolLogo}
+                  alt="School Logo"
+                  className="h-7 w-7 object-contain"
                 />
               ) : (
-                <BookOpen className="h-6 w-6 text-green-600" />
+                <BookOpen className="h-6 w-6 text-primary" />
               )}
             </div>
             <div>
-              <span className="font-bold text-xl text-green-900">Kool-Skool</span>
-              <p className="text-xs text-green-600">Management System</p>
+              <span className="font-bold text-lg text-foreground">Kool-Skool</span>
+              <p className="text-xs text-muted-foreground">Management System</p>
             </div>
           </div>
         )}
         {isCollapsed && (
-          <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-sm border border-green-200 mx-auto">
+          <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 mx-auto">
             {schoolLogo ? (
-              <img 
-                src={schoolLogo} 
-                alt="School Logo" 
-                className="h-8 w-8 object-contain"
+              <img
+                src={schoolLogo}
+                alt="School Logo"
+                className="h-7 w-7 object-contain"
               />
             ) : (
-              <BookOpen className="h-6 w-6 text-green-600" />
+              <BookOpen className="h-6 w-6 text-primary" />
             )}
           </div>
         )}
@@ -172,23 +175,23 @@ const Sidebar = () => {
           variant="ghost"
           size="icon"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8 hover:bg-green-100"
+          className="h-8 w-8 hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors"
         >
           {isCollapsed ? (
-            <ChevronRight className="h-4 w-4 text-green-600" />
+            <ChevronRight className="h-4 w-4" />
           ) : (
-            <ChevronLeft className="h-4 w-4 text-green-600" />
+            <ChevronLeft className="h-4 w-4" />
           )}
         </Button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 bg-gray-50/50">
+      <nav className="flex-1 p-4 space-y-2 relative z-10">
         {/* Main Navigation */}
         <div className="space-y-1">
           {!isCollapsed && (
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
-              Main
+              MAIN
             </p>
           )}
           {navigation.map((item) => {
@@ -198,28 +201,34 @@ const Sidebar = () => {
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative sidebar-item group",
                   isActive
-                    ? "bg-blue-500 text-white shadow-sm"
-                    : "text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200",
+                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg sidebar-item-active"
+                    : "text-gray-400 hover:text-white hover:bg-white/10",
                   isCollapsed && "justify-center"
                 )}
                 title={isCollapsed ? item.name : undefined}
               >
-                <item.icon className={cn("h-5 w-5 flex-shrink-0")} />
-                {!isCollapsed && <span>{item.name}</span>}
+                <item.icon className={cn(
+                  "h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110",
+                  isActive && "drop-shadow-md"
+                )} />
+                {!isCollapsed && <span className="font-medium">{item.name}</span>}
+                {isActive && (
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-600/20 to-indigo-600/20 blur-xl -z-10" />
+                )}
               </NavLink>
             );
           })}
         </div>
         
-        <Separator className="my-4 bg-gray-200" />
+        <Separator className="my-4 bg-white/10" />
         
         {/* Admin Navigation */}
         <div className="space-y-1">
           {!isCollapsed && (
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
-              Admin
+              ADMIN
             </p>
           )}
           {adminNavigation.map((item) => {
@@ -241,10 +250,10 @@ const Sidebar = () => {
                       }
                     }}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative sidebar-item group",
                       isActive
-                        ? "bg-blue-500 text-white shadow-sm"
-                        : "text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200",
+                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg sidebar-item-active"
+                        : "text-gray-400 hover:text-white hover:bg-white/10",
                       isCollapsed && "justify-center"
                     )}
                     title={isCollapsed ? item.name : undefined}
@@ -265,10 +274,10 @@ const Sidebar = () => {
                   <NavLink
                     to={item.href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative sidebar-item group",
                       isActive
-                        ? "bg-blue-500 text-white shadow-sm"
-                        : "text-gray-700 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-200",
+                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg sidebar-item-active"
+                        : "text-gray-400 hover:text-white hover:bg-white/10",
                       isCollapsed && "justify-center"
                     )}
                     title={isCollapsed ? item.name : undefined}
@@ -288,13 +297,13 @@ const Sidebar = () => {
                           key={subItem.name}
                           to={subItem.href}
                           className={cn(
-                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group",
                             isSubActive
-                              ? "bg-blue-100 text-blue-700 border border-blue-200"
-                              : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                              ? "bg-white/10 text-white"
+                              : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
                           )}
                         >
-                          <subItem.icon className="h-4 w-4 flex-shrink-0" />
+                          <subItem.icon className="h-4 w-4 flex-shrink-0 group-hover:scale-110 transition-transform" />
                           <span>{subItem.name}</span>
                         </NavLink>
                       );
@@ -306,7 +315,7 @@ const Sidebar = () => {
           })}
         </div>
 
-        <Separator className="my-4 bg-gray-200" />
+        <Separator className="my-4 bg-white/10" />
 
         {/* User Profile Section - Now positioned after Admin section */}
         <div className="space-y-1">
@@ -315,10 +324,10 @@ const Sidebar = () => {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
+      <div className="p-4 border-t border-white/10 relative z-10">
         {!isCollapsed && (
           <div className="text-xs text-gray-500 text-center">
-            © 2024 TutorPro
+            © 2024 Kool-Skool
           </div>
         )}
       </div>
