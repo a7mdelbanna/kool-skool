@@ -12,6 +12,10 @@ import StudentCard, { Student } from '@/components/StudentCard';
 import UpcomingLessons, { Lesson } from '@/components/UpcomingLessons';
 import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
 import AddStudentDialog from '@/components/AddStudentDialog';
+import QuickActionsBar from '@/components/dashboard/QuickActionsBar';
+import UrgentActionsWidget from '@/components/dashboard/UrgentActionsWidget';
+import BusinessHealthMonitor from '@/components/dashboard/BusinessHealthMonitor';
+import TodaysFocusWidget from '@/components/dashboard/TodaysFocusWidget';
 import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { UserContext } from '@/App';
@@ -173,7 +177,6 @@ const Index = () => {
   const navigate = useNavigate();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<'standard' | 'enhanced'>('enhanced');
-  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [recentStudents, setRecentStudents] = useState<Student[]>([]);
   const [upcomingLessons, setUpcomingLessons] = useState<Lesson[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
@@ -237,13 +240,14 @@ const Index = () => {
   }, [user?.schoolId]);
   
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-4xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-2">Welcome back, let's manage your tutoring business!</p>
         </div>
-        
+
         <div className="flex gap-2">
           <Tabs defaultValue="enhanced" className="hidden md:block" onValueChange={(value) => setView(value as 'standard' | 'enhanced')}>
             <TabsList className="bg-white/10 backdrop-blur-sm">
@@ -251,69 +255,51 @@ const Index = () => {
               <TabsTrigger value="standard" className="data-[state=active]:bg-primary data-[state=active]:text-white text-gray-300">Standard View</TabsTrigger>
             </TabsList>
           </Tabs>
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80" align="end">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Filters</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Customize your dashboard view
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button variant="outline" size="sm" className="justify-center">
-                      Daily
-                    </Button>
-                    <Button variant="default" size="sm" className="justify-center">
-                      Weekly
-                    </Button>
-                    <Button variant="outline" size="sm" className="justify-center">
-                      Monthly
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-          
-          <Button className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => setIsAddStudentOpen(true)}>
-            <PlusCircle className="h-4 w-4" />
-            <span>New Student</span>
-          </Button>
         </div>
       </div>
-      
-      {view === 'enhanced' ? <EnhancedDashboardStats /> : <DashboardStats />}
-      
-      {view === 'enhanced' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 element-transition">
-          <div className="lg:col-span-2">
-            <div className="glass-card glass-card-hover p-6 rounded-xl">
-              <RevenueExpensesChart />
-            </div>
-          </div>
-          <div>
-            <div className="glass-card glass-card-hover p-6 rounded-xl">
-              <NewStudentsStats />
-            </div>
+
+      {/* Quick Actions Bar */}
+      <QuickActionsBar />
+
+      {/* Business Health Monitor */}
+      <BusinessHealthMonitor />
+
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Urgent Actions - Takes 1 column */}
+        <div className="lg:col-span-1">
+          <UrgentActionsWidget />
+        </div>
+
+        {/* Today's Focus - Takes 1 column */}
+        <div className="lg:col-span-1">
+          <TodaysFocusWidget />
+        </div>
+
+        {/* Revenue Chart - Takes 1 column */}
+        <div className="lg:col-span-1">
+          <div className="glass-card glass-card-hover p-6 rounded-xl h-full">
+            <NewStudentsStats />
           </div>
         </div>
+      </div>
+      {/* Financial Intelligence Panel */}
+      {view === 'enhanced' && (
+        <div className="glass-card glass-card-hover p-6 rounded-xl">
+          <RevenueExpensesChart />
+        </div>
       )}
-      
+
+      {/* Legacy Stats View */}
+      {view === 'standard' && <DashboardStats />}
+      {/* Recent Activities & Upcoming Events */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-foreground">Recent Students</h2>
             <Button variant="link" className="text-primary hover:text-primary/80" onClick={() => navigate('/students')}>View All</Button>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 element-transition">
             {loadingStudents ? (
               [...Array(4)].map((_, i) => (
@@ -330,23 +316,12 @@ const Index = () => {
             )}
           </div>
         </div>
-        
+
         <div className="space-y-6">
           <UpcomingLessons lessons={loadingLessons ? [] : upcomingLessons} className="glass-card glass-card-hover" />
           <UpcomingPayments payments={samplePayments} className="glass-card glass-card-hover" />
         </div>
       </div>
-      
-      <PaymentProvider>
-        <AddStudentDialog 
-          open={isAddStudentOpen} 
-          onOpenChange={setIsAddStudentOpen}
-          onStudentAdded={(student) => {
-            setIsAddStudentOpen(false);
-            toast.success(`Student ${student.firstName} ${student.lastName} added successfully`);
-          }}
-        />
-      </PaymentProvider>
     </div>
   );
 };
