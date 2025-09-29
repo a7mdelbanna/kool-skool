@@ -373,16 +373,16 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           
           <div className="space-y-2">
             <Label>Lesson Type*</Label>
-            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+            <div className="flex gap-2 p-1 bg-muted rounded-lg">
               <button
                 type="button"
                 onClick={() => handleInputChange("lessonType", "individual")}
                 disabled={isViewMode}
                 className={`
-                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
-                  ${studentData.lessonType === "individual" 
-                    ? "bg-white text-blue-600 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
+                  flex-1 py-2.5 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.lessonType === "individual"
+                    ? "bg-background text-primary shadow-sm border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                   }
                   ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
                 `}
@@ -394,10 +394,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                 onClick={() => handleInputChange("lessonType", "group")}
                 disabled={isViewMode}
                 className={`
-                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
-                  ${studentData.lessonType === "group" 
-                    ? "bg-white text-blue-600 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
+                  flex-1 py-2.5 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.lessonType === "group"
+                    ? "bg-background text-primary shadow-sm border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                   }
                   ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
                 `}
@@ -409,16 +409,16 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
           
           <div className="space-y-2">
             <Label>Age Group*</Label>
-            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+            <div className="flex gap-2 p-1 bg-muted rounded-lg">
               <button
                 type="button"
                 onClick={() => handleInputChange("ageGroup", "adult")}
                 disabled={isViewMode}
                 className={`
-                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
-                  ${studentData.ageGroup === "adult" 
-                    ? "bg-white text-blue-600 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
+                  flex-1 py-2.5 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.ageGroup === "adult"
+                    ? "bg-background text-primary shadow-sm border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                   }
                   ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
                 `}
@@ -436,10 +436,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
                 }}
                 disabled={isViewMode}
                 className={`
-                  flex-1 py-2 px-4 rounded-md font-medium transition-all duration-200
-                  ${studentData.ageGroup === "kid" 
-                    ? "bg-white text-blue-600 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
+                  flex-1 py-2.5 px-4 rounded-md font-medium transition-all duration-200
+                  ${studentData.ageGroup === "kid"
+                    ? "bg-background text-primary shadow-sm border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                   }
                   ${isViewMode ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
                 `}
@@ -614,11 +614,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
       
       {/* Parent Information Section - Only show for kids */}
       {studentData.ageGroup === "kid" && (
-        <div className="mt-8 p-6 border rounded-lg bg-blue-50/50">
+        <div className="mt-8 p-6 border rounded-lg bg-primary/5">
           <div className="flex items-center gap-2 mb-4">
-            <UserCheck className="h-5 w-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-blue-900">Parent/Guardian Information</h3>
-            <span className="text-sm text-blue-600">(Required for kids)</span>
+            <UserCheck className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Parent/Guardian Information</h3>
+            <span className="text-sm text-primary">(Required for kids)</span>
           </div>
           
           <div className="grid md:grid-cols-2 gap-4">
