@@ -46,6 +46,7 @@ import RecentStudents from './RecentStudents';
 import UpcomingLessons, { Lesson } from '../UpcomingLessons';
 import UpcomingPayments, { Payment } from '../UpcomingPayments';
 import CashFlowWidget from './CashFlowWidget';
+import ExpectedPaymentsWidget from './ExpectedPaymentsWidget';
 
 interface MobileWidget {
   id: string;
@@ -117,6 +118,14 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
       title: 'Cash Flow',
       icon: DollarSign,
       component: CashFlowWidget,
+      priority: 'high',
+      defaultOpen: false
+    },
+    {
+      id: 'expected-payments',
+      title: 'Expected Payments',
+      icon: Calendar,
+      component: ExpectedPaymentsWidget,
       priority: 'high',
       defaultOpen: false
     },
@@ -256,7 +265,7 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         <CashFlowWidget />
-        <InsightsWidget />
+        <ExpectedPaymentsWidget />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -295,7 +304,7 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
 
         <TabsContent value="overview" className="space-y-3">
           {mobileWidgets
-            .filter(w => ['live-updates', 'quick-actions', 'business-health', 'urgent-actions', 'cash-flow'].includes(w.id))
+            .filter(w => ['live-updates', 'quick-actions', 'business-health', 'urgent-actions', 'cash-flow', 'expected-payments'].includes(w.id))
             .map(renderMobileWidget)}
         </TabsContent>
 

@@ -68,6 +68,22 @@ export interface CashFlowData {
   currency: string;
 }
 
+export interface ExpectedPaymentData {
+  id: string;
+  studentId: string;
+  studentName: string;
+  amount: number;
+  dueDate: string;
+  subscriptionName?: string;
+  status?: string;
+}
+
+export interface ExpectedPaymentsResponse {
+  payments: ExpectedPaymentData[];
+  total: number;
+  currency: string;
+}
+
 class DashboardService {
   async getDashboardMetrics(schoolId: string): Promise<DashboardMetrics> {
     try {
@@ -737,6 +753,151 @@ class DashboardService {
         trend: 0,
         currency: '₱'
       };
+    }
+  }
+
+  async getExpectedPayments(schoolId: string, period: 'today' | 'week' | 'month' | 'all' = 'week'): Promise<ExpectedPaymentsResponse> {
+    try {
+      const now = new Date();
+      let filterStart = startOfDay(now);
+      let filterEnd: Date;
+
+      // Determine filter period
+      switch (period) {
+        case 'today':
+          filterEnd = endOfDay(now);
+          break;
+        case 'week':
+          filterEnd = endOfWeek(now);
+          break;
+        case 'month':
+          filterEnd = endOfMonth(now);
+          break;
+        case 'all':
+          filterEnd = new Date(2100, 0, 1); // Far future date
+          break;
+      }
+
+      // Fetch active subscriptions
+      const subscriptions = await databaseService.query('subscriptions', {
+        where: [
+          { field: 'school_id', operator: '==', value: schoolId },
+          { field: 'status', operator: '==', value: 'active' }
+        ]
+      });
+
+      if (!subscriptions || subscriptions.length === 0) {
+        return { payments: [], total: 0, currency: '₱' };
+      }
+
+      // Get unique student IDs
+      const studentIds = [...new Set(subscriptions.map((s: any) => s.student_id).filter(Boolean))];
+
+      // Fetch all students and their users for names
+      const students = await Promise.all(
+        studentIds.map(async (id) => {
+          try {
+            const student = await databaseService.getById('students', id);
+            if (!student) return null;
+
+            const user = await databaseService.getById('users', student.userId || student.user_id);
+            return {
+              id: student.id,
+              name: user ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 'Unknown Student'
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const studentMap = new Map(students.filter(s => s !== null).map(s => [s!.id, s!.name]));
+
+      // Process subscriptions to get expected payments
+      const expectedPayments: ExpectedPaymentData[] = [];
+      let totalAmount = 0;
+
+      for (const subscription of subscriptions) {
+        const studentId = subscription.student_id;
+        const studentName = studentMap.get(studentId) || 'Unknown Student';
+
+        // Calculate next payment date based on subscription
+        let nextPaymentDate: Date | null = null;
+
+        // Check if subscription has next_payment_date field
+        if (subscription.next_payment_date) {
+          nextPaymentDate = new Date(subscription.next_payment_date);
+        } else if (subscription.start_date) {
+          // Calculate based on payment frequency
+          const startDate = new Date(subscription.start_date);
+          const sessionCount = subscription.session_count || 0;
+          const completedSessions = subscription.completed_sessions || 0;
+
+          if (completedSessions < sessionCount) {
+            // For subscriptions with session counts, check when payment is due
+            const sessionsPerPayment = subscription.sessions_per_payment || sessionCount;
+            const paymentsCompleted = Math.floor(completedSessions / sessionsPerPayment);
+            const nextPaymentSessions = (paymentsCompleted + 1) * sessionsPerPayment;
+
+            if (nextPaymentSessions <= sessionCount) {
+              // Estimate based on weekly sessions
+              const weeksUntilPayment = Math.ceil((nextPaymentSessions - completedSessions) / (subscription.sessions_per_week || 1));
+              nextPaymentDate = new Date(now.getTime() + weeksUntilPayment * 7 * 24 * 60 * 60 * 1000);
+            }
+          }
+
+          // Default to monthly if no specific logic applies
+          if (!nextPaymentDate && subscription.payment_mode === 'monthly') {
+            const lastPaymentDate = subscription.last_payment_date ? new Date(subscription.last_payment_date) : startDate;
+            nextPaymentDate = new Date(lastPaymentDate);
+            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+          }
+        }
+
+        // If still no date, skip this subscription
+        if (!nextPaymentDate) continue;
+
+        // Check if payment is within filter period
+        if (nextPaymentDate >= filterStart && nextPaymentDate <= filterEnd) {
+          const amount = subscription.price_per_session ?
+            (subscription.price_per_session * (subscription.sessions_per_payment || 1)) :
+            (subscription.total_price || 0);
+
+          expectedPayments.push({
+            id: subscription.id,
+            studentId,
+            studentName,
+            amount,
+            dueDate: nextPaymentDate.toISOString(),
+            subscriptionName: subscription.name || subscription.course_name || 'Subscription',
+            status: nextPaymentDate < now ? 'overdue' : 'upcoming'
+          });
+
+          totalAmount += amount;
+        }
+      }
+
+      // Sort by due date (overdue first, then soonest)
+      expectedPayments.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+      // Get currency
+      const currencies = await databaseService.query('currencies', {
+        where: [
+          { field: 'school_id', operator: '==', value: schoolId },
+          { field: 'is_default', operator: '==', value: true }
+        ]
+      });
+
+      const currency = currencies && currencies.length > 0 ? currencies[0].symbol || currencies[0].code : '₱';
+
+      return {
+        payments: expectedPayments,
+        total: totalAmount,
+        currency
+      };
+    } catch (error) {
+      console.error('Error fetching expected payments:', error);
+      return { payments: [], total: 0, currency: '₱' };
     }
   }
 

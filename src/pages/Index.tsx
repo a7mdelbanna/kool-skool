@@ -19,6 +19,7 @@ import TodaysFocusWidget from '@/components/dashboard/TodaysFocusWidget';
 import InsightsWidget from '@/components/dashboard/InsightsWidget';
 import LiveUpdatesIndicator from '@/components/dashboard/LiveUpdatesIndicator';
 import CashFlowWidget from '@/components/dashboard/CashFlowWidget';
+import ExpectedPaymentsWidget from '@/components/dashboard/ExpectedPaymentsWidget';
 import MobileResponsiveDashboard from '@/components/dashboard/MobileResponsiveDashboard';
 import EnhancedDashboardHeader from '@/components/dashboard/EnhancedDashboardHeader';
 import { toast } from 'sonner';
@@ -313,14 +314,14 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Second Row - Cash Flow and Insights */}
+            {/* Second Row - Cash Flow and Expected Payments */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="lg:col-span-1">
                 <CashFlowWidget />
               </div>
 
               <div className="lg:col-span-1">
-                <InsightsWidget />
+                <ExpectedPaymentsWidget />
               </div>
             </div>
 
