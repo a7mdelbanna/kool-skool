@@ -131,14 +131,14 @@ const Sidebar = () => {
 
   return (
     <div className={cn(
-      "bg-sidebar-background/95 backdrop-blur-xl border-r border-sidebar-border flex flex-col transition-all duration-300 relative overflow-hidden",
+      "bg-sidebar-background/95 backdrop-blur-xl border-r border-sidebar-border flex flex-col transition-all duration-300 relative h-screen",
       isCollapsed ? "w-16" : "w-64"
     )}>
       {/* Subtle Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-blue-500/[0.03] via-transparent to-blue-500/[0.03] pointer-events-none" />
 
-      {/* Header with Logo */}
-      <div className="p-4 border-b border-sidebar-border/50 flex items-center justify-between relative z-10">
+      {/* Header with Logo - Fixed */}
+      <div className="p-4 border-b border-sidebar-border/50 flex items-center justify-between relative z-10 flex-shrink-0">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
@@ -185,8 +185,8 @@ const Sidebar = () => {
         </Button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 relative z-10">
+      {/* Navigation - Scrollable */}
+      <nav className="flex-1 p-4 space-y-2 relative z-10 overflow-y-auto">
         {/* Main Navigation */}
         <div className="space-y-1">
           {!isCollapsed && (
@@ -323,8 +323,8 @@ const Sidebar = () => {
         </div>
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-white/10 relative z-10">
+      {/* Footer - Fixed */}
+      <div className="p-4 border-t border-white/10 relative z-10 flex-shrink-0">
         {!isCollapsed && (
           <div className="text-xs text-gray-500 text-center">
             © 2024 Kool-Skool
