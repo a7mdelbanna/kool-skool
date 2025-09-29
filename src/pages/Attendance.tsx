@@ -128,11 +128,11 @@ const Attendance = () => {
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-4">
         <div className="space-y-2">
-          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
-          <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-6 w-32 bg-muted rounded animate-pulse"></div>
+          <div className="h-4 w-24 bg-muted rounded animate-pulse"></div>
         </div>
       </div>
-      
+
       <div className="space-y-3">
         {Array(3).fill(0).map((_, i) => (
           <SessionSkeleton key={i} />
@@ -142,14 +142,14 @@ const Attendance = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Attendance</h1>
           <p className="text-muted-foreground mt-1">
             Track and manage session attendance
             {user?.timezone && (
-              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+              <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded">
                 Viewing in: {user.timezone}
               </span>
             )}
@@ -161,20 +161,20 @@ const Attendance = () => {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search sessions..."
-              className="pl-9 w-full md:w-[200px] rounded-lg"
+              className="pl-9 w-full md:w-[200px] rounded-lg bg-background/50 backdrop-blur-sm border-border/50"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button onClick={goToToday} variant="outline" className="gap-2 rounded-lg">
+          <Button onClick={goToToday} variant="outline" className="gap-2 rounded-lg hover:bg-primary/10 transition-colors">
             <CalendarIcon className="h-4 w-4" />
             <span>Today</span>
           </Button>
           <div className="flex rounded-lg shadow-sm">
-            <Button onClick={goToPreviousPeriod} variant="outline" size="icon" className="rounded-l-lg rounded-r-none">
+            <Button onClick={goToPreviousPeriod} variant="outline" size="icon" className="rounded-l-lg rounded-r-none hover:bg-primary/10 transition-colors">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button onClick={goToNextPeriod} variant="outline" size="icon" className="rounded-r-lg rounded-l-none">
+            <Button onClick={goToNextPeriod} variant="outline" size="icon" className="rounded-r-lg rounded-l-none hover:bg-primary/10 transition-colors">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -182,27 +182,27 @@ const Attendance = () => {
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="text-center text-xl font-medium">
+        <div className="text-center text-xl font-medium text-foreground">
           {getViewTitle()}
         </div>
-        
+
         <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-end">
-          <ToggleGroup 
-            type="single" 
-            value={viewMode} 
+          <ToggleGroup
+            type="single"
+            value={viewMode}
             onValueChange={(value) => value && handleViewModeChange(value)}
-            className="justify-start"
+            className="justify-start bg-background/50 backdrop-blur-sm border-border/50"
           >
-            <ToggleGroupItem value="day">Day</ToggleGroupItem>
-            <ToggleGroupItem value="week">Week</ToggleGroupItem>
-            <ToggleGroupItem value="month">Month</ToggleGroupItem>
+            <ToggleGroupItem value="day" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Day</ToggleGroupItem>
+            <ToggleGroupItem value="week" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Week</ToggleGroupItem>
+            <ToggleGroupItem value="month" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">Month</ToggleGroupItem>
           </ToggleGroup>
         </div>
       </div>
 
-      <div className="bg-card rounded-lg border shadow-sm p-4">
+      <div className="glass-card glass-card-hover rounded-xl p-6">
         {error ? (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="bg-red-500/10 border-red-500/30">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               {error}. <Button variant="link" onClick={refreshSessions} className="p-0 h-auto">Try again</Button>
@@ -211,7 +211,7 @@ const Attendance = () => {
         ) : loading ? (
           renderSkeletonLoader()
         ) : (
-          <UpcomingLessonsList 
+          <UpcomingLessonsList
             sessions={filteredSessions}
             onSessionUpdate={refreshSessions}
             onOptimisticUpdate={updateSessionOptimistically}

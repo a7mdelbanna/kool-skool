@@ -357,48 +357,48 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
         
         {/* Action Buttons */}
         <div className="grid grid-cols-4 gap-2">
-        <Button 
+        <Button
           onClick={(e) => {
             e.stopPropagation();
             handleSessionActionClick(sessionId, "attended");
-          }} 
-          className="h-7 px-2 text-xs border-green-500 text-green-500 hover:bg-green-50"
+          }}
+          className="h-7 px-2 text-xs border-green-500/50 text-green-500 hover:bg-green-500/10"
           variant="outline"
           disabled={isLoading}
         >
           <Check className="h-3 w-3 mr-1" />
           {actionLoading === sessionId && actionLoading === "attended" ? "..." : "Mark as Attended"}
         </Button>
-        <Button 
+        <Button
           onClick={(e) => {
             e.stopPropagation();
             handleSessionActionClick(sessionId, "cancelled");
-          }} 
-          className="h-7 px-2 text-xs border-red-500 text-red-500 hover:bg-red-50"
+          }}
+          className="h-7 px-2 text-xs border-red-500/50 text-red-500 hover:bg-red-500/10"
           variant="outline"
           disabled={isLoading}
         >
           <X className="h-3 w-3 mr-1" />
           {actionLoading === sessionId && actionLoading === "cancelled" ? "..." : "Cancel Session"}
         </Button>
-        <Button 
+        <Button
           onClick={(e) => {
             e.stopPropagation();
             handleSessionActionClick(sessionId, "rescheduled");
-          }} 
-          className="h-7 px-2 text-xs border-orange-500 text-orange-500 hover:bg-orange-50"
+          }}
+          className="h-7 px-2 text-xs border-orange-500/50 text-orange-500 hover:bg-orange-500/10"
           variant="outline"
           disabled={isLoading}
         >
           <RefreshCcw className="h-3 w-3 mr-1" />
           {actionLoading === sessionId && actionLoading === "rescheduled" ? "..." : "Reschedule"}
         </Button>
-        <Button 
+        <Button
           onClick={(e) => {
             e.stopPropagation();
             handleSessionActionClick(sessionId, "moved");
-          }} 
-          className="h-7 px-2 text-xs border-blue-500 text-blue-500 hover:bg-blue-50"
+          }}
+          className="h-7 px-2 text-xs border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
           variant="outline"
           disabled={isLoading}
         >
@@ -433,7 +433,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
           <Button
             size="sm"
             variant="outline"
-            className="h-7 px-2 text-xs border-purple-500 text-purple-500 hover:bg-purple-50"
+            className="h-7 px-2 text-xs border-purple-500/50 text-purple-500 hover:bg-purple-500/10"
             onClick={(e) => {
               e.stopPropagation();
               setStatusChangeSession(isExpanded ? null : sessionId);
@@ -455,27 +455,27 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
     const completedSessions = subscriptionInfo.completedSessions;
     const totalSessions = subscriptionInfo.sessionCount;
     const progressPercentage = Math.round((completedSessions / totalSessions) * 100);
-    
+
     return (
-      <div className="flex-shrink-0 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 min-w-[120px]">
+      <div className="flex-shrink-0 p-3 glass-card rounded-lg min-w-[120px]">
         <div className="flex items-center gap-2 mb-2">
-          <div className="p-1 bg-blue-500 rounded-full">
-            <CircleCheck className="h-3 w-3 text-white" />
+          <div className="p-1 bg-primary rounded-full">
+            <CircleCheck className="h-3 w-3 text-primary-foreground" />
           </div>
-          <span className="text-xs font-medium text-blue-900">Progress</span>
+          <span className="text-xs font-medium text-foreground">Progress</span>
         </div>
-        
+
         <div className="text-center">
-          <div className="text-2xl font-bold text-blue-700 mb-1">
+          <div className="text-2xl font-bold text-foreground mb-1">
             {completedSessions}/{totalSessions}
           </div>
-          <div className="text-xs text-blue-600 mb-2">
+          <div className="text-xs text-muted-foreground mb-2">
             Sessions completed
           </div>
           <div className={`text-xs px-2 py-1 rounded ${
-            progressPercentage >= 100 ? 'bg-green-100 text-green-700' :
-            progressPercentage >= 80 ? 'bg-orange-100 text-orange-700' :
-            'bg-blue-100 text-blue-700'
+            progressPercentage >= 100 ? 'bg-green-500/10 text-green-500' :
+            progressPercentage >= 80 ? 'bg-orange-500/10 text-orange-500' :
+            'bg-blue-500/10 text-blue-500'
           }`}>
             {progressPercentage}% done
           </div>
@@ -500,12 +500,12 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
     const sessionNumber = getSessionNumber(session);
     
     return (
-      <div 
-        key={session.id} 
-        className={`border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors ${
-          isPastSession 
-            ? 'opacity-60 bg-gray-50/50 border-gray-200' 
-            : 'bg-white border-border'
+      <div
+        key={session.id}
+        className={`glass-card glass-card-hover p-4 cursor-pointer transition-all ${
+          isPastSession
+            ? 'opacity-60'
+            : ''
         }`}
         onClick={() => handleLessonClick(session)}
       >
@@ -530,9 +530,7 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
           </div>
           
           {/* Divider */}
-          <div className={`w-px h-16 ${
-            isPastSession ? 'bg-gray-200' : 'bg-border'
-          }`}></div>
+          <div className="w-px h-16 bg-border/50"></div>
           
           {/* Main Content */}
           <div className="flex-1 min-w-0">
@@ -564,53 +562,29 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
                 
                 {/* Session Number & Subscription Details */}
                 {subscriptionInfo && (
-                  <div className={`rounded-md border p-3 mb-4 ${
-                    isPastSession 
-                      ? 'bg-gray-100 border-gray-300' 
-                      : 'bg-blue-50 border-blue-200'
-                  }`}>
+                  <div className="rounded-lg border border-primary/20 p-3 mb-4 bg-primary/5">
                     <div className="flex flex-wrap gap-2">
-                      <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                        isPastSession 
-                          ? 'bg-gray-200 text-gray-600' 
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
+                      <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/10 text-primary">
                         <Hash className="h-3 w-3" />
                         <span className="font-medium">Session {sessionNumber}</span>
                       </div>
                       
                       {subscriptionInfo.subscriptionName && (
-                        <div className={`px-2 py-1 rounded text-xs ${
-                          isPastSession 
-                            ? 'bg-gray-200 text-gray-600' 
-                            : 'bg-blue-100 text-blue-700'
-                        }`}>
+                        <div className="px-2 py-1 rounded text-xs bg-primary/10 text-primary">
                           {subscriptionInfo.subscriptionName}
                         </div>
                       )}
-                      
-                      <div className={`px-2 py-1 rounded text-xs ${
-                        isPastSession 
-                          ? 'bg-gray-200 text-gray-600' 
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
+
+                      <div className="px-2 py-1 rounded text-xs bg-primary/10 text-primary">
                         {subscriptionInfo.sessionCount} lessons total
                       </div>
-                      
-                      <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                        isPastSession 
-                          ? 'bg-gray-200 text-gray-600' 
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
+
+                      <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/10 text-primary">
                         <DollarSign className="h-3 w-3" />
                         <span>${subscriptionInfo.totalPrice} {subscriptionInfo.currency}</span>
                       </div>
-                      
-                      <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                        isPastSession 
-                          ? 'bg-gray-200 text-gray-600' 
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
+
+                      <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary/10 text-primary">
                         <CalendarScheduleIcon className="h-3 w-3" />
                         <span>
                           {format(new Date(subscriptionInfo.startDate), 'dd MMM')} – {format(new Date(subscriptionInfo.endDate), 'dd MMM')}
@@ -635,15 +609,15 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
               {/* Status Badge - fallback when no progress info */}
               {(!subscriptionInfo || isPastSession) && (
                 <div className="flex-shrink-0">
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className={
-                      isPastSession 
-                        ? "bg-gray-100 text-gray-500 border-gray-300 opacity-70"
-                        : session.status === "completed" ? "bg-green-50 text-green-700 border-green-300" :
-                          session.status === "canceled" ? "bg-red-50 text-red-700 border-red-300" :
-                          session.status === "missed" ? "bg-red-50 text-red-700 border-red-300" :
-                          "bg-blue-50 text-blue-700 border-blue-300"
+                      isPastSession
+                        ? "opacity-70"
+                        : session.status === "completed" ? "bg-green-500/10 text-green-500 border-green-500/30" :
+                          session.status === "canceled" ? "bg-red-500/10 text-red-500 border-red-500/30" :
+                          session.status === "missed" ? "bg-red-500/10 text-red-500 border-red-500/30" :
+                          "bg-blue-500/10 text-blue-500 border-blue-500/30"
                     }
                   >
                     <span className="mr-1">{renderStatusIcon(session.status)}</span>
@@ -713,13 +687,13 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
   // Render sessions for a specific date group
   const renderSessionGroup = (title: string, sessions: Session[], showDateLabels: boolean = true) => {
     if (sessions.length === 0) return null;
-    
+
     // NEW: Identify group and individual sessions
     const { groups, individual } = identifyGroupSessions(sessions);
-    
+
     return (
       <div className="space-y-3 mb-6">
-        <h3 className="text-lg font-medium">{title}</h3>
+        <h3 className="text-lg font-medium text-foreground">{title}</h3>
         <div className="grid gap-3">
           {/* Render Group Sessions */}
           {Array.from(groups.entries()).map(([groupKey, groupSessions]) => (
