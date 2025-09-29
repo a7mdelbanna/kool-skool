@@ -4,12 +4,12 @@ import {
   LayoutDashboard, 
   Users, 
   BookOpen, 
-  Calendar, 
+  Calendar,
   ClipboardCheck,
   CheckSquare,
-  CreditCard, 
-  Settings, 
-  Phone, 
+  CreditCard,
+  Settings,
+  Phone,
   BarChart3,
   UserCog,
   Key,
@@ -29,7 +29,8 @@ import {
   Database,
   Mic,
   Cake,
-  CalendarClock
+  CalendarClock,
+  Palette
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -87,6 +88,7 @@ const Sidebar = () => {
 
   const settingsSubItems = [
     { name: 'Personal', href: '/settings/personal', icon: User },
+    { name: 'Theme', href: '/settings/theme', icon: Palette },
     { name: 'School', href: '/settings/school', icon: Briefcase },
     { name: 'Academic', href: '/settings/academic', icon: GraduationCap },
     { name: 'Financial', href: '/settings/financial', icon: Wallet },
