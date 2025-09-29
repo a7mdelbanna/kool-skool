@@ -3,6 +3,7 @@ import { Palette, Check, Moon, Sun, Laptop } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { themeService } from '@/services/theme.service';
 
 interface ThemeOption {
   id: string;
@@ -221,6 +222,8 @@ const themes: ThemeOption[] = [
       '--warning': '38 92% 50%',
       '--sidebar-background': '0 0% 100%',
       '--sidebar-border': '214 32% 91%',
+      '--accent': '210 40% 96%',
+      '--accent-foreground': '222 84% 5%',
     }
   },
 ];
@@ -230,51 +233,28 @@ const ThemeSettings = () => {
   const [previewTheme, setPreviewTheme] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load saved theme on mount
-    const savedTheme = localStorage.getItem('selectedTheme') || 'dark-blue';
-    setSelectedTheme(savedTheme);
-    applyTheme(themes.find(t => t.id === savedTheme) || themes[0]);
+    // Get the current theme from the service
+    const currentTheme = themeService.getCurrentTheme();
+    setSelectedTheme(currentTheme);
   }, []);
 
-  const applyTheme = (theme: ThemeOption) => {
-    const root = document.documentElement;
-    Object.entries(theme.cssVars).forEach(([key, value]) => {
-      root.style.setProperty(key, value);
-    });
-
-    // Update body class for light/dark mode
-    if (theme.id === 'light') {
-      document.body.classList.remove('dark');
-      document.body.classList.add('light');
-    } else {
-      document.body.classList.remove('light');
-      document.body.classList.add('dark');
-    }
+  const applyTheme = (themeId: string) => {
+    themeService.applyTheme(themeId);
   };
 
   const handleThemeSelect = (themeId: string) => {
-    const theme = themes.find(t => t.id === themeId);
-    if (theme) {
-      setSelectedTheme(themeId);
-      localStorage.setItem('selectedTheme', themeId);
-      applyTheme(theme);
-    }
+    setSelectedTheme(themeId);
+    applyTheme(themeId);
   };
 
   const handlePreview = (themeId: string | null) => {
     if (themeId) {
-      const theme = themes.find(t => t.id === themeId);
-      if (theme) {
-        applyTheme(theme);
-        setPreviewTheme(themeId);
-      }
+      applyTheme(themeId);
+      setPreviewTheme(themeId);
     } else {
       // Restore selected theme
-      const theme = themes.find(t => t.id === selectedTheme);
-      if (theme) {
-        applyTheme(theme);
-        setPreviewTheme(null);
-      }
+      applyTheme(selectedTheme);
+      setPreviewTheme(null);
     }
   };
 

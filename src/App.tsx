@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { runTimezoneMigration } from '@/scripts/migrateToCairoTimezone';
 import { createTestTransaction } from '@/utils/createTestTransaction';
+import { themeService } from '@/services/theme.service';
 
 interface User {
   id: string;
@@ -47,8 +48,12 @@ const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Make utility functions available globally for console use
+  // Initialize theme and make utility functions available globally for console use
   useEffect(() => {
+    // Initialize theme on app startup
+    themeService.initializeTheme();
+
+    // Make utility functions available globally for console use
     (window as any).runTimezoneMigration = runTimezoneMigration;
     (window as any).createTestTransaction = createTestTransaction;
     console.log('💡 Timezone migration available. Run: runTimezoneMigration()');
