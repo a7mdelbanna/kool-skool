@@ -11,6 +11,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { differenceInDays, isToday, isTomorrow, startOfDay, endOfDay } from 'date-fns';
+import { getStudentsWithDetails, getStudentLessonSessions } from '@/integrations/supabase/client';
+import { databaseService } from '@/services/firebase/database.service';
 
 export interface RealtimeMetrics {
   totalRevenue: number;
@@ -141,26 +143,88 @@ class RealtimeDashboardService {
 
   /**
    * Listen to today's sessions
+   * NOTE: Sessions are stored in Supabase, not Firebase
+   * We need to fetch them from Supabase using the hybrid approach
    */
-  private listenToSessions(schoolId: string): void {
-    const today = new Date();
-    const todayStart = startOfDay(today);
-    const todayEnd = endOfDay(today);
+  private async listenToSessions(schoolId: string): Promise<void> {
+    // Fetch sessions from Supabase using the same approach as EnhancedDashboardHeader
+    await this.fetchTodaysSessions(schoolId);
 
-    const sessionsQuery = query(
-      collection(db, 'sessions'),
-      where('schoolId', '==', schoolId),
-      where('scheduled_date', '>=', Timestamp.fromDate(todayStart)),
-      where('scheduled_date', '<=', Timestamp.fromDate(todayEnd))
-    );
+    // Set up interval to refresh sessions every 30 seconds
+    const intervalId = setInterval(async () => {
+      await this.fetchTodaysSessions(schoolId);
+    }, 30000); // Refresh every 30 seconds
 
-    const unsubscribe = onSnapshot(sessionsQuery, (snapshot) => {
-      this.handleSessionsUpdate(snapshot);
-    }, (error) => {
-      console.error('Error listening to sessions:', error);
-    });
+    // Store cleanup function
+    const cleanup = () => clearInterval(intervalId);
+    this.subscriptions.set('sessions', cleanup);
+  }
 
-    this.subscriptions.set('sessions', unsubscribe);
+  /**
+   * Fetch today's sessions from Supabase
+   * Uses the same hybrid approach as EnhancedDashboardHeader
+   */
+  private async fetchTodaysSessions(schoolId: string): Promise<void> {
+    try {
+      const today = new Date();
+      const todayStart = startOfDay(today);
+      const todayEnd = endOfDay(today);
+
+      // Step 1: Get all students from Firebase
+      const students = await databaseService.query('students', {
+        where: [{ field: 'schoolId', operator: '==', value: schoolId }]
+      });
+
+      if (!students || students.length === 0) {
+        this.currentMetrics.todaySessions = 0;
+        this.notifyMetricsUpdate();
+        return;
+      }
+
+      // Step 2: Fetch sessions from Supabase for each student
+      const studentIds = students.map((s: any) => s.id);
+      const allSessions = await Promise.all(
+        studentIds.map(async (studentId) => {
+          try {
+            const sessions = await getStudentLessonSessions(studentId);
+            return sessions || [];
+          } catch (error) {
+            console.error(`Failed to fetch sessions for student ${studentId}:`, error);
+            return [];
+          }
+        })
+      );
+
+      // Step 3: Flatten and filter for today's non-cancelled sessions
+      const flatSessions = allSessions.flat();
+      const todaysSessions = flatSessions.filter((session: any) => {
+        // Use scheduled_datetime if available, otherwise use scheduled_date
+        let sessionDate: Date;
+
+        if (session.scheduled_datetime) {
+          sessionDate = new Date(session.scheduled_datetime);
+        } else if (session.scheduled_date) {
+          sessionDate = new Date(session.scheduled_date);
+        } else {
+          return false;
+        }
+
+        // Check if session is today and not cancelled
+        return sessionDate >= todayStart &&
+               sessionDate <= todayEnd &&
+               session.status !== 'cancelled';
+      });
+
+      // Update metrics
+      this.currentMetrics.todaySessions = todaysSessions.length;
+      this.notifyMetricsUpdate();
+
+      console.log(`📊 Today's sessions count updated: ${todaysSessions.length}`);
+    } catch (error) {
+      console.error('Error fetching today\'s sessions from Supabase:', error);
+      this.currentMetrics.todaySessions = 0;
+      this.notifyMetricsUpdate();
+    }
   }
 
   /**
@@ -254,31 +318,12 @@ class RealtimeDashboardService {
 
   /**
    * Handle sessions update
+   * NOTE: This method is deprecated as sessions are now fetched from Supabase
+   * Kept for backward compatibility but not used
    */
   private handleSessionsUpdate(snapshot: QuerySnapshot<DocumentData>): void {
-    // Count only non-cancelled sessions
-    let activeSessions = 0;
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.status !== 'cancelled') {
-        activeSessions++;
-      }
-    });
-
-    this.currentMetrics.todaySessions = activeSessions;
-    this.notifyMetricsUpdate();
-
-    // Notify about changes
-    snapshot.docChanges().forEach((change) => {
-      const data = change.doc.data();
-      const update: RealtimeUpdate = {
-        type: 'session',
-        action: change.type as 'added' | 'modified' | 'removed',
-        data: { id: change.doc.id, ...data },
-        timestamp: new Date()
-      };
-      this.notifyEventUpdate(update);
-    });
+    // This method is no longer used since sessions are in Supabase
+    console.warn('handleSessionsUpdate called but sessions are in Supabase, not Firebase');
   }
 
   /**

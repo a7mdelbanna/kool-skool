@@ -20,8 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { UserContext } from '@/App';
 import { format, isToday, isTomorrow, differenceInMinutes, addMinutes, startOfDay, endOfDay } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
-import { getStudentLessonSessions } from '@/integrations/supabase/client';
+import { getStudentLessonSessions, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 
 interface TimeSlot {
@@ -89,11 +88,8 @@ const TodaysFocusWidget: React.FC = () => {
       const todayStart = startOfDay(now);
       const todayEnd = endOfDay(now);
 
-      // First get all students for this school
-      const { data: students } = await supabase
-        .from('students')
-        .select('id, user_id')
-        .eq('school_id', user.schoolId);
+      // STEP 1: Get all students WITH their user details (names, course info)
+      const students = await getStudentsWithDetails(user.schoolId);
 
       if (!students || students.length === 0) {
         setTimeSlots([]);
@@ -109,36 +105,45 @@ const TodaysFocusWidget: React.FC = () => {
         return;
       }
 
-      // Fetch today's sessions for all students
-      const studentIds = students.map(s => s.id);
+      // STEP 2: Build student info map for quick lookups
+      const studentMap = new Map();
+      students.forEach((student: any) => {
+        studentMap.set(student.id, {
+          firstName: student.first_name,
+          lastName: student.last_name,
+          courseName: student.course_name,
+          level: student.level
+        });
+      });
+
+      // STEP 3: Fetch sessions from Supabase for each student
+      const studentIds = students.map((s: any) => s.id);
       const allSessions = [];
 
-      // Fetch sessions in batches to handle large student lists
-      for (let i = 0; i < studentIds.length; i += 10) {
-        const batch = studentIds.slice(i, i + 10);
-        const { data: batchSessions } = await supabase
-          .from('lesson_sessions')
-          .select(`
-            *,
-            students!inner(
-              id,
-              users!inner(
-                first_name,
-                last_name
-              )
-            ),
-            student_subscriptions(
-              price_per_session,
-              subscription_name
-            )
-          `)
-          .in('student_id', batch)
-          .gte('scheduled_date', todayStart.toISOString())
-          .lte('scheduled_date', todayEnd.toISOString())
-          .order('scheduled_date', { ascending: true });
+      // Fetch sessions for all students using RPC
+      for (const studentId of studentIds) {
+        try {
+          const sessions = await getStudentLessonSessions(studentId);
+          if (sessions) {
+            // Filter for today's sessions
+            const todaySessions = sessions.filter((session: any) => {
+              let sessionDate: Date;
 
-        if (batchSessions) {
-          allSessions.push(...batchSessions);
+              if (session.scheduled_datetime) {
+                sessionDate = new Date(session.scheduled_datetime);
+              } else if (session.scheduled_date) {
+                sessionDate = new Date(session.scheduled_date);
+              } else {
+                return false;
+              }
+
+              return sessionDate >= todayStart && sessionDate <= todayEnd;
+            });
+
+            allSessions.push(...todaySessions);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch sessions for student ${studentId}:`, error);
         }
       }
 
@@ -152,27 +157,34 @@ const TodaysFocusWidget: React.FC = () => {
       let cancelled = 0;
 
       for (const session of todaySessions) {
-        const sessionTime = new Date(session.scheduled_date);
+        // Parse session time - use scheduled_datetime if available
+        let sessionTime: Date;
+        if (session.scheduled_datetime) {
+          sessionTime = new Date(session.scheduled_datetime);
+        } else if (session.scheduled_time) {
+          // Combine date and time
+          const dateStr = session.scheduled_date;
+          const timeStr = session.scheduled_time;
+          const [year, month, day] = dateStr.split('-').map(Number);
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          sessionTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+        } else {
+          sessionTime = new Date(session.scheduled_date);
+        }
+
         const endTime = addMinutes(sessionTime, session.duration_minutes || 60);
 
-        // Get student name from the joined data
-        const studentName = session.students?.users
-          ? `${session.students.users.first_name} ${session.students.users.last_name}`
+        // Get student info from map
+        const studentInfo = studentMap.get(session.student_id);
+        const studentName = studentInfo
+          ? `${studentInfo.firstName} ${studentInfo.lastName}`.trim()
           : 'Unknown Student';
 
-        // Teacher details can be fetched if needed
-        let teacherName = undefined;
-        if (session.teacher_id) {
-          const { data: teacher } = await supabase
-            .from('users')
-            .select('first_name, last_name')
-            .eq('id', session.teacher_id)
-            .single();
+        // Get course name from student info or session
+        const courseName = studentInfo?.courseName || session.course_name || 'General Session';
 
-          if (teacher) {
-            teacherName = `${teacher.first_name} ${teacher.last_name}`;
-          }
-        }
+        // Teacher name is not needed for now, skip to improve performance
+        const teacherName = undefined;
 
         // Determine session status
         let status: TimeSlot['status'] = 'upcoming';
@@ -220,7 +232,7 @@ const TodaysFocusWidget: React.FC = () => {
           id: session.id,
           time: format(sessionTime, 'HH:mm'),
           endTime: format(endTime, 'HH:mm'),
-          title: session.student_subscriptions?.[0]?.subscription_name || session.course_name || 'General Session',
+          title: courseName,
           studentName,
           type: session.subscription_type === 'group' ? 'group' : 'individual',
           status,
@@ -231,6 +243,15 @@ const TodaysFocusWidget: React.FC = () => {
           duration: session.duration_minutes || 60
         });
       }
+
+      // Sort slots by time (earliest first)
+      slots.sort((a, b) => {
+        const timeA = a.time.split(':').map(Number);
+        const timeB = b.time.split(':').map(Number);
+        const minutesA = timeA[0] * 60 + timeA[1];
+        const minutesB = timeB[0] * 60 + timeB[1];
+        return minutesA - minutesB;
+      });
 
       setTimeSlots(slots);
       setDayStats({

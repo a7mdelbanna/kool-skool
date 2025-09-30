@@ -778,115 +778,216 @@ class DashboardService {
           break;
       }
 
-      // Fetch active subscriptions
-      const subscriptions = await databaseService.query('subscriptions', {
+      // Fetch active subscriptions - try both field formats
+      let subscriptions = await databaseService.query('subscriptions', {
         where: [
-          { field: 'school_id', operator: '==', value: schoolId },
+          { field: 'schoolId', operator: '==', value: schoolId },
           { field: 'status', operator: '==', value: 'active' }
         ]
       });
+
+      // Fallback to snake_case
+      if (!subscriptions || subscriptions.length === 0) {
+        subscriptions = await databaseService.query('subscriptions', {
+          where: [
+            { field: 'school_id', operator: '==', value: schoolId },
+            { field: 'status', operator: '==', value: 'active' }
+          ]
+        });
+      }
 
       if (!subscriptions || subscriptions.length === 0) {
         return { payments: [], total: 0, currency: '₱' };
       }
 
-      // Get unique student IDs
-      const studentIds = [...new Set(subscriptions.map((s: any) => s.student_id).filter(Boolean))];
+      // Get unique student IDs (handle both field formats)
+      const studentIds = [...new Set(subscriptions.map((s: any) => s.studentId || s.student_id).filter(Boolean))];
 
-      // Fetch all students and their users for names
+      // Step 1: Batch fetch ALL students (return full objects)
       const students = await Promise.all(
         studentIds.map(async (id) => {
           try {
             const student = await databaseService.getById('students', id);
             if (!student) return null;
-
-            const user = await databaseService.getById('users', student.userId || student.user_id);
-            return {
-              id: student.id,
-              name: user ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() : 'Unknown Student'
-            };
-          } catch {
+            return student;  // Return full student object
+          } catch (error) {
+            console.error('Failed to fetch student:', id, error);
             return null;
           }
         })
       );
 
-      const studentMap = new Map(students.filter(s => s !== null).map(s => [s!.id, s!.name]));
+      const validStudents = students.filter(s => s !== null);
 
-      // Process subscriptions to get expected payments
+      // Step 2: Extract user IDs and batch fetch ALL users
+      const userIds = validStudents.map((s: any) => s.userId || s.user_id).filter(Boolean);
+
+      const users = await Promise.all(
+        userIds.map(async (userId: string) => {
+          try {
+            const user = await databaseService.getById('users', userId);
+            return user;  // Return full user object
+          } catch (error) {
+            console.error('Failed to fetch user:', userId, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter subscriptions to only include those with existing students
+      const validSubscriptions = subscriptions.filter((subscription: any) => {
+        const studentId = subscription.studentId || subscription.student_id;
+        return validStudents.some((s: any) => s?.id === studentId);
+      });
+
+      // Batch fetch all sessions for all subscriptions
+      const sessionsBySubscription = await Promise.all(
+        validSubscriptions.map(async (subscription: any) => {
+          try {
+            // Fetch all sessions - try both field formats
+            let allSessions = await databaseService.query('sessions', {
+              where: [
+                { field: 'subscriptionId', operator: '==', value: subscription.id }
+              ]
+            });
+
+            // Fallback to snake_case
+            if (!allSessions || allSessions.length === 0) {
+              allSessions = await databaseService.query('sessions', {
+                where: [
+                  { field: 'subscription_id', operator: '==', value: subscription.id }
+                ]
+              });
+            }
+
+            // Filter out cancelled sessions
+            const sessions = allSessions ? allSessions.filter((s: any) => s.status !== 'cancelled') : [];
+
+            return { subscription, sessions };
+          } catch (error) {
+            console.error('Error fetching sessions for subscription:', subscription.id, error);
+            return { subscription, sessions: [] };
+          }
+        })
+      );
+
+      // Calculate expected payments
       const expectedPayments: ExpectedPaymentData[] = [];
       let totalAmount = 0;
 
-      for (const subscription of subscriptions) {
-        const studentId = subscription.student_id;
-        const studentName = studentMap.get(studentId) || 'Unknown Student';
+      for (const { subscription, sessions } of sessionsBySubscription) {
+        const studentId = subscription.studentId || subscription.student_id;
 
-        // Calculate next payment date based on subscription
-        let nextPaymentDate: Date | null = null;
+        // Find student from validStudents array
+        const student = validStudents.find((s: any) => s?.id === studentId);
 
-        // Check if subscription has next_payment_date field
-        if (subscription.next_payment_date) {
-          nextPaymentDate = new Date(subscription.next_payment_date);
-        } else if (subscription.start_date) {
-          // Calculate based on payment frequency
-          const startDate = new Date(subscription.start_date);
-          const sessionCount = subscription.session_count || 0;
-          const completedSessions = subscription.completed_sessions || 0;
+        let studentName = 'Unknown Student';
 
-          if (completedSessions < sessionCount) {
-            // For subscriptions with session counts, check when payment is due
-            const sessionsPerPayment = subscription.sessions_per_payment || sessionCount;
-            const paymentsCompleted = Math.floor(completedSessions / sessionsPerPayment);
-            const nextPaymentSessions = (paymentsCompleted + 1) * sessionsPerPayment;
+        if (student) {
+          const userId = student.userId || student.user_id;
+          const user = userId ? users.find((u: any) => u?.id === userId) : null;
 
-            if (nextPaymentSessions <= sessionCount) {
-              // Estimate based on weekly sessions
-              const weeksUntilPayment = Math.ceil((nextPaymentSessions - completedSessions) / (subscription.sessions_per_week || 1));
-              nextPaymentDate = new Date(now.getTime() + weeksUntilPayment * 7 * 24 * 60 * 60 * 1000);
-            }
-          }
-
-          // Default to monthly if no specific logic applies
-          if (!nextPaymentDate && subscription.payment_mode === 'monthly') {
-            const lastPaymentDate = subscription.last_payment_date ? new Date(subscription.last_payment_date) : startDate;
-            nextPaymentDate = new Date(lastPaymentDate);
-            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+          if (user) {
+            // SUCCESS: We found the user record
+            studentName = `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim();
+          } else if (student.firstName || student.first_name) {
+            // FALLBACK: Try to get name from student record
+            studentName = `${student.firstName || student.first_name || ''} ${student.lastName || student.last_name || ''}`.trim();
           }
         }
 
-        // If still no date, skip this subscription
-        if (!nextPaymentDate) continue;
+        // Calculate payment amount
+        const paymentAmount = subscription.totalPrice || subscription.total_price || subscription.price || 0;
+
+        // Get subscription schedule
+        const schedule = subscription.schedule;
+        if (!schedule || (Array.isArray(schedule) && schedule.length === 0)) {
+          continue;
+        }
+
+        let nextPaymentDate: Date;
+
+        // Case 1: No sessions yet - payment due today
+        if (!sessions || sessions.length === 0) {
+          nextPaymentDate = now;
+        } else {
+          // Case 2: Has sessions - find next occurrence of scheduled day after last session
+          const validSessions = sessions.filter((session: any) => {
+            const scheduledDate = session.scheduledDate || session.scheduled_date;
+            if (!scheduledDate) return false;
+            const date = new Date(scheduledDate);
+            return !isNaN(date.getTime());
+          });
+
+          if (validSessions.length === 0) {
+            nextPaymentDate = now;
+          } else {
+            // Sort by date to find LAST session
+            const sortedSessions = validSessions.sort((a: any, b: any) => {
+              const dateA = new Date(a.scheduledDate || a.scheduled_date);
+              const dateB = new Date(b.scheduledDate || b.scheduled_date);
+              return dateB.getTime() - dateA.getTime();
+            });
+
+            const lastSession = sortedSessions[0];
+            const lastSessionDate = new Date(lastSession.scheduledDate || lastSession.scheduled_date);
+
+            // Get scheduled day from subscription
+            const firstSchedule = Array.isArray(schedule) ? schedule[0] : schedule;
+            const scheduledDay = firstSchedule.day;
+
+            const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
+
+            if (targetDayIndex === -1) {
+              continue;
+            }
+
+            // Find next occurrence of target day after last session
+            nextPaymentDate = new Date(lastSessionDate);
+            nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+
+            while (nextPaymentDate.getDay() !== targetDayIndex) {
+              nextPaymentDate.setDate(nextPaymentDate.getDate() + 1);
+            }
+          }
+        }
 
         // Check if payment is within filter period
         if (nextPaymentDate >= filterStart && nextPaymentDate <= filterEnd) {
-          const amount = subscription.price_per_session ?
-            (subscription.price_per_session * (subscription.sessions_per_payment || 1)) :
-            (subscription.total_price || 0);
-
           expectedPayments.push({
             id: subscription.id,
             studentId,
             studentName,
-            amount,
+            amount: paymentAmount,
             dueDate: nextPaymentDate.toISOString(),
-            subscriptionName: subscription.name || subscription.course_name || 'Subscription',
+            subscriptionName: subscription.courseName || subscription.course_name || 'Subscription',
             status: nextPaymentDate < now ? 'overdue' : 'upcoming'
           });
 
-          totalAmount += amount;
+          totalAmount += paymentAmount;
         }
       }
 
-      // Sort by due date (overdue first, then soonest)
+      // Sort by due date
       expectedPayments.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
       // Get currency
-      const currencies = await databaseService.query('currencies', {
+      let currencies = await databaseService.query('currencies', {
         where: [
-          { field: 'school_id', operator: '==', value: schoolId },
+          { field: 'schoolId', operator: '==', value: schoolId },
           { field: 'is_default', operator: '==', value: true }
         ]
       });
+
+      if (!currencies || currencies.length === 0) {
+        currencies = await databaseService.query('currencies', {
+          where: [
+            { field: 'school_id', operator: '==', value: schoolId },
+            { field: 'is_default', operator: '==', value: true }
+          ]
+        });
+      }
 
       const currency = currencies && currencies.length > 0 ? currencies[0].symbol || currencies[0].code : '₱';
 
