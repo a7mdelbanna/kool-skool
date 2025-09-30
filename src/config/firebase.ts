@@ -23,15 +23,30 @@ import {
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 // Firebase configuration for kool-skool project
+// IMPORTANT: These values must be set in your environment variables
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA9wv23oSmC9bG-Bx9hA2KG2pAZBjHTO-A",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "kool-skool-7e858.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "kool-skool-7e858",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "kool-skool-7e858.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "207433730842",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:207433730842:web:a49b3934d80f71aa18faa3",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-5E4L5ST9FB"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
+// Validate required configuration
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  console.error('Missing required Firebase configuration. Please set the following environment variables:', {
+    VITE_FIREBASE_API_KEY: !firebaseConfig.apiKey ? 'Missing' : 'Set',
+    VITE_FIREBASE_AUTH_DOMAIN: !firebaseConfig.authDomain ? 'Missing' : 'Set',
+    VITE_FIREBASE_PROJECT_ID: !firebaseConfig.projectId ? 'Missing' : 'Set',
+    VITE_FIREBASE_STORAGE_BUCKET: !firebaseConfig.storageBucket ? 'Missing' : 'Set',
+    VITE_FIREBASE_MESSAGING_SENDER_ID: !firebaseConfig.messagingSenderId ? 'Missing' : 'Set',
+    VITE_FIREBASE_APP_ID: !firebaseConfig.appId ? 'Missing' : 'Set',
+    VITE_FIREBASE_MEASUREMENT_ID: !firebaseConfig.measurementId ? 'Missing' : 'Set'
+  });
+  throw new Error('Firebase configuration is incomplete. Check the console for missing environment variables.');
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

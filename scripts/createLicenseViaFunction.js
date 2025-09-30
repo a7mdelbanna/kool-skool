@@ -1,15 +1,30 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, Timestamp } from 'firebase/firestore';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Firebase configuration
+// Load environment variables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '..', '.env') });
+
+// Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyA9wv23oSmC9bG-Bx9hA2KG2pAZBjHTO-A",
-  authDomain: "kool-skool-7e858.firebaseapp.com",
-  projectId: "kool-skool-7e858",
-  storageBucket: "kool-skool-7e858.firebasestorage.app",
-  messagingSenderId: "207433730842",
-  appId: "1:207433730842:web:a49b3934d80f71aa18faa3"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID
 };
+
+// Validate configuration
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  console.error('❌ Missing required Firebase configuration in environment variables');
+  console.error('Please ensure your .env file contains all required Firebase configuration.');
+  process.exit(1);
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
