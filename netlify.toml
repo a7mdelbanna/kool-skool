@@ -1,0 +1,16 @@
+[build]
+  command = "bun run build"
+  publish = "dist"
+
+[build.environment]
+  # Firebase API keys are meant to be public and are secured through Firebase Security Rules
+  # This tells Netlify's secret scanner to ignore Firebase API key patterns
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyA9wv23oSmC9bG-Bx9hA2KG2pAZBjHTO-A"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
