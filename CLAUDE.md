@@ -4,6 +4,21 @@
 
 This project uses a multi-agent system for efficient parallel development. Each agent specializes in specific aspects of development.
 
+## 🌐 IMPORTANT: Git Branches & Deployment
+
+### Branch Structure:
+- **main branch**: Development/staging branch
+- **production branch**: PRODUCTION BRANCH connected to Netlify for live deployment
+  - GitHub: https://github.com/a7mdelbanna/kool-skool/tree/production
+  - **ALWAYS push to production branch for live deployment**
+  - Command: `git push origin main:production` to deploy main to production
+
+### Deployment Workflow:
+1. Develop and test on `main` branch
+2. When ready for production: `git push origin main:production`
+3. Netlify automatically deploys from production branch
+4. **NEVER create a new production branch locally - it already exists on remote!**
+
 ## 📋 Available Agents
 
 ### Master Coordinator
