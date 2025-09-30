@@ -17,7 +17,7 @@ import {
 import { db, auth } from '@/config/firebase';
 
 export type TodoCategory = 'homework' | 'practice' | 'review' | 'project' | 'assessment' | 'other';
-export type TodoPriority = 'high' | 'medium' | 'low';
+export type TodoPriority = 'urgent' | 'high' | 'medium' | 'low';
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface TodoAttachment {
@@ -361,7 +361,7 @@ class TodosService {
       const now = new Date();
       const nextWeek = new Date();
       nextWeek.setDate(nextWeek.getDate() + 7);
-      
+
       const q = query(
         collection(db, this.collectionName),
         where('school_id', '==', schoolId),
@@ -371,13 +371,84 @@ class TodosService {
         orderBy('due_date', 'asc')
       );
       const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => 
+
+      return querySnapshot.docs.map(doc =>
         this.formatTodo(doc.id, doc.data())
       );
     } catch (error) {
       console.error('Error getting upcoming TODOs:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get urgent TODOs (overdue + due within 7 days with high/urgent priority)
+   */
+  async getUrgentTodos(schoolId: string): Promise<Todo[]> {
+    try {
+      const now = new Date();
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+
+      // Get overdue TODOs first
+      const overdueQuery = query(
+        collection(db, this.collectionName),
+        where('school_id', '==', schoolId),
+        where('status', 'in', ['pending', 'in_progress']),
+        where('due_date', '<', Timestamp.fromDate(now)),
+        orderBy('due_date', 'asc')
+      );
+
+      // Get high priority upcoming TODOs
+      const upcomingHighPriorityQuery = query(
+        collection(db, this.collectionName),
+        where('school_id', '==', schoolId),
+        where('status', 'in', ['pending', 'in_progress']),
+        where('priority', 'in', ['high', 'urgent']),
+        where('due_date', '>=', Timestamp.fromDate(now)),
+        where('due_date', '<=', Timestamp.fromDate(nextWeek)),
+        orderBy('due_date', 'asc')
+      );
+
+      const [overdueSnapshot, upcomingSnapshot] = await Promise.all([
+        getDocs(overdueQuery),
+        getDocs(upcomingHighPriorityQuery)
+      ]);
+
+      const overdueTodos = overdueSnapshot.docs.map(doc =>
+        this.formatTodo(doc.id, doc.data())
+      );
+
+      const upcomingTodos = upcomingSnapshot.docs.map(doc =>
+        this.formatTodo(doc.id, doc.data())
+      );
+
+      // Combine and sort by priority and due date
+      const allUrgentTodos = [...overdueTodos, ...upcomingTodos];
+
+      return allUrgentTodos.sort((a, b) => {
+        // Overdue items first
+        const aOverdue = a.due_date < now;
+        const bOverdue = b.due_date < now;
+
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
+
+        // Then by priority
+        const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+        const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 4;
+        const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 4;
+
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
+
+        // Finally by due date
+        return a.due_date.getTime() - b.due_date.getTime();
+      });
+    } catch (error) {
+      console.error('Error getting urgent TODOs:', error);
+      return [];
     }
   }
 

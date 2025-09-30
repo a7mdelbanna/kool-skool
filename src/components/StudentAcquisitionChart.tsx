@@ -19,16 +19,7 @@ export interface StudentMetricsData {
   lostStudents: number;
 }
 
-export const generateStudentMetricsData = (days = 30): StudentMetricsData[] => {
-  return Array.from({ length: days }).map((_, i) => {
-    const date = subDays(new Date(), days - i - 1);
-    return {
-      date: format(date, 'MMM dd'),
-      newStudents: Math.floor(Math.random() * 4) + 1,
-      lostStudents: Math.floor(Math.random() * 2.5),
-    };
-  });
-};
+// Note: Mock data generator removed - data now comes from parent component with real data
 
 interface StudentAcquisitionChartProps {
   data?: StudentMetricsData[];
@@ -42,9 +33,9 @@ const dateRangeOptions = [
   { value: "3months", label: "Last 90 days" }
 ];
 
-const StudentAcquisitionChart: React.FC<StudentAcquisitionChartProps> = ({ 
-  data = generateStudentMetricsData(14), // Show 2 weeks by default
-  className 
+const StudentAcquisitionChart: React.FC<StudentAcquisitionChartProps> = ({
+  data = [], // Data should be provided by parent component
+  className
 }) => {
   const [dateRange, setDateRange] = useState<string>("2weeks");
   const [sortBy, setSortBy] = useState<string>("date");
@@ -82,7 +73,7 @@ const StudentAcquisitionChart: React.FC<StudentAcquisitionChartProps> = ({
   const sortedData = getSortedData();
   
   return (
-    <Card className={className}>
+    <Card className={`glass-card glass-card-hover ${className || ''}`}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle>Student Acquisition & Attrition</CardTitle>
@@ -90,7 +81,7 @@ const StudentAcquisitionChart: React.FC<StudentAcquisitionChartProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <Select value={dateRange} onValueChange={handleDateRangeChange}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] bg-background/50 backdrop-blur-sm border-border/50">
               <SelectValue placeholder="Time period" />
             </SelectTrigger>
             <SelectContent>
@@ -105,64 +96,70 @@ const StudentAcquisitionChart: React.FC<StudentAcquisitionChartProps> = ({
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+          <div className="glass-card p-4 rounded-lg border-emerald-500/20 bg-emerald-500/5">
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
-                <UserPlus className="h-4 w-4 text-green-500" />
-                <span className="text-sm font-medium">New Students</span>
+                <div className="p-1.5 bg-emerald-500/10 rounded">
+                  <UserPlus className="h-4 w-4 text-emerald-500" />
+                </div>
+                <span className="text-sm font-medium text-muted-foreground">New Students</span>
               </div>
-              <Badge variant="secondary">{totalNewStudents}</Badge>
             </div>
-            <div className="text-2xl font-bold">{totalNewStudents}</div>
+            <div className="text-2xl font-bold text-foreground">{totalNewStudents}</div>
           </div>
-          
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+
+          <div className="glass-card p-4 rounded-lg border-red-500/20 bg-red-500/5">
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
-                <UserMinus className="h-4 w-4 text-red-500" />
-                <span className="text-sm font-medium">Lost Students</span>
+                <div className="p-1.5 bg-red-500/10 rounded">
+                  <UserMinus className="h-4 w-4 text-red-500" />
+                </div>
+                <span className="text-sm font-medium text-muted-foreground">Lost Students</span>
               </div>
-              <Badge variant="secondary">{totalLostStudents}</Badge>
             </div>
-            <div className="text-2xl font-bold">{totalLostStudents}</div>
+            <div className="text-2xl font-bold text-foreground">{totalLostStudents}</div>
           </div>
-          
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+
+          <div className={`glass-card p-4 rounded-lg ${netStudentGrowth >= 0 ? 'border-blue-500/20 bg-blue-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium">Net Growth</span>
+                <div className={`p-1.5 ${netStudentGrowth >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'} rounded`}>
+                  <Filter className={`h-4 w-4 ${netStudentGrowth >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
+                </div>
+                <span className="text-sm font-medium text-muted-foreground">Net Growth</span>
               </div>
-              <Badge 
-                variant="outline" 
-                className={netStudentGrowth >= 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+              <Badge
+                variant="outline"
+                className={netStudentGrowth >= 0 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" : "bg-red-500/10 text-red-500 border-red-500/30"}
               >
                 {netStudentGrowth >= 0 ? "+" : ""}{netStudentGrowth}
               </Badge>
             </div>
-            <div className="text-2xl font-bold">{netStudentGrowth}</div>
+            <div className="text-2xl font-bold text-foreground">{netStudentGrowth}</div>
           </div>
-          
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+
+          <div className="glass-card p-4 rounded-lg border-purple-500/20 bg-purple-500/5">
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-purple-500" />
-                <span className="text-sm font-medium">Retention Rate</span>
+                <div className="p-1.5 bg-purple-500/10 rounded">
+                  <Filter className="h-4 w-4 text-purple-500" />
+                </div>
+                <span className="text-sm font-medium text-muted-foreground">Retention Rate</span>
               </div>
-              <Badge 
-                variant="outline" 
-                className={retentionRate >= 75 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}
+              <Badge
+                variant="outline"
+                className={retentionRate >= 75 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" : "bg-amber-500/10 text-amber-500 border-amber-500/30"}
               >
                 {retentionRate}%
               </Badge>
             </div>
-            <div className="text-2xl font-bold">{retentionRate}%</div>
+            <div className="text-2xl font-bold text-foreground">{retentionRate}%</div>
           </div>
         </div>
         
-        <div className="rounded-md border">
+        <div className="rounded-md border border-border/50 overflow-hidden">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-background/50 backdrop-blur-sm">
               <TableRow>
                 <TableHead className="w-[100px] cursor-pointer" onClick={() => setSortBy("date")}>
                   Date {sortBy === "date" && "↓"}
@@ -183,7 +180,7 @@ const StudentAcquisitionChart: React.FC<StudentAcquisitionChartProps> = ({
                   <TableCell>{item.newStudents}</TableCell>
                   <TableCell>{item.lostStudents}</TableCell>
                   <TableCell className="text-right">
-                    <span className={item.newStudents - item.lostStudents >= 0 ? "text-green-600" : "text-red-600"}>
+                    <span className={item.newStudents - item.lostStudents >= 0 ? "text-emerald-500 font-medium" : "text-red-500 font-medium"}>
                       {item.newStudents - item.lostStudents >= 0 ? "+" : ""}
                       {item.newStudents - item.lostStudents}
                     </span>

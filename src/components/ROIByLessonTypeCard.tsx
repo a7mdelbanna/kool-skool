@@ -33,27 +33,28 @@ const ROIByLessonTypeCard: React.FC<ROIByLessonTypeCardProps> = ({ data, classNa
   const getRoiPerformance = (roi: number) => {
     const diff = roi - averageROI;
     const percentage = Math.round((diff / averageROI) * 100);
-    
-    if (Math.abs(percentage) < 5) return { label: "Average", class: "bg-blue-100 text-blue-800" };
-    if (percentage >= 5) return { label: `${percentage}% above avg`, class: "bg-green-100 text-green-800", icon: <ArrowUp className="h-3 w-3" /> };
-    return { label: `${Math.abs(percentage)}% below avg`, class: "bg-red-100 text-red-800", icon: <ArrowDown className="h-3 w-3" /> };
+
+    if (Math.abs(percentage) < 5) return { label: "Average", class: "bg-blue-500/10 text-blue-500 border-blue-500/30" };
+    if (percentage >= 5) return { label: `${percentage}% above avg`, class: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30", icon: <ArrowUp className="h-3 w-3" /> };
+    return { label: `${Math.abs(percentage)}% below avg`, class: "bg-red-500/10 text-red-500 border-red-500/30", icon: <ArrowDown className="h-3 w-3" /> };
   };
   
   return (
-    <Card className={className}>
+    <Card className={`glass-card glass-card-hover ${className || ''}`}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle>Student ROI by Category</CardTitle>
+          <CardTitle className="text-foreground">Student ROI by Category</CardTitle>
           <p className="text-sm text-muted-foreground">Return on investment by lesson type</p>
         </div>
-        <Badge variant="outline" className="bg-blue-50 text-blue-800 flex gap-1">
+        <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/30 flex gap-1">
           <DollarSign className="h-4 w-4" />
           Avg: ${averageROI}
         </Badge>
       </CardHeader>
       <CardContent>
+        <div className="rounded-md border border-border/50 overflow-hidden">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-background/50 backdrop-blur-sm">
             <TableRow>
               <TableHead>Lesson Type</TableHead>
               <TableHead 
@@ -72,7 +73,7 @@ const ROIByLessonTypeCard: React.FC<ROIByLessonTypeCardProps> = ({ data, classNa
               return (
                 <TableRow key={index}>
                   <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell className="text-right font-mono">${item.roi}</TableCell>
+                  <TableCell className="text-right font-mono font-medium text-foreground">${item.roi}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant="outline" className={`${performance.class} flex gap-1 ml-auto`}>
                       {performance.icon}
@@ -84,6 +85,7 @@ const ROIByLessonTypeCard: React.FC<ROIByLessonTypeCardProps> = ({ data, classNa
             )}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );

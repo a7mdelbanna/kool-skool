@@ -1,3 +1,17 @@
+/**
+ * UrgentActionsWidget - Dashboard component that displays urgent/overdue items requiring immediate attention
+ *
+ * Features:
+ * - Fetches TODOs from Firebase using todosService.getUrgentTodos()
+ * - Shows urgent/overdue TODOs with proper categorization (overdue vs due soon)
+ * - Filters TODOs where status is not 'completed' or 'cancelled'
+ * - Includes TODOs that are overdue OR due within 7 days with 'high' or 'urgent' priority
+ * - Displays "All caught up!" when no urgent items exist
+ * - Includes counts and proper priority badges
+ * - Allows navigation to TODOs page when items are clicked
+ * - Uses glass-card styling consistent with other dashboard widgets
+ * - Also includes other urgent actions like payments, attendance, subscriptions, etc.
+ */
 import React, { useContext, useEffect, useState } from 'react';
 import {
   AlertTriangle,
@@ -194,21 +208,35 @@ const UrgentActionsWidget: React.FC = () => {
         }
       }
 
-      // 5. Fetch overdue TODOs
-      const overdueTodos = await todosService.getOverdueTodos(user.schoolId);
-      overdueTodos.forEach(todo => {
-        const daysOverdue = differenceInDays(now, todo.due_date);
+      // 5. Fetch urgent TODOs using optimized service method
+      const urgentTodos = await todosService.getUrgentTodos(user.schoolId);
+
+      urgentTodos.forEach(todo => {
+        const dueDate = new Date(todo.due_date);
+        const isOverdue = dueDate < now;
+        const daysOverdue = isOverdue ? differenceInDays(now, dueDate) : 0;
+        const daysToDue = isOverdue ? 0 : differenceInDays(dueDate, now);
+
+        let description = todo.title;
+        if (isOverdue) {
+          description += ` - ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} overdue`;
+        } else if (daysToDue === 0) {
+          description += ' - Due today';
+        } else {
+          description += ` - Due in ${daysToDue} day${daysToDue > 1 ? 's' : ''}`;
+        }
+
         actions.push({
           id: `todo-${todo.id}`,
           type: 'todo',
-          priority: todo.priority === 'high' || daysOverdue > 3 ? 'critical' : 'high',
-          title: 'Overdue TODO',
-          description: `${todo.title} - ${daysOverdue} days overdue`,
+          priority: isOverdue ? 'critical' : todo.priority === 'urgent' ? 'critical' : 'high',
+          title: isOverdue ? 'Overdue TODO' : 'Urgent TODO',
+          description,
           dueDate: todo.due_date,
-          icon: AlertCircle,
-          color: 'text-red-500',
+          icon: isOverdue ? XCircle : AlertCircle,
+          color: isOverdue ? 'text-red-500' : 'text-orange-500',
           action: () => navigate('/todos'),
-          actionLabel: 'Complete'
+          actionLabel: isOverdue ? 'Complete' : 'View'
         });
       });
 

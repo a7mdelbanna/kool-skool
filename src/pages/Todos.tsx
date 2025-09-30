@@ -75,6 +75,7 @@ const TodosPage: React.FC = () => {
     student_id: ''
   });
   const [showMigrationButton, setShowMigrationButton] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   // Statistics
   const [stats, setStats] = useState({
@@ -99,28 +100,67 @@ const TodosPage: React.FC = () => {
       console.log('No user found, skipping data load');
       return;
     }
-    
-    console.log('Loading data for user:', { 
-      id: user.id, 
-      role: user.role, 
-      schoolId: user.schoolId 
+
+    console.log('Loading data for user:', {
+      id: user.id,
+      role: user.role,
+      schoolId: user.schoolId
     });
-    
+
     try {
       setLoading(true);
-      
+
       // Load TODOs first
       await loadTodos();
-      
-      // Then load students (we'll fetch them individually if batch fetch fails)
+
+      // Then load students from Firebase (same as Students page)
       if (user.schoolId) {
         try {
-          const studentsData = await studentsService.getBySchoolId(user.schoolId);
+          // Import databaseService if not already imported
+          const { databaseService } = await import('@/services/firebase/database.service');
+
+          // Fetch students from Firebase using the same method as Students page
+          const studentsData = await databaseService.getBySchoolId('students', user.schoolId);
           console.log('Loaded students from Firebase:', studentsData.length);
-          setStudents(studentsData);
+
+          // Transform the data to match FirebaseStudent interface
+          // The data from Firebase already has the correct structure
+          const formattedStudents: FirebaseStudent[] = studentsData.map((student: any) => ({
+            id: student.id || student.studentId,
+            studentId: student.studentId || student.id,
+            firstName: student.firstName || student.first_name || '',
+            lastName: student.lastName || student.last_name || '',
+            email: student.email || '',
+            phone: student.phone || '',
+            schoolId: student.schoolId || student.school_id || user.schoolId,
+            status: student.status || 'active',
+            courseName: student.courseName || student.course_name || '',
+            level: student.level || '',
+            teacherId: student.teacherId || student.teacher_id || '',
+            groupId: student.groupId || student.group_id || '',
+            whatsappPhone: student.whatsappPhone || student.whatsapp_phone || '',
+            profilePictureUrl: student.profilePictureUrl || student.profile_picture_url || '',
+            dateOfBirth: student.dateOfBirth || student.date_of_birth || '',
+            gender: student.gender || '',
+            address: student.address || '',
+            city: student.city || '',
+            country: student.country || '',
+            parentName: student.parentName || student.parent_name || '',
+            parentPhone: student.parentPhone || student.parent_phone || '',
+            parentEmail: student.parentEmail || student.parent_email || '',
+            medicalConditions: student.medicalConditions || student.medical_conditions || '',
+            allergies: student.allergies || '',
+            emergencyContact: student.emergencyContact || student.emergency_contact || '',
+            emergencyPhone: student.emergencyPhone || student.emergency_phone || '',
+            notes: student.notes || '',
+            joinDate: student.joinDate || student.join_date || '',
+            totalLessonsTaken: student.totalLessonsTaken || student.total_lessons_taken || 0,
+            totalPayments: student.totalPayments || student.total_payments || 0
+          }));
+
+          setStudents(formattedStudents);
         } catch (error) {
           console.error('Error loading students from Firebase:', error);
-          // We'll fetch students individually as needed
           setStudents([]);
         }
       } else {
@@ -383,6 +423,7 @@ const TodosPage: React.FC = () => {
       notes: '',
       student_id: ''
     });
+    setStudentSearchQuery(''); // Clear search query when form is reset
   };
 
   const getPriorityColor = (priority: TodoPriority) => {
@@ -427,12 +468,12 @@ const TodosPage: React.FC = () => {
   const filteredTodos = applyFilters();
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-7xl">
+    <div className="container mx-auto py-6 px-4 max-w-7xl animate-fade-in">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold">TODOs Management</h1>
+            <h1 className="text-2xl font-bold text-foreground">TODOs Management</h1>
             <p className="text-muted-foreground">
               Manage tasks and assignments for your students
             </p>
@@ -444,7 +485,7 @@ const TodosPage: React.FC = () => {
                 Add TODO
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md glass-card border-border/50">
               <DialogHeader>
                 <DialogTitle>Create New TODO</DialogTitle>
                 <DialogDescription>
@@ -456,17 +497,52 @@ const TodosPage: React.FC = () => {
                   <Label htmlFor="student">Student *</Label>
                   <Select
                     value={formData.student_id}
-                    onValueChange={(value) => setFormData({ ...formData, student_id: value })}
+                    onValueChange={(value) => {
+                      setFormData({ ...formData, student_id: value });
+                      setStudentSearchQuery(''); // Clear search when student selected
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a student" />
                     </SelectTrigger>
                     <SelectContent>
-                      {students.map(student => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.firstName} {student.lastName}
-                        </SelectItem>
-                      ))}
+                      {/* Search input inside the dropdown */}
+                      <div className="px-2 pb-2">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search students..."
+                            value={studentSearchQuery}
+                            onChange={(e) => setStudentSearchQuery(e.target.value)}
+                            className="pl-8 h-9"
+                            onClick={(e) => e.stopPropagation()} // Prevent closing dropdown
+                          />
+                        </div>
+                      </div>
+
+                      {/* Filtered student list */}
+                      <div className="max-h-[200px] overflow-y-auto">
+                        {students
+                          .filter(student => {
+                            const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
+                            return fullName.includes(studentSearchQuery.toLowerCase());
+                          })
+                          .map(student => (
+                            <SelectItem key={student.id} value={student.id}>
+                              {student.firstName} {student.lastName}
+                            </SelectItem>
+                          ))}
+
+                        {/* No results message */}
+                        {students.filter(student => {
+                          const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
+                          return fullName.includes(studentSearchQuery.toLowerCase());
+                        }).length === 0 && (
+                          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                            No students found
+                          </div>
+                        )}
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
@@ -569,63 +645,75 @@ const TodosPage: React.FC = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          <Card className="p-4">
+          <Card className="glass-card glass-card-hover p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
               </div>
-              <Target className="h-8 w-8 text-muted-foreground" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Target className="h-6 w-6 text-primary" />
+              </div>
             </div>
           </Card>
-          
-          <Card className="p-4">
+
+          <Card className="glass-card glass-card-hover p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold">{stats.pending}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
               </div>
-              <Circle className="h-8 w-8 text-gray-400" />
+              <div className="p-2 bg-gray-500/10 rounded-lg">
+                <Circle className="h-6 w-6 text-gray-500" />
+              </div>
             </div>
           </Card>
-          
-          <Card className="p-4">
+
+          <Card className="glass-card glass-card-hover p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">In Progress</p>
-                <p className="text-2xl font-bold">{stats.in_progress}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.in_progress}</p>
               </div>
-              <Clock className="h-8 w-8 text-blue-500" />
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <Clock className="h-6 w-6 text-blue-500" />
+              </div>
             </div>
           </Card>
-          
-          <Card className="p-4">
+
+          <Card className="glass-card glass-card-hover p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">{stats.completed}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500" />
+              <div className="p-2 bg-green-500/10 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-green-500" />
+              </div>
             </div>
           </Card>
-          
-          <Card className="p-4 border-red-200 bg-red-50">
+
+          <Card className="glass-card glass-card-hover p-4 border-red-500/30 bg-red-500/5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-red-600">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                <p className="text-sm text-red-500">Overdue</p>
+                <p className="text-2xl font-bold text-red-500">{stats.overdue}</p>
               </div>
-              <AlertCircle className="h-8 w-8 text-red-500" />
+              <div className="p-2 bg-red-500/10 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-red-500" />
+              </div>
             </div>
           </Card>
-          
-          <Card className="p-4 border-orange-200 bg-orange-50">
+
+          <Card className="glass-card glass-card-hover p-4 border-orange-500/30 bg-orange-500/5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-orange-600">Due Soon</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.dueSoon}</p>
+                <p className="text-sm text-orange-500">Due Soon</p>
+                <p className="text-2xl font-bold text-orange-500">{stats.dueSoon}</p>
               </div>
-              <Calendar className="h-8 w-8 text-orange-500" />
+              <div className="p-2 bg-orange-500/10 rounded-lg">
+                <Calendar className="h-6 w-6 text-orange-500" />
+              </div>
             </div>
           </Card>
         </div>
@@ -639,13 +727,13 @@ const TodosPage: React.FC = () => {
                 placeholder="Search TODOs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-background/50 backdrop-blur-sm border-border/50"
               />
             </div>
           </div>
-          
+
           <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[200px] bg-background/50 backdrop-blur-sm border-border/50">
               <SelectValue placeholder="All Students" />
             </SelectTrigger>
             <SelectContent>
@@ -657,8 +745,8 @@ const TodosPage: React.FC = () => {
               ))}
             </SelectContent>
           </Select>
-          
-          <Button variant="outline" size="sm">
+
+          <Button variant="outline" size="sm" className="hover:bg-primary/10 transition-colors">
             <Filter className="h-4 w-4 mr-2" />
             More Filters
           </Button>
@@ -667,12 +755,12 @@ const TodosPage: React.FC = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="week">This Week</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 bg-background/50 backdrop-blur-sm">
+          <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">All</TabsTrigger>
+          <TabsTrigger value="today" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Today</TabsTrigger>
+          <TabsTrigger value="week" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">This Week</TabsTrigger>
+          <TabsTrigger value="overdue" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Overdue</TabsTrigger>
+          <TabsTrigger value="completed" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Completed</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4 mt-6">
@@ -681,17 +769,17 @@ const TodosPage: React.FC = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : filteredTodos.length === 0 ? (
-            <Card className="p-12 text-center">
+            <Card className="glass-card p-12 text-center">
               <p className="text-muted-foreground">No TODOs found</p>
               {showMigrationButton && (
                 <div className="mt-6">
                   <p className="text-sm text-muted-foreground mb-4">
                     If you have existing TODOs that aren't showing up, they may need to be migrated.
                   </p>
-                  <Button 
+                  <Button
                     onClick={handleFixTodosSchoolId}
                     variant="outline"
-                    className="gap-2"
+                    className="gap-2 hover:bg-primary/10 transition-colors"
                   >
                     <RefreshCcw className="h-4 w-4" />
                     Fix Missing TODOs

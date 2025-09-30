@@ -66,7 +66,7 @@ const TodoItem: React.FC<TodoItemProps> = ({
       case 'in_progress':
         return <Clock className="h-5 w-5 text-blue-500" />;
       default:
-        return <Circle className="h-5 w-5 text-gray-400" />;
+        return <Circle className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
@@ -103,34 +103,43 @@ const TodoItem: React.FC<TodoItemProps> = ({
     : loadingStudent ? 'Loading...' : 'Unknown';
 
   return (
-    <Card 
-      className={`p-4 ${isOverdue(todo) ? 'border-red-200 bg-red-50' : ''}`}
+    <Card
+      className={`glass-card glass-card-hover p-4 transition-all ${
+        isOverdue(todo) ? 'border-red-500/30 bg-red-500/5' : ''
+      }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3 flex-1">
           <button
             onClick={() => onStatusChange(
-              todo, 
+              todo,
               todo.status === 'completed' ? 'pending' : 'completed'
             )}
-            className="mt-1"
+            className="mt-1 transition-transform hover:scale-110"
           >
             {getStatusIcon(todo.status)}
           </button>
-          
+
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-lg">{getCategoryIcon(todo.category)}</span>
-              <h4 className={`font-medium ${
-                todo.status === 'completed' ? 'line-through text-muted-foreground' : ''
+              <h4 className={`font-medium text-foreground ${
+                todo.status === 'completed' ? 'line-through text-muted-foreground opacity-75' : ''
               }`}>
                 {todo.title}
               </h4>
-              <Badge variant={getPriorityColor(todo.priority)}>
+              <Badge
+                variant={getPriorityColor(todo.priority)}
+                className={`${
+                  todo.priority === 'high' ? 'bg-red-500/10 text-red-500 border-red-500/30' :
+                  todo.priority === 'medium' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' :
+                  'bg-blue-500/10 text-blue-500 border-blue-500/30'
+                }`}
+              >
                 {todo.priority}
               </Badge>
               {isOverdue(todo) && (
-                <Badge variant="destructive">Overdue</Badge>
+                <Badge className="bg-red-500/10 text-red-500 border-red-500/30">Overdue</Badge>
               )}
             </div>
             
@@ -150,7 +159,7 @@ const TodoItem: React.FC<TodoItemProps> = ({
                 Due: {format(new Date(todo.due_date), 'MMM dd, yyyy')}
               </span>
               {todo.completed_at && (
-                <span className="text-green-600">
+                <span className="text-green-500">
                   Completed: {format(new Date(todo.completed_at), 'MMM dd, yyyy')}
                 </span>
               )}
@@ -167,6 +176,7 @@ const TodoItem: React.FC<TodoItemProps> = ({
             }
           }}
           disabled={!todo.session_id}
+          className="hover:bg-primary/10 transition-colors"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

@@ -19,8 +19,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { UserContext } from '@/App';
-import { databaseService } from '@/services/firebase/database.service';
-import { format, isToday, isTomorrow, differenceInMinutes, addMinutes } from 'date-fns';
+import { format, isToday, isTomorrow, differenceInMinutes, addMinutes, startOfDay, endOfDay } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { getStudentLessonSessions } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 
 interface TimeSlot {
@@ -85,25 +86,63 @@ const TodaysFocusWidget: React.FC = () => {
     setLoading(true);
     try {
       const now = new Date();
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(now);
-      todayEnd.setHours(23, 59, 59, 999);
+      const todayStart = startOfDay(now);
+      const todayEnd = endOfDay(now);
 
-      // Fetch today's sessions
-      const sessions = await databaseService.query('sessions', {
-        where: [{ field: 'schoolId', operator: '==', value: user.schoolId }]
-      });
+      // First get all students for this school
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, user_id')
+        .eq('school_id', user.schoolId);
 
-      const todaySessions = sessions?.filter((session: any) => {
-        const sessionDate = new Date(session.scheduled_date);
-        return sessionDate >= todayStart && sessionDate <= todayEnd;
-      }) || [];
+      if (!students || students.length === 0) {
+        setTimeSlots([]);
+        setDayStats({
+          totalSessions: 0,
+          completedSessions: 0,
+          upcomingSessions: 0,
+          cancelledSessions: 0,
+          revenue: 0,
+          studentsToday: 0
+        });
+        setLoading(false);
+        return;
+      }
 
-      // Sort by time
-      todaySessions.sort((a: any, b: any) => {
-        return new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
-      });
+      // Fetch today's sessions for all students
+      const studentIds = students.map(s => s.id);
+      const allSessions = [];
+
+      // Fetch sessions in batches to handle large student lists
+      for (let i = 0; i < studentIds.length; i += 10) {
+        const batch = studentIds.slice(i, i + 10);
+        const { data: batchSessions } = await supabase
+          .from('lesson_sessions')
+          .select(`
+            *,
+            students!inner(
+              id,
+              users!inner(
+                first_name,
+                last_name
+              )
+            ),
+            student_subscriptions(
+              price_per_session,
+              subscription_name
+            )
+          `)
+          .in('student_id', batch)
+          .gte('scheduled_date', todayStart.toISOString())
+          .lte('scheduled_date', todayEnd.toISOString())
+          .order('scheduled_date', { ascending: true });
+
+        if (batchSessions) {
+          allSessions.push(...batchSessions);
+        }
+      }
+
+      const todaySessions = allSessions;
 
       const slots: TimeSlot[] = [];
       const uniqueStudents = new Set<string>();
@@ -116,24 +155,24 @@ const TodaysFocusWidget: React.FC = () => {
         const sessionTime = new Date(session.scheduled_date);
         const endTime = addMinutes(sessionTime, session.duration_minutes || 60);
 
-        // Get student details
-        const student = session.student_id
-          ? await databaseService.getById('students', session.student_id)
-          : null;
-        const studentUser = student
-          ? await databaseService.getById('users', student.userId || student.user_id)
-          : null;
-        const studentName = studentUser
-          ? `${studentUser.firstName || studentUser.first_name} ${studentUser.lastName || studentUser.last_name}`
+        // Get student name from the joined data
+        const studentName = session.students?.users
+          ? `${session.students.users.first_name} ${session.students.users.last_name}`
           : 'Unknown Student';
 
-        // Get teacher details
-        const teacher = session.teacher_id
-          ? await databaseService.getById('users', session.teacher_id)
-          : null;
-        const teacherName = teacher
-          ? `${teacher.firstName || teacher.first_name} ${teacher.lastName || teacher.last_name}`
-          : undefined;
+        // Teacher details can be fetched if needed
+        let teacherName = undefined;
+        if (session.teacher_id) {
+          const { data: teacher } = await supabase
+            .from('users')
+            .select('first_name, last_name')
+            .eq('id', session.teacher_id)
+            .single();
+
+          if (teacher) {
+            teacherName = `${teacher.first_name} ${teacher.last_name}`;
+          }
+        }
 
         // Determine session status
         let status: TimeSlot['status'] = 'upcoming';
@@ -159,9 +198,10 @@ const TodaysFocusWidget: React.FC = () => {
           uniqueStudents.add(session.student_id);
         }
 
-        // Calculate revenue (if payment is associated)
-        if (session.price && status !== 'cancelled') {
-          totalRevenue += session.price;
+        // Calculate revenue from subscription price
+        const price = session.student_subscriptions?.[0]?.price_per_session || 0;
+        if (price && status !== 'cancelled') {
+          totalRevenue += price;
         }
 
         // Determine color based on status and type
@@ -180,7 +220,7 @@ const TodaysFocusWidget: React.FC = () => {
           id: session.id,
           time: format(sessionTime, 'HH:mm'),
           endTime: format(endTime, 'HH:mm'),
-          title: session.course_name || 'General Session',
+          title: session.student_subscriptions?.[0]?.subscription_name || session.course_name || 'General Session',
           studentName,
           type: session.subscription_type === 'group' ? 'group' : 'individual',
           status,

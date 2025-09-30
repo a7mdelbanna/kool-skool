@@ -166,6 +166,35 @@ class StudentsService {
   }
 
   /**
+   * Get all students
+   */
+  async getAll(): Promise<FirebaseStudent[]> {
+    try {
+      const q = query(
+        collection(db, this.collectionName),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map(doc =>
+        this.formatStudent(doc.id, doc.data())
+      );
+    } catch (error) {
+      console.error('Error getting all students:', error);
+      // If orderBy fails, try without it
+      try {
+        const querySnapshot = await getDocs(collection(db, this.collectionName));
+        return querySnapshot.docs.map(doc =>
+          this.formatStudent(doc.id, doc.data())
+        );
+      } catch (fallbackError) {
+        console.error('Error getting all students (fallback):', fallbackError);
+        return [];
+      }
+    }
+  }
+
+  /**
    * Get students by group ID
    */
   async getByGroupId(groupId: string): Promise<FirebaseStudent[]> {
