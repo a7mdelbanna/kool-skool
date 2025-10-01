@@ -14,6 +14,7 @@ import UpcomingPayments, { Payment } from '@/components/UpcomingPayments';
 import AddStudentDialog from '@/components/AddStudentDialog';
 import QuickActionsBar from '@/components/dashboard/QuickActionsBar';
 import UrgentActionsWidget from '@/components/dashboard/UrgentActionsWidget';
+import PastSessionsWidget from '@/components/dashboard/PastSessionsWidget';
 import BusinessHealthMonitor from '@/components/dashboard/BusinessHealthMonitor';
 import TodaysFocusWidget from '@/components/dashboard/TodaysFocusWidget';
 import InsightsWidget from '@/components/dashboard/InsightsWidget';
@@ -323,6 +324,11 @@ const Index = () => {
               <div className="lg:col-span-1">
                 <ExpectedPaymentsWidget />
               </div>
+            </div>
+
+            {/* Third Row - Past Sessions Widget */}
+            <div className="grid grid-cols-1 gap-6">
+              <PastSessionsWidget />
             </div>
 
             {/* Financial Intelligence Panel */}

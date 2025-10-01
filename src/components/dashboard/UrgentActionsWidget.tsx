@@ -74,6 +74,18 @@ const UrgentActionsWidget: React.FC = () => {
       const actions: UrgentAction[] = [];
       const now = new Date();
 
+      // Batch load ALL students for later lookups (used by TODOs)
+      // This follows the documented pattern from Todos.tsx to avoid N+1 queries
+      const allStudents = await databaseService.getBySchoolId('students', user.schoolId);
+      const studentMap = new Map();
+      allStudents.forEach((student: any) => {
+        studentMap.set(student.id || student.studentId, {
+          firstName: student.firstName || student.first_name || '',
+          lastName: student.lastName || student.last_name || '',
+          userId: student.userId || student.user_id
+        });
+      });
+
       // 1. Fetch overdue payments
       const payments = await databaseService.query('payments', {
         where: [
@@ -208,8 +220,37 @@ const UrgentActionsWidget: React.FC = () => {
         }
       }
 
-      // 5. Fetch urgent TODOs using optimized service method
-      const urgentTodos = await todosService.getUrgentTodos(user.schoolId);
+      // 5. Fetch TODOs using the same approach as /todos page
+      // Use getBySchoolId instead of getUrgentTodos to avoid composite index requirement
+      const allTodos = await todosService.getBySchoolId(user.schoolId);
+      console.log('📋 All TODOs fetched:', allTodos.length);
+
+      // Filter for urgent TODOs client-side (same logic as getUrgentTodos but without index)
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+
+      const urgentTodos = allTodos.filter(todo => {
+        // Only include pending/in_progress TODOs
+        if (todo.status !== 'pending' && todo.status !== 'in_progress') {
+          return false;
+        }
+
+        const dueDate = new Date(todo.due_date);
+
+        // Include if overdue
+        if (dueDate < now) {
+          return true;
+        }
+
+        // Include if due within 7 days AND high/urgent priority
+        if (dueDate <= nextWeek && (todo.priority === 'high' || todo.priority === 'urgent')) {
+          return true;
+        }
+
+        return false;
+      });
+
+      console.log('📋 Urgent TODOs filtered:', urgentTodos.length);
 
       urgentTodos.forEach(todo => {
         const dueDate = new Date(todo.due_date);
@@ -217,7 +258,15 @@ const UrgentActionsWidget: React.FC = () => {
         const daysOverdue = isOverdue ? differenceInDays(now, dueDate) : 0;
         const daysToDue = isOverdue ? 0 : differenceInDays(dueDate, now);
 
-        let description = todo.title;
+        // Find student name using the documented pattern (two-tier lookup)
+        // STEP 1: Try to find in the studentMap (FAST)
+        const studentInfo = studentMap.get(todo.student_id);
+        const studentName = studentInfo
+          ? `${studentInfo.firstName} ${studentInfo.lastName}`.trim()
+          : null;
+
+        // Build description with student name
+        let description = studentName ? `${studentName} - ${todo.title}` : todo.title;
         if (isOverdue) {
           description += ` - ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} overdue`;
         } else if (daysToDue === 0) {
@@ -240,25 +289,7 @@ const UrgentActionsWidget: React.FC = () => {
         });
       });
 
-      // 6. Unconfirmed lessons for today
-      const unconfirmedLessons = sessions?.filter((session: any) => {
-        const sessionDate = new Date(session.scheduled_date);
-        return isToday(sessionDate) && !session.confirmed;
-      });
-
-      if (unconfirmedLessons && unconfirmedLessons.length > 0) {
-        actions.push({
-          id: 'unconfirmed-lessons',
-          type: 'lesson',
-          priority: 'high',
-          title: 'Unconfirmed Lessons',
-          description: `${unconfirmedLessons.length} lessons need confirmation for today`,
-          icon: BookX,
-          color: 'text-amber-500',
-          action: () => navigate('/calendar'),
-          actionLabel: 'Confirm'
-        });
-      }
+      // Note: Unconfirmed lessons moved to PastSessionsWidget
 
       // Sort by priority and date
       actions.sort((a, b) => {
