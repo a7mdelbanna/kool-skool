@@ -116,38 +116,7 @@ const UrgentActionsWidget: React.FC = () => {
         });
       }
 
-      // 2. Fetch pending attendance
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-      const sessions = await databaseService.query('sessions', {
-        where: [
-          { field: 'schoolId', operator: '==', value: user.schoolId },
-          { field: 'status', operator: '==', value: 'scheduled' }
-        ]
-      });
-
-      if (sessions) {
-        const pastSessions = sessions.filter((session: any) => {
-          const sessionDate = new Date(session.scheduled_date);
-          return sessionDate < now && sessionDate >= todayStart;
-        });
-
-        if (pastSessions.length > 0) {
-          actions.push({
-            id: 'attendance-pending',
-            type: 'attendance',
-            priority: 'high',
-            title: 'Pending Attendance',
-            description: `${pastSessions.length} completed sessions need attendance marking`,
-            icon: ClipboardX,
-            color: 'text-orange-500',
-            action: () => navigate('/attendance'),
-            actionLabel: 'Mark Attendance'
-          });
-        }
-      }
-
-      // 3. Fetch expiring subscriptions (next 7 days)
+      // 2. Fetch expiring subscriptions (next 7 days)
       const subscriptions = await databaseService.query('subscriptions', {
         where: [
           { field: 'schoolId', operator: '==', value: user.schoolId },
@@ -179,7 +148,7 @@ const UrgentActionsWidget: React.FC = () => {
         });
       }
 
-      // 4. Fetch birthdays
+      // 3. Fetch birthdays
       const students = await databaseService.query('students', {
         where: [{ field: 'schoolId', operator: '==', value: user.schoolId }]
       });
@@ -220,7 +189,7 @@ const UrgentActionsWidget: React.FC = () => {
         }
       }
 
-      // 5. Fetch TODOs using the same approach as /todos page
+      // 4. Fetch TODOs using the same approach as /todos page
       // Use getBySchoolId instead of getUrgentTodos to avoid composite index requirement
       const allTodos = await todosService.getBySchoolId(user.schoolId);
       console.log('📋 All TODOs fetched:', allTodos.length);
