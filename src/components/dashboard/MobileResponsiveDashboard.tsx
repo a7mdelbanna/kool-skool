@@ -47,6 +47,7 @@ import UpcomingLessons, { Lesson } from '../UpcomingLessons';
 import UpcomingPayments, { Payment } from '../UpcomingPayments';
 import CashFlowWidget from './CashFlowWidget';
 import ExpectedPaymentsWidget from './ExpectedPaymentsWidget';
+import PastSessionsWidget from './PastSessionsWidget';
 
 interface MobileWidget {
   id: string;
@@ -270,17 +271,7 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <RevenueExpensesChart />
-        <NewStudentsStats />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <RecentStudents />
-        </div>
-        <div className="space-y-4">
-          <UpcomingLessons lessons={lessons} />
-          <UpcomingPayments payments={payments} />
-        </div>
+        <PastSessionsWidget />
       </div>
     </div>
   );

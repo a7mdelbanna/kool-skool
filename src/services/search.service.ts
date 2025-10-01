@@ -1,6 +1,7 @@
 import { collection, query, where, getDocs, orderBy, limit, DocumentData } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { format } from 'date-fns';
+import { formatShortcut } from '@/hooks/useKeyboardShortcuts';
 
 export interface SearchResult {
   id: string;
@@ -203,7 +204,7 @@ class SearchService {
         title: 'Add New Student',
         subtitle: 'Create a new student profile',
         icon: 'UserPlus',
-        meta: 'Cmd+N'
+        meta: formatShortcut({ key: 'n', ctrlKey: true })
       },
       {
         id: 'action-schedule-lesson',
@@ -211,7 +212,7 @@ class SearchService {
         title: 'Schedule Lesson',
         subtitle: 'Book a new session',
         icon: 'Calendar',
-        meta: 'Cmd+L'
+        meta: formatShortcut({ key: 'l', ctrlKey: true })
       },
       {
         id: 'action-record-payment',
@@ -219,7 +220,7 @@ class SearchService {
         title: 'Record Payment',
         subtitle: 'Add a new transaction',
         icon: 'CreditCard',
-        meta: 'Cmd+P'
+        meta: formatShortcut({ key: 'p', ctrlKey: true })
       },
       {
         id: 'action-mark-attendance',
@@ -227,7 +228,7 @@ class SearchService {
         title: 'Mark Attendance',
         subtitle: "Today's sessions",
         icon: 'CheckSquare',
-        meta: 'Cmd+A'
+        meta: formatShortcut({ key: 'a', ctrlKey: true })
       }
     ];
 

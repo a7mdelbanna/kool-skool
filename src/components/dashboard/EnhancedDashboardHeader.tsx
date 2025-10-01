@@ -168,7 +168,7 @@ const EnhancedDashboardHeader: React.FC = () => {
 
               <div className="flex items-center gap-2">
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
-                  <kbd className="text-xs font-mono">⌘K</kbd>
+                  <kbd className="text-xs font-mono">{formatShortcut({ key: 'k', ctrlKey: true })}</kbd>
                   <span className="text-xs text-muted-foreground">to open</span>
                 </div>
                 <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">

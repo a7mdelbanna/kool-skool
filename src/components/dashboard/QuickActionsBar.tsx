@@ -26,6 +26,7 @@ import AddStudentDialog from '@/components/AddStudentDialog';
 import PaymentDialog from '@/components/PaymentDialog';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { toast } from 'sonner';
+import { formatShortcut } from '@/hooks/useKeyboardShortcuts';
 
 interface QuickAction {
   id: string;
@@ -51,7 +52,7 @@ const QuickActionsBar: React.FC = () => {
       icon: UserPlus,
       color: 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-500',
       action: () => setIsAddStudentOpen(true),
-      shortcut: 'Cmd+N'
+      shortcut: formatShortcut({ key: 'n', ctrlKey: true })
     },
     {
       id: 'schedule-lesson',
@@ -60,7 +61,7 @@ const QuickActionsBar: React.FC = () => {
       icon: Calendar,
       color: 'bg-green-500/10 hover:bg-green-500/20 text-green-500',
       action: () => navigate('/calendar'),
-      shortcut: 'Cmd+L'
+      shortcut: formatShortcut({ key: 'l', ctrlKey: true })
     },
     {
       id: 'record-payment',
@@ -69,7 +70,7 @@ const QuickActionsBar: React.FC = () => {
       icon: CreditCard,
       color: 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-500',
       action: () => setIsPaymentOpen(true),
-      shortcut: 'Cmd+P'
+      shortcut: formatShortcut({ key: 'p', ctrlKey: true })
     },
     {
       id: 'mark-attendance',
@@ -78,7 +79,7 @@ const QuickActionsBar: React.FC = () => {
       icon: CheckSquare,
       color: 'bg-orange-500/10 hover:bg-orange-500/20 text-orange-500',
       action: () => navigate('/attendance'),
-      shortcut: 'Cmd+A'
+      shortcut: formatShortcut({ key: 'a', ctrlKey: true })
     }
   ];
 

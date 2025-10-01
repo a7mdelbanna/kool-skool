@@ -10,7 +10,11 @@ import {
   XCircle,
   AlertCircle,
   Coffee,
-  Zap
+  Zap,
+  Check,
+  X,
+  MoveRight,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +26,8 @@ import { UserContext } from '@/App';
 import { format, isToday, isTomorrow, differenceInMinutes, addMinutes, startOfDay, endOfDay } from 'date-fns';
 import { getStudentLessonSessions, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TimeSlot {
   id: string;
@@ -61,6 +67,7 @@ const TodaysFocusWidget: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Update current time every minute
   useEffect(() => {
@@ -292,6 +299,63 @@ const TodaysFocusWidget: React.FC = () => {
     }
   };
 
+  // Action handlers (same as PastSessionsWidget)
+  const handleMarkAttended = async (sessionId: string) => {
+    setActionLoading(sessionId);
+    try {
+      const { error } = await supabase
+        .from('lesson_sessions')
+        .update({ status: 'completed' })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      toast.success('Session marked as attended');
+      // Refresh the schedule
+      if (user?.schoolId) {
+        fetchTodaysSchedule();
+      }
+    } catch (error) {
+      console.error('Error marking session attended:', error);
+      toast.error('Failed to mark session as attended');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCancel = async (sessionId: string) => {
+    setActionLoading(sessionId);
+    try {
+      const { error } = await supabase
+        .from('lesson_sessions')
+        .update({ status: 'cancelled' })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      toast.success('Session cancelled');
+      // Refresh the schedule
+      if (user?.schoolId) {
+        fetchTodaysSchedule();
+      }
+    } catch (error) {
+      console.error('Error cancelling session:', error);
+      toast.error('Failed to cancel session');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMove = (sessionId: string) => {
+    toast.info('Move functionality - redirect to attendance page');
+    // TODO: Implement move modal or redirect to attendance page with session pre-selected
+  };
+
+  const handleReschedule = (sessionId: string) => {
+    toast.info('Reschedule functionality - redirect to calendar page');
+    // TODO: Implement reschedule modal or redirect to calendar page with session pre-selected
+  };
+
   const getNextBreak = () => {
     const now = currentTime;
     const currentSlot = timeSlots.find(slot => {
@@ -486,6 +550,69 @@ const TodaysFocusWidget: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Quick Action Icons */}
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 hover:bg-green-500/10 hover:text-green-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkAttended(slot.id);
+                      }}
+                      disabled={actionLoading === slot.id}
+                      title="Mark Attended"
+                    >
+                      {actionLoading === slot.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 hover:bg-red-500/10 hover:text-red-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCancel(slot.id);
+                      }}
+                      disabled={actionLoading === slot.id}
+                      title="Cancel"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 hover:bg-blue-500/10 hover:text-blue-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMove(slot.id);
+                      }}
+                      disabled={actionLoading === slot.id}
+                      title="Move"
+                    >
+                      <MoveRight className="h-3.5 w-3.5" />
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 hover:bg-purple-500/10 hover:text-purple-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReschedule(slot.id);
+                      }}
+                      disabled={actionLoading === slot.id}
+                      title="Reschedule"
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               ))}
