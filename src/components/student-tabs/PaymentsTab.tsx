@@ -119,13 +119,77 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
       if (error) throw error;
       console.log('📊 SUBSCRIPTIONS DATA FROM RPC:', data);
       if (data && data.length > 0) {
-        data.forEach((sub: any) => {
-          console.log(`💰 Subscription ${sub.id}:`, {
+        // Sort by start_date to assign sequential numbers
+        const sortedData = [...data].sort((a, b) => {
+          const dateA = new Date(a.start_date || a.created_at);
+          const dateB = new Date(b.start_date || b.created_at);
+          return dateA.getTime() - dateB.getTime();
+        });
+
+        // Add sequential numbering and fetch last session date for each subscription
+        const numberedDataPromises = sortedData.map(async (sub: any, index: number) => {
+          // Fetch sessions from Firebase for this subscription
+          try {
+            // Query sessions for this subscription, checking both subscriptionId and subscription_id fields
+            const sessions = await databaseService.query('sessions', {
+              where: [{ field: 'subscriptionId', operator: '==', value: sub.id }]
+            });
+
+            // If no sessions found with camelCase, try snake_case
+            let allSessions = sessions || [];
+            if (allSessions.length === 0) {
+              const sessionsSnakeCase = await databaseService.query('sessions', {
+                where: [{ field: 'subscription_id', operator: '==', value: sub.id }]
+              });
+              allSessions = sessionsSnakeCase || [];
+            }
+
+            let calculatedEndDate = sub.end_date;
+            if (allSessions.length > 0) {
+              // Sort sessions by scheduled_date to find the last one
+              const sortedSessions = allSessions.sort((a: any, b: any) => {
+                const dateA = new Date(a.scheduled_date || a.scheduledDate || a.date);
+                const dateB = new Date(b.scheduled_date || b.scheduledDate || b.date);
+                return dateB.getTime() - dateA.getTime(); // Descending order
+              });
+
+              // Get the last session's date
+              const lastSession = sortedSessions[0];
+              if (lastSession && (lastSession.scheduled_date || lastSession.scheduledDate)) {
+                calculatedEndDate = lastSession.scheduled_date || lastSession.scheduledDate;
+                console.log(`📅 Found last session date for subscription ${sub.id}:`, calculatedEndDate);
+              }
+            }
+
+            return {
+              ...sub,
+              subscription_number: index + 1,
+              calculated_end_date: calculatedEndDate
+            };
+          } catch (error) {
+            console.error(`Error fetching sessions for subscription ${sub.id}:`, error);
+            return {
+              ...sub,
+              subscription_number: index + 1,
+              calculated_end_date: sub.end_date
+            };
+          }
+        });
+
+        const numberedData = await Promise.all(numberedDataPromises);
+
+        numberedData.forEach((sub: any) => {
+          console.log(`💰 Subscription #${sub.subscription_number} (${sub.id}):`, {
             total_price: sub.total_price,
             total_paid: sub.total_paid,
-            is_fully_paid: (sub.total_paid || 0) >= (sub.total_price || 0)
+            is_fully_paid: (sub.total_paid || 0) >= (sub.total_price || 0),
+            start_date: sub.start_date,
+            end_date: sub.end_date,
+            calculated_end_date: sub.calculated_end_date
           });
         });
+
+        return numberedData;
       }
       return data;
     },
@@ -651,17 +715,24 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
   // Helper function to get subscription info for a payment
   const getSubscriptionInfo = (subscriptionId: string | null) => {
     if (!subscriptionId) return null;
-    
+
     const subscription = subscriptions.find(sub => sub.id === subscriptionId);
     if (!subscription) return null;
 
+    // Find the index to determine subscription number if not already set
+    const subscriptionIndex = subscriptions.findIndex(sub => sub.id === subscriptionId);
+    const subscriptionNumber = subscription.subscription_number || (subscriptionIndex + 1);
+
     const startDate = safeFormatDate(subscription.start_date);
-    const endDate = subscription.end_date 
-      ? safeFormatDate(subscription.end_date)
-      : calculateEndDate(subscription.start_date, subscription.duration_months);
-    
+    // Use calculated_end_date first (based on last session), then fall back to end_date or calculation
+    const endDate = subscription.calculated_end_date
+      ? safeFormatDate(subscription.calculated_end_date)
+      : subscription.end_date
+        ? safeFormatDate(subscription.end_date)
+        : calculateEndDate(subscription.start_date, subscription.duration_months);
+
     return {
-      title: `${subscription.session_count} Sessions`,
+      title: `Subscription #${subscriptionNumber} - ${subscription.session_count} Sessions`,
       duration: `${startDate} to ${endDate}`,
       totalPrice: subscription.total_price,
       currency: subscription.currency
@@ -939,16 +1010,38 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="none">No subscription</SelectItem>
-                          {subscriptions.map((subscription) => (
-                            <SelectItem key={subscription.id} value={subscription.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{subscription.session_count} sessions</span>
-                                <span className="text-xs text-muted-foreground">
-                                  ({subscription.currency} {subscription.total_price})
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
+                          {subscriptions.map((subscription, index) => {
+                            const subscriptionNumber = subscription.subscription_number || (index + 1);
+                            const startDate = subscription.start_date ?
+                              new Date(subscription.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) :
+                              'N/A';
+                            // Use calculated_end_date which is based on the last session
+                            const endDate = subscription.calculated_end_date ?
+                              new Date(subscription.calculated_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) :
+                              subscription.end_date ?
+                                new Date(subscription.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) :
+                                'N/A';
+
+                            return (
+                              <SelectItem key={subscription.id} value={subscription.id}>
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">
+                                      Subscription #{subscriptionNumber}
+                                    </span>
+                                    <span>-</span>
+                                    <span>{subscription.session_count} sessions</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({subscription.currency} {subscription.total_price})
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {startDate} → {endDate}
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                       <FormMessage />
