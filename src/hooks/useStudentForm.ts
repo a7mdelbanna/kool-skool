@@ -109,6 +109,12 @@ export const useStudentForm = (
       console.log('[useStudentForm] Loading student data:', student);
       // If phone contains country code, separate them for the form
       let processedStudent = { ...student };
+
+      // IMPORTANT: Preserve the student ID
+      if (student.id) {
+        processedStudent.id = student.id;
+        console.log('[useStudentForm] Student ID preserved:', processedStudent.id);
+      }
       
       // Keep the original level value (don't normalize to lowercase)
       // This preserves custom levels like A1, A2, B1, etc.

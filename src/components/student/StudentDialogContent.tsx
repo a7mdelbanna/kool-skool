@@ -114,11 +114,20 @@ const StudentDialogContent: React.FC<StudentDialogContentProps> = ({
         </TabsContent>
         
         <TabsContent value="payments">
-          <PaymentsTab studentData={studentData} setStudentData={updateStudentData} isViewMode={false} />
+          {/* Pass the student ID explicitly if available, otherwise use studentData */}
+          <PaymentsTab
+            studentData={student?.id ? { ...studentData, id: student.id } : studentData}
+            setStudentData={updateStudentData}
+            isViewMode={false}
+          />
         </TabsContent>
         
         <TabsContent value="sessions">
-          <SessionsTab studentData={studentData} setStudentData={updateStudentData} isViewMode={false} />
+          <SessionsTab
+            studentData={student?.id ? { ...studentData, id: student.id } : studentData}
+            setStudentData={updateStudentData}
+            isViewMode={false}
+          />
         </TabsContent>
         
         <TabsContent value="additional">
