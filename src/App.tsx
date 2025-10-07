@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { runTimezoneMigration } from '@/scripts/migrateToCairoTimezone';
 import { createTestTransaction } from '@/utils/createTestTransaction';
+import { cleanupMaroSubscription } from '@/utils/cleanupMaroSubscription';
 import { themeService } from '@/services/theme.service';
 
 interface User {
@@ -56,8 +57,10 @@ const App = () => {
     // Make utility functions available globally for console use
     (window as any).runTimezoneMigration = runTimezoneMigration;
     (window as any).createTestTransaction = createTestTransaction;
+    (window as any).cleanupMaroSubscription = cleanupMaroSubscription;
     console.log('💡 Timezone migration available. Run: runTimezoneMigration()');
     console.log('💡 Test transaction creator available. Run: createTestTransaction()');
+    console.log('🧹 Cleanup function available. Run: cleanupMaroSubscription()');
   }, []);
 
   useEffect(() => {

@@ -1003,14 +1003,275 @@ async function handleDebugSubscriptionAccess(params: any) {
 
 async function handleRenewSubscription(params: any) {
   try {
-    const subscriptionId = await databaseService.create('subscriptions', {
-      ...params,
-      status: 'active',
-      createdAt: new Date().toISOString()
+    const { p_subscription_id, p_current_user_id, p_current_school_id } = params;
+
+    console.log('🔄 Starting subscription renewal:', {
+      subscriptionId: p_subscription_id,
+      userId: p_current_user_id,
+      schoolId: p_current_school_id
     });
-    return { data: { id: subscriptionId, success: true }, error: null };
+
+    // Step 1: Fetch the original subscription
+    const originalSubscription = await databaseService.getById('subscriptions', p_subscription_id);
+
+    if (!originalSubscription) {
+      console.error('❌ Original subscription not found:', p_subscription_id);
+      return {
+        data: {
+          success: false,
+          message: 'Original subscription not found'
+        },
+        error: null
+      };
+    }
+
+    console.log('✅ Found original subscription:', originalSubscription);
+
+    // Step 2: Get all sessions for the original subscription to find the last one
+    let sessions = await databaseService.query('sessions', {
+      where: [{ field: 'subscriptionId', operator: '==', value: p_subscription_id }]
+    });
+
+    // Try snake_case if no sessions found
+    if (!sessions || sessions.length === 0) {
+      sessions = await databaseService.query('sessions', {
+        where: [{ field: 'subscription_id', operator: '==', value: p_subscription_id }]
+      });
+    }
+
+    console.log(`📅 Found ${sessions ? sessions.length : 0} sessions for original subscription`);
+
+    // Step 3: Calculate new start date based on the last session
+    let newStartDate: Date;
+
+    if (sessions && sessions.length > 0) {
+      // Filter valid sessions with dates
+      const validSessions = sessions.filter((session: any) => {
+        const scheduledDate = session.scheduledDate || session.scheduled_date || session.scheduledDateTime;
+        if (!scheduledDate) return false;
+        const date = new Date(scheduledDate);
+        return !isNaN(date.getTime());
+      });
+
+      if (validSessions.length > 0) {
+        // Sort sessions by date to find the LAST one
+        const sortedSessions = validSessions.sort((a: any, b: any) => {
+          const dateA = new Date(a.scheduledDate || a.scheduled_date || a.scheduledDateTime);
+          const dateB = new Date(b.scheduledDate || b.scheduled_date || b.scheduledDateTime);
+          return dateB.getTime() - dateA.getTime(); // Sort descending to get last first
+        });
+
+        const lastSession = sortedSessions[0];
+        const lastSessionDate = new Date(lastSession.scheduledDate || lastSession.scheduled_date || lastSession.scheduledDateTime);
+
+        console.log('📍 Last session date:', lastSessionDate);
+
+        // Get schedule from original subscription
+        const schedule = originalSubscription.schedule;
+        if (schedule && (Array.isArray(schedule) ? schedule.length > 0 : true)) {
+          const firstSchedule = Array.isArray(schedule) ? schedule[0] : schedule;
+          const scheduledDay = firstSchedule.day || firstSchedule;
+
+          const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          const targetDayIndex = daysOfWeek.indexOf(scheduledDay);
+
+          if (targetDayIndex !== -1) {
+            // Find next occurrence of target day after last session
+            newStartDate = new Date(lastSessionDate);
+            newStartDate.setDate(newStartDate.getDate() + 1); // Start from day after last session
+
+            // Find the next occurrence of the scheduled day
+            while (newStartDate.getDay() !== targetDayIndex) {
+              newStartDate.setDate(newStartDate.getDate() + 1);
+            }
+
+            console.log(`📅 Next ${scheduledDay} after last session:`, newStartDate);
+          } else {
+            // If day not found, start a week after last session
+            newStartDate = new Date(lastSessionDate);
+            newStartDate.setDate(newStartDate.getDate() + 7);
+          }
+        } else {
+          // No schedule, start a week after last session
+          newStartDate = new Date(lastSessionDate);
+          newStartDate.setDate(newStartDate.getDate() + 7);
+        }
+      } else {
+        // No valid sessions, start from today
+        newStartDate = new Date();
+        console.log('⚠️ No valid sessions found, starting from today');
+      }
+    } else {
+      // No sessions at all, start from today
+      newStartDate = new Date();
+      console.log('⚠️ No sessions found, starting from today');
+    }
+
+    console.log('🗓️ New subscription start date:', newStartDate);
+
+    // Step 4: Create the new subscription with ALL fields from the original
+    const newSubscriptionData: any = {
+      // Student and teacher info
+      studentId: originalSubscription.studentId || originalSubscription.student_id,
+      teacherId: originalSubscription.teacherId || originalSubscription.teacher_id,
+      schoolId: originalSubscription.schoolId || originalSubscription.school_id || p_current_school_id,
+
+      // Session configuration
+      sessionCount: originalSubscription.sessionCount || originalSubscription.session_count || 10,
+      durationMonths: originalSubscription.durationMonths || originalSubscription.duration_months || 1,
+      sessionDurationMinutes: originalSubscription.sessionDurationMinutes || originalSubscription.session_duration_minutes || 60,
+
+      // Schedule (keep exact same schedule)
+      schedule: originalSubscription.schedule,
+
+      // Pricing (keep exact same pricing)
+      priceMode: originalSubscription.priceMode || originalSubscription.price_mode || 'fixed',
+      pricePerSession: originalSubscription.pricePerSession || originalSubscription.price_per_session || 0,
+      fixedPrice: originalSubscription.fixedPrice || originalSubscription.fixed_price || 0,
+      totalPrice: originalSubscription.totalPrice || originalSubscription.total_price || 0,
+      currency: originalSubscription.currency || 'RUB',
+
+      // Dates
+      startDate: newStartDate.toISOString(),
+
+      // Metadata
+      status: 'active',
+      notes: `Renewed from subscription ${p_subscription_id} on ${new Date().toLocaleDateString()}`,
+      createdBy: p_current_user_id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+
+      // Additional fields if they exist
+      courseName: originalSubscription.courseName || originalSubscription.course_name,
+      sessionsCompleted: 0,
+      sessionsRemaining: originalSubscription.sessionCount || originalSubscription.session_count || 10
+    };
+
+    // Remove any undefined fields to prevent Firebase errors
+    Object.keys(newSubscriptionData).forEach(key => {
+      if (newSubscriptionData[key] === undefined) {
+        delete newSubscriptionData[key];
+      }
+    });
+
+    console.log('📝 Creating new subscription with data:', newSubscriptionData);
+
+    // Step 5: Create the new subscription
+    const newSubscriptionId = await databaseService.create('subscriptions', newSubscriptionData);
+
+    console.log('✅ New subscription created with ID:', newSubscriptionId);
+
+    // Step 6: Generate sessions for the new subscription
+    const sessionCount = newSubscriptionData.sessionCount;
+    const schedule = newSubscriptionData.schedule;
+
+    if (schedule && sessionCount > 0) {
+      try {
+        console.log('🎯 Generating sessions for renewed subscription...');
+
+        // Parse schedule if it's a string
+        const scheduleData = typeof schedule === 'string' ? JSON.parse(schedule) : schedule;
+
+        if (Array.isArray(scheduleData) && scheduleData.length > 0) {
+          const sessionsToCreate = [];
+          let currentDate = new Date(newStartDate);
+
+          for (let i = 0; i < sessionCount; i++) {
+            // Get schedule item for this session
+            const scheduleItem = scheduleData[i % scheduleData.length];
+
+            // Extract time from schedule
+            let timeString = '09:00'; // Default time
+            if (scheduleItem && scheduleItem.time) {
+              timeString = scheduleItem.time;
+            } else if (scheduleItem && typeof scheduleItem === 'string' && scheduleItem.includes(' at ')) {
+              const parts = scheduleItem.split(' at ');
+              if (parts.length > 1) {
+                timeString = parts[1];
+              }
+            }
+
+            // Format dates properly
+            const dateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            const fullDateTime = `${dateString}T${timeString}:00.000Z`;
+
+            const session: any = {
+              // IDs
+              subscriptionId: newSubscriptionId,
+              studentId: newSubscriptionData.studentId,
+              teacherId: newSubscriptionData.teacherId,
+              schoolId: newSubscriptionData.schoolId,
+
+              // Date and time fields (multiple formats for compatibility)
+              scheduledDate: dateString,
+              scheduledTime: timeString,
+              scheduledDateTime: fullDateTime,
+              scheduled_date: dateString,  // snake_case for compatibility
+              scheduled_time: timeString,   // snake_case for compatibility
+
+              // Session details
+              duration: newSubscriptionData.sessionDurationMinutes || 60,
+              durationMinutes: newSubscriptionData.sessionDurationMinutes || 60,
+              status: 'scheduled',
+              sessionNumber: i + 1,
+              indexInSub: i + 1,
+              countsTowardCompletion: true,
+              counts_toward_completion: true, // snake_case for compatibility
+
+              // Metadata
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+
+            // Remove undefined fields
+            Object.keys(session).forEach(key => {
+              if (session[key] === undefined) {
+                delete session[key];
+              }
+            });
+
+            sessionsToCreate.push(session);
+
+            // Move to next week for next session
+            currentDate.setDate(currentDate.getDate() + 7);
+          }
+
+          // Create all sessions
+          console.log(`📝 Creating ${sessionsToCreate.length} sessions...`);
+
+          for (const session of sessionsToCreate) {
+            await databaseService.create('sessions', session);
+          }
+
+          console.log(`✅ Created ${sessionsToCreate.length} sessions for the renewed subscription`);
+        }
+      } catch (error) {
+        console.error('⚠️ Error creating sessions for renewed subscription:', error);
+        // Don't fail the renewal if session creation has issues
+      }
+    }
+
+    // Step 7: Return success response
+    return {
+      data: {
+        id: newSubscriptionId,
+        success: true,
+        message: 'Subscription renewed successfully!',
+        new_subscription_id: newSubscriptionId,
+        new_start_date: newStartDate.toISOString()
+      },
+      error: null
+    };
+
   } catch (error) {
-    return { data: null, error };
+    console.error('❌ Error renewing subscription:', error);
+    return {
+      data: {
+        success: false,
+        message: error.message || 'Failed to renew subscription'
+      },
+      error
+    };
   }
 }
 
