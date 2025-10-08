@@ -60,7 +60,12 @@ const SubscriptionRenewalWidget: React.FC = () => {
             });
           }
 
+          console.log(`Student ${student.firstName} ${student.lastName} (${student.id}): ${subscriptions.length} subscriptions found`);
+
           if (subscriptions.length === 0) continue;
+
+          // Log the first subscription to see its structure
+          console.log('Subscription data:', subscriptions[0]);
 
           // Sort subscriptions by created_at or start_date to get the most recent
           subscriptions.sort((a: any, b: any) => {
@@ -73,10 +78,25 @@ const SubscriptionRenewalWidget: React.FC = () => {
           const mostRecent = subscriptions[0];
 
           // Check if subscription is in the date range (past month to next month)
-          const endDate = new Date(mostRecent.end_date || mostRecent.endDate);
+          const endDateStr = mostRecent.end_date || mostRecent.endDate;
+          console.log(`Most recent subscription end_date: ${endDateStr}, is_renewed: ${mostRecent.is_renewed}`);
+
+          if (!endDateStr) {
+            console.log('⚠️ Subscription has no end_date field!');
+            continue;
+          }
+
+          const endDate = new Date(endDateStr);
+
+          if (isNaN(endDate.getTime())) {
+            console.log(`⚠️ Invalid end_date: ${endDateStr}`);
+            continue;
+          }
+
+          console.log(`Checking if ${endDate.toISOString()} is between ${oneMonthAgo.toISOString()} and ${oneMonthFromNow.toISOString()}`);
 
           if (endDate >= oneMonthAgo && endDate <= oneMonthFromNow && !mostRecent.is_renewed) {
-            console.log(`Found expiring subscription for ${student.firstName} ${student.lastName}, ends: ${endDate.toISOString()}`);
+            console.log(`✅ Found expiring subscription for ${student.firstName} ${student.lastName}, ends: ${endDate.toISOString()}`);
 
             // Get teacher name if available
             let teacherName = 'No Teacher Assigned';
