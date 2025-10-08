@@ -579,57 +579,132 @@ const StudentDetail = () => {
           <Card>
             <CardHeader>
               <CardTitle>All Sessions</CardTitle>
-              <CardDescription>Complete history of student sessions</CardDescription>
+              <CardDescription>Sessions grouped by subscription</CardDescription>
             </CardHeader>
             <CardContent>
-              {sessionsLoading ? (
+              {sessionsLoading || subscriptionsLoading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-20 w-full" />
                   <Skeleton className="h-20 w-full" />
                 </div>
               ) : sessions.length > 0 ? (
-                <div className="space-y-2">
-                  {sessions.map((session: any, index: number) => {
-                    const sessionDate = session.scheduled_date || session.scheduledDate || session.date;
-                    const isValidDate = sessionDate && !isNaN(new Date(sessionDate).getTime());
+                <div className="space-y-6">
+                  {/* Group sessions by subscription */}
+                  {(() => {
+                    // First, group sessions by subscriptionId
+                    const sessionsBySubscription = sessions.reduce((acc: any, session: any) => {
+                      const subId = session.subscriptionId || session.subscription_id || 'unassigned';
+                      if (!acc[subId]) {
+                        acc[subId] = [];
+                      }
+                      acc[subId].push(session);
+                      return acc;
+                    }, {});
 
-                    return (
-                      <Card key={session.id || index}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">
-                                  {safeFormatDate(sessionDate, 'EEEE, MMMM d, yyyy')}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <span>Time: {session.scheduled_time || session.scheduledTime || 'Not set'}</span>
-                                {session.duration && <span>Duration: {session.duration} min</span>}
-                                {(session.teacher_name || session.teacherName) && (
-                                  <span>Teacher: {session.teacher_name || session.teacherName}</span>
-                                )}
-                              </div>
-                              {session.notes && (
-                                <p className="text-sm mt-2">{session.notes}</p>
-                              )}
-                            </div>
+                    // Sort subscriptions to show active ones first, then by date
+                    const sortedSubIds = Object.keys(sessionsBySubscription).sort((a, b) => {
+                      if (a === 'unassigned') return 1;
+                      if (b === 'unassigned') return -1;
+
+                      const subA = subscriptions.find((s: any) => s.id === a);
+                      const subB = subscriptions.find((s: any) => s.id === b);
+
+                      if (!subA) return 1;
+                      if (!subB) return -1;
+
+                      // Sort by start date (newest first)
+                      return new Date(subB.start_date).getTime() - new Date(subA.start_date).getTime();
+                    });
+
+                    return sortedSubIds.map((subId, subIndex) => {
+                      const subscription = subscriptions.find((s: any) => s.id === subId);
+                      const subSessions = sessionsBySubscription[subId].sort((a: any, b: any) => {
+                        const dateA = new Date(a.scheduled_date || a.scheduledDate || a.date || 0);
+                        const dateB = new Date(b.scheduled_date || b.scheduledDate || b.date || 0);
+                        return dateB.getTime() - dateA.getTime(); // Most recent first
+                      });
+
+                      return (
+                        <div key={subId} className="space-y-2">
+                          {/* Subscription Header */}
+                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                             <div className="flex items-center gap-2">
-                              <Badge variant={
-                                session.status === 'completed' || session.status === 'attended' ? 'default' :
-                                session.status === 'scheduled' ? 'secondary' :
-                                session.status === 'cancelled' ? 'destructive' :
-                                'outline'
-                              }>
-                                {session.status}
-                              </Badge>
+                              <BookOpen className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {subscription ? (
+                                  <>
+                                    Subscription #{subIndex + 1} - {subscription.session_count} Sessions
+                                    <span className="text-sm text-muted-foreground ml-2">
+                                      ({safeFormatDate(subscription.start_date, 'MMM d')} - {safeFormatDate(subscription.end_date, 'MMM d, yyyy')})
+                                    </span>
+                                  </>
+                                ) : (
+                                  'Unassigned Sessions'
+                                )}
+                              </span>
                             </div>
+                            {subscription && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">
+                                  {subSessions.filter((s: any) => s.status === 'completed' || s.status === 'attended').length}/{subscription.session_count} completed
+                                </span>
+                                <Badge
+                                  variant={subscription.status === 'active' ? 'default' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {subscription.status}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+
+                          {/* Sessions for this subscription */}
+                          <div className="space-y-2 pl-4">
+                            {subSessions.map((session: any, index: number) => {
+                              const sessionDate = session.scheduled_date || session.scheduledDate || session.date;
+
+                              return (
+                                <Card key={session.id || `${subId}-${index}`} className="border-l-4 border-l-primary/20">
+                                  <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                      <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                                          <span className="font-medium">
+                                            {safeFormatDate(sessionDate, 'EEEE, MMMM d, yyyy')}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                          <span>Time: {session.scheduled_time || session.scheduledTime || 'Not set'}</span>
+                                          {session.duration && <span>Duration: {session.duration} min</span>}
+                                          {(session.teacher_name || session.teacherName) && (
+                                            <span>Teacher: {session.teacher_name || session.teacherName}</span>
+                                          )}
+                                        </div>
+                                        {session.notes && (
+                                          <p className="text-sm mt-2">{session.notes}</p>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant={
+                                          session.status === 'completed' || session.status === 'attended' ? 'default' :
+                                          session.status === 'scheduled' ? 'secondary' :
+                                          session.status === 'cancelled' ? 'destructive' :
+                                          'outline'
+                                        }>
+                                          {session.status}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               ) : (
                 <div className="text-center py-8">

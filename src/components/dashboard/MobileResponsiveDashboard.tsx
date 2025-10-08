@@ -49,6 +49,7 @@ import CashFlowWidget from './CashFlowWidget';
 import ExpectedPaymentsWidget from './ExpectedPaymentsWidget';
 import PastSessionsWidget from './PastSessionsWidget';
 import OverduePaymentsWidget from './OverduePaymentsWidget';
+import SubscriptionRenewalWidget from './SubscriptionRenewalWidget';
 
 interface MobileWidget {
   id: string;
@@ -278,6 +279,11 @@ const MobileResponsiveDashboard: React.FC<MobileResponsiveDashboardProps> = ({
       {/* Overdue Payments Widget */}
       <div className="grid grid-cols-1 gap-4">
         <OverduePaymentsWidget />
+      </div>
+
+      {/* Subscription Renewal Widget */}
+      <div className="grid grid-cols-1 gap-4">
+        <SubscriptionRenewalWidget />
       </div>
     </div>
   );
