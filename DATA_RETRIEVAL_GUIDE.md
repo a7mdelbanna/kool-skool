@@ -60,6 +60,112 @@ const { data: subscriptions } = await supabase.rpc('get_student_subscriptions', 
 // - course_name, teacher_id, subscription_type
 ```
 
+#### Students Page Implementation (Mixed Approach)
+The Students page uses a combination of Supabase RPC and Firebase for calculating student progress:
+
+```typescript
+// In Students.tsx - Calculate subscription progress and next payment
+const calculateStudentProgress = async (studentId: string) => {
+  // 1. Get subscriptions from Supabase RPC
+  const { data: subscriptions, error } = await supabase.rpc('get_student_subscriptions', {
+    p_student_id: studentId
+  });
+
+  if (subscriptions.length === 0) {
+    return {
+      progress: '0/0',
+      nextSessionDate: null,
+      completedSessions: 0,
+      nextPaymentDate: null,
+      nextPaymentAmount: 0,
+      nextPaymentCurrency: 'USD'
+    };
+  }
+
+  // 2. Get the most recent active subscription (or first one)
+  const activeSubscription = subscriptions.find(s => s.status === 'active') || subscriptions[0];
+
+  // 3. Calculate progress from session counts
+  const attendedSessions = activeSubscription.sessions_attended || 0;
+  const cancelledSessions = activeSubscription.sessions_cancelled || 0;
+  const scheduledSessions = activeSubscription.sessions_scheduled || 0;
+
+  // Progress: (attended + cancelled) / total
+  const completedCount = attendedSessions + cancelledSessions;
+  const progress = `${completedCount}/${activeSubscription.session_count}`;
+
+  // 4. Get next scheduled session from Firebase
+  const upcomingSessions = await databaseService.query('sessions', {
+    where: [
+      { field: 'student_id', operator: '==', value: studentId },
+      { field: 'status', operator: '==', value: 'scheduled' }
+    ],
+    orderBy: [{ field: 'scheduled_date', direction: 'asc' }],
+    limit: 1
+  });
+
+  const nextSessionDate = upcomingSessions[0]?.scheduled_date || null;
+
+  // 5. Calculate next payment info
+  const totalPrice = activeSubscription.total_price || 0;
+  const sessionCount = activeSubscription.session_count || 1;
+  const pricePerSession = totalPrice / sessionCount;
+
+  return {
+    progress: progress,
+    nextSessionDate: nextSessionDate,
+    completedSessions: completedCount,
+    nextPaymentDate: nextSessionDate, // Next payment is due on next session
+    nextPaymentAmount: pricePerSession,
+    nextPaymentCurrency: activeSubscription.currency || 'USD'
+  };
+};
+```
+
+#### Alternative: Pure Firebase Approach for Subscriptions
+For components that need to work entirely with Firebase (no Supabase):
+
+```typescript
+// Fetch subscriptions from Firebase only
+const getStudentSubscriptions = async (studentId: string) => {
+  // Try both field naming conventions
+  let subscriptions = await databaseService.query('subscriptions', {
+    where: [{ field: 'student_id', operator: '==', value: studentId }]
+  });
+
+  if (subscriptions.length === 0) {
+    subscriptions = await databaseService.query('subscriptions', {
+      where: [{ field: 'studentId', operator: '==', value: studentId }]
+    });
+  }
+
+  // Sort by created_at or start_date to get most recent first
+  subscriptions.sort((a: any, b: any) => {
+    const dateA = new Date(a.created_at || a.start_date || 0);
+    const dateB = new Date(b.created_at || b.start_date || 0);
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  // Get the most recent subscription
+  const mostRecent = subscriptions[0];
+
+  // Count completed sessions for progress
+  const sessions = await databaseService.query('sessions', {
+    where: [{ field: 'subscriptionId', operator: '==', value: mostRecent.id }]
+  });
+
+  const completedSessions = sessions.filter((s: any) =>
+    s.status === 'completed' || s.status === 'attended'
+  ).length;
+
+  return {
+    ...mostRecent,
+    sessions_completed: completedSessions,
+    progress: `${completedSessions}/${mostRecent.session_count || 0}`
+  };
+};
+```
+
 #### Payment Calculation for Subscriptions (Firebase)
 ```typescript
 // Get payments linked to subscription from Firebase
@@ -393,14 +499,18 @@ await todosService.create(todoData);
 | Data Type | Storage | Service/Method | Table/Collection |
 |-----------|---------|----------------|------------------|
 | Students | Firebase | `databaseService.getBySchoolId` | `students` |
-| Subscriptions | Supabase | `supabase.rpc('get_student_subscriptions')` | `student_subscriptions` |
-| Sessions | Supabase | `supabase.from('lesson_sessions')` | `lesson_sessions` |
+| Subscriptions | Mixed* | `supabase.rpc('get_student_subscriptions')` OR `databaseService.query('subscriptions')` | `subscriptions` (Firebase) / `student_subscriptions` (Supabase) |
+| Sessions | Mixed* | `supabase.from('lesson_sessions')` OR `databaseService.query('sessions')` | `sessions` (Firebase) / `lesson_sessions` (Supabase) |
 | Payments | Firebase | `databaseService.query('payments')` | `payments` |
 | Transactions | Firebase | `databaseService.query('transactions')` | `transactions` |
 | Courses | Supabase | `getSchoolCourses()` | `courses` |
 | Accounts | Supabase | `supabase.from('accounts_balance_section')` | `accounts_balance_section` |
 | Expected Payments | Supabase | `supabase.from('expected_payments')` | `expected_payments` |
 | TODOs | Firebase | `todosService` | `todos` |
+
+**Note on Mixed Sources (*)**:
+- **Subscriptions**: Data exists in both Firebase (`subscriptions` collection) and Supabase (`student_subscriptions` table). The Students page uses Supabase RPC for session counts but Firebase can be used for basic subscription data.
+- **Sessions**: Data exists in both Firebase (`sessions` collection) and Supabase (`lesson_sessions` table). Most components use Supabase but Firebase has the data too.
 
 ### 2. Field Name Conventions
 
