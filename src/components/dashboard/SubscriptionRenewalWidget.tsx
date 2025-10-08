@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle, Calendar, RefreshCw, User } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
 import { format, differenceInDays, addDays, subDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +18,6 @@ interface SubscriptionData {
   start_date: string;
   end_date: string;
   session_count: number;
-  sessions_attended: number;
   sessions_completed: number;
   status: string;
   teacher_name?: string;
@@ -30,11 +28,14 @@ const SubscriptionRenewalWidget: React.FC = () => {
   const navigate = useNavigate();
 
   const { data: expiringSubscriptions, isLoading } = useQuery({
-    queryKey: ['expiring-subscriptions-mixed'],
+    queryKey: ['expiring-subscriptions-firebase'],
     queryFn: async () => {
+      console.log('🔄 Fetching subscriptions for renewal widget...');
+
       // Get all active students from Firebase
       const students = await databaseService.getAll('students');
       const activeStudents = students.filter((s: any) => s.status === 'active');
+      console.log(`Found ${activeStudents.length} active students`);
 
       const subscriptionsToRenew: SubscriptionData[] = [];
 
@@ -43,51 +44,78 @@ const SubscriptionRenewalWidget: React.FC = () => {
       const oneMonthAgo = subDays(today, 30);
       const oneMonthFromNow = addDays(today, 30);
 
-      // Fetch subscriptions for each student using Supabase RPC (same as Students page)
+      console.log(`Date range: ${oneMonthAgo.toISOString()} to ${oneMonthFromNow.toISOString()}`);
+
+      // Fetch subscriptions for each student from Firebase
       for (const student of activeStudents) {
         try {
-          // Use Supabase RPC to get subscriptions with session progress
-          const { data: subscriptions, error } = await supabase.rpc('get_student_subscriptions', {
-            p_student_id: student.id
+          // Try both field naming conventions
+          let subscriptions = await databaseService.query('subscriptions', {
+            where: [{ field: 'student_id', operator: '==', value: student.id }]
           });
 
-          if (error || !subscriptions || subscriptions.length === 0) continue;
+          if (subscriptions.length === 0) {
+            subscriptions = await databaseService.query('subscriptions', {
+              where: [{ field: 'studentId', operator: '==', value: student.id }]
+            });
+          }
 
-          // Get the most recent subscription (first in the sorted list from RPC)
+          if (subscriptions.length === 0) continue;
+
+          // Sort subscriptions by created_at or start_date to get the most recent
+          subscriptions.sort((a: any, b: any) => {
+            const dateA = new Date(a.created_at || a.start_date || 0);
+            const dateB = new Date(b.created_at || b.start_date || 0);
+            return dateB.getTime() - dateA.getTime(); // Most recent first
+          });
+
+          // Get the most recent subscription
           const mostRecent = subscriptions[0];
 
-          // Check if subscription needs renewal (expired in past month or expiring in next month)
-          const endDate = new Date(mostRecent.end_date);
+          // Check if subscription is in the date range (past month to next month)
+          const endDate = new Date(mostRecent.end_date || mostRecent.endDate);
 
           if (endDate >= oneMonthAgo && endDate <= oneMonthFromNow && !mostRecent.is_renewed) {
-            // Get teacher name from Supabase data or Firebase
-            let teacherName = mostRecent.teacher_name || 'No Teacher Assigned';
-            if (!mostRecent.teacher_name && mostRecent.teacher_id) {
+            console.log(`Found expiring subscription for ${student.firstName} ${student.lastName}, ends: ${endDate.toISOString()}`);
+
+            // Get teacher name if available
+            let teacherName = 'No Teacher Assigned';
+            if (mostRecent.teacher_id || mostRecent.teacherId) {
               try {
-                const teacher = await databaseService.getById('teachers', mostRecent.teacher_id);
+                const teacher = await databaseService.getById('teachers', mostRecent.teacher_id || mostRecent.teacherId);
                 teacherName = teacher?.name || 'No Teacher Assigned';
               } catch (error) {
                 console.log('Could not fetch teacher');
               }
             }
 
-            // Use session counts from Supabase RPC (already calculated)
-            const attendedSessions = mostRecent.sessions_attended || 0;
-            const cancelledSessions = mostRecent.sessions_cancelled || 0;
-            const completedSessions = attendedSessions + cancelledSessions; // Same logic as Students page
+            // Count completed sessions for this subscription
+            let completedSessions = 0;
+            try {
+              const sessions = await databaseService.query('sessions', {
+                where: [
+                  { field: 'subscriptionId', operator: '==', value: mostRecent.id }
+                ]
+              });
+
+              completedSessions = sessions.filter((s: any) =>
+                s.status === 'completed' || s.status === 'attended'
+              ).length;
+            } catch (error) {
+              console.log('Could not fetch sessions');
+            }
 
             subscriptionsToRenew.push({
               id: mostRecent.id,
               student_id: student.id,
               student_name: `${student.firstName || student.first_name || ''} ${student.lastName || student.last_name || ''}`.trim(),
-              start_date: mostRecent.start_date,
-              end_date: mostRecent.end_date,
-              session_count: mostRecent.session_count || 0,
-              sessions_attended: attendedSessions,
+              start_date: mostRecent.start_date || mostRecent.startDate,
+              end_date: mostRecent.end_date || mostRecent.endDate,
+              session_count: mostRecent.session_count || mostRecent.sessionCount || 0,
               sessions_completed: completedSessions,
               status: endDate < today ? 'expired' : 'expiring',
               teacher_name: teacherName,
-              teacher_id: mostRecent.teacher_id
+              teacher_id: mostRecent.teacher_id || mostRecent.teacherId
             });
           }
         } catch (error) {
@@ -174,7 +202,7 @@ const SubscriptionRenewalWidget: React.FC = () => {
           )}
         </CardTitle>
         <CardDescription>
-          Subscriptions from past month to next month
+          Subscriptions ending from past month to next month
         </CardDescription>
       </CardHeader>
       <CardContent>
