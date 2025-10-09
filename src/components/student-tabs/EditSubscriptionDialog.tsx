@@ -569,10 +569,10 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-background border border-border">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <Calendar className="h-5 w-5 text-primary" />
               Edit Subscription
             </DialogTitle>
           </DialogHeader>
@@ -583,29 +583,29 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
               {/* Session Count, Duration, and Currency */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
-                  <Input 
-                    type="number" 
-                    id="sessionCount" 
-                    value={formData.sessionCount} 
+                  <Label htmlFor="sessionCount" className="text-sm font-semibold text-muted-foreground">Session Count</Label>
+                  <Input
+                    type="number"
+                    id="sessionCount"
+                    value={formData.sessionCount}
                     onChange={(e) => setFormData({ ...formData, sessionCount: e.target.value })}
                     placeholder="4"
-                    className="mt-1"
+                    className="mt-1 bg-background border-border"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="durationMonths" className="text-sm font-semibold text-gray-700">Duration (Months)</Label>
-                  <Input 
-                    type="number" 
-                    id="durationMonths" 
-                    value={formData.durationMonths} 
+                  <Label htmlFor="durationMonths" className="text-sm font-semibold text-muted-foreground">Duration (Months)</Label>
+                  <Input
+                    type="number"
+                    id="durationMonths"
+                    value={formData.durationMonths}
                     onChange={(e) => setFormData({ ...formData, durationMonths: e.target.value })}
                     placeholder="1"
-                    className="mt-1"
+                    className="mt-1 bg-background border-border"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="sessionDuration" className="text-sm font-semibold text-gray-700">Session Duration</Label>
+                  <Label htmlFor="sessionDuration" className="text-sm font-semibold text-muted-foreground">Session Duration</Label>
                   <Select 
                     value={formData.sessionDuration} 
                     onValueChange={(value) => setFormData({ ...formData, sessionDuration: value })}
@@ -627,7 +627,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
+                  <Label htmlFor="currency" className="text-sm font-semibold text-muted-foreground">Currency</Label>
                   <Select 
                     value={formData.currency} 
                     onValueChange={(value) => setFormData({ ...formData, currency: value })}
@@ -648,7 +648,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
               {/* Start Date */}
               <div>
-                <Label className="text-sm font-semibold text-gray-700">Start Date</Label>
+                <Label className="text-sm font-semibold text-muted-foreground">Start Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -676,7 +676,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
               {/* Schedule Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold text-gray-700">Schedule</Label>
+                  <Label className="text-sm font-semibold text-muted-foreground">Schedule</Label>
                   <Button 
                     type="button"
                     variant="outline" 
@@ -690,9 +690,9 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                 </div>
                 
                 {formData.schedule.map((schedule, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div key={index} className="flex items-center gap-4 p-4 bg-card rounded-lg border border-border">
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-600">Day</Label>
+                      <Label className="text-xs text-muted-foreground">Day</Label>
                       <Select 
                         value={schedule.day || ""}
                         onValueChange={(value) => updateScheduleItem(index, 'day', value)}
@@ -708,7 +708,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                       </Select>
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-600">Time</Label>
+                      <Label className="text-xs text-muted-foreground">Time</Label>
                       <TimePicker
                         value={schedule.time}
                         onChange={(time) => updateScheduleItem(index, 'time', time)}
@@ -730,9 +730,9 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
               {/* Validation Error Alert */}
               {validationError && (
-                <Alert variant="destructive" className="border-red-200 bg-red-50">
+                <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-red-800 font-medium">
+                  <AlertDescription className="font-medium">
                     {validationError}
                   </AlertDescription>
                 </Alert>
@@ -740,9 +740,9 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
               {/* Validation Loading */}
               {isValidating && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <Clock className="h-4 w-4" />
-                  <AlertDescription className="text-blue-800">
+                <Alert className="border-blue-500/50 bg-blue-500/10">
+                  <Clock className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-blue-200">
                     Checking teacher availability...
                   </AlertDescription>
                 </Alert>
@@ -751,7 +751,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
               {/* Price Section */}
               <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-semibold text-gray-700">Price Mode</Label>
+                  <Label className="text-sm font-semibold text-muted-foreground">Price Mode</Label>
                   <Select value={formData.priceMode} onValueChange={(value) => setFormData({ ...formData, priceMode: value })}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select price mode" />
@@ -765,20 +765,20 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
                 {formData.priceMode === 'perSession' && (
                   <div>
-                    <Label htmlFor="pricePerSession" className="text-sm font-semibold text-gray-700">
+                    <Label htmlFor="pricePerSession" className="text-sm font-semibold text-muted-foreground">
                       Price Per Session ({getCurrencySymbol(formData.currency)})
                     </Label>
-                    <Input 
-                      type="number" 
-                      id="pricePerSession" 
-                      value={formData.pricePerSession} 
+                    <Input
+                      type="number"
+                      id="pricePerSession"
+                      value={formData.pricePerSession}
                       onChange={(e) => setFormData({ ...formData, pricePerSession: e.target.value })}
                       placeholder="0.00"
-                      className="mt-1"
+                      className="mt-1 bg-background border-border"
                       step="0.01"
                     />
                     {formData.pricePerSession > 0 && (
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         Total: {getCurrencySymbol(formData.currency)} {(formData.pricePerSession * formData.sessionCount).toFixed(2)}
                       </p>
                     )}
@@ -787,16 +787,16 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
                 {formData.priceMode === 'fixedPrice' && (
                   <div>
-                    <Label htmlFor="fixedPrice" className="text-sm font-semibold text-gray-700">
+                    <Label htmlFor="fixedPrice" className="text-sm font-semibold text-muted-foreground">
                       Fixed Price ({getCurrencySymbol(formData.currency)})
                     </Label>
-                    <Input 
-                      type="number" 
-                      id="fixedPrice" 
-                      value={formData.fixedPrice} 
+                    <Input
+                      type="number"
+                      id="fixedPrice"
+                      value={formData.fixedPrice}
                       onChange={(e) => setFormData({ ...formData, fixedPrice: e.target.value })}
                       placeholder="0.00"
-                      className="mt-1"
+                      className="mt-1 bg-background border-border"
                       step="0.01"
                     />
                   </div>
@@ -805,7 +805,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
               {/* Status */}
               <div>
-                <Label className="text-sm font-semibold text-gray-700">Status</Label>
+                <Label className="text-sm font-semibold text-muted-foreground">Status</Label>
                 <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select status" />
@@ -821,10 +821,10 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
               {/* Initial Payment Section */}
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Initial Payment</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Initial Payment</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="initialAmount" className="text-sm font-semibold text-gray-700">
+                    <Label htmlFor="initialAmount" className="text-sm font-semibold text-muted-foreground">
                       Amount ({getCurrencySymbol(formData.currency)})
                     </Label>
                     <Input 
@@ -839,12 +839,12 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                         } 
                       })}
                       placeholder="0.00"
-                      className="mt-1"
+                      className="mt-1 bg-background border-border"
                       step="0.01"
                     />
                   </div>
                   <div>
-                    <Label className="text-sm font-semibold text-gray-700">Payment Method</Label>
+                    <Label className="text-sm font-semibold text-muted-foreground">Payment Method</Label>
                     <Select 
                       value={formData.initialPayment.method} 
                       onValueChange={(value) => setFormData({ 
@@ -869,7 +869,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                 
                 {formData.initialPayment.amount > 0 && (
                   <div className="mt-4">
-                    <Label className="text-sm font-semibold text-gray-700">Account</Label>
+                    <Label className="text-sm font-semibold text-muted-foreground">Account</Label>
                     <Select 
                       value={formData.initialPayment.accountId} 
                       onValueChange={(value) => setFormData({ 
@@ -897,7 +897,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                 )}
                 
                 <div className="mt-4">
-                  <Label htmlFor="paymentNotes" className="text-sm font-semibold text-gray-700">Payment Notes</Label>
+                  <Label htmlFor="paymentNotes" className="text-sm font-semibold text-muted-foreground">Payment Notes</Label>
                   <Textarea 
                     id="paymentNotes" 
                     placeholder="Add any notes about the initial payment..."
@@ -917,7 +917,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
               {/* Notes */}
               <div>
-                <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Notes</Label>
+                <Label htmlFor="notes" className="text-sm font-semibold text-muted-foreground">Notes</Label>
                 <Textarea 
                   id="notes" 
                   placeholder="Add any additional notes about this subscription..."
