@@ -27,7 +27,7 @@ import { format } from 'date-fns';
 import CountdownTimer from './CountdownTimer';
 import ActionProgressBar from './ActionProgressBar';
 import { toast } from 'sonner';
-import { handleSessionAction, supabase } from '@/integrations/supabase/client';
+import { handleSessionAction as supabaseHandleSessionAction, supabase } from '@/integrations/supabase/client';
 import confetti from 'canvas-confetti';
 
 interface ActionFlowModalProps {
@@ -74,46 +74,42 @@ const ActionFlowModal: React.FC<ActionFlowModalProps> = ({
 
     setIsProcessing(true);
     try {
-      let result: any;
+      // Use the same approach as SessionsTab - call the handleSessionAction from Supabase
+      const actionMap = {
+        'attended': 'attended',
+        'cancelled': 'cancelled',
+        'moved': 'moved',
+        'rescheduled': 'rescheduled'
+      };
 
-      if (action === 'attended') {
-        result = await supabase
-          .from('lesson_sessions')
-          .update({ status: 'completed' })
-          .eq('id', currentAction.id);
-      } else if (action === 'cancelled') {
-        result = await supabase
-          .from('lesson_sessions')
-          .update({ status: 'cancelled' })
-          .eq('id', currentAction.id);
-      } else if (action === 'moved') {
-        // Handle move action - this would create a new session
-        result = await supabase
-          .from('lesson_sessions')
-          .update({ status: 'rescheduled' })
-          .eq('id', currentAction.id);
+      const rawResult = await supabaseHandleSessionAction(currentAction.id, actionMap[action]);
+      const result = rawResult as any;
+
+      if (result.success) {
+        toast.success(result.message || `Session ${action} successfully`);
+
+        // Mark as completed
+        const newCompleted = new Set(completedActions);
+        newCompleted.add(currentAction.id);
+        setCompletedActions(newCompleted);
+
+        // Auto-advance or complete
+        if (isLastAction) {
+          handleAllComplete();
+        } else if (autoAdvance) {
+          setShowCountdown(true);
+        }
+      } else {
+        throw new Error(result.message || 'Session action failed');
       }
 
-      if (result?.error) throw result.error;
-
-      toast.success(`Session marked as ${action}`);
-
-      // Mark as completed
-      const newCompleted = new Set(completedActions);
-      newCompleted.add(currentAction.id);
-      setCompletedActions(newCompleted);
-
-      // Auto-advance or complete
-      if (isLastAction) {
-        handleAllComplete();
-      } else if (autoAdvance) {
-        setShowCountdown(true);
-      }
-
-      onRefresh();
+      // Add a small delay before refreshing to ensure database is updated
+      setTimeout(() => {
+        onRefresh();
+      }, 1000);
     } catch (error) {
       console.error('Error handling session action:', error);
-      toast.error('Failed to update session');
+      toast.error(error instanceof Error ? error.message : 'Failed to update session');
     } finally {
       setIsProcessing(false);
     }
@@ -124,30 +120,74 @@ const ActionFlowModal: React.FC<ActionFlowModalProps> = ({
 
     setIsProcessing(true);
     try {
-      // Mark subscription as renewed
-      await supabase
-        .from('subscriptions')
-        .update({ is_renewed: true })
-        .eq('id', currentAction.id);
-
-      toast.success('Subscription marked for renewal');
-
-      // Mark as completed
-      const newCompleted = new Set(completedActions);
-      newCompleted.add(currentAction.id);
-      setCompletedActions(newCompleted);
-
-      // Auto-advance or complete
-      if (isLastAction) {
-        handleAllComplete();
-      } else if (autoAdvance) {
-        setShowCountdown(true);
+      // Get user data from localStorage (same as SubscriptionCard)
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        throw new Error('User authentication data not found');
       }
 
-      onRefresh();
+      const user = JSON.parse(userData);
+      if (!user.id || !user.schoolId) {
+        throw new Error('Missing user ID or school ID');
+      }
+
+      console.log('🔄 Renewing subscription:', {
+        subscriptionId: currentAction.id,
+        userId: user.id,
+        schoolId: user.schoolId
+      });
+
+      // Use the same RPC call as SubscriptionCard
+      const { data, error } = await supabase.rpc('renew_subscription', {
+        p_subscription_id: currentAction.id,
+        p_current_user_id: user.id,
+        p_current_school_id: user.schoolId
+      });
+
+      if (error) {
+        console.error('❌ RPC Error:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      // Handle the response
+      let response: any;
+      if (typeof data === 'string') {
+        try {
+          response = JSON.parse(data);
+        } catch (parseError) {
+          throw new Error('Invalid response format from server');
+        }
+      } else if (typeof data === 'object' && data !== null) {
+        response = data;
+      } else {
+        throw new Error('Unexpected response format from server');
+      }
+
+      if (response.success) {
+        toast.success(response.message || 'Subscription renewed successfully!');
+
+        // Mark as completed
+        const newCompleted = new Set(completedActions);
+        newCompleted.add(currentAction.id);
+        setCompletedActions(newCompleted);
+
+        // Auto-advance or complete
+        if (isLastAction) {
+          handleAllComplete();
+        } else if (autoAdvance) {
+          setShowCountdown(true);
+        }
+      } else {
+        throw new Error(response.message || 'Failed to renew subscription');
+      }
+
+      // Add a small delay before refreshing to ensure database is updated
+      setTimeout(() => {
+        onRefresh();
+      }, 1000);
     } catch (error) {
       console.error('Error handling subscription renewal:', error);
-      toast.error('Failed to update subscription');
+      toast.error(error instanceof Error ? error.message : 'Failed to renew subscription');
     } finally {
       setIsProcessing(false);
     }

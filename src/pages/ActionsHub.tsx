@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { UserContext } from '@/App';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,7 @@ export interface StudentAction {
 
 const ActionsHub: React.FC = () => {
   const { user } = useContext(UserContext);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTab, setSelectedTab] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState<StudentAction | null>(null);
@@ -210,6 +212,9 @@ const ActionsHub: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    // Invalidate the queries to force fresh data from server
+    await queryClient.invalidateQueries({ queryKey: ['actionable-sessions'] });
+    await queryClient.invalidateQueries({ queryKey: ['expired-subscriptions'] });
     await Promise.all([refetchSessions(), refetchSubscriptions()]);
     toast.success('Data refreshed');
   };
@@ -517,7 +522,10 @@ const ActionsHub: React.FC = () => {
           }}
           student={selectedStudent}
           onComplete={handleActionComplete}
-          onRefresh={() => {
+          onRefresh={async () => {
+            // Invalidate the queries to force fresh data from server
+            await queryClient.invalidateQueries({ queryKey: ['actionable-sessions'] });
+            await queryClient.invalidateQueries({ queryKey: ['expired-subscriptions'] });
             refetchSessions();
             refetchSubscriptions();
           }}
@@ -530,7 +538,10 @@ const ActionsHub: React.FC = () => {
         onClose={() => setIsBatchFlowModalOpen(false)}
         students={studentActions.filter(s => !s.completedAt && s.totalActions > 0)}
         onComplete={handleBatchComplete}
-        onRefresh={() => {
+        onRefresh={async () => {
+          // Invalidate the queries to force fresh data from server
+          await queryClient.invalidateQueries({ queryKey: ['actionable-sessions'] });
+          await queryClient.invalidateQueries({ queryKey: ['expired-subscriptions'] });
           refetchSessions();
           refetchSubscriptions();
         }}
