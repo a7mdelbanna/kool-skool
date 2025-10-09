@@ -81,20 +81,20 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
 
   if (schedule.length === 0) {
     return (
-      <Card className="border-dashed border-2 border-gray-300">
+      <Card className="border-dashed border-2 border-muted">
         <CardContent className="flex flex-col items-center justify-center py-8">
-          <Calendar className="h-12 w-12 text-gray-400 mb-2" />
-          <p className="text-gray-600 text-sm">Add schedule items to see preview</p>
+          <Calendar className="h-12 w-12 text-muted-foreground mb-2" />
+          <p className="text-muted-foreground text-sm">Add schedule items to see preview</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="border border-blue-200 bg-blue-50/50">
+    <Card className="border border-primary/20 bg-card/50">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Calendar className="h-4 w-4 text-blue-600" />
+        <CardTitle className="flex items-center gap-2 text-base text-foreground">
+          <Calendar className="h-4 w-4 text-primary" />
           Schedule Preview
         </CardTitle>
       </CardHeader>
@@ -102,34 +102,34 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
         {/* Schedule Summary */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-gray-600 mb-1">Total Sessions</p>
-            <p className="font-semibold text-gray-900">{sessionCount} sessions</p>
+            <p className="text-xs text-muted-foreground mb-1">Total Sessions</p>
+            <p className="font-semibold text-foreground">{sessionCount} sessions</p>
           </div>
           <div>
-            <p className="text-xs text-gray-600 mb-1">Duration</p>
-            <p className="font-semibold text-gray-900">{durationMonths} month{durationMonths !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground mb-1">Duration</p>
+            <p className="font-semibold text-foreground">{durationMonths} month{durationMonths !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        
+
         {/* Session Duration */}
-        <div className="bg-white rounded-lg p-3 border border-blue-100">
-          <p className="text-xs text-gray-600 mb-1">Session Duration</p>
-          <p className="font-semibold text-gray-900">{sessionDuration} minutes</p>
+        <div className="bg-background rounded-lg p-3 border border-border">
+          <p className="text-xs text-muted-foreground mb-1">Session Duration</p>
+          <p className="font-semibold text-foreground">{sessionDuration} minutes</p>
         </div>
 
         {/* Weekly Schedule */}
         <div>
-          <p className="text-sm font-medium text-gray-900 mb-2">Weekly Schedule</p>
+          <p className="text-sm font-medium text-foreground mb-2">Weekly Schedule</p>
           <div className="space-y-2">
             {schedule.map((item, index) => (
-              <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3 border">
+              <div key={index} className="flex items-center justify-between bg-background rounded-lg p-3 border border-border">
                 <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                  <span className="font-medium text-gray-900">{item.day}</span>
+                  <div className="w-2 h-2 bg-primary rounded-full"></div>
+                  <span className="font-medium text-foreground">{item.day}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Clock className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">{formatTime(item.time)}</span>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{formatTime(item.time)}</span>
                 </div>
               </div>
             ))}
@@ -139,17 +139,17 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
         {/* Next Sessions Preview */}
         {nextSessions.length > 0 && (
           <div>
-            <p className="text-sm font-medium text-gray-900 mb-2">Next Sessions</p>
+            <p className="text-sm font-medium text-foreground mb-2">Next Sessions</p>
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {nextSessions.map((session, index) => (
-                <div key={index} className="flex items-center justify-between bg-white rounded-lg p-2 border text-sm">
+                <div key={index} className="flex items-center justify-between bg-background rounded-lg p-2 border border-border text-sm">
                   <div className="flex items-center space-x-2">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs border-primary/50 text-foreground">
                       {format(session.date, 'MMM dd')}
                     </Badge>
-                    <span className="text-gray-600">{session.day}</span>
+                    <span className="text-muted-foreground">{session.day}</span>
                   </div>
-                  <span className="text-gray-600">{formatTime(session.time)}</span>
+                  <span className="text-muted-foreground">{formatTime(session.time)}</span>
                 </div>
               ))}
             </div>
