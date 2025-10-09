@@ -30,7 +30,8 @@ import {
   Mic,
   Cake,
   CalendarClock,
-  Palette
+  Palette,
+  Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -77,6 +78,7 @@ const Sidebar = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Actions Hub', href: '/actions-hub', icon: Zap },
     { name: 'Students', href: '/students', icon: Users },
     { name: 'Groups', href: '/groups', icon: UsersRound },
     { name: 'Courses', href: '/courses', icon: BookOpen },

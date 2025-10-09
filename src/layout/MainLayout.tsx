@@ -40,6 +40,7 @@ import SpeakingTopics from '@/pages/SpeakingTopics';
 import StudentSpeaking from '@/pages/StudentSpeaking';
 import AssignSpeakingTopic from '@/pages/AssignSpeakingTopic';
 import Birthdays from '@/pages/Birthdays';
+import ActionsHub from '@/pages/ActionsHub';
 
 const MainLayout = () => {
   // Initialize global keyboard shortcuts
@@ -59,6 +60,7 @@ const MainLayout = () => {
               <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6">
                 <Routes>
                   <Route path="/" element={<Index />} />
+                  <Route path="/actions-hub" element={<ActionsHub />} />
                   <Route path="/students" element={<Students />} />
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/courses" element={<Courses />} />
