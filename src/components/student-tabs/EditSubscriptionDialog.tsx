@@ -263,9 +263,16 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         durationMonths: subscription.duration_months?.toString() || '',
         sessionDuration: subscription.session_duration_minutes?.toString() || '60',
         startDate: subscription.start_date ? (() => {
-          // Parse YYYY-MM-DD as Cairo timezone date
-          const [year, month, day] = subscription.start_date.split('-').map(Number);
-          return new Date(year, month - 1, day);
+          try {
+            // Parse YYYY-MM-DD as Cairo timezone date
+            const [year, month, day] = subscription.start_date.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            // Validate the date is valid
+            return !isNaN(date.getTime()) ? date : undefined;
+          } catch (error) {
+            console.error('Error parsing subscription start date:', subscription.start_date);
+            return undefined;
+          }
         })() : undefined,
         schedule: parsedSchedule,
         priceMode: subscription.price_mode,
@@ -320,6 +327,13 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       setValidationError('');
 
       try {
+        // Validate startDate exists and is valid
+        if (!formData.startDate || isNaN(formData.startDate.getTime())) {
+          setValidationError('Please select a valid start date');
+          setIsValidating(false);
+          return;
+        }
+
         const dateStr = format(formData.startDate, 'yyyy-MM-dd');
         
         // Validate each schedule item
@@ -439,8 +453,15 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     // Final validation before submission
     if (studentTeacherId) {
       setIsValidating(true);
-      
+
       try {
+        // Validate startDate exists and is valid
+        if (!formData.startDate || isNaN(formData.startDate.getTime())) {
+          toast.error('Please select a valid start date');
+          setIsValidating(false);
+          return;
+        }
+
         const dateStr = format(formData.startDate, 'yyyy-MM-dd');
         
         for (const scheduleItem of formData.schedule) {
@@ -638,7 +659,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                       )}
                     >
                       <Calendar className="mr-2 h-4 w-4" />
-                      {formData.startDate ? format(formData.startDate, "PPP") : <span>Pick a date</span>}
+                      {formData.startDate && !isNaN(formData.startDate.getTime()) ? format(formData.startDate, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
