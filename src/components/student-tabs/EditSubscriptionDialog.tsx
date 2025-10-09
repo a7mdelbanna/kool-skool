@@ -283,35 +283,39 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         durationMonths: subscription.duration_months?.toString() || '',
         sessionDuration: subscription.session_duration_minutes?.toString() || '60',
         startDate: (() => {
-          // First try to use the subscription's start_date
-          if (subscription.start_date) {
-            try {
-              // Parse YYYY-MM-DD as Cairo timezone date
-              const [year, month, day] = subscription.start_date.split('-').map(Number);
-              const date = new Date(year, month - 1, day);
-              // Validate the date is valid
-              if (!isNaN(date.getTime())) {
-                return date;
-              }
-            } catch (error) {
-              console.error('Error parsing subscription start date:', subscription.start_date);
-            }
+          // Use subscription start_date if available, otherwise use first session date (for renewed subscriptions)
+          const dateToUse = subscription.start_date || firstSessionData?.scheduled_date;
+
+          if (!dateToUse) {
+            console.log('No date available for subscription');
+            return undefined;
           }
 
-          // If no valid start_date, try to use the first session's date
-          if (firstSessionData?.scheduled_date) {
-            try {
-              const sessionDate = new Date(firstSessionData.scheduled_date);
-              if (!isNaN(sessionDate.getTime())) {
-                console.log('Using first session date as start date:', firstSessionData.scheduled_date);
-                return sessionDate;
-              }
-            } catch (error) {
-              console.error('Error parsing first session date:', firstSessionData.scheduled_date);
-            }
-          }
+          try {
+            // Handle different date formats
+            let date: Date;
 
-          return undefined;
+            // Check if it's in YYYY-MM-DD format
+            if (typeof dateToUse === 'string' && dateToUse.includes('-')) {
+              const datePart = dateToUse.split('T')[0]; // Handle both YYYY-MM-DD and ISO format
+              const [year, month, day] = datePart.split('-').map(Number);
+              date = new Date(year, month - 1, day);
+            } else {
+              // Try parsing as a regular date string
+              date = new Date(dateToUse);
+            }
+
+            if (!isNaN(date.getTime())) {
+              console.log(`Using ${subscription.start_date ? 'subscription start_date' : 'first session date'}: ${dateToUse} -> parsed as: ${date}`);
+              return date;
+            } else {
+              console.error('Invalid date:', dateToUse);
+              return undefined;
+            }
+          } catch (error) {
+            console.error('Error parsing date:', dateToUse, error);
+            return undefined;
+          }
         })(),
         schedule: parsedSchedule,
         priceMode: subscription.price_mode,

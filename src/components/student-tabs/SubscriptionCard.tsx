@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Edit, Trash2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Subscription, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,31 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
 }) => {
   const { toast } = useToast();
   const [isRenewing, setIsRenewing] = useState(false);
+
+  // Fetch first session date if subscription doesn't have a start_date (for renewed subscriptions)
+  const { data: firstSessionData } = useQuery({
+    queryKey: ['subscription-first-session', subscription?.id],
+    queryFn: async () => {
+      if (!subscription?.id) return null;
+      const { data, error } = await supabase
+        .from('lesson_sessions')
+        .select('scheduled_date')
+        .eq('subscription_id', subscription.id)
+        .order('scheduled_date', { ascending: true })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching first session:', error);
+        return null;
+      }
+
+      return data?.[0] || null;
+    },
+    enabled: !!subscription?.id && !subscription?.start_date
+  });
+
+  // Use subscription start_date if available, otherwise use first session date
+  const displayStartDate = subscription?.start_date || firstSessionData?.scheduled_date;
 
   // Get current user data from localStorage
   const getCurrentUserData = () => {
@@ -327,7 +353,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          Start Date: {format(new Date(subscription.start_date), 'MMMM dd, yyyy')}
+          Start Date: {displayStartDate ? format(new Date(displayStartDate), 'MMMM dd, yyyy') : 'Not set'}
         </p>
       </CardHeader>
       
