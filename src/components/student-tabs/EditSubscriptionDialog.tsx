@@ -107,6 +107,26 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     enabled: !!subscription?.student_id && open,
   });
 
+  // Fetch first session for this subscription to get the start date if needed
+  const { data: firstSessionData } = useQuery({
+    queryKey: ['subscription-first-session', subscription?.id],
+    queryFn: async () => {
+      if (!subscription?.id) return null;
+      const { data, error } = await supabase
+        .from('lesson_sessions')
+        .select('scheduled_date')
+        .eq('subscription_id', subscription.id)
+        .order('scheduled_date', { ascending: true })
+        .limit(1);
+      if (error) {
+        console.error('Error fetching subscription first session:', error);
+        return null;
+      }
+      return data?.[0] || null;
+    },
+    enabled: !!subscription?.id && open && !subscription?.start_date
+  });
+
   useEffect(() => {
     if (studentData?.teacher_id) {
       setStudentTeacherId(studentData.teacher_id);
@@ -262,18 +282,37 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         sessionCount: subscription.session_count?.toString() || '',
         durationMonths: subscription.duration_months?.toString() || '',
         sessionDuration: subscription.session_duration_minutes?.toString() || '60',
-        startDate: subscription.start_date ? (() => {
-          try {
-            // Parse YYYY-MM-DD as Cairo timezone date
-            const [year, month, day] = subscription.start_date.split('-').map(Number);
-            const date = new Date(year, month - 1, day);
-            // Validate the date is valid
-            return !isNaN(date.getTime()) ? date : undefined;
-          } catch (error) {
-            console.error('Error parsing subscription start date:', subscription.start_date);
-            return undefined;
+        startDate: (() => {
+          // First try to use the subscription's start_date
+          if (subscription.start_date) {
+            try {
+              // Parse YYYY-MM-DD as Cairo timezone date
+              const [year, month, day] = subscription.start_date.split('-').map(Number);
+              const date = new Date(year, month - 1, day);
+              // Validate the date is valid
+              if (!isNaN(date.getTime())) {
+                return date;
+              }
+            } catch (error) {
+              console.error('Error parsing subscription start date:', subscription.start_date);
+            }
           }
-        })() : undefined,
+
+          // If no valid start_date, try to use the first session's date
+          if (firstSessionData?.scheduled_date) {
+            try {
+              const sessionDate = new Date(firstSessionData.scheduled_date);
+              if (!isNaN(sessionDate.getTime())) {
+                console.log('Using first session date as start date:', firstSessionData.scheduled_date);
+                return sessionDate;
+              }
+            } catch (error) {
+              console.error('Error parsing first session date:', firstSessionData.scheduled_date);
+            }
+          }
+
+          return undefined;
+        })(),
         schedule: parsedSchedule,
         priceMode: subscription.price_mode,
         pricePerSession: subscription.price_per_session?.toString() || '',
@@ -293,7 +332,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       setConflictMessage('');
       setShowConflictDialog(false);
     }
-  }, [subscription, open, initialPaymentData]);
+  }, [subscription, open, initialPaymentData, firstSessionData]);
 
   // Set default currency when currencies are loaded
   useEffect(() => {
