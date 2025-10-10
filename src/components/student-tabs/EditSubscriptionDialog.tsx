@@ -56,6 +56,12 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
   const [conflictMessage, setConflictMessage] = useState<string>('');
   const [studentTeacherId, setStudentTeacherId] = useState<string>('');
 
+  // Session preservation confirmation dialog states
+  const [showSessionConfirmDialog, setShowSessionConfirmDialog] = useState(false);
+  const [pendingUpdateData, setPendingUpdateData] = useState<any>(null);
+  const [changesSummary, setChangesSummary] = useState<string[]>([]);
+  const [suggestPreserve, setSuggestPreserve] = useState(true);
+
   // Get user's timezone (Cairo)
   const getUserTimezone = () => {
     const userData = localStorage.getItem('user');
@@ -444,9 +450,61 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     const pricePerSession = parseFloat(formData.pricePerSession) || 0;
     const sessionCount = parseInt(formData.sessionCount) || 0;
     const fixedPrice = parseFloat(formData.fixedPrice) || 0;
-    return formData.priceMode === 'perSession' 
-      ? pricePerSession * sessionCount 
+    return formData.priceMode === 'perSession'
+      ? pricePerSession * sessionCount
       : fixedPrice;
+  };
+
+  // Detect what changed between original subscription and form data
+  const detectChanges = () => {
+    if (!subscription) return { changes: [], majorChange: false };
+
+    const changes: string[] = [];
+    let majorChange = false;
+
+    // Check schedule days change (major)
+    const originalDays = subscription.schedule?.map(s => s.day).sort() || [];
+    const newDays = formData.schedule.map(s => s.day).sort();
+    const daysChanged = JSON.stringify(originalDays) !== JSON.stringify(newDays);
+
+    if (daysChanged) {
+      changes.push(`Schedule days changed from [${originalDays.join(', ')}] to [${newDays.join(', ')}]`);
+      majorChange = true;
+    }
+
+    // Check schedule times change (minor)
+    const originalTimes = subscription.schedule?.map(s => `${s.day}:${s.time}`).sort() || [];
+    const newTimes = formData.schedule.map(s => `${s.day}:${s.time}`).sort();
+    const timesChanged = !daysChanged && JSON.stringify(originalTimes) !== JSON.stringify(newTimes);
+
+    if (timesChanged) {
+      changes.push('Session times updated');
+    }
+
+    // Check session count change (moderate)
+    const countChanged = subscription.sessionCount !== parseInt(formData.sessionCount);
+    if (countChanged) {
+      changes.push(`Session count changed from ${subscription.sessionCount} to ${formData.sessionCount}`);
+      majorChange = true;
+    }
+
+    // Check price changes (minor)
+    if (subscription.priceMode !== formData.priceMode) {
+      changes.push('Pricing mode changed');
+    }
+    if (subscription.pricePerSession !== parseFloat(formData.pricePerSession || '0')) {
+      changes.push(`Price per session changed from ${subscription.pricePerSession} to ${formData.pricePerSession}`);
+    }
+    if (subscription.fixedPrice !== parseFloat(formData.fixedPrice || '0')) {
+      changes.push('Fixed price changed');
+    }
+
+    // Check duration (moderate)
+    if (subscription.sessionDurationMinutes !== parseInt(formData.sessionDuration)) {
+      changes.push(`Session duration changed from ${subscription.sessionDurationMinutes} to ${formData.sessionDuration} minutes`);
+    }
+
+    return { changes, majorChange };
   };
 
   const handleSubmit = async () => {
@@ -537,34 +595,29 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       setIsValidating(false);
     }
 
-    try {
-      setLoading(true);
-      
-      // Prepare schedule data - keep times in 24-hour format for database consistency
+    // Detect changes and show confirmation dialog
+    const { changes, majorChange } = detectChanges();
+
+    if (changes.length > 0) {
+      console.log('📊 Changes detected:', changes);
+      console.log('🔍 Major change:', majorChange);
+
+      // Prepare the update data to be executed later
       const scheduleForDatabase = formData.schedule.map(item => ({
         day: item.day,
-        time: item.time // Keep in 24-hour format
+        time: item.time
       }));
-      
-      console.log('Updating subscription with data:', {
-        subscription_id: subscription.id,
-        ...formData,
-        schedule: scheduleForDatabase,
-        total_price: getTotalPrice()
-      });
 
-      // Pass the schedule as a JSONB array directly, not as a JSON string
-      const { data, error } = await supabase.rpc('update_subscription_with_related_data', {
+      const updateData = {
         p_subscription_id: subscription.id,
         p_session_count: parseInt(formData.sessionCount) || 0,
         p_duration_months: parseInt(formData.durationMonths) || 0,
         p_session_duration_minutes: parseInt(formData.sessionDuration) || 60,
         p_start_date: (() => {
-          // Format date as YYYY-MM-DD in Cairo timezone
           const date = formData.startDate;
           return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         })(),
-        p_schedule: scheduleForDatabase, // Pass as array, not JSON string
+        p_schedule: scheduleForDatabase,
         p_price_mode: formData.priceMode,
         p_price_per_session: formData.priceMode === 'perSession' ? parseFloat(formData.pricePerSession) || 0 : null,
         p_fixed_price: formData.priceMode === 'fixedPrice' ? parseFloat(formData.fixedPrice) || 0 : null,
@@ -574,6 +627,52 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         p_status: formData.status,
         p_current_user_id: currentUserId,
         p_current_school_id: schoolId
+      };
+
+      // Store pending data and show confirmation dialog
+      setPendingUpdateData(updateData);
+      setChangesSummary(changes);
+      setSuggestPreserve(!majorChange); // Suggest preserve if no major changes
+      setShowSessionConfirmDialog(true);
+      return;
+    }
+
+    // No changes detected, proceed with update (preserve by default)
+    await performUpdate(true);
+  };
+
+  // Function to actually perform the update with preserve_sessions parameter
+  const performUpdate = async (preserveSessions: boolean) => {
+    try {
+      setLoading(true);
+      setShowSessionConfirmDialog(false);
+
+      const updateData = pendingUpdateData || {
+        p_subscription_id: subscription!.id,
+        p_session_count: parseInt(formData.sessionCount) || 0,
+        p_duration_months: parseInt(formData.durationMonths) || 0,
+        p_session_duration_minutes: parseInt(formData.sessionDuration) || 60,
+        p_start_date: (() => {
+          const date = formData.startDate;
+          return `${date!.getFullYear()}-${String(date!.getMonth() + 1).padStart(2, '0')}-${String(date!.getDate()).padStart(2, '0')}`;
+        })(),
+        p_schedule: formData.schedule.map(item => ({ day: item.day, time: item.time })),
+        p_price_mode: formData.priceMode,
+        p_price_per_session: formData.priceMode === 'perSession' ? parseFloat(formData.pricePerSession) || 0 : null,
+        p_fixed_price: formData.priceMode === 'fixedPrice' ? parseFloat(formData.fixedPrice) || 0 : null,
+        p_total_price: getTotalPrice(),
+        p_currency: formData.currency,
+        p_notes: formData.notes,
+        p_status: formData.status,
+        p_current_user_id: currentUserId,
+        p_current_school_id: schoolId
+      };
+
+      console.log('📤 Updating subscription with preserve_sessions:', preserveSessions);
+
+      const { data, error} = await supabase.rpc('update_subscription_with_related_data', {
+        ...updateData,
+        p_preserve_sessions: preserveSessions
       });
 
       if (error) {
@@ -1068,6 +1167,112 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
             >
               Got It
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Session Preservation Confirmation Dialog */}
+      <AlertDialog open={showSessionConfirmDialog} onOpenChange={setShowSessionConfirmDialog}>
+        <AlertDialogContent className="sm:max-w-[600px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-blue-600" />
+              Update Subscription - Session Actions
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p className="text-foreground font-medium">
+                  You've made changes to this subscription. How should we handle existing session actions?
+                </p>
+
+                {changesSummary.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="font-medium text-sm text-foreground mb-2">Changes detected:</p>
+                    <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
+                      {changesSummary.map((change, index) => (
+                        <li key={index}>{change}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div className={cn(
+                    "border-2 rounded-lg p-4 cursor-pointer transition-all",
+                    suggestPreserve
+                      ? "border-green-500 bg-green-50"
+                      : "border-gray-300 hover:border-green-400"
+                  )}>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className={cn(
+                        "h-5 w-5 mt-0.5",
+                        suggestPreserve ? "text-green-600" : "text-gray-400"
+                      )} />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-foreground">Keep Session Actions</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Preserve attendance records, cancellations, and completion status for existing sessions.
+                          Updates times and dates while keeping all session history intact.
+                        </p>
+                        {suggestPreserve && (
+                          <p className="text-sm text-green-700 font-medium mt-2">
+                            ✓ Recommended for your changes
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={cn(
+                    "border-2 rounded-lg p-4 cursor-pointer transition-all",
+                    !suggestPreserve
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-gray-300 hover:border-orange-400"
+                  )}>
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className={cn(
+                        "h-5 w-5 mt-0.5",
+                        !suggestPreserve ? "text-orange-600" : "text-gray-400"
+                      )} />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-foreground">Reset All Sessions</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Delete all existing sessions and create new ones from scratch.
+                          All attendance records and session history will be lost.
+                        </p>
+                        {!suggestPreserve && (
+                          <p className="text-sm text-orange-700 font-medium mt-2">
+                            ⚠️ Recommended due to schedule day changes
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel onClick={() => {
+              setShowSessionConfirmDialog(false);
+              setPendingUpdateData(null);
+            }}>
+              Cancel Update
+            </AlertDialogCancel>
+            <Button
+              onClick={() => performUpdate(true)}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Keep Actions'}
+            </Button>
+            <Button
+              onClick={() => performUpdate(false)}
+              disabled={loading}
+              variant="destructive"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reset Sessions'}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

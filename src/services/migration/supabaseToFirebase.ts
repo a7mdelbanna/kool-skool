@@ -650,14 +650,20 @@ async function handleUpdateSubscriptionWithRelatedData(params: any) {
   try {
     const DEBUG_MODE = true;
     if (DEBUG_MODE) {
-      console.log('Updating subscription with params:', params);
+      console.log('🔄 Updating subscription with params:', params);
     }
-    
+
     const subscriptionId = params.p_subscription_id;
+    const preserveSessions = params.p_preserve_sessions === true;
+
     if (!subscriptionId) {
       throw new Error('Subscription ID is required');
     }
-    
+
+    if (DEBUG_MODE) {
+      console.log(`📊 Session preservation mode: ${preserveSessions ? 'PRESERVE' : 'RESET'}`);
+    }
+
     // Update the subscription
     const updateData: any = {
       sessionCount: params.p_session_count,
@@ -674,133 +680,236 @@ async function handleUpdateSubscriptionWithRelatedData(params: any) {
       status: params.p_status || 'active',
       updatedAt: new Date().toISOString()
     };
-    
+
     await databaseService.update('subscriptions', subscriptionId, updateData);
-    
-    // Delete existing sessions for this subscription
+
+    // Get the subscription and student ID
+    const subscription = await databaseService.getById('subscriptions', subscriptionId);
+    const studentId = subscription?.studentId || subscription?.student_id;
+
+    // Fetch existing sessions
     const existingSessions = await databaseService.query('sessions', {
       where: [{ field: 'subscriptionId', operator: '==', value: subscriptionId }]
     });
-    
-    // Delete each existing session
-    for (const session of existingSessions) {
-      await databaseService.delete('sessions', session.id);
-    }
-    
-    // Regenerate sessions with the new schedule
-    if (params.p_schedule && params.p_schedule.length > 0 && params.p_session_count > 0) {
-      const sessions = [];
-      const startDate = new Date(params.p_start_date);
-      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      
-      // Get all scheduled days and times
-      const scheduleItems = params.p_schedule || [];
-      
-      // Convert schedule days to day indices and sort them
-      const scheduledDays = scheduleItems.map(item => ({
-        dayIndex: daysOfWeek.findIndex(day => day.toLowerCase() === item.day.toLowerCase()),
-        time: item.time
-      })).sort((a, b) => a.dayIndex - b.dayIndex);
-      
-      // Find the first scheduled session date
-      let currentDate = new Date(startDate);
-      let sessionDates = [];
-      
-      // Generate all session dates
-      while (sessionDates.length < params.p_session_count) {
-        const currentDayIndex = currentDate.getDay();
-        
-        // Check if current date matches any scheduled day
-        const matchingSchedule = scheduledDays.find(s => s.dayIndex === currentDayIndex);
-        
-        if (matchingSchedule && currentDate >= startDate) {
-          sessionDates.push({
-            date: new Date(currentDate),
-            time: matchingSchedule.time
-          });
-        }
-        
-        // Move to next day
-        currentDate.setDate(currentDate.getDate() + 1);
-        
-        // Safety limit to prevent infinite loop
-        if (currentDate > new Date(startDate.getTime() + (365 * 24 * 60 * 60 * 1000))) {
-          console.warn('Reached safety limit while generating sessions');
-          break;
+
+    // Sort existing sessions by session number
+    existingSessions.sort((a, b) => (a.sessionNumber || 0) - (b.sessionNumber || 0));
+
+    if (preserveSessions) {
+      // **PRESERVE SESSIONS MODE** - Update existing sessions and add/remove as needed
+      if (DEBUG_MODE) console.log('✅ Preserving session actions and statuses');
+
+      // Generate new session dates based on updated schedule
+      const newSessionDates = generateSessionDates(params);
+      const targetSessionCount = params.p_session_count;
+
+      // Update existing sessions with new dates/times
+      for (let i = 0; i < Math.min(existingSessions.length, targetSessionCount); i++) {
+        const existingSession = existingSessions[i];
+        const newSessionInfo = newSessionDates[i];
+
+        if (newSessionInfo) {
+          const { date, time } = newSessionInfo;
+          const { hours, minutes, sessionDateTime } = parseTimeAndCreateDateTime(time, date);
+
+          // Update session with new schedule but preserve status and actions
+          const updateSessionData: any = {
+            scheduledDate: date.toISOString().split('T')[0],
+            scheduledTime: time || '00:00',
+            scheduledDateTime: sessionDateTime.toISOString(),
+            durationMinutes: params.p_session_duration_minutes || 60,
+            updatedAt: new Date().toISOString()
+          };
+
+          // Only update if session hasn't been completed/attended (preserve those)
+          if (existingSession.status === 'scheduled' || existingSession.status === 'cancelled') {
+            // Can update these sessions
+            await databaseService.update('sessions', existingSession.id, updateSessionData);
+          } else {
+            // For attended/completed sessions, only update duration if needed
+            await databaseService.update('sessions', existingSession.id, {
+              durationMinutes: params.p_session_duration_minutes || 60,
+              updatedAt: new Date().toISOString()
+            });
+          }
+
+          if (DEBUG_MODE) console.log(`  Updated session ${i + 1}: ${existingSession.status}`);
         }
       }
-      
-      // Get the student ID from the subscription
-      const subscription = await databaseService.getById('subscriptions', subscriptionId);
-      const studentId = subscription?.studentId || subscription?.student_id;
-      
-      // Create session records
-      for (let i = 0; i < sessionDates.length; i++) {
-        const sessionNumber = i + 1;
-        const { date, time } = sessionDates[i];
-        
-        // Parse the time string to get hours and minutes
-        let hours = 0;
-        let minutes = 0;
-        
-        if (time) {
-          if (time.includes(':')) {
-            const parts = time.split(':');
-            hours = parseInt(parts[0]);
-            minutes = parseInt(parts[1]) || 0;
-            
-            // Handle PM indicator if present
-            if (time.toUpperCase().includes('PM') && hours !== 12) {
-              hours += 12;
-            } else if (time.toUpperCase().includes('AM') && hours === 12) {
-              hours = 0;
-            }
+
+      // If new count is greater, add new sessions
+      if (targetSessionCount > existingSessions.length) {
+        if (DEBUG_MODE) console.log(`📝 Adding ${targetSessionCount - existingSessions.length} new sessions`);
+
+        for (let i = existingSessions.length; i < targetSessionCount; i++) {
+          const newSessionInfo = newSessionDates[i];
+          if (newSessionInfo) {
+            const { date, time } = newSessionInfo;
+            const { sessionDateTime } = parseTimeAndCreateDateTime(time, date);
+
+            const sessionData = {
+              subscriptionId: subscriptionId,
+              studentId: studentId,
+              schoolId: params.p_current_school_id,
+              teacherId: subscription?.teacherId || null,
+              sessionNumber: i + 1,
+              scheduledDate: date.toISOString().split('T')[0],
+              scheduledTime: time || '00:00',
+              scheduledDateTime: sessionDateTime.toISOString(),
+              durationMinutes: params.p_session_duration_minutes || 60,
+              status: 'scheduled',
+              countsTowardCompletion: true,
+              indexInSub: i + 1,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+
+            await databaseService.create('sessions', sessionData);
           }
         }
-        
-        // Create a date at midnight local time (Cairo)
-        const sessionDate = new Date(date);
-        sessionDate.setHours(0, 0, 0, 0);
-        
-        // Create the final datetime by adding hours and minutes
-        const sessionDateTime = new Date(sessionDate);
-        sessionDateTime.setHours(hours, minutes, 0, 0);
-        
-        const sessionData = {
-          subscriptionId: subscriptionId,
-          studentId: studentId,
-          schoolId: params.p_current_school_id,
-          teacherId: subscription?.teacherId || null,
-          sessionNumber: sessionNumber,
-          scheduledDate: date.toISOString().split('T')[0],
-          scheduledTime: time || '00:00',
-          scheduledDateTime: sessionDateTime.toISOString(), // Full datetime for proper timezone handling
-          durationMinutes: params.p_session_duration_minutes || 60,
-          status: 'scheduled',
-          countsTowardCompletion: true,
-          indexInSub: sessionNumber,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        const sessionId = await databaseService.create('sessions', sessionData);
-        sessions.push({ id: sessionId, ...sessionData });
       }
-      
-      if (DEBUG_MODE) console.log('Regenerated sessions:', sessions.length);
+
+      // If new count is smaller, mark extra sessions as cancelled (don't delete)
+      if (targetSessionCount < existingSessions.length) {
+        if (DEBUG_MODE) console.log(`🚫 Marking ${existingSessions.length - targetSessionCount} sessions as cancelled`);
+
+        for (let i = targetSessionCount; i < existingSessions.length; i++) {
+          const session = existingSessions[i];
+          // Only cancel if not already completed/attended
+          if (session.status === 'scheduled') {
+            await databaseService.update('sessions', session.id, {
+              status: 'cancelled',
+              countsTowardCompletion: false,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }
+      }
+
+      if (DEBUG_MODE) console.log('✅ Sessions preserved and updated successfully');
+
+    } else {
+      // **RESET SESSIONS MODE** - Delete all and regenerate (original behavior)
+      if (DEBUG_MODE) console.log('🔄 Resetting all sessions (deleting and regenerating)');
+
+      // Delete each existing session
+      for (const session of existingSessions) {
+        await databaseService.delete('sessions', session.id);
+      }
+
+      // Regenerate sessions with the new schedule
+      if (params.p_schedule && params.p_schedule.length > 0 && params.p_session_count > 0) {
+        const newSessionDates = generateSessionDates(params);
+
+        // Create new session records
+        for (let i = 0; i < newSessionDates.length; i++) {
+          const sessionNumber = i + 1;
+          const { date, time } = newSessionDates[i];
+          const { sessionDateTime } = parseTimeAndCreateDateTime(time, date);
+
+          const sessionData = {
+            subscriptionId: subscriptionId,
+            studentId: studentId,
+            schoolId: params.p_current_school_id,
+            teacherId: subscription?.teacherId || null,
+            sessionNumber: sessionNumber,
+            scheduledDate: date.toISOString().split('T')[0],
+            scheduledTime: time || '00:00',
+            scheduledDateTime: sessionDateTime.toISOString(),
+            durationMinutes: params.p_session_duration_minutes || 60,
+            status: 'scheduled',
+            countsTowardCompletion: true,
+            indexInSub: sessionNumber,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          await databaseService.create('sessions', sessionData);
+        }
+
+        if (DEBUG_MODE) console.log(`✅ Regenerated ${newSessionDates.length} sessions`);
+      }
     }
-    
-    return { 
-      data: { 
-        success: true, 
-        message: 'Subscription updated successfully' 
-      }, 
-      error: null 
+
+    return {
+      data: {
+        success: true,
+        message: preserveSessions
+          ? 'Subscription updated successfully (sessions preserved)'
+          : 'Subscription updated successfully (sessions reset)'
+      },
+      error: null
     };
   } catch (error) {
-    console.error('Error updating subscription:', error);
+    console.error('❌ Error updating subscription:', error);
     return { data: null, error };
   }
+}
+
+// Helper function to generate session dates from schedule
+function generateSessionDates(params: any) {
+  const sessionDates = [];
+  const startDate = new Date(params.p_start_date);
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const scheduleItems = params.p_schedule || [];
+
+  // Convert schedule days to day indices and sort them
+  const scheduledDays = scheduleItems.map(item => ({
+    dayIndex: daysOfWeek.findIndex(day => day.toLowerCase() === item.day.toLowerCase()),
+    time: item.time
+  })).sort((a, b) => a.dayIndex - b.dayIndex);
+
+  let currentDate = new Date(startDate);
+
+  // Generate all session dates
+  while (sessionDates.length < params.p_session_count) {
+    const currentDayIndex = currentDate.getDay();
+    const matchingSchedule = scheduledDays.find(s => s.dayIndex === currentDayIndex);
+
+    if (matchingSchedule && currentDate >= startDate) {
+      sessionDates.push({
+        date: new Date(currentDate),
+        time: matchingSchedule.time
+      });
+    }
+
+    currentDate.setDate(currentDate.getDate() + 1);
+
+    // Safety limit
+    if (currentDate > new Date(startDate.getTime() + (365 * 24 * 60 * 60 * 1000))) {
+      console.warn('Reached safety limit while generating sessions');
+      break;
+    }
+  }
+
+  return sessionDates;
+}
+
+// Helper function to parse time and create datetime
+function parseTimeAndCreateDateTime(time: string, date: Date) {
+  let hours = 0;
+  let minutes = 0;
+
+  if (time && time.includes(':')) {
+    const parts = time.split(':');
+    hours = parseInt(parts[0]);
+    minutes = parseInt(parts[1]) || 0;
+
+    // Handle PM indicator if present
+    if (time.toUpperCase().includes('PM') && hours !== 12) {
+      hours += 12;
+    } else if (time.toUpperCase().includes('AM') && hours === 12) {
+      hours = 0;
+    }
+  }
+
+  const sessionDate = new Date(date);
+  sessionDate.setHours(0, 0, 0, 0);
+
+  const sessionDateTime = new Date(sessionDate);
+  sessionDateTime.setHours(hours, minutes, 0, 0);
+
+  return { hours, minutes, sessionDateTime };
 }
 
 async function handleGenerateSessions(params: any) {
