@@ -28,7 +28,9 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActionableSessions } from '@/hooks/useActionableSessions';
 import { useExpiredSubscriptions } from '@/hooks/useExpiredSubscriptions';
+import { useOverduePayments } from '@/hooks/useOverduePayments';
 import ActionCard from '@/components/actions-hub/ActionCard';
+import PaymentCard from '@/components/actions-hub/PaymentCard';
 import ActionFlowModal from '@/components/actions-hub/ActionFlowModal';
 import BatchActionFlowModal from '@/components/actions-hub/BatchActionFlowModal';
 import { toast } from 'sonner';
@@ -86,6 +88,12 @@ const ActionsHub: React.FC = () => {
     isLoading: subscriptionsLoading,
     refetch: refetchSubscriptions
   } = useExpiredSubscriptions(user?.schoolId);
+
+  const {
+    data: paymentsData,
+    isLoading: paymentsLoading,
+    refetch: refetchPayments
+  } = useOverduePayments(user?.schoolId);
 
   // Combine and process data
   const studentActions: StudentAction[] = React.useMemo(() => {
@@ -160,6 +168,9 @@ const ActionsHub: React.FC = () => {
       filtered = filtered.filter(s => s.actions.sessions.length > 0);
     } else if (selectedTab === 'subscriptions') {
       filtered = filtered.filter(s => s.actions.subscriptions.length > 0);
+    } else if (selectedTab === 'payments') {
+      // Payments tab is handled separately below
+      return [];
     } else if (selectedTab === 'completed') {
       filtered = filtered.filter(s => s.completedAt);
     } else if (selectedTab === 'pending') {
@@ -215,7 +226,8 @@ const ActionsHub: React.FC = () => {
     // Invalidate the queries to force fresh data from server
     await queryClient.invalidateQueries({ queryKey: ['actionable-sessions'] });
     await queryClient.invalidateQueries({ queryKey: ['expired-subscriptions'] });
-    await Promise.all([refetchSessions(), refetchSubscriptions()]);
+    await queryClient.invalidateQueries({ queryKey: ['overdue-payments'] });
+    await Promise.all([refetchSessions(), refetchSubscriptions(), refetchPayments()]);
     toast.success('Data refreshed');
   };
 
@@ -264,10 +276,13 @@ const ActionsHub: React.FC = () => {
     completed: studentActions.filter(s => s.completedAt).length,
     urgent: studentActions.filter(s => s.priority === 'urgent' && !s.completedAt).length,
     totalSessions: studentActions.reduce((acc, s) => acc + s.actions.sessions.length, 0),
-    totalSubscriptions: studentActions.reduce((acc, s) => acc + s.actions.subscriptions.length, 0)
+    totalSubscriptions: studentActions.reduce((acc, s) => acc + s.actions.subscriptions.length, 0),
+    totalPayments: paymentsData?.length || 0,
+    totalOwed: paymentsData?.reduce((acc, p) => acc + p.amountOwed, 0) || 0,
+    urgentPayments: paymentsData?.filter(p => p.priority === 'urgent').length || 0
   };
 
-  const isLoading = sessionsLoading || subscriptionsLoading;
+  const isLoading = sessionsLoading || subscriptionsLoading || paymentsLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -321,7 +336,7 @@ const ActionsHub: React.FC = () => {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
             <Card className="p-3 bg-primary/5 border-primary/20">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-primary" />
@@ -378,6 +393,16 @@ const ActionsHub: React.FC = () => {
                 <div>
                   <p className="text-2xl font-bold">{stats.total}</p>
                   <p className="text-xs text-muted-foreground">Students</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-3 bg-amber-500/10 border-amber-500/20">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-amber-500" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.totalPayments}</p>
+                  <p className="text-xs text-muted-foreground">Overdue</p>
                 </div>
               </div>
             </Card>
@@ -439,7 +464,7 @@ const ActionsHub: React.FC = () => {
 
         {/* Tabs */}
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             <TabsTrigger value="all" className="gap-1">
               All
               <Badge variant="secondary" className="ml-1">
@@ -464,6 +489,12 @@ const ActionsHub: React.FC = () => {
                 {stats.totalSubscriptions}
               </Badge>
             </TabsTrigger>
+            <TabsTrigger value="payments" className="gap-1">
+              Payments
+              <Badge variant="secondary" className="ml-1">
+                {stats.totalPayments}
+              </Badge>
+            </TabsTrigger>
             <TabsTrigger value="completed" className="gap-1">
               Completed
               <Badge variant="secondary" className="ml-1">
@@ -473,40 +504,76 @@ const ActionsHub: React.FC = () => {
           </TabsList>
 
           <TabsContent value={selectedTab} className="mt-0">
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map(i => (
-                  <Card key={i} className="p-6 animate-pulse">
-                    <div className="h-20 bg-muted rounded" />
-                  </Card>
-                ))}
-              </div>
-            ) : filteredStudents.length === 0 ? (
-              <Card className="p-12 text-center">
-                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">All caught up!</h3>
-                <p className="text-muted-foreground">
-                  {selectedTab === 'completed'
-                    ? 'No completed actions today'
-                    : 'No actions require your attention right now'}
-                </p>
-              </Card>
-            ) : (
-              <motion.div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-                layout
-              >
-                <AnimatePresence mode="popLayout">
-                  {filteredStudents.map((student) => (
-                    <ActionCard
-                      key={student.studentId}
-                      student={student}
-                      onClick={() => handleStudentClick(student)}
-                      isCompleted={!!student.completedAt}
-                    />
+            {selectedTab === 'payments' ? (
+              // Payments Tab - Show PaymentCard components
+              isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map(i => (
+                    <Card key={i} className="p-6 animate-pulse">
+                      <div className="h-20 bg-muted rounded" />
+                    </Card>
                   ))}
-                </AnimatePresence>
-              </motion.div>
+                </div>
+              ) : !paymentsData || paymentsData.length === 0 ? (
+                <Card className="p-12 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">All payments up to date!</h3>
+                  <p className="text-muted-foreground">
+                    No subscriptions have outstanding payments right now.
+                  </p>
+                </Card>
+              ) : (
+                <motion.div
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr"
+                  layout
+                >
+                  <AnimatePresence mode="popLayout">
+                    {paymentsData.map((payment) => (
+                      <PaymentCard
+                        key={payment.subscriptionId}
+                        payment={payment}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              )
+            ) : (
+              // Other Tabs - Show ActionCard components
+              isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map(i => (
+                    <Card key={i} className="p-6 animate-pulse">
+                      <div className="h-20 bg-muted rounded" />
+                    </Card>
+                  ))}
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <Card className="p-12 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">All caught up!</h3>
+                  <p className="text-muted-foreground">
+                    {selectedTab === 'completed'
+                      ? 'No completed actions today'
+                      : 'No actions require your attention right now'}
+                  </p>
+                </Card>
+              ) : (
+                <motion.div
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                  layout
+                >
+                  <AnimatePresence mode="popLayout">
+                    {filteredStudents.map((student) => (
+                      <ActionCard
+                        key={student.studentId}
+                        student={student}
+                        onClick={() => handleStudentClick(student)}
+                        isCompleted={!!student.completedAt}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              )
             )}
           </TabsContent>
         </Tabs>

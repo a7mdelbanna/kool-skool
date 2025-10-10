@@ -1173,50 +1173,51 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
 
       {/* Session Preservation Confirmation Dialog */}
       <AlertDialog open={showSessionConfirmDialog} onOpenChange={setShowSessionConfirmDialog}>
-        <AlertDialogContent className="sm:max-w-[600px]">
+        <AlertDialogContent className="sm:max-w-[650px] bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-blue-600" />
+            <AlertDialogTitle className="flex items-center gap-2 text-foreground text-lg">
+              <AlertTriangle className="h-5 w-5 text-primary" />
               Update Subscription - Session Actions
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-4">
-                <p className="text-foreground font-medium">
+              <div className="space-y-4 pt-2">
+                <p className="text-foreground font-medium text-base">
                   You've made changes to this subscription. How should we handle existing session actions?
                 </p>
 
                 {changesSummary.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="font-medium text-sm text-foreground mb-2">Changes detected:</p>
-                    <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
+                  <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                    <p className="font-semibold text-sm text-foreground mb-2">Changes detected:</p>
+                    <ul className="text-sm space-y-1.5 ml-4 list-disc text-foreground/80">
                       {changesSummary.map((change, index) => (
-                        <li key={index}>{change}</li>
+                        <li key={index} className="leading-relaxed">{change}</li>
                       ))}
                     </ul>
                   </div>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-3 pt-2">
                   <div className={cn(
-                    "border-2 rounded-lg p-4 cursor-pointer transition-all",
+                    "border-2 rounded-lg p-4 transition-all",
                     suggestPreserve
-                      ? "border-green-500 bg-green-50"
-                      : "border-gray-300 hover:border-green-400"
+                      ? "border-success bg-success/10"
+                      : "border-border bg-muted/30 hover:border-success/50"
                   )}>
                     <div className="flex items-start gap-3">
                       <CheckCircle className={cn(
-                        "h-5 w-5 mt-0.5",
-                        suggestPreserve ? "text-green-600" : "text-gray-400"
+                        "h-5 w-5 mt-0.5 flex-shrink-0",
+                        suggestPreserve ? "text-success" : "text-muted-foreground"
                       )} />
                       <div className="flex-1">
-                        <h4 className="font-semibold text-foreground">Keep Session Actions</h4>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <h4 className="font-semibold text-foreground text-base mb-1.5">Keep Session Actions</h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           Preserve attendance records, cancellations, and completion status for existing sessions.
                           Updates times and dates while keeping all session history intact.
                         </p>
                         {suggestPreserve && (
-                          <p className="text-sm text-green-700 font-medium mt-2">
-                            ✓ Recommended for your changes
+                          <p className="text-sm text-success font-semibold mt-2.5 flex items-center gap-1.5">
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            Recommended for your changes
                           </p>
                         )}
                       </div>
@@ -1224,25 +1225,26 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                   </div>
 
                   <div className={cn(
-                    "border-2 rounded-lg p-4 cursor-pointer transition-all",
+                    "border-2 rounded-lg p-4 transition-all",
                     !suggestPreserve
-                      ? "border-orange-500 bg-orange-50"
-                      : "border-gray-300 hover:border-orange-400"
+                      ? "border-destructive bg-destructive/10"
+                      : "border-border bg-muted/30 hover:border-destructive/50"
                   )}>
                     <div className="flex items-start gap-3">
                       <AlertTriangle className={cn(
-                        "h-5 w-5 mt-0.5",
-                        !suggestPreserve ? "text-orange-600" : "text-gray-400"
+                        "h-5 w-5 mt-0.5 flex-shrink-0",
+                        !suggestPreserve ? "text-destructive" : "text-muted-foreground"
                       )} />
                       <div className="flex-1">
-                        <h4 className="font-semibold text-foreground">Reset All Sessions</h4>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <h4 className="font-semibold text-foreground text-base mb-1.5">Reset All Sessions</h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
                           Delete all existing sessions and create new ones from scratch.
                           All attendance records and session history will be lost.
                         </p>
                         {!suggestPreserve && (
-                          <p className="text-sm text-orange-700 font-medium mt-2">
-                            ⚠️ Recommended due to schedule day changes
+                          <p className="text-sm text-destructive font-semibold mt-2.5 flex items-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            Recommended due to schedule day changes
                           </p>
                         )}
                       </div>
@@ -1252,26 +1254,32 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-2">
-            <AlertDialogCancel onClick={() => {
-              setShowSessionConfirmDialog(false);
-              setPendingUpdateData(null);
-            }}>
+          <AlertDialogFooter className="flex gap-2 mt-2">
+            <AlertDialogCancel
+              onClick={() => {
+                setShowSessionConfirmDialog(false);
+                setPendingUpdateData(null);
+              }}
+              className="text-foreground"
+            >
               Cancel Update
             </AlertDialogCancel>
             <Button
               onClick={() => performUpdate(true)}
               disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-success hover:bg-success/90 text-white font-medium"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Keep Actions'}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Keep Actions
             </Button>
             <Button
               onClick={() => performUpdate(false)}
               disabled={loading}
               variant="destructive"
+              className="font-medium"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reset Sessions'}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Reset Sessions
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

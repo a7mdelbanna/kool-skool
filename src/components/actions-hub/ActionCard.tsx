@@ -21,7 +21,7 @@ interface ActionCardProps {
   isCompleted: boolean;
 }
 
-const ActionCard: React.FC<ActionCardProps> = ({ student, onClick, isCompleted }) => {
+const ActionCard = React.forwardRef<HTMLDivElement, ActionCardProps>(({ student, onClick, isCompleted }, ref) => {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
@@ -43,6 +43,7 @@ const ActionCard: React.FC<ActionCardProps> = ({ student, onClick, isCompleted }
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -182,6 +183,8 @@ const ActionCard: React.FC<ActionCardProps> = ({ student, onClick, isCompleted }
       </Card>
     </motion.div>
   );
-};
+});
+
+ActionCard.displayName = 'ActionCard';
 
 export default ActionCard;
