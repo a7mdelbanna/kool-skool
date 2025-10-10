@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Edit, Trash2, RotateCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -333,9 +333,25 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Subscription</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete this subscription and all related sessions and payments. This action cannot be undone.
+                  <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-5 w-5" />
+                    Permanently Delete Subscription?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-3">
+                    <p className="font-semibold text-foreground">
+                      Are you sure you want to delete this subscription?
+                    </p>
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
+                      <p className="font-medium text-sm text-foreground">This will permanently delete:</p>
+                      <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
+                        <li>All lesson sessions for this subscription</li>
+                        <li>All payment records</li>
+                        <li>All related notifications and tasks</li>
+                      </ul>
+                    </div>
+                    <p className="text-destructive font-medium text-sm">
+                      ⚠️ This action cannot be undone!
+                    </p>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -345,7 +361,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                     onClick={() => onDelete(subscription.id)}
                     className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                   >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
+                    {isDeleting ? 'Deleting...' : 'Delete Permanently'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

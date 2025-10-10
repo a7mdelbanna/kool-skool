@@ -171,6 +171,8 @@ export const supabase = {
         return handleVerifyPasswordUpdate(params);
       case 'delete_student_cascade':
         return handleDeleteStudent(params);
+      case 'delete_subscription_cascade':
+        return handleDeleteSubscription(params);
       case 'update_subscription_with_related_data':
         return handleUpdateSubscriptionWithRelatedData(params);
       default:
@@ -2726,6 +2728,122 @@ async function handleVerifyPasswordUpdate(params: { p_user_id: string }) {
   } catch (error) {
     console.error('Error verifying password update:', error);
     return { data: [], error };
+  }
+}
+
+// Handle delete_subscription_cascade RPC function - Deletes subscription and all related data
+async function handleDeleteSubscription(params: { p_subscription_id: string, p_school_id: string }) {
+  try {
+    console.log('🗑️ Starting cascade delete for subscription:', params.p_subscription_id);
+
+    const errors: string[] = [];
+    const deleted: string[] = [];
+
+    // Step 1: Delete Firebase collections
+    console.log('📦 Deleting Firebase collections...');
+
+    // 1.1 Delete notifications
+    try {
+      const notifications = await databaseService.query('notifications', {
+        where: [{ field: 'subscriptionId', operator: '==', value: params.p_subscription_id }]
+      });
+      for (const notification of notifications) {
+        await databaseService.delete('notifications', notification.id);
+      }
+      deleted.push(`notifications (${notifications.length})`);
+    } catch (error) {
+      errors.push(`notifications: ${error.message}`);
+    }
+
+    // 1.2 Delete todos
+    try {
+      const todos = await databaseService.query('todos', {
+        where: [{ field: 'subscriptionId', operator: '==', value: params.p_subscription_id }]
+      });
+      for (const todo of todos) {
+        await databaseService.delete('todos', todo.id);
+      }
+      deleted.push(`todos (${todos.length})`);
+    } catch (error) {
+      errors.push(`todos: ${error.message}`);
+    }
+
+    // 1.3 Delete sessions
+    try {
+      const sessions = await databaseService.query('sessions', {
+        where: [{ field: 'subscriptionId', operator: '==', value: params.p_subscription_id }]
+      });
+      for (const session of sessions) {
+        await databaseService.delete('sessions', session.id);
+      }
+      deleted.push(`sessions (${sessions.length})`);
+    } catch (error) {
+      errors.push(`sessions: ${error.message}`);
+    }
+
+    // 1.4 Delete payments
+    try {
+      const payments = await databaseService.query('payments', {
+        where: [{ field: 'subscriptionId', operator: '==', value: params.p_subscription_id }]
+      });
+      for (const payment of payments) {
+        await databaseService.delete('payments', payment.id);
+      }
+      deleted.push(`payments (${payments.length})`);
+    } catch (error) {
+      errors.push(`payments: ${error.message}`);
+    }
+
+    // 1.5 Update transactions (set subscription_id to null instead of deleting)
+    try {
+      const transactions = await databaseService.query('transactions', {
+        where: [{ field: 'subscriptionId', operator: '==', value: params.p_subscription_id }]
+      });
+      for (const transaction of transactions) {
+        await databaseService.update('transactions', transaction.id, {
+          subscriptionId: null,
+          subscription_id: null
+        });
+      }
+      deleted.push(`transactions updated (${transactions.length})`);
+    } catch (error) {
+      errors.push(`transactions: ${error.message}`);
+    }
+
+    // Step 2: Finally delete the subscription record
+    try {
+      await databaseService.delete('subscriptions', params.p_subscription_id);
+      deleted.push('subscription record');
+      console.log('✅ Subscription record deleted');
+    } catch (error) {
+      errors.push(`subscription record: ${error.message}`);
+      throw new Error('Failed to delete subscription record: ' + error.message);
+    }
+
+    console.log('✅ Cascade delete completed');
+    console.log('📊 Deleted:', deleted);
+    if (errors.length > 0) {
+      console.warn('⚠️ Errors during deletion:', errors);
+    }
+
+    return {
+      data: {
+        success: true,
+        message: 'Subscription and all related data deleted successfully',
+        deleted: deleted,
+        errors: errors.length > 0 ? errors : undefined
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('❌ Error during cascade delete:', error);
+    return {
+      data: {
+        success: false,
+        message: error.message || 'Failed to delete subscription'
+      },
+      error: error
+    };
   }
 }
 

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Plus, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { Subscription, deleteStudentSubscriptionEnhanced, RpcResponse, supabase } from '@/integrations/supabase/client';
+import { Subscription, RpcResponse, supabase } from '@/integrations/supabase/client';
+import { UserContext } from '@/contexts/UserContext';
 import EditSubscriptionDialog from './EditSubscriptionDialog';
 import AddSubscriptionDialog from './AddSubscriptionDialog';
 import SubscriptionCard from './SubscriptionCard';
@@ -19,6 +20,7 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
   isLoading = false
 }) => {
   const { toast } = useToast();
+  const { user } = useContext(UserContext);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -177,23 +179,40 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
     gcTime: 30000, // Reduced cache time for fresher data
   });
 
-  // Handle subscription deletion
+  // Handle subscription deletion with cascade
   const handleDeleteSubscription = async (subscriptionId: string) => {
     try {
       setDeletingId(subscriptionId);
-      console.log('🗑️ Deleting subscription:', subscriptionId);
-      
-      const response = await deleteStudentSubscriptionEnhanced(subscriptionId);
-      console.log('✅ Delete response:', response);
-      
-      const typedResponse = response as RpcResponse;
-      if (typedResponse && !typedResponse.success) {
-        throw new Error(typedResponse.message || 'Failed to delete subscription');
+      console.log('🗑️ Starting cascade delete for subscription:', subscriptionId);
+
+      if (!user?.schoolId) {
+        throw new Error('School ID not found');
       }
+
+      const { data, error } = await supabase.rpc('delete_subscription_cascade', {
+        p_subscription_id: subscriptionId,
+        p_school_id: user.schoolId
+      });
+
+      if (error) {
+        console.error('❌ Delete error:', error);
+        throw new Error(error.message || 'Failed to delete subscription');
+      }
+
+      let response = data;
+      if (typeof data === 'string') {
+        response = JSON.parse(data);
+      }
+
+      if (!response || !response.success) {
+        throw new Error(response?.message || 'Failed to delete subscription');
+      }
+
+      console.log('✅ Cascade delete completed:', response);
 
       toast({
         title: "Success",
-        description: typedResponse?.message || "Subscription deleted successfully!",
+        description: response.message || "Subscription and all related data deleted successfully!",
       });
 
       console.log('🔄 Triggering refresh after deletion');
