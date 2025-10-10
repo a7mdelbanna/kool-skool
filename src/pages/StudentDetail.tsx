@@ -71,7 +71,7 @@ const StudentDetail = () => {
     enabled: !!studentId
   });
 
-  // Fetch subscriptions from Supabase RPC
+  // Fetch subscriptions from Supabase RPC with calculated end dates
   const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery({
     queryKey: ['student-subscriptions-detail', studentId],
     queryFn: async () => {
@@ -84,7 +84,62 @@ const StudentDetail = () => {
         return [];
       }
       console.log('Subscriptions:', data);
-      return data || [];
+
+      // Calculate end dates from sessions for each subscription
+      const subscriptionsWithCalculatedDates = await Promise.all(
+        (data || []).map(async (sub: any) => {
+          try {
+            // Fetch sessions for this subscription, checking both field naming conventions
+            const sessions = await databaseService.query('sessions', {
+              where: [{ field: 'subscriptionId', operator: '==', value: sub.id }]
+            });
+
+            let allSessions = sessions || [];
+            if (allSessions.length === 0) {
+              const sessionsSnakeCase = await databaseService.query('sessions', {
+                where: [{ field: 'subscription_id', operator: '==', value: sub.id }]
+              });
+              allSessions = sessionsSnakeCase || [];
+            }
+
+            let calculatedEndDate = sub.end_date;
+            if (allSessions.length > 0) {
+              // Sort sessions by date descending to get the last session
+              const sortedSessions = allSessions.sort((a: any, b: any) => {
+                const dateA = new Date(a.scheduled_date || a.scheduledDate || a.date);
+                const dateB = new Date(b.scheduled_date || b.scheduledDate || b.date);
+                return dateB.getTime() - dateA.getTime();
+              });
+
+              const lastSession = sortedSessions[0];
+              if (lastSession && (lastSession.scheduled_date || lastSession.scheduledDate)) {
+                calculatedEndDate = lastSession.scheduled_date || lastSession.scheduledDate;
+                console.log(`📅 Calculated end date for subscription ${sub.id}:`, calculatedEndDate);
+              }
+            }
+
+            return {
+              ...sub,
+              calculated_end_date: calculatedEndDate
+            };
+          } catch (error) {
+            console.error(`Error fetching sessions for subscription ${sub.id}:`, error);
+            return {
+              ...sub,
+              calculated_end_date: sub.end_date
+            };
+          }
+        })
+      );
+
+      // Sort subscriptions by start_date (oldest first) so #1 is the first subscription
+      const sortedSubscriptions = subscriptionsWithCalculatedDates.sort((a: any, b: any) => {
+        const dateA = new Date(a.start_date || 0);
+        const dateB = new Date(b.start_date || 0);
+        return dateA.getTime() - dateB.getTime(); // Ascending order (oldest first)
+      });
+
+      return sortedSubscriptions;
     },
     enabled: !!studentId
   });
@@ -635,7 +690,7 @@ const StudentDetail = () => {
                                   <>
                                     Subscription #{subIndex + 1} - {subscription.session_count} Sessions
                                     <span className="text-sm text-muted-foreground ml-2">
-                                      ({safeFormatDate(subscription.start_date, 'MMM d')} - {safeFormatDate(subscription.end_date, 'MMM d, yyyy')})
+                                      ({safeFormatDate(subscription.start_date, 'MMM d')} - {safeFormatDate(subscription.calculated_end_date || subscription.end_date, 'MMM d, yyyy')})
                                     </span>
                                   </>
                                 ) : (
@@ -752,7 +807,7 @@ const StudentDetail = () => {
                               <div>
                                 <p className="text-muted-foreground">End Date</p>
                                 <p className="font-medium">
-                                  {safeFormatDate(subscription.end_date, 'MMM d, yyyy')}
+                                  {safeFormatDate(subscription.calculated_end_date || subscription.end_date, 'MMM d, yyyy')}
                                 </p>
                               </div>
                               <div>
