@@ -444,7 +444,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
               {/* Session Count, Duration, Session Duration, and Currency */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="sessionCount" className="text-sm font-semibold text-gray-700">Session Count</Label>
+                  <Label htmlFor="sessionCount" className="text-sm font-semibold text-foreground">Session Count</Label>
                   <Input 
                     type="number" 
                     id="sessionCount" 
@@ -455,7 +455,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                   />
                 </div>
                 <div>
-                  <Label htmlFor="durationMonths" className="text-sm font-semibold text-gray-700">Duration (Months)</Label>
+                  <Label htmlFor="durationMonths" className="text-sm font-semibold text-foreground">Duration (Months)</Label>
                   <Input 
                     type="number" 
                     id="durationMonths" 
@@ -466,7 +466,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                   />
                 </div>
                 <div>
-                  <Label htmlFor="sessionDuration" className="text-sm font-semibold text-gray-700">Session Duration</Label>
+                  <Label htmlFor="sessionDuration" className="text-sm font-semibold text-foreground">Session Duration</Label>
                   <Select 
                     value={formData.sessionDuration} 
                     onValueChange={(value) => setFormData({ ...formData, sessionDuration: value })}
@@ -488,7 +488,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">Currency</Label>
+                  <Label htmlFor="currency" className="text-sm font-semibold text-foreground">Currency</Label>
                   <Select 
                     value={formData.currency} 
                     onValueChange={(value) => setFormData({ ...formData, currency: value })}
@@ -509,7 +509,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
               {/* Start Date */}
               <div>
-                <Label className="text-sm font-semibold text-gray-700">Start Date</Label>
+                <Label className="text-sm font-semibold text-foreground">Start Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -538,56 +538,65 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
               {/* Schedule Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold text-gray-700">Schedule</Label>
-                  <Button 
+                  <Label className="text-sm font-semibold text-foreground">Schedule</Label>
+                  <Button
                     type="button"
-                    variant="outline" 
+                    variant="outline"
                     size="sm"
                     onClick={addScheduleItem}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
                   >
                     <Plus className="h-4 w-4" />
                     Add Schedule
                   </Button>
                 </div>
-                
-                {formData.schedule.map((schedule, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-600">Day</Label>
-                      <Select 
-                        value={schedule.day || ""}
-                        onValueChange={(value) => updateScheduleItem(index, 'day', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select day" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {daysOfWeek.map((day) => (
-                            <SelectItem key={day} value={day}>{day}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-gray-600">Time</Label>
-                      <TimePicker
-                        value={schedule.time}
-                        onChange={(value) => updateScheduleItem(index, 'time', value)}
-                        placeholder="Select time"
-                      />
-                    </div>
-                    <Button 
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeScheduleItem(index)}
-                      className="text-red-600 hover:text-red-800 mt-4"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+
+                {formData.schedule.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 px-4 bg-muted/50 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                    <Calendar className="h-12 w-12 text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No schedule items added yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click "Add Schedule" to get started</p>
                   </div>
-                ))}
+                ) : (
+                  formData.schedule.map((schedule, index) => (
+                    <div key={index} className="flex items-center gap-3 p-4 bg-card border border-border rounded-lg shadow-sm">
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">Day</Label>
+                        <Select
+                          value={schedule.day || ""}
+                          onValueChange={(value) => updateScheduleItem(index, 'day', value)}
+                        >
+                          <SelectTrigger className="bg-background border-input hover:bg-accent hover:text-accent-foreground">
+                            <SelectValue placeholder="Select day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {daysOfWeek.map((day) => (
+                              <SelectItem key={day} value={day}>{day}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">Time</Label>
+                        <TimePicker
+                          value={schedule.time}
+                          onChange={(value) => updateScheduleItem(index, 'time', value)}
+                          placeholder="Select time"
+                          className="bg-background border-input hover:bg-accent hover:text-accent-foreground"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeScheduleItem(index)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-6"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Validation Loading */}
@@ -613,7 +622,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
               {/* Price Section */}
               <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-semibold text-gray-700">Price Mode</Label>
+                  <Label className="text-sm font-semibold text-foreground">Price Mode</Label>
                   <Select 
                     value={formData.priceMode} 
                     onValueChange={(value) => setFormData({ 
@@ -633,7 +642,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
                 {formData.priceMode === 'perSession' && (
                   <div>
-                    <Label htmlFor="pricePerSession" className="text-sm font-semibold text-gray-700">
+                    <Label htmlFor="pricePerSession" className="text-sm font-semibold text-foreground">
                       Price Per Session ({getCurrencySymbol(formData.currency)})
                     </Label>
                     <Input 
@@ -646,7 +655,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                       step="0.01"
                     />
                     {formData.pricePerSession > 0 && (
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         Total: {getCurrencySymbol(formData.currency)} {(formData.pricePerSession * formData.sessionCount).toFixed(2)}
                       </p>
                     )}
@@ -655,7 +664,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
                 {formData.priceMode === 'fixedPrice' && (
                   <div>
-                    <Label htmlFor="fixedPrice" className="text-sm font-semibold text-gray-700">
+                    <Label htmlFor="fixedPrice" className="text-sm font-semibold text-foreground">
                       Fixed Price ({getCurrencySymbol(formData.currency)})
                     </Label>
                     <Input 
@@ -673,7 +682,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
               {/* Status */}
               <div>
-                <Label className="text-sm font-semibold text-gray-700">Status</Label>
+                <Label className="text-sm font-semibold text-foreground">Status</Label>
                 <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select status" />
@@ -689,10 +698,10 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
               {/* Initial Payment Section */}
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Initial Payment</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Initial Payment</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="initialAmount" className="text-sm font-semibold text-gray-700">
+                    <Label htmlFor="initialAmount" className="text-sm font-semibold text-foreground">
                       Amount ({getCurrencySymbol(formData.currency)})
                     </Label>
                     <Input 
@@ -712,7 +721,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                     />
                   </div>
                   <div>
-                    <Label className="text-sm font-semibold text-gray-700">Payment Method</Label>
+                    <Label className="text-sm font-semibold text-foreground">Payment Method</Label>
                     <Select 
                       value={formData.initialPayment.method} 
                       onValueChange={(value) => setFormData({ 
@@ -734,7 +743,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm font-semibold text-gray-700">Account</Label>
+                    <Label className="text-sm font-semibold text-foreground">Account</Label>
                     <Select 
                       value={formData.initialPayment.accountId} 
                       onValueChange={(value) => setFormData({ 
@@ -762,7 +771,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                 </div>
                 
                 <div className="mt-4">
-                  <Label htmlFor="paymentNotes" className="text-sm font-semibold text-gray-700">Payment Notes</Label>
+                  <Label htmlFor="paymentNotes" className="text-sm font-semibold text-foreground">Payment Notes</Label>
                   <Textarea 
                     id="paymentNotes" 
                     placeholder="Add any notes about the initial payment..."
@@ -782,7 +791,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
 
               {/* Notes */}
               <div>
-                <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Notes</Label>
+                <Label htmlFor="notes" className="text-sm font-semibold text-foreground">Notes</Label>
                 <Textarea 
                   id="notes" 
                   placeholder="Add any additional notes about this subscription..."
@@ -849,14 +858,14 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
               <AlertTriangle className="h-5 w-5" />
               Teacher Schedule Conflict
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-left whitespace-pre-wrap text-gray-700 leading-relaxed">
+            <AlertDialogDescription className="text-left whitespace-pre-wrap text-foreground leading-relaxed">
               <div className="mb-4">
                 <strong>Unable to create subscription due to a scheduling conflict.</strong>
               </div>
               <div className="mb-4">
                 {conflictMessage}
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 <strong>What you can do:</strong>
                 <ul className="list-disc list-inside mt-2 space-y-1">
                   <li>Choose a different time slot for your session</li>

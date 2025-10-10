@@ -719,56 +719,65 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
               {/* Schedule Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold text-muted-foreground">Schedule</Label>
-                  <Button 
+                  <Label className="text-sm font-semibold text-foreground">Schedule</Label>
+                  <Button
                     type="button"
-                    variant="outline" 
+                    variant="outline"
                     size="sm"
                     onClick={addScheduleItem}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
                   >
                     <Plus className="h-4 w-4" />
                     Add Schedule
                   </Button>
                 </div>
-                
-                {formData.schedule.map((schedule, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 bg-card rounded-lg border border-border">
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Day</Label>
-                      <Select 
-                        value={schedule.day || ""}
-                        onValueChange={(value) => updateScheduleItem(index, 'day', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select day" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {daysOfWeek.map((day) => (
-                            <SelectItem key={day} value={day}>{day}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Time</Label>
-                      <TimePicker
-                        value={schedule.time}
-                        onChange={(time) => updateScheduleItem(index, 'time', time)}
-                        placeholder="Select time"
-                      />
-                    </div>
-                    <Button 
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeScheduleItem(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+
+                {formData.schedule.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 px-4 bg-muted/50 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                    <Calendar className="h-12 w-12 text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No schedule items added yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click "Add Schedule" to get started</p>
                   </div>
-                ))}
+                ) : (
+                  formData.schedule.map((schedule, index) => (
+                    <div key={index} className="flex items-center gap-3 p-4 bg-card border border-border rounded-lg shadow-sm">
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">Day</Label>
+                        <Select
+                          value={schedule.day || ""}
+                          onValueChange={(value) => updateScheduleItem(index, 'day', value)}
+                        >
+                          <SelectTrigger className="bg-background border-input hover:bg-accent hover:text-accent-foreground">
+                            <SelectValue placeholder="Select day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {daysOfWeek.map((day) => (
+                              <SelectItem key={day} value={day}>{day}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">Time</Label>
+                        <TimePicker
+                          value={schedule.time}
+                          onChange={(time) => updateScheduleItem(index, 'time', time)}
+                          placeholder="Select time"
+                          className="bg-background border-input hover:bg-accent hover:text-accent-foreground"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeScheduleItem(index)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-6"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Validation Error Alert */}

@@ -99,7 +99,7 @@ const TimePicker: React.FC<TimePickerProps> = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <div className="bg-white rounded-lg shadow-lg border p-4">
+        <div className="bg-popover rounded-lg shadow-lg border border-border p-4">
           <div className="flex items-center justify-center space-x-2">
             {/* Hours */}
             <div className="flex flex-col items-center">
@@ -111,7 +111,7 @@ const TimePicker: React.FC<TimePickerProps> = ({
               >
                 <ChevronUp className="h-4 w-4" />
               </Button>
-              <div className="text-2xl font-bold w-12 text-center py-2">
+              <div className="text-2xl font-bold w-12 text-center py-2 text-foreground">
                 {hours.toString().padStart(2, '0')}
               </div>
               <Button
@@ -124,7 +124,7 @@ const TimePicker: React.FC<TimePickerProps> = ({
               </Button>
             </div>
 
-            <div className="text-2xl font-bold">:</div>
+            <div className="text-2xl font-bold text-foreground">:</div>
 
             {/* Minutes */}
             <div className="flex flex-col items-center">
@@ -136,7 +136,7 @@ const TimePicker: React.FC<TimePickerProps> = ({
               >
                 <ChevronUp className="h-4 w-4" />
               </Button>
-              <div className="text-2xl font-bold w-12 text-center py-2">
+              <div className="text-2xl font-bold w-12 text-center py-2 text-foreground">
                 {minutes.toString().padStart(2, '0')}
               </div>
               <Button
