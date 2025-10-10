@@ -1,11 +1,21 @@
-import React from 'react';
-import { Calendar, CheckSquare, DollarSign, Edit, Trash2, CreditCard, Eye } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, CheckSquare, DollarSign, Edit, Trash2, CreditCard, Eye, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -66,7 +76,8 @@ interface StudentCardProps {
 
 const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCardProps) => {
   const navigate = useNavigate();
-  
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
   // Debug log to see what data is being passed to the component
   console.log('Rendering StudentCard with data:', student);
   console.log('Subscription progress value:', student.subscriptionProgress);
@@ -265,7 +276,7 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
                     <Edit className="mr-2 h-4 w-4" />
                     <span>Edit</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={() => onDelete?.(student)}>
+                  <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={() => setShowDeleteDialog(true)}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     <span>Delete</span>
                   </DropdownMenuItem>
@@ -336,6 +347,48 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
           </div>
         </div>
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Permanently Delete Student?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p className="font-semibold text-foreground">
+                Are you sure you want to delete <span className="text-destructive">{student.firstName} {student.lastName}</span>?
+              </p>
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
+                <p className="font-medium text-sm text-foreground">This will permanently delete:</p>
+                <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
+                  <li>All subscription records</li>
+                  <li>All lesson sessions</li>
+                  <li>All payment records</li>
+                  <li>All progress and achievements</li>
+                  <li>All related notifications and tasks</li>
+                </ul>
+              </div>
+              <p className="text-destructive font-medium text-sm">
+                ⚠️ This action cannot be undone!
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDelete?.(student);
+                setShowDeleteDialog(false);
+              }}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };

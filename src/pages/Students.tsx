@@ -754,18 +754,47 @@ const Students = () => {
     try {
       toast.promise(
         async () => {
-          // Update student status to 'deleted' instead of actually deleting
-          await databaseService.update('students', student.id, {
-            status: 'deleted'
+          if (!user?.schoolId) {
+            throw new Error('School ID not found');
+          }
+
+          // Use cascade delete RPC to remove student and all related data
+          const { data, error } = await supabase.rpc('delete_student_cascade', {
+            p_student_id: student.id,
+            p_school_id: user.schoolId
           });
-          
+
+          if (error) {
+            console.error('❌ Delete error:', error);
+            throw new Error(error.message || 'Failed to delete student');
+          }
+
+          // Parse response
+          let response = data;
+          if (typeof data === 'string') {
+            try {
+              response = JSON.parse(data);
+            } catch (e) {
+              // data is already an object
+            }
+          }
+
+          if (!response || !response.success) {
+            throw new Error(response?.message || 'Failed to delete student');
+          }
+
+          console.log('✅ Student deleted:', response.deleted);
+          if (response.errors && response.errors.length > 0) {
+            console.warn('⚠️ Some errors during deletion:', response.errors);
+          }
+
           await refetchStudents();
-          
+
           return { success: true };
         },
         {
-          loading: 'Deleting student...',
-          success: `${student.firstName} ${student.lastName} deleted successfully`,
+          loading: 'Deleting student and all related data...',
+          success: `${student.firstName} ${student.lastName} and all related data deleted successfully`,
           error: (err) => `Failed to delete student: ${err.message}`
         }
       );

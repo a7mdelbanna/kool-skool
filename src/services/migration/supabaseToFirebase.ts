@@ -169,6 +169,8 @@ export const supabase = {
         return handleUpdateStudentPassword(params);
       case 'verify_password_update':
         return handleVerifyPasswordUpdate(params);
+      case 'delete_student_cascade':
+        return handleDeleteStudent(params);
       case 'update_subscription_with_related_data':
         return handleUpdateSubscriptionWithRelatedData(params);
       default:
@@ -2724,6 +2726,180 @@ async function handleVerifyPasswordUpdate(params: { p_user_id: string }) {
   } catch (error) {
     console.error('Error verifying password update:', error);
     return { data: [], error };
+  }
+}
+
+// Handle delete_student_cascade RPC function - Deletes student and all related data
+async function handleDeleteStudent(params: { p_student_id: string, p_school_id: string }) {
+  try {
+    console.log('🗑️ Starting cascade delete for student:', params.p_student_id);
+
+    const errors: string[] = [];
+    const deleted: string[] = [];
+
+    // Step 1: Delete Firebase collections
+    console.log('📦 Deleting Firebase collections...');
+
+    // 1.1 Delete vocabulary progress sessions
+    try {
+      const vocabSessions = await databaseService.query('vocabularyProgress_sessions', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const session of vocabSessions) {
+        await databaseService.delete('vocabularyProgress_sessions', session.id);
+      }
+      deleted.push(`vocabularyProgress_sessions (${vocabSessions.length})`);
+    } catch (error) {
+      errors.push(`vocabularyProgress_sessions: ${error.message}`);
+    }
+
+    // 1.2 Delete vocabulary progress
+    try {
+      const vocabProgress = await databaseService.query('vocabularyProgress', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const progress of vocabProgress) {
+        await databaseService.delete('vocabularyProgress', progress.id);
+      }
+      deleted.push(`vocabularyProgress (${vocabProgress.length})`);
+    } catch (error) {
+      errors.push(`vocabularyProgress: ${error.message}`);
+    }
+
+    // 1.3 Delete achievements
+    try {
+      const achievements = await databaseService.query('achievements', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const achievement of achievements) {
+        await databaseService.delete('achievements', achievement.id);
+      }
+      deleted.push(`achievements (${achievements.length})`);
+    } catch (error) {
+      errors.push(`achievements: ${error.message}`);
+    }
+
+    // 1.4 Delete notifications
+    try {
+      const notifications = await databaseService.query('notifications', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const notification of notifications) {
+        await databaseService.delete('notifications', notification.id);
+      }
+      deleted.push(`notifications (${notifications.length})`);
+    } catch (error) {
+      errors.push(`notifications: ${error.message}`);
+    }
+
+    // 1.5 Delete todos
+    try {
+      const todos = await databaseService.query('todos', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const todo of todos) {
+        await databaseService.delete('todos', todo.id);
+      }
+      deleted.push(`todos (${todos.length})`);
+    } catch (error) {
+      errors.push(`todos: ${error.message}`);
+    }
+
+    // 1.6 Delete sessions (Firebase format)
+    try {
+      const sessions = await databaseService.query('sessions', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const session of sessions) {
+        await databaseService.delete('sessions', session.id);
+      }
+      deleted.push(`sessions (${sessions.length})`);
+    } catch (error) {
+      errors.push(`sessions: ${error.message}`);
+    }
+
+    // 1.7 Delete payments (Firebase format)
+    try {
+      const payments = await databaseService.query('payments', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const payment of payments) {
+        await databaseService.delete('payments', payment.id);
+      }
+      deleted.push(`payments (${payments.length})`);
+    } catch (error) {
+      errors.push(`payments: ${error.message}`);
+    }
+
+    // 1.8 Delete subscriptions (Firebase format)
+    try {
+      const subscriptions = await databaseService.query('subscriptions', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const subscription of subscriptions) {
+        await databaseService.delete('subscriptions', subscription.id);
+      }
+      deleted.push(`subscriptions (${subscriptions.length})`);
+    } catch (error) {
+      errors.push(`subscriptions: ${error.message}`);
+    }
+
+    // 1.9 Update transactions (set student_id to null instead of deleting)
+    try {
+      const transactions = await databaseService.query('transactions', {
+        where: [{ field: 'studentId', operator: '==', value: params.p_student_id }]
+      });
+      for (const transaction of transactions) {
+        await databaseService.update('transactions', transaction.id, {
+          studentId: null,
+          student_id: null
+        });
+      }
+      deleted.push(`transactions updated (${transactions.length})`);
+    } catch (error) {
+      errors.push(`transactions: ${error.message}`);
+    }
+
+    // Step 2: Delete Supabase tables (legacy data)
+    console.log('📊 Deleting Supabase legacy data...');
+
+    // Note: We don't use supabase.from().delete() anymore, everything is in Firebase
+    // But we keep this for backwards compatibility if needed
+
+    // Step 3: Finally delete the student record
+    try {
+      await databaseService.delete('students', params.p_student_id);
+      deleted.push('student record');
+      console.log('✅ Student record deleted');
+    } catch (error) {
+      errors.push(`student record: ${error.message}`);
+      throw new Error('Failed to delete student record: ' + error.message);
+    }
+
+    console.log('✅ Cascade delete completed');
+    console.log('📊 Deleted:', deleted);
+    if (errors.length > 0) {
+      console.warn('⚠️ Errors during deletion:', errors);
+    }
+
+    return {
+      data: {
+        success: true,
+        message: 'Student and all related data deleted successfully',
+        deleted: deleted,
+        errors: errors.length > 0 ? errors : undefined
+      },
+      error: null
+    };
+  } catch (error) {
+    console.error('❌ Error during cascade delete:', error);
+    return {
+      data: {
+        success: false,
+        message: error.message || 'Failed to delete student'
+      },
+      error: error
+    };
   }
 }
 
