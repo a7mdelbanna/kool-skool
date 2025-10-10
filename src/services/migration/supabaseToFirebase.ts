@@ -1173,67 +1173,109 @@ async function handleRenewSubscription(params: any) {
         const scheduleData = typeof schedule === 'string' ? JSON.parse(schedule) : schedule;
 
         if (Array.isArray(scheduleData) && scheduleData.length > 0) {
+          console.log('📅 Schedule data for renewal:', scheduleData);
+
           const sessionsToCreate = [];
-          let currentDate = new Date(newStartDate);
+          const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-          for (let i = 0; i < sessionCount; i++) {
-            // Get schedule item for this session
-            const scheduleItem = scheduleData[i % scheduleData.length];
+          // Sort schedule items by day of week for proper ordering
+          const sortedSchedule = [...scheduleData].sort((a, b) => {
+            const dayA = (a.day || a).toString();
+            const dayB = (b.day || b).toString();
+            const indexA = daysOfWeek.indexOf(dayA);
+            const indexB = daysOfWeek.indexOf(dayB);
+            return indexA - indexB;
+          });
 
-            // Extract time from schedule
-            let timeString = '09:00'; // Default time
-            if (scheduleItem && scheduleItem.time) {
-              timeString = scheduleItem.time;
-            } else if (scheduleItem && typeof scheduleItem === 'string' && scheduleItem.includes(' at ')) {
-              const parts = scheduleItem.split(' at ');
-              if (parts.length > 1) {
-                timeString = parts[1];
+          console.log('📅 Sorted schedule for session generation:', sortedSchedule);
+
+          let sessionsCreated = 0;
+          let currentWeekStart = new Date(newStartDate);
+
+          // Keep generating sessions until we reach the target count
+          while (sessionsCreated < sessionCount) {
+            // For each week, create sessions for ALL scheduled days
+            for (const scheduleItem of sortedSchedule) {
+              if (sessionsCreated >= sessionCount) break;
+
+              // Extract day and time from schedule item
+              const dayName = (scheduleItem.day || scheduleItem).toString();
+              const dayIndex = daysOfWeek.indexOf(dayName);
+
+              if (dayIndex === -1) {
+                console.warn(`⚠️ Invalid day name in schedule: ${dayName}`);
+                continue;
               }
+
+              // Extract time from schedule
+              let timeString = '09:00'; // Default time
+              if (scheduleItem && scheduleItem.time) {
+                timeString = scheduleItem.time;
+              } else if (scheduleItem && typeof scheduleItem === 'string' && scheduleItem.includes(' at ')) {
+                const parts = scheduleItem.split(' at ');
+                if (parts.length > 1) {
+                  timeString = parts[1];
+                }
+              }
+
+              // Calculate the date for this session
+              const sessionDate = new Date(currentWeekStart);
+              const currentDayIndex = sessionDate.getDay();
+              const daysToAdd = (dayIndex - currentDayIndex + 7) % 7;
+              sessionDate.setDate(sessionDate.getDate() + daysToAdd);
+
+              // Skip if this date is before the start date (for the first week)
+              if (sessionDate < newStartDate) {
+                continue;
+              }
+
+              // Format dates properly
+              const dateString = sessionDate.toISOString().split('T')[0]; // YYYY-MM-DD
+              const fullDateTime = `${dateString}T${timeString}:00.000Z`;
+
+              const session: any = {
+                // IDs
+                subscriptionId: newSubscriptionId,
+                studentId: newSubscriptionData.studentId,
+                teacherId: newSubscriptionData.teacherId,
+                schoolId: newSubscriptionData.schoolId,
+
+                // Date and time fields (multiple formats for compatibility)
+                scheduledDate: dateString,
+                scheduledTime: timeString,
+                scheduledDateTime: fullDateTime,
+                scheduled_date: dateString,  // snake_case for compatibility
+                scheduled_time: timeString,   // snake_case for compatibility
+
+                // Session details
+                duration: newSubscriptionData.sessionDurationMinutes || 60,
+                durationMinutes: newSubscriptionData.sessionDurationMinutes || 60,
+                status: 'scheduled',
+                sessionNumber: sessionsCreated + 1,
+                indexInSub: sessionsCreated + 1,
+                countsTowardCompletion: true,
+                counts_toward_completion: true, // snake_case for compatibility
+
+                // Metadata
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              };
+
+              // Remove undefined fields
+              Object.keys(session).forEach(key => {
+                if (session[key] === undefined) {
+                  delete session[key];
+                }
+              });
+
+              sessionsToCreate.push(session);
+              sessionsCreated++;
+
+              console.log(`📝 Scheduled session ${sessionsCreated} on ${dayName} ${dateString} at ${timeString}`);
             }
 
-            // Format dates properly
-            const dateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
-            const fullDateTime = `${dateString}T${timeString}:00.000Z`;
-
-            const session: any = {
-              // IDs
-              subscriptionId: newSubscriptionId,
-              studentId: newSubscriptionData.studentId,
-              teacherId: newSubscriptionData.teacherId,
-              schoolId: newSubscriptionData.schoolId,
-
-              // Date and time fields (multiple formats for compatibility)
-              scheduledDate: dateString,
-              scheduledTime: timeString,
-              scheduledDateTime: fullDateTime,
-              scheduled_date: dateString,  // snake_case for compatibility
-              scheduled_time: timeString,   // snake_case for compatibility
-
-              // Session details
-              duration: newSubscriptionData.sessionDurationMinutes || 60,
-              durationMinutes: newSubscriptionData.sessionDurationMinutes || 60,
-              status: 'scheduled',
-              sessionNumber: i + 1,
-              indexInSub: i + 1,
-              countsTowardCompletion: true,
-              counts_toward_completion: true, // snake_case for compatibility
-
-              // Metadata
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-
-            // Remove undefined fields
-            Object.keys(session).forEach(key => {
-              if (session[key] === undefined) {
-                delete session[key];
-              }
-            });
-
-            sessionsToCreate.push(session);
-
-            // Move to next week for next session
-            currentDate.setDate(currentDate.getDate() + 7);
+            // Move to next week
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
           }
 
           // Create all sessions
