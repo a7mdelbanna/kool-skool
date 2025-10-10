@@ -337,21 +337,23 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                     <AlertTriangle className="h-5 w-5" />
                     Permanently Delete Subscription?
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-3">
-                    <p className="font-semibold text-foreground">
-                      Are you sure you want to delete this subscription?
-                    </p>
-                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
-                      <p className="font-medium text-sm text-foreground">This will permanently delete:</p>
-                      <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
-                        <li>All lesson sessions for this subscription</li>
-                        <li>All payment records</li>
-                        <li>All related notifications and tasks</li>
-                      </ul>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3">
+                      <p className="font-semibold text-foreground">
+                        Are you sure you want to delete this subscription?
+                      </p>
+                      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
+                        <p className="font-medium text-sm text-foreground">This will permanently delete:</p>
+                        <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
+                          <li>All lesson sessions for this subscription</li>
+                          <li>All payment records</li>
+                          <li>All related notifications and tasks</li>
+                        </ul>
+                      </div>
+                      <p className="text-destructive font-medium text-sm">
+                        ⚠️ This action cannot be undone!
+                      </p>
                     </div>
-                    <p className="text-destructive font-medium text-sm">
-                      ⚠️ This action cannot be undone!
-                    </p>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

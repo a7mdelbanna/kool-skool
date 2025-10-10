@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { Subscription, RpcResponse, supabase } from '@/integrations/supabase/client';
-import { UserContext } from '@/contexts/UserContext';
+import { UserContext } from '@/App';
 import EditSubscriptionDialog from './EditSubscriptionDialog';
 import AddSubscriptionDialog from './AddSubscriptionDialog';
 import SubscriptionCard from './SubscriptionCard';
