@@ -26,3 +26,7 @@ dist-ssr
 # Nested git repositories
 kool-skool-monorepo/
 tutorflow-assistant/
+
+# Test and cleanup scripts
+cleanup-maro-subscription.js
+test-renewal.js
