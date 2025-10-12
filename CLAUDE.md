@@ -19,6 +19,41 @@ This project uses a multi-agent system for efficient parallel development. Each 
 3. Netlify automatically deploys from production branch
 4. **NEVER create a new production branch locally - it already exists on remote!**
 
+### 🔒 Netlify Secrets Scanning Fix:
+
+**Problem**: Netlify scans repository for exposed secrets and blocks deployment if found.
+
+**Solution Approach**:
+1. **Firebase API Keys** are already whitelisted in `netlify.toml`:
+   ```toml
+   [build.environment]
+   SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyA9wv23oSmC9bG-Bx9hA2KG2pAZBjHTO-A"
+   ```
+   - Firebase API keys are meant to be public (secured via Firebase Security Rules)
+   - This configuration tells Netlify to ignore this specific API key
+
+2. **Test/Temporary Files** with API keys must be excluded:
+   - Add any test scripts (e.g., `test-renewal.js`, `cleanup-*.js`) to `.gitignore`
+   - Remove them from git tracking: `git rm --cached filename.js`
+   - These files should NEVER be committed to the repository
+
+3. **When Netlify Deployment Fails with Secrets Error**:
+   ```bash
+   # Step 1: Identify the files mentioned in Netlify error log
+   # Step 2: Add them to .gitignore
+   # Step 3: Remove from git tracking
+   git rm --cached problematic-file.js
+   # Step 4: Commit and push
+   git add .gitignore
+   git commit -m "Remove test scripts from repository to fix Netlify secrets scan"
+   git push origin production
+   ```
+
+4. **Prevention**:
+   - Never commit test/debug scripts with hardcoded credentials
+   - Keep test files local only (add to .gitignore immediately)
+   - Use environment variables for sensitive data in actual code
+
 ## 📋 Available Agents
 
 ### Master Coordinator
