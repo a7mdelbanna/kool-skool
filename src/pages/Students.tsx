@@ -430,8 +430,15 @@ const Students = () => {
         };
       }
 
-      // Get the most recent active subscription
-      const activeSubscription = subscriptions.find(s => s.status === 'active') || subscriptions[0];
+      // Sort subscriptions by start date - NEWEST FIRST (descending order)
+      const sortedSubscriptions = subscriptions.sort((a, b) => {
+        const dateA = new Date(a.start_date || a.startDate || 0);
+        const dateB = new Date(b.start_date || b.startDate || 0);
+        return dateB.getTime() - dateA.getTime(); // Descending = newest first
+      });
+
+      // Get the most recent active subscription, or fall back to the newest subscription (first in sorted array)
+      const activeSubscription = sortedSubscriptions.find(s => s.status === 'active') || sortedSubscriptions[0];
       
       if (!activeSubscription) {
         return {
