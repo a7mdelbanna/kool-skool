@@ -166,8 +166,20 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         
         console.log('🎉 FINAL SUBSCRIPTIONS WITH REAL-TIME PROGRESS AND PAYMENTS:', subscriptionsWithPayments);
         console.log('📊 Total subscriptions to return with enhanced data:', subscriptionsWithPayments.length);
-        
-        return subscriptionsWithPayments;
+
+        // Sort subscriptions by start date - NEWEST FIRST (descending order)
+        const sortedSubscriptions = subscriptionsWithPayments.sort((a, b) => {
+          const dateA = new Date(a.start_date || a.startDate || 0);
+          const dateB = new Date(b.start_date || b.startDate || 0);
+          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+        });
+
+        console.log('🔄 Subscriptions sorted by date (newest first):', sortedSubscriptions.map(s => ({
+          id: s.id,
+          startDate: s.start_date || s.startDate
+        })));
+
+        return sortedSubscriptions;
       } catch (error) {
         console.error('❌ CRITICAL ERROR in RPC subscription fetch with real-time progress:', error);
         throw error;

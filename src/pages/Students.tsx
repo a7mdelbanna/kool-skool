@@ -12,9 +12,10 @@ import { toast } from 'sonner';
 import { PaymentProvider } from '@/contexts/PaymentContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { databaseService } from '@/services/firebase/database.service';
-import { 
-  createCourse, 
-  supabase
+import {
+  createCourse,
+  supabase,
+  deleteStudent
 } from '@/integrations/supabase/client';
 import { UserContext } from '@/App';
 import { useNavigate } from 'react-router-dom';
@@ -758,36 +759,18 @@ const Students = () => {
             throw new Error('School ID not found');
           }
 
-          // Use cascade delete RPC to remove student and all related data
-          const { data, error } = await supabase.rpc('delete_student_cascade', {
-            p_student_id: student.id,
-            p_school_id: user.schoolId
-          });
+          console.log('🗑️ Starting student deletion:', student.id);
 
-          if (error) {
-            console.error('❌ Delete error:', error);
-            throw new Error(error.message || 'Failed to delete student');
+          // Use Firebase cascade delete to remove student and all related data
+          const result = await deleteStudent(student.id);
+
+          if (!result || !result.success) {
+            throw new Error(result?.message || 'Failed to delete student');
           }
 
-          // Parse response
-          let response = data;
-          if (typeof data === 'string') {
-            try {
-              response = JSON.parse(data);
-            } catch (e) {
-              // data is already an object
-            }
-          }
+          console.log('✅ Student and all related data deleted successfully');
 
-          if (!response || !response.success) {
-            throw new Error(response?.message || 'Failed to delete student');
-          }
-
-          console.log('✅ Student deleted:', response.deleted);
-          if (response.errors && response.errors.length > 0) {
-            console.warn('⚠️ Some errors during deletion:', response.errors);
-          }
-
+          // Refresh the students list
           await refetchStudents();
 
           return { success: true };

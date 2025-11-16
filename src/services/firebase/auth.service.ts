@@ -315,6 +315,10 @@ class AuthService {
         id: uid,
         userId: uid,
         schoolId: userData.schoolId,
+        // Add user data to student document so it's available in student cards
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        email: userData.email,
         ...cleanStudentData,
         // Add normalized fields for UI display
         courseName: cleanStudentData.courseName || '',

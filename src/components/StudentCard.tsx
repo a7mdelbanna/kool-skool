@@ -356,23 +356,25 @@ const StudentCard = ({ student, className, onView, onEdit, onDelete }: StudentCa
               <AlertTriangle className="h-5 w-5" />
               Permanently Delete Student?
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p className="font-semibold text-foreground">
-                Are you sure you want to delete <span className="text-destructive">{student.firstName} {student.lastName}</span>?
-              </p>
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
-                <p className="font-medium text-sm text-foreground">This will permanently delete:</p>
-                <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
-                  <li>All subscription records</li>
-                  <li>All lesson sessions</li>
-                  <li>All payment records</li>
-                  <li>All progress and achievements</li>
-                  <li>All related notifications and tasks</li>
-                </ul>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="font-semibold text-foreground">
+                  Are you sure you want to delete <span className="text-destructive">{student.firstName} {student.lastName}</span>?
+                </p>
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
+                  <p className="font-medium text-sm text-foreground">This will permanently delete:</p>
+                  <ul className="text-sm space-y-1 ml-4 list-disc text-muted-foreground">
+                    <li>All subscription records</li>
+                    <li>All lesson sessions</li>
+                    <li>All payment records</li>
+                    <li>All progress and achievements</li>
+                    <li>All related notifications and tasks</li>
+                  </ul>
+                </div>
+                <p className="text-destructive font-medium text-sm">
+                  ⚠️ This action cannot be undone!
+                </p>
               </div>
-              <p className="text-destructive font-medium text-sm">
-                ⚠️ This action cannot be undone!
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

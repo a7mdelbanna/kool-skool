@@ -949,10 +949,51 @@ export const updateStudent = async (id: string, updates: Partial<StudentRecord>)
 
 export const deleteStudent = async (id: string) => {
   try {
+    console.log('[deleteStudent] Starting cascade delete for student:', id);
+
+    // 1. Delete all sessions for this student
+    const sessions = await databaseService.query('sessions', {
+      where: [{ field: 'studentId', operator: '==', value: id }]
+    });
+    console.log('[deleteStudent] Found sessions to delete:', sessions.length);
+    for (const session of sessions) {
+      await databaseService.delete('sessions', session.id);
+    }
+
+    // 2. Delete all subscriptions for this student
+    const subscriptions = await databaseService.query('subscriptions', {
+      where: [{ field: 'studentId', operator: '==', value: id }]
+    });
+    console.log('[deleteStudent] Found subscriptions to delete:', subscriptions.length);
+    for (const subscription of subscriptions) {
+      await databaseService.delete('subscriptions', subscription.id);
+    }
+
+    // 3. Delete all payments/transactions for this student
+    const transactions = await databaseService.query('transactions', {
+      where: [{ field: 'studentId', operator: '==', value: id }]
+    });
+    console.log('[deleteStudent] Found transactions to delete:', transactions.length);
+    for (const transaction of transactions) {
+      await databaseService.delete('transactions', transaction.id);
+    }
+
+    // 4. Delete the student document
     await databaseService.delete('students', id);
-    return { success: true };
+    console.log('[deleteStudent] Deleted student document');
+
+    // 5. Delete the user document (if it exists)
+    try {
+      await databaseService.delete('users', id);
+      console.log('[deleteStudent] Deleted user document');
+    } catch (error) {
+      console.log('[deleteStudent] No user document found or error deleting:', error);
+    }
+
+    console.log('[deleteStudent] Cascade delete completed successfully');
+    return { success: true, message: 'Student and all related data deleted successfully' };
   } catch (error) {
-    console.error('Error deleting student:', error);
+    console.error('[deleteStudent] Error during cascade delete:', error);
     throw error;
   }
 };

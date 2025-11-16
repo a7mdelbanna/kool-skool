@@ -265,7 +265,19 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
         console.log(`Group ${index + 1} (${sub.id}): ${sub.sessions.length} sessions`);
       });
 
-      setSubscriptions(subscriptionsWithSessions);
+      // Sort subscriptions by start date - NEWEST FIRST (descending order)
+      const sortedSubscriptions = subscriptionsWithSessions.sort((a, b) => {
+        const dateA = new Date(a.start_date || 0);
+        const dateB = new Date(b.start_date || 0);
+        return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      });
+
+      console.log('🔄 Subscriptions sorted by date (newest first):', sortedSubscriptions.map(s => ({
+        id: s.id,
+        startDate: s.start_date
+      })));
+
+      setSubscriptions(sortedSubscriptions);
       console.log('=== SESSIONS TAB: LOAD COMPLETE ===');
       
     } catch (error) {
