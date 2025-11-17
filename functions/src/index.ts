@@ -604,9 +604,20 @@ exports.updatePaymentStatuses = functions.pubsub
 // ============================================
 
 // Export Twilio functions
-export { 
+export {
   testTwilioCredentials,
-  sendTwilioMessage, 
-  scheduleLessonReminders, 
-  schedulePaymentReminders 
+  sendTwilioMessage,
+  scheduleLessonReminders,
+  schedulePaymentReminders
 } from './twilio/sendMessage';
+
+// ============================================
+// TELEGRAM FUNCTIONS
+// ============================================
+
+// Export Telegram functions
+export {
+  sendTelegramLessonReminders,
+  sendTelegramSubscriptionReminders,
+  handleTelegramWebhook
+} from './telegram/notifications';

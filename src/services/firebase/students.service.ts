@@ -44,6 +44,13 @@ export interface FirebaseStudent {
   joinDate?: string;
   totalLessonsTaken?: number;
   totalPayments?: number;
+  telegramNotifications?: {
+    chatId?: string;           // Telegram chat ID for sending messages
+    username?: string;          // Telegram username (optional)
+    linkedAt?: Date;           // When the account was linked
+    enabled?: boolean;         // Whether notifications are enabled
+    language?: 'en' | 'ru';    // Preferred notification language
+  };
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -86,6 +93,15 @@ class StudentsService {
       joinDate: data.joinDate || data.join_date || '',
       totalLessonsTaken: data.totalLessonsTaken || data.total_lessons_taken || 0,
       totalPayments: data.totalPayments || data.total_payments || 0,
+      telegramNotifications: data.telegramNotifications || data.telegram_notifications ? {
+        chatId: data.telegramNotifications?.chatId || data.telegram_notifications?.chat_id,
+        username: data.telegramNotifications?.username || data.telegram_notifications?.username,
+        linkedAt: data.telegramNotifications?.linkedAt?.toDate ? data.telegramNotifications.linkedAt.toDate() :
+                  data.telegram_notifications?.linked_at?.toDate ? data.telegram_notifications.linked_at.toDate() :
+                  data.telegramNotifications?.linkedAt || data.telegram_notifications?.linked_at,
+        enabled: data.telegramNotifications?.enabled ?? data.telegram_notifications?.enabled ?? false,
+        language: data.telegramNotifications?.language || data.telegram_notifications?.language || 'en'
+      } : undefined,
       createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
       updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt
     };

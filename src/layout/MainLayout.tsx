@@ -25,6 +25,7 @@ import TeamAccess from '@/pages/TeamAccess';
 import StudentAccess from '@/pages/StudentAccess';
 import LicenseManagement from '@/pages/LicenseManagement';
 import TwilioSettings from '@/pages/TwilioSettings';
+import TelegramSettings from '@/pages/TelegramSettings';
 import PersonalSettings from '@/pages/PersonalSettings';
 import ThemeSettings from '@/pages/ThemeSettings';
 import SchoolSettings from '@/pages/SchoolSettings';
@@ -77,6 +78,7 @@ const MainLayout = () => {
                   <Route path="/student-access" element={<StudentAccess />} />
                   <Route path="/license-management" element={<LicenseManagement />} />
                   <Route path="/settings/communications" element={<TwilioSettings />} />
+                  <Route path="/settings/telegram" element={<TelegramSettings />} />
                   <Route path="/settings/personal" element={<PersonalSettings />} />
                   <Route path="/settings/theme" element={<ThemeSettings />} />
                   <Route path="/settings/school" element={<SchoolSettings />} />

@@ -19,6 +19,7 @@ export enum NotificationTemplateType {
   LESSON_REMINDER_15_MIN = 'lesson_reminder_15_min',
   PAYMENT_REMINDER = 'payment_reminder',
   LESSON_CANCELLATION = 'lesson_cancellation',
+  SUBSCRIPTION_EXPIRY = 'subscription_expiry',
   CUSTOM = 'custom'
 }
 
@@ -37,7 +38,8 @@ export interface NotificationRule {
 export enum NotificationRuleType {
   LESSON_REMINDERS = 'lesson_reminders',
   PAYMENT_REMINDERS = 'payment_reminders',
-  LESSON_CANCELLATION = 'lesson_cancellation'
+  LESSON_CANCELLATION = 'lesson_cancellation',
+  SUBSCRIPTION_EXPIRY = 'subscription_expiry'
 }
 
 export interface NotificationReminder {
@@ -64,7 +66,9 @@ export interface NotificationRecipients {
 export enum NotificationChannel {
   SMS = 'sms',
   WHATSAPP = 'whatsapp',
-  BOTH = 'both'
+  TELEGRAM = 'telegram',
+  BOTH = 'both',
+  ALL = 'all' // SMS + WhatsApp + Telegram
 }
 
 export interface NotificationVariable {
@@ -153,6 +157,24 @@ export const NOTIFICATION_VARIABLES: NotificationVariable[] = [
     label: 'School Name',
     description: 'Name of the educational institution',
     example: 'TutorFlow Academy'
+  },
+  {
+    key: 'subscriptionEndDate',
+    label: 'Subscription End Date',
+    description: 'Date when the subscription ends',
+    example: 'January 15, 2025'
+  },
+  {
+    key: 'sessionsRemaining',
+    label: 'Sessions Remaining',
+    description: 'Number of sessions remaining in subscription',
+    example: '3'
+  },
+  {
+    key: 'daysUntilExpiry',
+    label: 'Days Until Expiry',
+    description: 'Number of days until subscription expires',
+    example: '7'
   }
 ];
 
@@ -256,6 +278,26 @@ export const DEFAULT_TEMPLATES: Omit<NotificationTemplate, 'id' | 'schoolId' | '
     variables: ['studentName', 'subject', 'teacherName', 'lessonTime'],
     isDefault: true,
     isActive: true
+  },
+
+  // Subscription Expiry Reminder
+  {
+    name: 'Subscription Expiry Reminder',
+    type: NotificationTemplateType.SUBSCRIPTION_EXPIRY,
+    language: 'en',
+    body: 'Hi {parentName}, {studentName}\'s subscription for {subject} lessons will expire in {daysUntilExpiry} days on {subscriptionEndDate}. You have {sessionsRemaining} sessions remaining. Please renew to continue the lessons without interruption.',
+    variables: ['parentName', 'studentName', 'subject', 'daysUntilExpiry', 'subscriptionEndDate', 'sessionsRemaining'],
+    isDefault: true,
+    isActive: true
+  },
+  {
+    name: 'Напоминание об окончании подписки',
+    type: NotificationTemplateType.SUBSCRIPTION_EXPIRY,
+    language: 'ru',
+    body: 'Привет {parentName}, подписка {studentName} на уроки {subject} истекает через {daysUntilExpiry} дней - {subscriptionEndDate}. У вас осталось {sessionsRemaining} занятий. Пожалуйста, продлите подписку, чтобы продолжить обучение без перерывов.',
+    variables: ['parentName', 'studentName', 'subject', 'daysUntilExpiry', 'subscriptionEndDate', 'sessionsRemaining'],
+    isDefault: true,
+    isActive: true
   }
 ];
 
@@ -332,6 +374,24 @@ export const DEFAULT_NOTIFICATION_RULES: Omit<NotificationRule, 'id' | 'schoolId
     ],
     recipients: {
       student: true,
+      parent: true,
+      teacher: false
+    }
+  },
+  {
+    type: NotificationRuleType.SUBSCRIPTION_EXPIRY,
+    enabled: true,
+    reminders: [
+      {
+        id: 'subscription_7_days',
+        enabled: true,
+        timing: { value: 7, unit: 'days' },
+        channel: NotificationChannel.TELEGRAM,
+        templateType: NotificationTemplateType.SUBSCRIPTION_EXPIRY
+      }
+    ],
+    recipients: {
+      student: false,
       parent: true,
       teacher: false
     }

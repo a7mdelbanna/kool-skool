@@ -5,8 +5,8 @@ export interface NotificationLog {
   recipientName: string;
   recipientPhone: string;
   recipientType: 'student' | 'parent' | 'teacher';
-  notificationType: 'lesson_reminder' | 'payment_reminder' | 'lesson_cancellation' | 'custom';
-  channel: 'sms' | 'whatsapp';
+  notificationType: 'lesson_reminder' | 'payment_reminder' | 'lesson_cancellation' | 'subscription_expiry' | 'custom';
+  channel: 'sms' | 'whatsapp' | 'telegram';
   status: 'sent' | 'failed' | 'pending' | 'delivered' | 'read';
   cost?: number; // Cost in USD
   currency?: string;
@@ -54,11 +54,13 @@ export interface NotificationLogStats {
   costByChannel: {
     sms: number;
     whatsapp: number;
+    telegram: number;
   };
   sentByType: {
     lesson_reminder: number;
     payment_reminder: number;
     lesson_cancellation: number;
+    subscription_expiry: number;
     custom: number;
   };
   sentByDay: {

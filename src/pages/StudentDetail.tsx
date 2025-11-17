@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   User,
@@ -23,7 +23,10 @@ import {
   MapPin,
   Cake,
   Star,
-  School
+  School,
+  Send,
+  Copy,
+  QrCode
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,19 +35,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { UserContext } from '@/App';
 import { databaseService } from '@/services/firebase/database.service';
 import { sessionDetailsService } from '@/services/firebase/sessionDetails.service';
 import { todosService } from '@/services/firebase/todos.service';
+import { telegramService } from '@/services/telegram.service';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'sonner';
 
 const StudentDetail = () => {
   const { studentId } = useParams<{ studentId: string }>();
   const navigate = useNavigate();
   const { user } = useContext(UserContext);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [showUnlinkDialog, setShowUnlinkDialog] = useState(false);
+  const [linkingCode, setLinkingCode] = useState('');
+  const [deepLink, setDeepLink] = useState('');
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
 
   // Helper function to safely format dates
   const safeFormatDate = (date: any, formatString: string): string => {
@@ -60,7 +90,7 @@ const StudentDetail = () => {
   };
 
   // Fetch student data from Firebase
-  const { data: student, isLoading: studentLoading } = useQuery({
+  const { data: student, isLoading: studentLoading, refetch: refetchStudent } = useQuery({
     queryKey: ['student-detail', studentId],
     queryFn: async () => {
       if (!studentId) throw new Error('No student ID');
@@ -69,6 +99,16 @@ const StudentDetail = () => {
       return studentData;
     },
     enabled: !!studentId
+  });
+
+  // Fetch Telegram config for generating deep links
+  const { data: telegramConfig } = useQuery({
+    queryKey: ['telegram-config', user?.schoolId],
+    queryFn: async () => {
+      if (!user?.schoolId) return null;
+      return await telegramService.getConfig(user.schoolId);
+    },
+    enabled: !!user?.schoolId
   });
 
   // Fetch subscriptions from Supabase RPC with calculated end dates
@@ -271,6 +311,55 @@ const StudentDetail = () => {
   const handleSpeakingPractice = () => {
     navigate(`/student/${studentId}/speaking`);
   };
+
+  const handleGenerateQRCode = async () => {
+    if (!studentId || !user?.schoolId || !telegramConfig?.botUsername) {
+      toast.error('Unable to generate QR code. Please check Telegram settings.');
+      return;
+    }
+
+    setIsGeneratingCode(true);
+    try {
+      const code = await telegramService.generateLinkingCode(studentId, user.schoolId);
+      const link = telegramService.generateDeepLink(telegramConfig.botUsername, code);
+
+      setLinkingCode(code);
+      setDeepLink(link);
+      setShowQRDialog(true);
+      toast.success('QR code generated successfully');
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast.error('Failed to generate QR code');
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (deepLink) {
+      navigator.clipboard.writeText(deepLink);
+      toast.success('Link copied to clipboard');
+    }
+  };
+
+  const handleUnlink = async () => {
+    if (!studentId) return;
+
+    setIsUnlinking(true);
+    try {
+      await telegramService.unlinkStudent(studentId);
+      await refetchStudent();
+      setShowUnlinkDialog(false);
+      toast.success('Telegram account unlinked successfully');
+    } catch (error) {
+      console.error('Error unlinking Telegram:', error);
+      toast.error('Failed to unlink Telegram account');
+    } finally {
+      setIsUnlinking(false);
+    }
+  };
+
+  const isTelegramLinked = student?.telegramNotifications?.chatId && student?.telegramNotifications?.enabled;
 
   if (studentLoading) {
     return (
@@ -593,6 +682,96 @@ const StudentDetail = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Telegram Notifications Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Send className="h-4 w-4" />
+                Telegram Notifications
+              </CardTitle>
+              <CardDescription>
+                Link student's Telegram account for automated notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start justify-between">
+                <div className="space-y-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Status:</span>
+                    <Badge variant={isTelegramLinked ? 'default' : 'secondary'} className={isTelegramLinked ? 'bg-green-100 text-green-800' : ''}>
+                      {isTelegramLinked ? 'Linked' : 'Not Linked'}
+                    </Badge>
+                  </div>
+
+                  {isTelegramLinked && (
+                    <div className="space-y-2 text-sm">
+                      {student.telegramNotifications?.username && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Username:</span>
+                          <span className="font-medium">@{student.telegramNotifications.username}</span>
+                        </div>
+                      )}
+                      {student.telegramNotifications?.chatId && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Chat ID:</span>
+                          <span className="font-mono text-xs">{student.telegramNotifications.chatId}</span>
+                        </div>
+                      )}
+                      {student.telegramNotifications?.language && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Language:</span>
+                          <span className="font-medium uppercase">{student.telegramNotifications.language}</span>
+                        </div>
+                      )}
+                      {student.telegramNotifications?.linkedAt && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Linked:</span>
+                          <span>{safeFormatDate(student.telegramNotifications.linkedAt, 'MMM d, yyyy')}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!isTelegramLinked && (
+                    <p className="text-sm text-muted-foreground">
+                      Generate a QR code for the student to scan and link their Telegram account for notifications.
+                    </p>
+                  )}
+                </div>
+
+                <div className="ml-4">
+                  {isTelegramLinked ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowUnlinkDialog(true)}
+                    >
+                      Unlink
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleGenerateQRCode}
+                      disabled={isGeneratingCode || !telegramConfig?.isActive}
+                    >
+                      <QrCode className="h-4 w-4 mr-2" />
+                      {isGeneratingCode ? 'Generating...' : 'Generate QR Code'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {!telegramConfig?.isActive && !isTelegramLinked && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    Telegram integration is not configured. Please set up Telegram in Settings first.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Pending TODOs */}
           <Card>
@@ -983,6 +1162,65 @@ const StudentDetail = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* QR Code Dialog */}
+      <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Telegram Account</DialogTitle>
+            <DialogDescription>
+              Scan this QR code with Telegram or share the link below
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {deepLink && (
+              <div className="flex justify-center p-6 bg-white rounded-lg">
+                <QRCodeSVG value={deepLink} size={256} level="H" />
+              </div>
+            )}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Or share this link:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={deepLink}
+                  className="flex-1 px-3 py-2 text-sm border rounded-md bg-muted"
+                />
+                <Button size="sm" variant="outline" onClick={handleCopyLink}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              <p>This code expires in 24 hours.</p>
+              <p className="mt-1">Code: <span className="font-mono">{linkingCode}</span></p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unlink Confirmation Dialog */}
+      <AlertDialog open={showUnlinkDialog} onOpenChange={setShowUnlinkDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlink Telegram Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to unlink this student's Telegram account? They will stop receiving notifications.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnlinking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnlink}
+              disabled={isUnlinking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isUnlinking ? 'Unlinking...' : 'Unlink'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
