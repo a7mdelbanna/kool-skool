@@ -30,7 +30,8 @@ import {
   MessageSquare,
   Users,
   Link as LinkIcon,
-  Unlink
+  Unlink,
+  Bot
 } from 'lucide-react';
 import { UserContext } from '@/App';
 import NotificationLogsViewer from '@/components/NotificationLogsViewer';
@@ -40,6 +41,9 @@ import NotificationTemplateEditor from '@/components/NotificationTemplateEditor'
 import ConfirmationDialog from '@/components/ui/confirmation-dialog';
 import NotificationRulesEditor from '@/components/NotificationRulesEditor';
 import NotificationTestFlow from '@/components/NotificationTestFlow';
+import { AISettingsPanel } from '@/components/settings/AISettingsPanel';
+import { AILogsPanel } from '@/components/telegram/AILogsPanel';
+import { AITestPanel } from '@/components/telegram/AITestPanel';
 import {
   NotificationTemplate,
   NotificationRule,
@@ -49,8 +53,8 @@ import {
   DEFAULT_TEMPLATES,
   DEFAULT_NOTIFICATION_RULES
 } from '@/types/notification.types';
-import QRCode from 'qrcode.react';
-import { studentsService } from '@/services/firebase/students.service';
+import { QRCodeSVG } from 'qrcode.react';
+import { databaseService } from '@/services/firebase/database.service';
 
 const TelegramSettings = () => {
   const { user } = useContext(UserContext);
@@ -82,6 +86,7 @@ const TelegramSettings = () => {
 
   // Student linking state
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'ru'>('en');
   const [linkingCode, setLinkingCode] = useState('');
   const [showQRCode, setShowQRCode] = useState(false);
   const [linkedStudents, setLinkedStudents] = useState<any[]>([]);
@@ -123,11 +128,13 @@ const TelegramSettings = () => {
   });
 
   // Fetch students
-  const { data: students = [] } = useQuery({
+  const { data: students = [], isLoading: isLoadingStudents, error: studentsError } = useQuery({
     queryKey: ['students', user?.schoolId],
     queryFn: async () => {
       if (!user?.schoolId) return [];
-      return await studentsService.getStudentsBySchool(user.schoolId);
+      const result = await databaseService.getBySchoolId('students', user.schoolId);
+      console.log('Fetched students for Telegram linking:', result?.length || 0, result);
+      return result;
     },
     enabled: !!user?.schoolId
   });
@@ -204,11 +211,22 @@ const TelegramSettings = () => {
     mutationFn: async () => {
       return await telegramService.verifyBotToken(config.botToken);
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.valid && data.botInfo) {
         setBotInfo(data.botInfo);
-        setConfig(prev => ({ ...prev, botUsername: data.botInfo.username }));
-        toast.success('Bot token verified successfully!');
+        const updatedConfig = { ...config, botUsername: data.botInfo.username };
+        setConfig(updatedConfig);
+
+        // Auto-save configuration after successful verification
+        try {
+          await telegramService.saveConfig(user!.schoolId, updatedConfig);
+          clearDraftValues();
+          queryClient.invalidateQueries({ queryKey: ['telegram-config'] });
+          toast.success('Bot verified and configuration saved!');
+        } catch (saveError) {
+          console.error('Failed to auto-save after verification:', saveError);
+          toast.warning('Bot verified but failed to save. Please click Save Configuration.');
+        }
 
         setTestResults({
           success: true,
@@ -262,8 +280,8 @@ const TelegramSettings = () => {
 
   // Generate linking code mutation
   const generateLinkingCodeMutation = useMutation({
-    mutationFn: async (studentId: string) => {
-      return await telegramService.generateLinkingCode(studentId, user!.schoolId);
+    mutationFn: async ({ studentId, language }: { studentId: string; language: 'en' | 'ru' }) => {
+      return await telegramService.generateLinkingCode(studentId, user!.schoolId, language);
     },
     onSuccess: (code) => {
       setLinkingCode(code);
@@ -317,6 +335,14 @@ const TelegramSettings = () => {
 
       if (!savedDraft) {
         setConfig(telegramConfig);
+
+        // If config has botUsername, set botInfo to show as verified
+        if (telegramConfig.botUsername) {
+          setBotInfo({
+            username: telegramConfig.botUsername,
+            first_name: telegramConfig.botUsername
+          });
+        }
       }
 
       setHasLoadedFromFirestore(true);
@@ -456,7 +482,7 @@ const TelegramSettings = () => {
       return;
     }
 
-    generateLinkingCodeMutation.mutate(selectedStudentId);
+    generateLinkingCodeMutation.mutate({ studentId: selectedStudentId, language: selectedLanguage });
   };
 
   const handleUnlinkStudent = (studentId: string) => {
@@ -474,6 +500,22 @@ const TelegramSettings = () => {
 
   const getTemplatesByType = (type: NotificationTemplateType) => {
     return notificationTemplates.filter(t => t.type === type && t.isActive);
+  };
+
+  // Helper to identify Telegram-relevant templates
+  const isTelegramTemplate = (template: NotificationTemplate): boolean => {
+    const telegramTypes = [
+      NotificationTemplateType.LESSON_REMINDER_1_DAY,
+      NotificationTemplateType.LESSON_REMINDER_2_HOURS,
+      NotificationTemplateType.LESSON_REMINDER_15_MIN,
+      NotificationTemplateType.SUBSCRIPTION_EXPIRY
+    ];
+    return telegramTypes.includes(template.type);
+  };
+
+  // Helper to identify Telegram-relevant rules
+  const isTelegramRule = (rule: NotificationRule): boolean => {
+    return rule.reminders?.some(r => r.channel === 'telegram' || r.channel === 'both') || false;
   };
 
   const getConfigurationStatus = () => {
@@ -516,10 +558,22 @@ const TelegramSettings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="config">
             <Settings className="h-4 w-4 mr-2" />
             Configuration
+          </TabsTrigger>
+          <TabsTrigger value="ai">
+            <Bot className="h-4 w-4 mr-2" />
+            AI Assistant
+          </TabsTrigger>
+          <TabsTrigger value="ai-logs">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            AI Logs
+          </TabsTrigger>
+          <TabsTrigger value="ai-test">
+            <TestTube className="h-4 w-4 mr-2" />
+            AI Test
           </TabsTrigger>
           <TabsTrigger value="rules">
             <Bell className="h-4 w-4 mr-2" />
@@ -681,13 +735,18 @@ const TelegramSettings = () => {
                 <Button
                   variant="outline"
                   onClick={handleVerifyBot}
-                  disabled={verifyBotMutation.isPending || !config.botToken}
+                  disabled={verifyBotMutation.isPending || !config.botToken?.trim()}
                   className="flex-1"
                 >
                   {verifyBotMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Verifying...
+                    </>
+                  ) : botInfo ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Re-verify Bot Token
                     </>
                   ) : (
                     <>
@@ -699,7 +758,7 @@ const TelegramSettings = () => {
 
                 <Button
                   onClick={handleConfigSave}
-                  disabled={saveConfigMutation.isPending || !config.botToken}
+                  disabled={saveConfigMutation.isPending || !config.botToken?.trim()}
                   className="flex-1"
                 >
                   {saveConfigMutation.isPending ? (
@@ -716,13 +775,25 @@ const TelegramSettings = () => {
                 </Button>
               </div>
 
-              {!config.botToken && (
+              {!config.botToken?.trim() && (
                 <p className="text-sm text-muted-foreground text-center">
                   Enter your bot token to verify and save the configuration
                 </p>
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="ai" className="space-y-4">
+          <AISettingsPanel schoolId={user?.schoolId || ''} />
+        </TabsContent>
+
+        <TabsContent value="ai-logs" className="space-y-4">
+          <AILogsPanel schoolId={user?.schoolId || ''} />
+        </TabsContent>
+
+        <TabsContent value="ai-test" className="space-y-4">
+          <AITestPanel schoolId={user?.schoolId || ''} />
         </TabsContent>
 
         <TabsContent value="rules" className="space-y-4">
@@ -750,36 +821,43 @@ const TelegramSettings = () => {
           </Card>
 
           {/* Initialize Defaults Button */}
-          {notificationRules.length === 0 && notificationTemplates.length === 0 && (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center space-y-4">
-                  <div className="text-muted-foreground">
-                    <Bell className="h-12 w-12 mx-auto mb-4" />
-                    <p>No notification rules or templates found.</p>
-                    <p className="text-sm">Initialize default notification settings to get started.</p>
+          {(() => {
+            const hasTelegramRules = notificationRules.some(rule => isTelegramRule(rule));
+            const hasTelegramTemplates = notificationTemplates.some(t => isTelegramTemplate(t));
+            const shouldShowInitialize = !hasTelegramRules && !hasTelegramTemplates;
+
+            return shouldShowInitialize && (
+              <Card className="border-dashed border-2">
+                <CardContent className="pt-6">
+                  <div className="text-center space-y-4">
+                    <div className="text-muted-foreground">
+                      <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium">No Telegram notification rules found</p>
+                      <p className="text-sm">Initialize default notification settings to get started with automated Telegram notifications.</p>
+                    </div>
+                    <Button
+                      onClick={handleInitializeDefaults}
+                      disabled={initializeDefaultsMutation.isPending}
+                      size="lg"
+                    >
+                      {initializeDefaultsMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Initialize Default Settings
+                    </Button>
                   </div>
-                  <Button
-                    onClick={handleInitializeDefaults}
-                    disabled={initializeDefaultsMutation.isPending}
-                  >
-                    {initializeDefaultsMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4 mr-2" />
-                    )}
-                    Initialize Default Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Notification Rules Editor */}
           {notificationRules.length > 0 || notificationTemplates.length > 0 ? (
             <NotificationRulesEditor
               schoolId={user?.schoolId || ''}
-              templates={notificationTemplates.filter(t => t.channel === 'telegram' as any)}
+              templates={notificationTemplates.filter(t => isTelegramTemplate(t))}
               onSave={(updatedRules) => {
                 const formattedRules = updatedRules.map(rule => ({
                   ...rule,
@@ -789,7 +867,7 @@ const TelegramSettings = () => {
                 saveNotificationRulesMutation.mutate(formattedRules);
               }}
               initialRules={notificationRules
-                .filter(rule => rule.channel === 'telegram' as any || rule.channel === 'both')
+                .filter(rule => isTelegramRule(rule))
                 .map(rule => ({
                   type: rule.type,
                   name: getRuleTypeDisplayName(rule.type),
@@ -959,7 +1037,7 @@ const TelegramSettings = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {notificationTemplates.filter(t => t.channel === 'telegram' as any).length === 0 ? (
+              {notificationTemplates.filter(t => isTelegramTemplate(t)).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="h-12 w-12 mx-auto mb-4" />
                   <p>No Telegram templates found</p>
@@ -968,7 +1046,7 @@ const TelegramSettings = () => {
               ) : (
                 <div className="space-y-4">
                   {notificationTemplates
-                    .filter(t => t.channel === 'telegram' as any)
+                    .filter(t => isTelegramTemplate(t))
                     .map(template => (
                       <div key={template.id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-start justify-between">
@@ -1119,18 +1197,45 @@ const TelegramSettings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Select Student</Label>
-                <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                <Select value={selectedStudentId} onValueChange={setSelectedStudentId} disabled={isLoadingStudents}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a student..." />
+                    <SelectValue placeholder={isLoadingStudents ? "Loading students..." : students.length === 0 ? "No students found" : "Choose a student..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    {students.map(student => (
-                      <SelectItem key={student.id} value={student.id!}>
-                        {student.firstName} {student.lastName}
-                      </SelectItem>
-                    ))}
+                    {students.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        No students available
+                      </div>
+                    ) : (
+                      students.map(student => (
+                        <SelectItem key={student.id} value={student.id!}>
+                          {student.firstName} {student.lastName}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                {studentsError && (
+                  <p className="text-xs text-red-600">
+                    Error loading students: {(studentsError as Error).message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="student-language">Preferred Language</Label>
+                <Select value={selectedLanguage} onValueChange={(value: 'en' | 'ru') => setSelectedLanguage(value)}>
+                  <SelectTrigger id="student-language">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="ru">Russian (Русский)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Student will be asked to confirm their language preference when linking
+                </p>
               </div>
 
               <Button
@@ -1161,7 +1266,7 @@ const TelegramSettings = () => {
               {showQRCode && linkingCode && config.botUsername && (
                 <div className="border rounded-lg p-4 space-y-4">
                   <div className="flex flex-col items-center space-y-4">
-                    <QRCode
+                    <QRCodeSVG
                       value={telegramService.generateDeepLink(config.botUsername, linkingCode)}
                       size={256}
                       level="H"
