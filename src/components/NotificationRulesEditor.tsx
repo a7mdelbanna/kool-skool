@@ -464,19 +464,23 @@ const NotificationRulesEditor: React.FC<NotificationRulesEditorProps> = ({
 
                 {/* Preview of schedule */}
                 {rule.reminders.length > 0 && (
-                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                      <div className="text-sm text-blue-900">
+                      <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                      <div className="text-sm text-blue-900 dark:text-blue-100">
                         <p className="font-medium mb-1">Reminder Schedule:</p>
                         <ul className="space-y-0.5">
                           {rule.reminders.map((reminder, idx) => (
                             <li key={idx} className="flex items-center gap-2">
-                              <span className="text-blue-600">•</span>
-                              {getTimeUnitLabel(reminder.value, reminder.unit)}
-                              {reminder.value > 0 && ' the event'} via {' '}
-                              <Badge variant="outline" className="text-xs">
-                                {reminder.channel === 'both' ? 'SMS & WhatsApp' : reminder.channel.toUpperCase()}
+                              <span className="text-blue-600 dark:text-blue-400">•</span>
+                              <span className="text-blue-900 dark:text-blue-100">
+                                {getTimeUnitLabel(reminder.value, reminder.unit)}
+                                {reminder.value > 0 && ' before the event'} via{' '}
+                              </span>
+                              <Badge variant="outline" className="text-xs border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300">
+                                {reminder.channel === 'both' ? 'SMS & WhatsApp' :
+                                 reminder.channel === 'telegram' ? 'Telegram' :
+                                 reminder.channel.toUpperCase()}
                               </Badge>
                             </li>
                           ))}

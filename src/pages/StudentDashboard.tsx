@@ -12,6 +12,8 @@ import { format } from 'date-fns';
 import { formatInUserTimezone, getEffectiveTimezone, getBrowserTimezone } from '@/utils/timezone';
 import TimezoneSelector from '@/components/TimezoneSelector';
 import SessionTimeDisplay from '@/components/SessionTimeDisplay';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 import {
   Dialog,
   DialogContent,
@@ -93,38 +95,82 @@ const StudentDashboard = () => {
       console.log('=== FETCHING STUDENT DATA ===');
       console.log('User ID:', user.id);
       console.log('School ID:', user.schoolId);
-      
-      // First, get the student record to get the student ID
-      const { data: students, error: studentsError } = await supabase
-        .from('students')
-        .select(`
-          id,
-          school_id,
-          user_id,
-          course_id,
-          teacher_id,
-          age_group,
-          level,
-          phone,
-          next_payment_date,
-          next_payment_amount,
-          courses:course_id (
-            name,
-            lesson_type
-          ),
-          users!students_teacher_id_fkey (
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('user_id', user.id)
-        .single();
-      
-      if (studentsError) {
-        console.error('Error fetching student:', studentsError);
-        toast.error('Failed to load student data');
-        return;
+
+      let students = null;
+
+      // Try Firebase first
+      try {
+        const studentsRef = collection(db, 'students');
+        const q = query(studentsRef, where('userId', '==', user.id));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          const doc = querySnapshot.docs[0];
+          const data = doc.data();
+          console.log('Firebase student data found:', data);
+
+          // Convert Firebase data to match expected format
+          students = {
+            id: doc.id,
+            school_id: data.schoolId || data.school_id,
+            user_id: user.id,
+            course_id: data.courseId || data.course_id,
+            teacher_id: data.teacherId || data.teacher_id,
+            age_group: data.ageGroup || data.age_group,
+            level: data.level,
+            phone: data.phone,
+            next_payment_date: data.nextPaymentDate || data.next_payment_date,
+            next_payment_amount: data.nextPaymentAmount || data.next_payment_amount,
+            courses: {
+              name: data.courseName || data.course_name || 'Test Course',
+              lesson_type: data.lessonType || data.lesson_type || 'individual'
+            },
+            users: {
+              first_name: data.teacherFirstName || data.teacher_first_name || 'No teacher',
+              last_name: data.teacherLastName || data.teacher_last_name || 'assigned',
+              email: data.teacherEmail || data.teacher_email || ''
+            }
+          };
+        }
+      } catch (firebaseError) {
+        console.log('Firebase query failed or no data, trying Supabase:', firebaseError);
+      }
+
+      // If no Firebase data, try Supabase
+      if (!students) {
+        const { data: supabaseStudents, error: studentsError } = await supabase
+          .from('students')
+          .select(`
+            id,
+            school_id,
+            user_id,
+            course_id,
+            teacher_id,
+            age_group,
+            level,
+            phone,
+            next_payment_date,
+            next_payment_amount,
+            courses:course_id (
+              name,
+              lesson_type
+            ),
+            users!students_teacher_id_fkey (
+              first_name,
+              last_name,
+              email
+            )
+          `)
+          .eq('user_id', user.id)
+          .single();
+
+        if (studentsError) {
+          console.error('Error fetching student from Supabase:', studentsError);
+          // Don't show toast error here, just log it
+          console.log('No student data found in either Firebase or Supabase');
+        } else {
+          students = supabaseStudents;
+        }
       }
       
       console.log('Student data:', students);
@@ -190,25 +236,83 @@ const StudentDashboard = () => {
     try {
       console.log('=== FETCHING SUBSCRIPTIONS ===');
       console.log('Student ID:', studentId);
-      
-      const { data: subscriptionsData, error: subscriptionsError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
-      
-      if (subscriptionsError) {
-        console.error('Error fetching subscriptions:', subscriptionsError);
-        return [];
+
+      // Try Firebase first
+      const subsRef = collection(db, 'subscriptions');
+      const q = query(
+        subsRef,
+        where('studentId', '==', studentId),  // camelCase for Firebase
+        orderBy('createdAt', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      const firebaseSubscriptions = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Convert Firebase data to match expected format
+        return {
+          id: doc.id,
+          session_count: data.sessionCount || data.session_count || 0,
+          duration_months: data.durationMonths || data.duration_months || 0,
+          start_date: data.startDate || data.start_date || '',
+          end_date: data.endDate || data.end_date || null,
+          total_price: data.totalPrice || data.total_price || 0,
+          currency: data.currency || 'USD',
+          status: data.status || 'active',
+          sessions_completed: data.sessionsCompleted || data.sessions_completed || 0,
+          ...data
+        };
+      });
+
+      console.log('Firebase subscriptions:', firebaseSubscriptions);
+
+      // If no data in Firebase, fallback to Supabase
+      if (firebaseSubscriptions.length === 0) {
+        console.log('No Firebase subscriptions found, trying Supabase...');
+        const { data: subscriptionsData, error: subscriptionsError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false });
+
+        if (subscriptionsError) {
+          console.error('Error fetching from Supabase:', subscriptionsError);
+          setSubscriptions([]);
+          return [];
+        }
+
+        console.log('Supabase subscriptions:', subscriptionsData);
+        setSubscriptions(subscriptionsData || []);
+        return subscriptionsData || [];
       }
-      
-      console.log('Subscriptions data:', subscriptionsData);
-      setSubscriptions(subscriptionsData || []);
-      return subscriptionsData || [];
-      
+
+      setSubscriptions(firebaseSubscriptions);
+      return firebaseSubscriptions;
+
     } catch (error) {
       console.error('Error in fetchSubscriptions:', error);
-      return [];
+
+      // If Firebase fails, try Supabase as fallback
+      try {
+        const { data: subscriptionsData, error: subscriptionsError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false });
+
+        if (subscriptionsError) {
+          console.error('Error fetching from Supabase:', subscriptionsError);
+          setSubscriptions([]);
+          return [];
+        }
+
+        setSubscriptions(subscriptionsData || []);
+        return subscriptionsData || [];
+      } catch (supabaseError) {
+        console.error('Both Firebase and Supabase failed:', supabaseError);
+        setSubscriptions([]);
+        return [];
+      }
     }
   };
 
@@ -216,25 +320,80 @@ const StudentDashboard = () => {
     try {
       console.log('=== FETCHING SESSIONS ===');
       console.log('Student ID:', studentId);
-      
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('lesson_sessions')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('scheduled_date', { ascending: true });
-      
-      if (sessionsError) {
-        console.error('Error fetching sessions:', sessionsError);
-        return [];
+
+      // Try Firebase first
+      const sessionsRef = collection(db, 'sessions');
+      const q = query(
+        sessionsRef,
+        where('studentId', '==', studentId),  // camelCase for Firebase
+        orderBy('scheduledDate', 'asc')
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      const firebaseSessions = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Convert Firebase data to match expected format
+        return {
+          id: doc.id,
+          scheduled_date: data.scheduledDate || data.scheduled_date || '',
+          status: data.status || 'scheduled',
+          duration_minutes: data.durationMinutes || data.duration_minutes || 60,
+          teacher_notes: data.teacherNotes || data.teacher_notes || '',
+          student_id: studentId,
+          ...data
+        };
+      });
+
+      console.log('Firebase sessions:', firebaseSessions);
+
+      // If no data in Firebase, fallback to Supabase
+      if (firebaseSessions.length === 0) {
+        console.log('No Firebase sessions found, trying Supabase...');
+        const { data: sessionsData, error: sessionsError } = await supabase
+          .from('lesson_sessions')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('scheduled_date', { ascending: true });
+
+        if (sessionsError) {
+          console.error('Error fetching from Supabase:', sessionsError);
+          setSessions([]);
+          return [];
+        }
+
+        console.log('Supabase sessions:', sessionsData);
+        setSessions(sessionsData || []);
+        return sessionsData || [];
       }
-      
-      console.log('Sessions data:', sessionsData);
-      setSessions(sessionsData || []);
-      return sessionsData || [];
-      
+
+      setSessions(firebaseSessions);
+      return firebaseSessions;
+
     } catch (error) {
       console.error('Error in fetchSessions:', error);
-      return [];
+
+      // If Firebase fails, try Supabase as fallback
+      try {
+        const { data: sessionsData, error: sessionsError } = await supabase
+          .from('lesson_sessions')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('scheduled_date', { ascending: true });
+
+        if (sessionsError) {
+          console.error('Error fetching from Supabase:', sessionsError);
+          setSessions([]);
+          return [];
+        }
+
+        setSessions(sessionsData || []);
+        return sessionsData || [];
+      } catch (supabaseError) {
+        console.error('Both Firebase and Supabase failed:', supabaseError);
+        setSessions([]);
+        return [];
+      }
     }
   };
 
@@ -316,7 +475,7 @@ const StudentDashboard = () => {
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <p className="text-lg font-semibold">Unable to load student data</p>
-          <Button onClick={() => navigate('/student-login')} className="mt-4">
+          <Button onClick={handleLogout} className="mt-4">
             Go to Login
           </Button>
         </div>

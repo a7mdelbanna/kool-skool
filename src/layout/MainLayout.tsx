@@ -42,6 +42,10 @@ import StudentSpeaking from '@/pages/StudentSpeaking';
 import AssignSpeakingTopic from '@/pages/AssignSpeakingTopic';
 import Birthdays from '@/pages/Birthdays';
 import ActionsHub from '@/pages/ActionsHub';
+import Messages from '@/pages/Messages';
+import MessageTemplates from '@/pages/MessageTemplates';
+import MessageStatistics from '@/pages/MessageStatistics';
+import BroadcastMessages from '@/pages/BroadcastMessages';
 
 const MainLayout = () => {
   // Initialize global keyboard shortcuts
@@ -62,6 +66,10 @@ const MainLayout = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/actions-hub" element={<ActionsHub />} />
+                  <Route path="/messages" element={<Messages />} />
+                  <Route path="/message-templates" element={<MessageTemplates />} />
+                  <Route path="/message-statistics" element={<MessageStatistics />} />
+                  <Route path="/broadcast-messages" element={<BroadcastMessages />} />
                   <Route path="/students" element={<Students />} />
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/courses" element={<Courses />} />

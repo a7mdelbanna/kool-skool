@@ -115,7 +115,13 @@ export const useStudentForm = (
         processedStudent.id = student.id;
         console.log('[useStudentForm] Student ID preserved:', processedStudent.id);
       }
-      
+
+      // Handle both camelCase and snake_case for teacher ID
+      if (student.teacher_id && !student.teacherId) {
+        processedStudent.teacherId = student.teacher_id;
+        console.log('[useStudentForm] Mapped teacher_id to teacherId:', processedStudent.teacherId);
+      }
+
       // Keep the original level value (don't normalize to lowercase)
       // This preserves custom levels like A1, A2, B1, etc.
       console.log('Loading student with level:', student.level);

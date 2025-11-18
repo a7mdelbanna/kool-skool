@@ -204,19 +204,51 @@ export const getStudentsWithDetails = async (schoolId: string | undefined) => {
         user = await databaseService.getById('users', student.userId);
       }
       
-      // Fetch teacher data if teacherId exists
+      // Fetch teacher data if teacherId exists (handle both camelCase and snake_case)
       let teacherFirstName = '';
       let teacherLastName = '';
-      if (student.teacherId) {
+      const teacherId = student.teacherId || student.teacher_id;
+
+      if (teacherId) {
+        console.log(`🔍 Looking for teacher with ID: ${teacherId} for student: ${student.firstName || student.first_name} ${student.lastName || student.last_name}`);
+
         try {
-          const teacher = await databaseService.getById('users', student.teacherId);
-          if (teacher) {
-            teacherFirstName = teacher.firstName || '';
-            teacherLastName = teacher.lastName || '';
+          // First try Firebase users collection
+          let teacher = null;
+          try {
+            teacher = await databaseService.getById('users', teacherId);
+            if (teacher) {
+              console.log(`📚 Found teacher in Firebase:`, teacher);
+              // Handle both camelCase and snake_case fields
+              teacherFirstName = teacher.firstName || teacher.first_name || '';
+              teacherLastName = teacher.lastName || teacher.last_name || '';
+              console.log(`✅ Teacher name from Firebase: ${teacherFirstName} ${teacherLastName}`);
+            }
+          } catch (firebaseError) {
+            console.log(`Teacher ${teacherId} not found in Firebase, trying Supabase...`);
+          }
+
+          // If not found in Firebase, try Supabase users table
+          if (!teacherFirstName && !teacherLastName) {
+            const { data: supabaseTeacher, error } = await supabase
+              .from('users')
+              .select('first_name, last_name')
+              .eq('id', teacherId)
+              .single();
+
+            if (supabaseTeacher && !error) {
+              teacherFirstName = supabaseTeacher.first_name || '';
+              teacherLastName = supabaseTeacher.last_name || '';
+              console.log(`✅ Found teacher in Supabase: ${teacherFirstName} ${teacherLastName}`);
+            } else {
+              console.warn(`Could not fetch teacher data for ID ${teacherId}:`, error);
+            }
           }
         } catch (error) {
-          console.warn(`Could not fetch teacher data for ID ${student.teacherId}:`, error);
+          console.warn(`Error fetching teacher data for ID ${teacherId}:`, error);
         }
+      } else {
+        console.log(`⚠️ No teacher ID for student: ${student.firstName || student.first_name} ${student.lastName || student.last_name}`);
       }
       
       // Fetch active subscriptions for progress calculation

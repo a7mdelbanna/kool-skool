@@ -41,6 +41,7 @@ export interface LinkingCode {
   code: string;
   studentId: string;
   schoolId: string;
+  language?: 'en' | 'ru';
   expiresAt: Date;
   used: boolean;
 }
@@ -219,7 +220,7 @@ class TelegramService {
   /**
    * Generate a unique linking code for a student
    */
-  async generateLinkingCode(studentId: string, schoolId: string): Promise<string> {
+  async generateLinkingCode(studentId: string, schoolId: string, language: 'en' | 'ru' = 'en'): Promise<string> {
     try {
       // Generate a random 8-character code
       const code = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -228,6 +229,7 @@ class TelegramService {
         code,
         studentId,
         schoolId,
+        language,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Expires in 24 hours
         used: false
       };
@@ -335,11 +337,11 @@ class TelegramService {
    */
   async getEnabledStudents(schoolId: string): Promise<FirebaseStudent[]> {
     try {
+      // Use simple query and filter client-side to avoid index requirements
       const studentsRef = collection(db, 'students');
       const q = query(
         studentsRef,
-        where('schoolId', '==', schoolId),
-        where('telegramNotifications.enabled', '==', true)
+        where('schoolId', '==', schoolId)
       );
 
       const snapshot = await getDocs(q);
@@ -347,12 +349,18 @@ class TelegramService {
 
       snapshot.forEach(doc => {
         const data = doc.data();
-        students.push({
+        const student = {
           id: doc.id,
           ...data
-        } as FirebaseStudent);
+        } as FirebaseStudent;
+
+        // Filter client-side for students with Telegram enabled
+        if (student.telegramNotifications?.enabled && student.telegramNotifications?.chatId) {
+          students.push(student);
+        }
       });
 
+      console.log('Telegram enabled students:', students.length, students);
       return students;
     } catch (error) {
       console.error('Error getting enabled students:', error);

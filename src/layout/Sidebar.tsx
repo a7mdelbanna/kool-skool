@@ -19,6 +19,7 @@ import {
   Shield,
   UsersRound,
   MessageSquare,
+  Send,
   ChevronDown,
   ChevronUp,
   User,
@@ -31,7 +32,9 @@ import {
   Cake,
   CalendarClock,
   Palette,
-  Zap
+  Zap,
+  FileText,
+  Radio
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -79,6 +82,10 @@ const Sidebar = () => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Actions Hub', href: '/actions-hub', icon: Zap },
+    { name: 'Messages', href: '/messages', icon: MessageSquare },
+    { name: 'Message Templates', href: '/message-templates', icon: FileText },
+    { name: 'Message Statistics', href: '/message-statistics', icon: BarChart3 },
+    { name: 'Broadcast Messages', href: '/broadcast-messages', icon: Radio },
     { name: 'Students', href: '/students', icon: Users },
     { name: 'Groups', href: '/groups', icon: UsersRound },
     { name: 'Courses', href: '/courses', icon: BookOpen },
@@ -102,6 +109,7 @@ const Sidebar = () => {
     { name: 'Financial', href: '/settings/financial', icon: Wallet },
     { name: 'Notifications', href: '/settings/notifications', icon: Bell },
     { name: 'Communications', href: '/settings/communications', icon: MessageSquare },
+    { name: 'Telegram', href: '/settings/telegram', icon: Send },
     { name: 'Data Management', href: '/settings/data-management', icon: Database },
   ];
 

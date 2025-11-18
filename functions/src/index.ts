@@ -618,6 +618,17 @@ export {
 // Export Telegram functions
 export {
   sendTelegramLessonReminders,
-  sendTelegramSubscriptionReminders,
-  handleTelegramWebhook
+  sendTelegramSubscriptionReminders
 } from './telegram/notifications';
+
+export {
+  handleTelegramWebhook
+} from './telegram/webhookHandler';
+
+export {
+  sendTelegramAdminMessage
+} from './telegram/sendAdminMessage';
+
+export {
+  sendTelegramBroadcast
+} from './telegram/broadcastMessage';

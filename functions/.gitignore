@@ -1,0 +1,16 @@
+# Environment variables (contains API keys)
+.env
+.env.local
+
+# Compiled JavaScript
+lib/
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store

@@ -193,17 +193,26 @@ class NotificationSettingsService {
    */
   async initializeDefaultTemplates(schoolId: string): Promise<void> {
     try {
-      // Check if templates already exist
+      // Get existing templates
       const existingTemplates = await this.getTemplates(schoolId);
-      if (existingTemplates.length > 0) {
-        console.log('Default templates already exist for school:', schoolId);
+
+      // Filter DEFAULT_TEMPLATES to only include ones that don't already exist
+      const templatesToCreate = DEFAULT_TEMPLATES.filter(defaultTemplate => {
+        return !existingTemplates.some(existing =>
+          existing.type === defaultTemplate.type &&
+          existing.language === defaultTemplate.language
+        );
+      });
+
+      if (templatesToCreate.length === 0) {
+        console.log('All default templates already exist for school:', schoolId);
         return;
       }
 
-      // Create batch to add all default templates
+      // Create batch to add missing default templates
       const batch = writeBatch(db);
-      
-      DEFAULT_TEMPLATES.forEach(template => {
+
+      templatesToCreate.forEach(template => {
         const docRef = doc(collection(db, this.templatesCollection));
         batch.set(docRef, {
           ...template,
@@ -214,7 +223,7 @@ class NotificationSettingsService {
       });
 
       await batch.commit();
-      console.log('Default templates initialized for school:', schoolId);
+      console.log(`Initialized ${templatesToCreate.length} default templates for school:`, schoolId);
     } catch (error) {
       console.error('Error initializing default templates:', error);
       throw error;
@@ -374,17 +383,25 @@ class NotificationSettingsService {
    */
   async initializeDefaultRules(schoolId: string): Promise<void> {
     try {
-      // Check if rules already exist
+      // Get existing rules
       const existingRules = await this.getNotificationRules(schoolId);
-      if (existingRules.length > 0) {
-        console.log('Default rules already exist for school:', schoolId);
+
+      // Filter DEFAULT_NOTIFICATION_RULES to only include ones that don't already exist
+      const rulesToCreate = DEFAULT_NOTIFICATION_RULES.filter(defaultRule => {
+        return !existingRules.some(existing =>
+          existing.type === defaultRule.type
+        );
+      });
+
+      if (rulesToCreate.length === 0) {
+        console.log('All default notification rules already exist for school:', schoolId);
         return;
       }
 
-      // Create batch to add all default rules
+      // Create batch to add missing default rules
       const batch = writeBatch(db);
 
-      DEFAULT_NOTIFICATION_RULES.forEach(rule => {
+      rulesToCreate.forEach(rule => {
         const docRef = doc(collection(db, this.rulesCollection));
         batch.set(docRef, {
           ...rule,
@@ -395,7 +412,7 @@ class NotificationSettingsService {
       });
 
       await batch.commit();
-      console.log('Default notification rules initialized for school:', schoolId);
+      console.log(`Initialized ${rulesToCreate.length} default notification rules for school:`, schoolId);
     } catch (error) {
       console.error('Error initializing default rules:', error);
       throw error;

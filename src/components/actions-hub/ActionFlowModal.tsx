@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -245,6 +245,12 @@ const ActionFlowModal: React.FC<ActionFlowModalProps> = ({
       {isOpen && (
         <Dialog open={isOpen} onOpenChange={onClose}>
           <DialogContent className="max-w-full h-screen p-0 overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
+            <DialogTitle className="sr-only">
+              Action Flow for {student.studentName}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Complete pending actions for this student including sessions and subscription renewals
+            </DialogDescription>
             {/* Header */}
             <div className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b p-6">
               <div className="flex items-center justify-between">

@@ -14,12 +14,6 @@ interface TelegramConfig {
   };
 }
 
-interface NotificationTemplate {
-  body: string;
-  language: 'en' | 'ru';
-  type: string;
-}
-
 interface NotificationRule {
   enabled: boolean;
   reminders: Array<{
@@ -496,7 +490,7 @@ export const sendTelegramSubscriptionReminders = functions.pubsub
 /**
  * HTTP Callable Function: Handle Telegram webhook (for bot commands like /start, /link, /unlink)
  */
-export const handleTelegramWebhook = functions.https.onRequest(async (req, res) => {
+export const handleTelegramWebhook = functions.https.onRequest(async (req: any, res: any) => {
   try {
     if (req.method !== 'POST') {
       res.status(405).send('Method Not Allowed');

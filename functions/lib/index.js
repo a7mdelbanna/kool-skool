@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = exports.testTwilioCredentials = void 0;
+exports.sendTelegramBroadcast = exports.sendTelegramAdminMessage = exports.handleTelegramWebhook = exports.sendTelegramSubscriptionReminders = exports.sendTelegramLessonReminders = exports.schedulePaymentReminders = exports.scheduleLessonReminders = exports.sendTwilioMessage = exports.testTwilioCredentials = void 0;
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 // Initialize Admin SDK
@@ -470,4 +470,17 @@ Object.defineProperty(exports, "testTwilioCredentials", { enumerable: true, get:
 Object.defineProperty(exports, "sendTwilioMessage", { enumerable: true, get: function () { return sendMessage_1.sendTwilioMessage; } });
 Object.defineProperty(exports, "scheduleLessonReminders", { enumerable: true, get: function () { return sendMessage_1.scheduleLessonReminders; } });
 Object.defineProperty(exports, "schedulePaymentReminders", { enumerable: true, get: function () { return sendMessage_1.schedulePaymentReminders; } });
+// ============================================
+// TELEGRAM FUNCTIONS
+// ============================================
+// Export Telegram functions
+var notifications_1 = require("./telegram/notifications");
+Object.defineProperty(exports, "sendTelegramLessonReminders", { enumerable: true, get: function () { return notifications_1.sendTelegramLessonReminders; } });
+Object.defineProperty(exports, "sendTelegramSubscriptionReminders", { enumerable: true, get: function () { return notifications_1.sendTelegramSubscriptionReminders; } });
+var webhookHandler_1 = require("./telegram/webhookHandler");
+Object.defineProperty(exports, "handleTelegramWebhook", { enumerable: true, get: function () { return webhookHandler_1.handleTelegramWebhook; } });
+var sendAdminMessage_1 = require("./telegram/sendAdminMessage");
+Object.defineProperty(exports, "sendTelegramAdminMessage", { enumerable: true, get: function () { return sendAdminMessage_1.sendTelegramAdminMessage; } });
+var broadcastMessage_1 = require("./telegram/broadcastMessage");
+Object.defineProperty(exports, "sendTelegramBroadcast", { enumerable: true, get: function () { return broadcastMessage_1.sendTelegramBroadcast; } });
 //# sourceMappingURL=index.js.map

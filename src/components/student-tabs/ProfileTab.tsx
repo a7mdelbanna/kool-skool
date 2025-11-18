@@ -564,7 +564,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
               </div>
             ) : validTeachers.length > 0 ? (
               <Select
-                value={studentData.teacherId || ""}
+                value={studentData.teacherId || studentData.teacher_id || ""}
                 onValueChange={(value) => handleInputChange("teacherId", value)}
                 disabled={isViewMode}
               >
