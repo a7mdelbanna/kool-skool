@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +23,7 @@ import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidatio
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import SchedulePreview from '@/components/student-tabs/SchedulePreview';
+import TimePicker from '@/components/ui/time-picker';
 
 interface CreateGroupDialogProps {
   open: boolean;
@@ -377,7 +378,23 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     }
   };
 
-  const handleAddSchedule = async () => {
+  // Auto-validate teacher availability when schedule or teacher changes
+  useEffect(() => {
+    // Only validate if we have both teacher and at least one schedule item
+    if (groupData.teacher_id && groupData.schedule.length > 0) {
+      // Small delay to avoid excessive API calls during rapid changes
+      const timeoutId = setTimeout(() => {
+        validateTeacherAvailability();
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Clear any validation errors if no teacher or schedule
+      setScheduleValidationError('');
+    }
+  }, [groupData.teacher_id, groupData.schedule, groupData.session_duration_minutes]);
+
+  const handleAddSchedule = () => {
     if (newScheduleDay && newScheduleTime) {
       setGroupData(prev => ({
         ...prev,
@@ -385,12 +402,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       }));
       setNewScheduleDay('');
       setNewScheduleTime('');
-
-      // Validate teacher availability after adding schedule
-      // Use setTimeout to ensure state is updated
-      setTimeout(() => {
-        validateTeacherAvailability();
-      }, 100);
+      // Validation will be triggered automatically by useEffect
     }
   };
 
@@ -900,10 +912,10 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
 
                   <div>
                     <Label>Time</Label>
-                    <Input
-                      type="time"
+                    <TimePicker
                       value={newScheduleTime}
-                      onChange={(e) => setNewScheduleTime(e.target.value)}
+                      onChange={(value) => setNewScheduleTime(value)}
+                      placeholder="Select time"
                     />
                   </div>
 
