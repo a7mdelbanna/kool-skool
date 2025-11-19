@@ -25,6 +25,7 @@ interface Group {
   price_mode: string;
   price_per_session: number;
   total_price: number;
+  prices_by_currency?: { [currencyCode: string]: { per_session: number; total: number; symbol?: string } };
   status: string;
   student_count: number;
   created_at: string;
@@ -37,9 +38,29 @@ const Groups = () => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
+  // Fetch school currencies from Firebase
+  const { data: currencies } = useQuery({
+    queryKey: ['currencies', user?.schoolId],
+    queryFn: async () => {
+      if (!user?.schoolId) return [];
+
+      try {
+        const data = await databaseService.query('currencies', {
+          where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
+        });
+
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching currencies:', error);
+        return [];
+      }
+    },
+    enabled: !!user?.schoolId
+  });
+
   // Fetch groups data
   const { data: groups, isLoading, error, refetch } = useQuery({
-    queryKey: ['groups', user?.schoolId],
+    queryKey: ['groups', user?.schoolId, currencies],
     queryFn: async () => {
       if (!user?.schoolId) {
         throw new Error('No school ID found');
@@ -52,7 +73,7 @@ const Groups = () => {
 
       // Get unique teacher IDs
       const teacherIds = [...new Set(groups.map((g: any) => g.teacher_id).filter(Boolean))];
-      
+
       // Fetch teacher details
       const teachers = await Promise.all(
         teacherIds.map(async (teacherId) => {
@@ -75,22 +96,48 @@ const Groups = () => {
         }
       });
 
-      // Enrich groups with student count and teacher names
+      // Create currency map for symbol lookup
+      const currencyMap = new Map();
+      if (currencies && currencies.length > 0) {
+        currencies.forEach((currency: any) => {
+          currencyMap.set(currency.code, currency.symbol);
+        });
+      }
+
+      // Enrich groups with student count, teacher names, and currency symbols
       const enrichedGroups = await Promise.all(groups.map(async (group: any) => {
         const students = await databaseService.query(`groups/${group.id}/students`, {});
         const teacherName = group.teacher_id ? teacherMap.get(group.teacher_id) || 'Unknown Teacher' : 'No Teacher Assigned';
-        
-        return {
+
+        // Enrich prices_by_currency with currency symbols
+        let enrichedPrices = group.prices_by_currency || group.pricesByCurrency || {};
+        console.log(`Group ${group.name} prices_by_currency:`, enrichedPrices);
+
+        if (enrichedPrices && typeof enrichedPrices === 'object' && Object.keys(enrichedPrices).length > 0) {
+          enrichedPrices = Object.keys(enrichedPrices).reduce((acc: any, code: string) => {
+            acc[code] = {
+              ...enrichedPrices[code],
+              symbol: currencyMap.get(code) || '$'
+            };
+            return acc;
+          }, {});
+        }
+
+        const enrichedGroup = {
           ...group,
           teacher_name: teacherName,
           student_count: students.length,
-          students_count: students.length
+          students_count: students.length,
+          prices_by_currency: enrichedPrices
         };
+
+        console.log(`Enriched group ${group.name}:`, enrichedGroup);
+        return enrichedGroup;
       }));
 
       return enrichedGroups as Group[];
     },
-    enabled: !!user?.schoolId
+    enabled: !!user?.schoolId && !!currencies
   });
 
   const handleDeleteGroup = async (groupId: string, groupName: string) => {
@@ -102,29 +149,83 @@ const Groups = () => {
     setDeletingGroupId(groupId);
 
     try {
-      // Delete group and related data from Firebase
-      // First, delete all students in the group
+      console.log(`Starting cascade deletion for group: ${groupName} (${groupId})`);
+
+      // Step 1: Find all subscriptions for this group
+      const subscriptions = await databaseService.query('subscriptions', {
+        where: [{ field: 'group_id', operator: '==', value: groupId }]
+      });
+
+      console.log(`Found ${subscriptions.length} subscriptions to delete`);
+
+      // Step 2: Delete all payments/transactions linked to these subscriptions
+      if (subscriptions.length > 0) {
+        const subscriptionIds = subscriptions.map((sub: any) => sub.id);
+
+        for (const subId of subscriptionIds) {
+          // Query payments for this subscription
+          const payments = await databaseService.query('payments', {
+            where: [{ field: 'subscription_id', operator: '==', value: subId }]
+          });
+
+          console.log(`Found ${payments.length} payments for subscription ${subId}`);
+
+          // Delete each payment
+          for (const payment of payments) {
+            await databaseService.delete('payments', payment.id);
+            console.log(`Deleted payment ${payment.id}`);
+          }
+        }
+      }
+
+      // Step 3: Delete all subscriptions for this group
+      for (const subscription of subscriptions) {
+        await databaseService.delete('subscriptions', subscription.id);
+        console.log(`Deleted subscription ${subscription.id}`);
+      }
+
+      // Step 4: Delete all sessions for this group
+      const sessions = await databaseService.query('sessions', {
+        where: [{ field: 'group_id', operator: '==', value: groupId }]
+      });
+
+      console.log(`Found ${sessions.length} sessions to delete`);
+
+      for (const session of sessions) {
+        await databaseService.delete('sessions', session.id);
+        console.log(`Deleted session ${session.id}`);
+      }
+
+      // Step 5: Delete all students in the group's subcollection
       const groupStudents = await databaseService.query(`groups/${groupId}/students`, {});
+      console.log(`Found ${groupStudents.length} students in group subcollection`);
+
       for (const student of groupStudents) {
         await databaseService.delete(`groups/${groupId}/students`, student.id);
+        console.log(`Deleted student ${student.id} from group subcollection`);
       }
-      
-      // Then delete the group itself
-      await databaseService.delete('groups', groupId);
-      
-      console.log('Successfully deleted group:', groupName);
 
-      toast.success(`Group "${groupName}" and all related data deleted successfully`);
+      // Step 6: Finally, delete the group itself
+      await databaseService.delete('groups', groupId);
+
+      console.log(`Successfully deleted group "${groupName}" and all related data`);
+
+      toast.success(
+        `Group "${groupName}" deleted successfully`,
+        {
+          description: `Deleted ${subscriptions.length} subscriptions, ${sessions.length} sessions, and all related payments`
+        }
+      );
 
       // Refresh the groups list
       refetch();
-      
+
     } catch (error) {
       console.error('Error deleting group:', error);
-      
+
       toast.error(
-        error instanceof Error 
-          ? `Error deleting group: ${error.message}` 
+        error instanceof Error
+          ? `Error deleting group: ${error.message}`
           : 'An unexpected error occurred while deleting the group'
       );
     } finally {
@@ -135,17 +236,38 @@ const Groups = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800';
       case 'inactive':
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300 border-gray-200 dark:border-gray-700';
       case 'completed':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800';
       default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300 border-gray-200 dark:border-gray-700';
     }
   };
 
   const formatPrice = (group: Group) => {
+    // Check if group has multi-currency pricing
+    if (group.prices_by_currency && Object.keys(group.prices_by_currency).length > 0) {
+      const pricesArray = Object.entries(group.prices_by_currency)
+        .filter(([_, priceData]) => {
+          const price = group.price_mode === 'perSession' ? priceData.per_session : priceData.total;
+          return price && parseFloat(String(price)) > 0;
+        })
+        .map(([code, priceData]) => {
+          const price = group.price_mode === 'perSession' ? priceData.per_session : priceData.total;
+          const symbol = priceData.symbol || code;
+          if (group.price_mode === 'perSession') {
+            return `${price} ${symbol}/session`;
+          } else {
+            return `${price} ${symbol} total`;
+          }
+        });
+
+      return pricesArray.length > 0 ? pricesArray.join(' • ') : 'No price set';
+    }
+
+    // Fallback to old single-currency format
     if (group.price_mode === 'perSession') {
       return `${group.price_per_session} ${group.currency}/session`;
     } else {
@@ -271,124 +393,116 @@ const Groups = () => {
           {groups.map((group) => (
             <Card
               key={group.id}
-              className="rounded-2xl shadow-md border bg-card hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group"
+              className="rounded-2xl shadow-sm border border-border bg-card hover:shadow-lg hover:border-primary/20 transition-all duration-300 overflow-hidden"
             >
-              <CardHeader className="pb-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
+              <CardHeader className="pb-4 border-b border-border">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <CardTitle className="text-xl font-bold text-gray-900 line-clamp-1">
+                      <CardTitle className="text-xl font-bold text-foreground truncate">
                         {group.name}
                       </CardTitle>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
-                            disabled={deletingGroupId === group.id}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Group</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete "{group.name}"? This will also delete all subscriptions, sessions, and payments for students in this group. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteGroup(group.id, group.name)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Delete Group
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <Badge
+                        className={`${getStatusColor(group.status)} font-medium px-2.5 py-0.5 rounded-md text-xs border flex-shrink-0`}
+                      >
+                        {group.status}
+                      </Badge>
                     </div>
                     {group.description && (
-                      <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+                      <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                         {group.description}
                       </p>
                     )}
                   </div>
-                  <Badge 
-                    className={`${getStatusColor(group.status)} font-semibold px-3 py-1 rounded-full text-xs border ml-3 flex-shrink-0`}
-                  >
-                    {group.status}
-                  </Badge>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-1.5 h-auto flex-shrink-0"
+                        disabled={deletingGroupId === group.id}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Group</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{group.name}"? This will also delete all subscriptions, sessions, and payments for students in this group. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteGroup(group.id, group.name)}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          Delete Group
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardHeader>
-              
-              <CardContent className="space-y-4">
+
+              <CardContent className="pt-4 space-y-3">
                 {/* Teacher Info */}
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                  <div className="h-8 w-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <GraduationCap className="h-4 w-4 text-white" />
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Teacher</p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">{group.teacher_name}</p>
+                    <p className="text-xs text-muted-foreground">Teacher</p>
+                    <p className="text-sm font-medium text-foreground truncate">{group.teacher_name}</p>
                   </div>
                 </div>
 
                 {/* Stats Row */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 py-2">
                   {/* Student Count */}
-                  <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl">
-                    <div className="h-7 w-7 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Users className="h-3.5 w-3.5 text-white" />
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="text-lg font-bold text-blue-900">{group.student_count}</p>
-                      <p className="text-xs text-blue-600 font-medium">students</p>
+                      <p className="text-lg font-semibold text-foreground">{group.student_count}</p>
+                      <p className="text-xs text-muted-foreground">students</p>
                     </div>
                   </div>
 
                   {/* Session Count */}
-                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-xl">
-                    <div className="h-7 w-7 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Clock className="h-3.5 w-3.5 text-white" />
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="text-lg font-bold text-green-900">{group.session_count}</p>
-                      <p className="text-xs text-green-600 font-medium">sessions</p>
+                      <p className="text-lg font-semibold text-foreground">{group.session_count}</p>
+                      <p className="text-xs text-muted-foreground">sessions</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Schedule */}
-                <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-xl">
-                  <div className="h-8 w-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Calendar className="h-4 w-4 text-white" />
-                  </div>
+                <div className="flex items-start gap-3 pt-2 border-t border-border">
+                  <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-orange-600 uppercase tracking-wide mb-1">Schedule</p>
-                    <p className="text-sm font-semibold text-orange-900 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mb-0.5">Schedule</p>
+                    <p className="text-sm font-medium text-foreground leading-relaxed">
                       {formatSchedule(group.schedule)}
                     </p>
                   </div>
                 </div>
 
                 {/* Pricing */}
-                <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl">
-                  <div className="h-8 w-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <DollarSign className="h-4 w-4 text-white" />
-                  </div>
+                <div className="flex items-start gap-3 pt-2 border-t border-border">
+                  <DollarSign className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Price</p>
-                    <p className="text-sm font-bold text-emerald-900">{formatPrice(group)}</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Price</p>
+                    <p className="text-sm font-semibold text-foreground">{formatPrice(group)}</p>
                   </div>
                 </div>
 
                 {/* Action Button */}
-                <Button 
-                  variant="outline" 
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 group-hover:border-blue-400 font-medium"
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2 mt-4 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-200"
                   onClick={() => handleViewDetails(group)}
                 >
                   <Eye className="h-4 w-4" />

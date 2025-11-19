@@ -134,6 +134,8 @@ export interface Subscription {
   created_at: string;
   teacherId?: string; // Teacher assigned to this subscription (stored in Firebase)
   teacher_id?: string; // Support both camelCase and snake_case
+  groupId?: string; // For group subscriptions (stored in Firebase)
+  group_id?: string; // Support both camelCase and snake_case
 }
 
 export interface PaymentRecord {

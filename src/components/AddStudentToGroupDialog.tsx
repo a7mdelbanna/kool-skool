@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, DollarSign } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
@@ -22,6 +22,10 @@ interface Group {
   price_per_session: number;
   total_price: number;
   session_count: number;
+  schedule: Array<{ day: string; time: string }>;
+  teacher_id: string;
+  course_id?: string;
+  session_duration_minutes?: number;
 }
 
 interface AddStudentToGroupDialogProps {
@@ -54,6 +58,7 @@ interface RpcResponse {
 const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddStudentToGroupDialogProps) => {
   const { user } = useContext(UserContext);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form data
@@ -199,7 +204,7 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
     try {
       // Add student to group in Firebase
       const selectedStudent = availableStudents?.find(s => s.id === selectedStudentId);
-      
+
       await databaseService.create(`groups/${group.id}/students`, {
         studentId: selectedStudentId,
         studentName: selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : 'Unknown',
@@ -207,23 +212,127 @@ const AddStudentToGroupDialog = ({ open, onOpenChange, group, onSuccess }: AddSt
         status: 'active',
         createdAt: new Date().toISOString()
       });
-      
-      // Create initial payment if amount provided
+
+      // Create subscription for this student in the group
+      const subscriptionData = {
+        school_id: user.schoolId,
+        student_id: selectedStudentId,
+        group_id: group.id, // Link subscription to group
+        session_count: group.session_count,
+        schedule: group.schedule, // Use group schedule
+        currency: group.currency,
+        price_mode: group.price_mode,
+        price_per_session: group.price_mode === 'perSession' ? group.price_per_session : null,
+        total_price: group.price_mode === 'perSession' ? (group.price_per_session * group.session_count) : group.total_price,
+        status: 'active',
+        start_date: startDate || new Date().toISOString().split('T')[0],
+        notes: subscriptionNotes || `Subscription for group: ${group.name}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const subscriptionId = await databaseService.create('subscriptions', subscriptionData);
+      console.log('Created subscription for student in group:', subscriptionId);
+
+      // Generate sessions based on schedule with chronological distribution
+      if (group.schedule.length > 0 && group.session_count > 0) {
+        console.log('Generating sessions for subscription:', subscriptionId);
+
+        const sessionStartDate = new Date(startDate || new Date());
+        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        // Build all possible session dates across all schedule days
+        const allSessionDates: Array<{ date: Date; time: string; day: string }> = [];
+        const maxWeeks = Math.ceil(group.session_count / group.schedule.length) + 4;
+
+        // Generate sessions week by week across all schedule days
+        for (let week = 0; week < maxWeeks && allSessionDates.length < group.session_count; week++) {
+          for (const scheduleItem of group.schedule) {
+            if (allSessionDates.length >= group.session_count) break;
+
+            const dayIndex = daysOfWeek.indexOf(scheduleItem.day);
+            if (dayIndex === -1) continue;
+
+            // Calculate the date for this schedule day in this week
+            const sessionDate = new Date(sessionStartDate);
+
+            // Find first occurrence of this day
+            let daysToAdd = (dayIndex - sessionStartDate.getDay() + 7) % 7;
+            if (daysToAdd === 0 && week === 0) {
+              // If it's the same day as start date, use it
+              daysToAdd = 0;
+            }
+
+            // Add the week offset
+            daysToAdd += (week * 7);
+            sessionDate.setDate(sessionDate.getDate() + daysToAdd);
+
+            // Only add if on or after start date
+            if (sessionDate >= sessionStartDate) {
+              allSessionDates.push({
+                date: sessionDate,
+                time: scheduleItem.time,
+                day: scheduleItem.day
+              });
+            }
+          }
+        }
+
+        // Sort chronologically and take only the required number
+        const sortedSessions = allSessionDates
+          .sort((a, b) => a.date.getTime() - b.date.getTime())
+          .slice(0, group.session_count);
+
+        // Create sessions in database
+        for (let i = 0; i < sortedSessions.length; i++) {
+          const session = sortedSessions[i];
+          const sessionData = {
+            subscription_id: subscriptionId,
+            student_id: selectedStudentId,
+            school_id: user.schoolId,
+            teacher_id: group.teacher_id,
+            course_id: group.course_id || null,
+            group_id: group.id,
+            scheduled_date: session.date.toISOString().split('T')[0],
+            scheduled_time: session.time,
+            duration_minutes: group.session_duration_minutes || 60,
+            status: 'scheduled',
+            index_in_sub: i + 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          await databaseService.create('sessions', sessionData);
+        }
+
+        console.log(`Created ${sortedSessions.length} sessions for student (requested ${group.session_count})`);
+      }
+
+      // Create initial payment if amount provided (link to subscription)
       if (paymentAmount > 0) {
-        await databaseService.create('payments', {
+        await databaseService.create('transactions', {
           school_id: user.schoolId,
           student_id: selectedStudentId,
+          subscription_id: subscriptionId, // Link payment to subscription
           group_id: group.id,
+          type: 'income',
           amount: paymentAmount,
           currency: group.currency,
-          payment_date: new Date().toISOString().split('T')[0],
+          transaction_date: new Date().toISOString().split('T')[0],
           payment_method: paymentMethod,
-          account_id: accountId || null,
-          notes: paymentNotes || `Initial payment for group ${group.name}`,
-          status: 'paid',
-          createdAt: new Date().toISOString()
+          from_account_id: accountId || null,
+          description: `Initial payment for group ${group.name}`,
+          notes: paymentNotes || '',
+          status: 'completed',
+          created_at: new Date().toISOString()
         });
       }
+
+      // Invalidate queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['group-student-payments', group.id] });
+      queryClient.invalidateQueries({ queryKey: ['school-transactions', user.schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['group-subscriptions', group.id] });
+      queryClient.invalidateQueries({ queryKey: ['group-students', group.id] });
 
       toast({
         title: "Success!",
