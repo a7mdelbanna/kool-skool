@@ -35,8 +35,8 @@ export const useKeyboardShortcuts = ({
       const isContentEditable = target.contentEditable === 'true';
 
       shortcuts.forEach((shortcut) => {
-        // Skip if shortcut is disabled
-        if (shortcut.enabled === false) return;
+        // Skip if shortcut is disabled or has no key defined
+        if (shortcut.enabled === false || !shortcut.key || !event.key) return;
 
         // Check if all modifier keys match
         const ctrlMatch = shortcut.ctrlKey ? (event.ctrlKey || event.metaKey) : true;
