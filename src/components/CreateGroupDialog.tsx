@@ -12,7 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp, BookOpen, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, getSchoolTeachers, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
@@ -1215,12 +1219,40 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                       <div>
                                         <Label htmlFor={`start-date-${student.id}`}>Start Date</Label>
-                                        <Input
-                                          id={`start-date-${student.id}`}
-                                          type="date"
-                                          value={student.paymentDetails.start_date}
-                                          onChange={(e) => handleStudentPaymentChange(student.id, 'start_date', e.target.value)}
-                                        />
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              className={cn(
+                                                "w-full justify-start text-left font-normal mt-1",
+                                                !student.paymentDetails.start_date && "text-muted-foreground"
+                                              )}
+                                            >
+                                              <Calendar className="mr-2 h-4 w-4" />
+                                              {student.paymentDetails.start_date
+                                                ? format(new Date(student.paymentDetails.start_date), "PPP")
+                                                : <span>Pick a date</span>
+                                              }
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0" align="start">
+                                            <CalendarComponent
+                                              mode="single"
+                                              selected={student.paymentDetails.start_date ? new Date(student.paymentDetails.start_date) : undefined}
+                                              onSelect={(date) => {
+                                                if (date) {
+                                                  handleStudentPaymentChange(
+                                                    student.id,
+                                                    'start_date',
+                                                    format(date, 'yyyy-MM-dd')
+                                                  );
+                                                }
+                                              }}
+                                              initialFocus
+                                              className="pointer-events-auto"
+                                            />
+                                          </PopoverContent>
+                                        </Popover>
                                       </div>
 
                                       <div>
@@ -1447,28 +1479,6 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
               </CardContent>
             </Card>
 
-            {groupData.schedule.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Group Schedule Overview
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Preview of the weekly group schedule. Each student will see their personalized schedule based on their start date.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <SchedulePreview
-                    schedule={groupData.schedule}
-                    startDate={new Date()}
-                    sessionCount={parseInt(String(groupData.session_count)) || 0}
-                    durationMonths={Math.ceil((parseInt(String(groupData.session_count)) || 0) / (groupData.schedule.length || 1))}
-                    sessionDuration={String(groupData.session_duration_minutes || 60)}
-                  />
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
         </Tabs>
 
