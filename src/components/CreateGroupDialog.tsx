@@ -11,13 +11,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
+import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp, BookOpen, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, getSchoolTeachers, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
 import { useContext } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 interface CreateGroupDialogProps {
   open: boolean;
@@ -89,6 +92,8 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('details');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scheduleValidationError, setScheduleValidationError] = useState<string>('');
+  const [isValidatingSchedule, setIsValidatingSchedule] = useState(false);
   
   // Group form data
   const [groupData, setGroupData] = useState<GroupFormData>({
@@ -288,7 +293,61 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     return selectedCurrency?.symbol || '$';
   };
 
-  const handleAddSchedule = () => {
+  // Validate teacher availability for all schedule items
+  const validateTeacherAvailability = async () => {
+    if (!groupData.teacher_id || groupData.schedule.length === 0) {
+      setScheduleValidationError('');
+      return true;
+    }
+
+    setIsValidatingSchedule(true);
+    setScheduleValidationError('');
+
+    try {
+      // Get the first occurrence of each scheduled day in the future
+      const today = new Date();
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const sessionDuration = parseInt(String(groupData.session_duration_minutes)) || 60;
+
+      for (const scheduleItem of groupData.schedule) {
+        const dayIndex = daysOfWeek.indexOf(scheduleItem.day);
+        if (dayIndex === -1) continue;
+
+        // Find the next occurrence of this day
+        let checkDate = new Date(today);
+        let daysToAdd = (dayIndex - checkDate.getDay() + 7) % 7;
+        if (daysToAdd === 0 && checkDate.getHours() >= parseInt(scheduleItem.time.split(':')[0])) {
+          daysToAdd = 7; // If today but time has passed, check next week
+        }
+        checkDate.setDate(checkDate.getDate() + daysToAdd);
+
+        const dateStr = checkDate.toISOString().split('T')[0];
+
+        // Validate this time slot
+        const result = await validateTeacherScheduleOverlap({
+          teacherId: groupData.teacher_id,
+          date: dateStr,
+          startTime: scheduleItem.time,
+          durationMinutes: sessionDuration
+        }, user?.role === 'admin');
+
+        if (result.hasConflict && result.conflictMessage) {
+          setScheduleValidationError(result.conflictMessage);
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error validating teacher schedule:', error);
+      // Don't block on validation errors
+      return true;
+    } finally {
+      setIsValidatingSchedule(false);
+    }
+  };
+
+  const handleAddSchedule = async () => {
     if (newScheduleDay && newScheduleTime) {
       setGroupData(prev => ({
         ...prev,
@@ -296,6 +355,12 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       }));
       setNewScheduleDay('');
       setNewScheduleTime('');
+
+      // Validate teacher availability after adding schedule
+      // Use setTimeout to ensure state is updated
+      setTimeout(() => {
+        validateTeacherAvailability();
+      }, 100);
     }
   };
 
@@ -356,7 +421,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     console.log('User:', user);
     console.log('Group Data:', groupData);
     console.log('Selected Students:', selectedStudents);
-    
+
     if (!user?.schoolId) {
       console.error('No school ID found');
       toast({
@@ -383,6 +448,17 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       toast({
         title: "No Students Selected",
         description: "Please add at least one student to the group.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate teacher availability before creating group
+    const isAvailable = await validateTeacherAvailability();
+    if (!isAvailable) {
+      toast({
+        title: "Teacher Schedule Conflict",
+        description: "Please resolve the schedule conflict before creating the group.",
         variant: "destructive",
       });
       return;
@@ -662,12 +738,12 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                     </SelectContent>
                   </Select>
                   {selectedCourse && (
-                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="mt-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                       <div className="flex items-start gap-2">
                         <BookOpen className="h-4 w-4 text-blue-600 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-blue-900">{selectedCourse.name}</p>
-                          <p className="text-sm text-blue-700 mt-1">Course Type: {selectedCourse.lesson_type}</p>
+                          <p className="text-sm font-medium text-blue-700 dark:text-blue-300">{selectedCourse.name}</p>
+                          <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">Course Type: {selectedCourse.lesson_type}</p>
                         </div>
                       </div>
                     </div>
@@ -770,7 +846,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                 </div>
 
                 {groupData.schedule.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <Label>Current Schedule</Label>
                     <div className="space-y-2">
                       {groupData.schedule.map((item, index) => (
@@ -787,9 +863,28 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                         </div>
                       ))}
                     </div>
+
+                    {/* Teacher Availability Validation */}
+                    {isValidatingSchedule && (
+                      <Alert className="border-blue-500/20 bg-blue-500/10">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                        <AlertDescription className="text-blue-700 dark:text-blue-300">
+                          Checking teacher availability...
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {scheduleValidationError && !isValidatingSchedule && (
+                      <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription className="text-red-700 dark:text-red-300">
+                          {scheduleValidationError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 ) : (
-                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                  <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
                     ⚠️ Please add at least one schedule item by clicking "Add to Schedule" button above
                   </div>
                 )}
@@ -856,19 +951,19 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                 </div>
 
                 {/* Total Amount Display */}
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+                <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-base font-semibold">Total Amount</Label>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {groupData.price_mode === 'perSession' 
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {groupData.price_mode === 'perSession'
                           ? `${groupData.session_count} sessions × ${getSelectedCurrencySymbol()}${groupData.price_per_session}`
                           : 'Fixed total price'
                         }
                       </p>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-blue-500">
                         {getSelectedCurrencySymbol()}{calculateTotalAmount().toFixed(2)}
                       </div>
                     </div>
@@ -913,12 +1008,12 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                             onOpenChange={() => handleToggleStudentExpansion(student.id)}
                           >
                             <CollapsibleTrigger asChild>
-                              <CardHeader className="cursor-pointer hover:bg-gray-50">
+                              <CardHeader className="cursor-pointer hover:bg-muted/50">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-3">
                                     <div>
                                       <CardTitle className="text-lg">{student.name}</CardTitle>
-                                      <p className="text-sm text-gray-600">{student.email}</p>
+                                      <p className="text-sm text-muted-foreground">{student.email}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
