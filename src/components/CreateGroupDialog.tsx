@@ -53,6 +53,8 @@ interface GroupFormData {
   price_mode: 'perSession' | 'total';
   price_per_session: string | number;
   total_price: string | number;
+  // Multi-currency pricing: store prices for each currency
+  prices_by_currency: { [currencyCode: string]: { per_session: string | number; total: string | number } };
 }
 
 interface StudentPaymentDetails {
@@ -114,7 +116,8 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     currency: 'RUB', // Default to RUB for now
     price_mode: 'total',
     price_per_session: '',
-    total_price: ''
+    total_price: '',
+    prices_by_currency: {}
   });
 
   // Students tab data
@@ -300,23 +303,23 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     return selectedCurrency?.symbol || '$';
   };
 
-  // Convert price to all currencies based on exchange rates
-  const convertToAllCurrencies = (baseAmount: number, baseCurrency: string) => {
-    if (!currencies || currencies.length === 0) return [];
-
-    const baseCurr = currencies.find(c => c.code === baseCurrency);
-    if (!baseCurr) return [];
-
-    return currencies.map(currency => {
-      // Convert from base currency to target currency using exchange rates
-      const convertedAmount = (baseAmount * baseCurr.exchange_rate) / currency.exchange_rate;
-      return {
-        code: currency.code,
-        symbol: currency.symbol,
-        name: currency.name,
-        amount: convertedAmount
-      };
+  // Get available currencies (currencies with prices entered)
+  const getAvailableCurrencies = () => {
+    if (!currencies) return [];
+    return currencies.filter(curr => {
+      const priceData = groupData.prices_by_currency[curr.code];
+      if (!priceData) return false;
+      const price = groupData.price_mode === 'perSession' ? priceData.per_session : priceData.total;
+      return price && parseFloat(String(price)) > 0;
     });
+  };
+
+  // Get price for a specific currency
+  const getPriceForCurrency = (currencyCode: string) => {
+    const priceData = groupData.prices_by_currency[currencyCode];
+    if (!priceData) return 0;
+    const price = groupData.price_mode === 'perSession' ? priceData.per_session : priceData.total;
+    return parseFloat(String(price)) || 0;
   };
 
   // Validate teacher availability for all schedule items
@@ -568,20 +571,43 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
             createdAt: new Date().toISOString()
           });
           
-          // Determine pricing for this student (use custom if override is enabled, otherwise use group default)
+          // Determine pricing for this student
           const useCustomPricing = student.paymentDetails.override_pricing;
-          const studentCurrency = useCustomPricing ? (student.paymentDetails.custom_currency || groupData.currency) : groupData.currency;
-          const studentPriceMode = useCustomPricing ? (student.paymentDetails.custom_price_mode || groupData.price_mode) : groupData.price_mode;
 
-          const studentPricePerSession = useCustomPricing
-            ? parseFloat(String(student.paymentDetails.custom_price_per_session)) || 0
-            : pricePerSession;
+          // Get student's currency (from selection or first available)
+          const availableCurrencies = getAvailableCurrencies();
+          const studentCurrency = useCustomPricing
+            ? (student.paymentDetails.custom_currency || (availableCurrencies[0]?.code || groupData.currency))
+            : (student.paymentDetails.custom_currency || (availableCurrencies[0]?.code || groupData.currency));
 
-          const studentTotalPrice = useCustomPricing
-            ? (studentPriceMode === 'perSession'
+          let studentPricePerSession = 0;
+          let studentTotalPrice = 0;
+
+          if (useCustomPricing) {
+            // Use custom pricing from override fields
+            const studentPriceMode = student.paymentDetails.custom_price_mode || groupData.price_mode;
+            studentPricePerSession = parseFloat(String(student.paymentDetails.custom_price_per_session)) || 0;
+            studentTotalPrice = studentPriceMode === 'perSession'
               ? studentPricePerSession * sessionCount
-              : parseFloat(String(student.paymentDetails.custom_total_price)) || 0)
-            : (groupData.price_mode === 'total' ? totalPrice : pricePerSession * sessionCount);
+              : parseFloat(String(student.paymentDetails.custom_total_price)) || 0;
+          } else {
+            // Use group pricing for the selected currency
+            const priceData = groupData.prices_by_currency[studentCurrency];
+            if (priceData) {
+              if (groupData.price_mode === 'perSession') {
+                studentPricePerSession = parseFloat(String(priceData.per_session)) || 0;
+                studentTotalPrice = studentPricePerSession * sessionCount;
+              } else {
+                studentTotalPrice = parseFloat(String(priceData.total)) || 0;
+                studentPricePerSession = 0;
+              }
+            }
+          }
+
+          // Determine price mode for subscription
+          const subscriptionPriceMode = useCustomPricing
+            ? (student.paymentDetails.custom_price_mode || groupData.price_mode)
+            : groupData.price_mode;
 
           // Create actual subscription in main subscriptions collection
           const subscriptionData = {
@@ -597,8 +623,8 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
             session_duration: sessionDuration,
             schedule: groupData.schedule,
             currency: studentCurrency,
-            price_mode: studentPriceMode,
-            price_per_session: studentPriceMode === 'perSession' ? studentPricePerSession : null,
+            price_mode: subscriptionPriceMode,
+            price_per_session: subscriptionPriceMode === 'perSession' ? studentPricePerSession : null,
             total_price: studentTotalPrice,
             status: 'active',
             start_date: student.paymentDetails.start_date || new Date().toISOString().split('T')[0],
@@ -1018,27 +1044,53 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                   </div>
                 </div>
 
-                {/* Multi-Currency Pricing Display */}
-                {currencies && currencies.length > 1 && calculateTotalAmount() > 0 && (
+                {/* Multi-Currency Pricing Input */}
+                {currencies && currencies.length > 0 && (
                   <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                    <Label className="text-sm font-medium mb-2 block">Prices in All Currencies</Label>
+                    <Label className="text-sm font-medium mb-2 block">Set Prices in Multiple Currencies (Optional)</Label>
                     <p className="text-xs text-muted-foreground mb-3">
-                      Based on current exchange rates. Students can pay in any of these currencies or have custom pricing.
+                      Enter prices for each currency you want to offer. Students can choose which currency to pay in.
+                      Leave empty if not offered in that currency.
                     </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {convertToAllCurrencies(calculateTotalAmount(), groupData.currency).map((curr) => (
-                        <div
-                          key={curr.code}
-                          className={`p-2 rounded-lg ${
-                            curr.code === groupData.currency
-                              ? 'bg-blue-500/20 border border-blue-500/30'
-                              : 'bg-muted/50'
-                          }`}
-                        >
-                          <div className="text-xs text-muted-foreground">{curr.name}</div>
-                          <div className="text-sm font-semibold">
-                            {curr.symbol}{curr.amount.toFixed(2)}
-                          </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {currencies.map((currency) => (
+                        <div key={currency.code} className="p-3 bg-muted/50 rounded-lg border">
+                          <Label className="text-xs font-medium mb-2 flex items-center gap-2">
+                            {currency.name} ({currency.symbol})
+                            {currency.is_default && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">Default</Badge>
+                            )}
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={groupData.price_mode === 'perSession' ? 'Per session' : 'Total'}
+                            value={
+                              groupData.price_mode === 'perSession'
+                                ? (groupData.prices_by_currency[currency.code]?.per_session || '')
+                                : (groupData.prices_by_currency[currency.code]?.total || '')
+                            }
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setGroupData(prev => ({
+                                ...prev,
+                                prices_by_currency: {
+                                  ...prev.prices_by_currency,
+                                  [currency.code]: {
+                                    per_session: groupData.price_mode === 'perSession' ? value : (prev.prices_by_currency[currency.code]?.per_session || ''),
+                                    total: groupData.price_mode === 'total' ? value : (prev.prices_by_currency[currency.code]?.total || '')
+                                  }
+                                }
+                              }));
+                            }}
+                            className="h-8 text-sm"
+                          />
+                          {groupData.price_mode === 'perSession' && groupData.prices_by_currency[currency.code]?.per_session && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Total: {currency.symbol}
+                              {(parseFloat(String(groupData.prices_by_currency[currency.code]?.per_session)) * (parseFloat(String(groupData.session_count)) || 0)).toFixed(2)}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1199,26 +1251,86 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                                 <Separator className="my-4" />
 
                                 <div className="space-y-4">
-                                  <div className="flex items-start space-x-3">
-                                    <Checkbox
-                                      id={`override-pricing-${student.id}`}
-                                      checked={student.paymentDetails.override_pricing}
-                                      onCheckedChange={(checked) =>
-                                        handleStudentPaymentChange(student.id, 'override_pricing', checked as boolean)
-                                      }
-                                    />
-                                    <div className="flex-1">
-                                      <Label htmlFor={`override-pricing-${student.id}`} className="font-semibold cursor-pointer">
-                                        Override Pricing for this Student
-                                      </Label>
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {student.paymentDetails.override_pricing
-                                          ? 'Custom pricing enabled - student will use their own price instead of group default'
-                                          : `Using group default: ${getSelectedCurrencySymbol()}${calculateTotalAmount().toFixed(2)}`
-                                        }
+                                  {getAvailableCurrencies().length > 0 ? (
+                                    <div>
+                                      <Label className="text-sm font-medium mb-2 block">Select Currency for this Student</Label>
+                                      <p className="text-xs text-muted-foreground mb-3">
+                                        Choose which currency this student will pay in from the available group prices.
+                                      </p>
+                                      <Select
+                                        value={student.paymentDetails.custom_currency || getAvailableCurrencies()[0]?.code || ''}
+                                        onValueChange={(value) => {
+                                          handleStudentPaymentChange(student.id, 'custom_currency', value);
+                                          // Also set override flag if choosing different currency
+                                          const availableCurrs = getAvailableCurrencies();
+                                          if (availableCurrs.length > 0 && value !== availableCurrs[0]?.code) {
+                                            handleStudentPaymentChange(student.id, 'override_pricing', false);
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {getAvailableCurrencies().map((currency) => {
+                                            const price = getPriceForCurrency(currency.code);
+                                            const total = groupData.price_mode === 'perSession'
+                                              ? price * (parseFloat(String(groupData.session_count)) || 0)
+                                              : price;
+                                            return (
+                                              <SelectItem key={currency.code} value={currency.code}>
+                                                {currency.name} - {currency.symbol}{total.toFixed(2)}
+                                                {currency.is_default && ' (Default)'}
+                                              </SelectItem>
+                                            );
+                                          })}
+                                        </SelectContent>
+                                      </Select>
+                                      <div className="mt-2 p-2 bg-muted/50 rounded-lg">
+                                        <div className="text-xs text-muted-foreground">Price for this student:</div>
+                                        <div className="text-sm font-semibold">
+                                          {(() => {
+                                            const selectedCurr = student.paymentDetails.custom_currency || getAvailableCurrencies()[0]?.code;
+                                            const currency = currencies?.find(c => c.code === selectedCurr);
+                                            const price = getPriceForCurrency(selectedCurr || '');
+                                            const total = groupData.price_mode === 'perSession'
+                                              ? price * (parseFloat(String(groupData.session_count)) || 0)
+                                              : price;
+                                            return `${currency?.symbol}${total.toFixed(2)}`;
+                                          })()}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                                      <p className="text-sm text-amber-700 dark:text-amber-400">
+                                        ⚠️ No prices set for this group yet. Please go to the "Group Details" tab and enter prices in at least one currency.
                                       </p>
                                     </div>
-                                  </div>
+                                  )}
+
+                                  {/* Advanced: Custom Price Override */}
+                                  {getAvailableCurrencies().length > 0 && (
+                                    <div className="mt-4">
+                                      <div className="flex items-start space-x-3">
+                                        <Checkbox
+                                          id={`override-pricing-${student.id}`}
+                                          checked={student.paymentDetails.override_pricing}
+                                          onCheckedChange={(checked) =>
+                                            handleStudentPaymentChange(student.id, 'override_pricing', checked as boolean)
+                                          }
+                                        />
+                                        <div className="flex-1">
+                                          <Label htmlFor={`override-pricing-${student.id}`} className="font-semibold cursor-pointer">
+                                            Override with Custom Price
+                                          </Label>
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Enable this to set a completely custom price for this student (e.g., discounts, scholarships)
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
 
                                   {/* Custom Pricing Inputs (shown only if override is enabled) */}
                                   {student.paymentDetails.override_pricing && (
