@@ -29,10 +29,20 @@ import TimePicker from '@/components/ui/time-picker';
 import SchedulePreview from './SchedulePreview';
 import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { databaseService } from '@/services/firebase/database.service';
 
 interface ScheduleItem {
   day: string;
   time: string;
+}
+
+interface Teacher {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
 }
 
 interface EditSubscriptionDialogProps {
@@ -205,6 +215,51 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     enabled: !!schoolId,
   });
 
+  // Fetch teachers from Firebase (FIREBASE ONLY - NO SUPABASE)
+  const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
+    queryKey: ['teachers', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      console.log('🔥 Fetching teachers from Firebase for school:', schoolId);
+
+      try {
+        // Query Firebase users collection for teachers in this school
+        const allTeachers = await databaseService.query<Teacher>('users', {
+          where: [
+            { field: 'schoolId', operator: '==', value: schoolId },
+            { field: 'role', operator: '==', value: 'teacher' }
+          ]
+        });
+
+        console.log('✅ Loaded teachers from Firebase:', allTeachers);
+        return allTeachers;
+      } catch (error) {
+        console.error('❌ Error fetching teachers from Firebase:', error);
+        return [];
+      }
+    },
+    enabled: !!schoolId && open,
+  });
+
+  // Fetch subscription teacherId from Firebase (FIREBASE ONLY - NO SUPABASE)
+  const { data: firebaseSubscription } = useQuery({
+    queryKey: ['firebase-subscription', subscription?.id],
+    queryFn: async () => {
+      if (!subscription?.id) return null;
+      console.log('🔥 Fetching subscription from Firebase:', subscription.id);
+
+      try {
+        const sub = await databaseService.getById('subscriptions', subscription.id);
+        console.log('✅ Firebase subscription data:', sub);
+        return sub as any;
+      } catch (error) {
+        console.error('❌ Error fetching subscription from Firebase:', error);
+        return null;
+      }
+    },
+    enabled: !!subscription?.id && open,
+  });
+
   // Fetch initial payment data - simplified query to avoid index requirement
   const { data: initialPaymentData } = useQuery({
     queryKey: ['subscription-initial-payment', subscription?.id],
@@ -238,6 +293,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     sessionDuration: '60', // Default to 60 minutes
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
+    teacherId: '', // Teacher assigned to this subscription
     priceMode: 'perSession',
     pricePerSession: '',
     fixedPrice: '',
@@ -324,6 +380,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
           }
         })(),
         schedule: parsedSchedule,
+        teacherId: firebaseSubscription?.teacherId || '', // Load from Firebase
         priceMode: subscription.price_mode,
         pricePerSession: subscription.price_per_session?.toString() || '',
         fixedPrice: subscription.fixed_price?.toString() || '',
@@ -337,12 +394,12 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
           accountId: initialPaymentData?.to_account_id || ''
         }
       });
-      
+
       setValidationError('');
       setConflictMessage('');
       setShowConflictDialog(false);
     }
-  }, [subscription, open, initialPaymentData, firstSessionData]);
+  }, [subscription, open, initialPaymentData, firstSessionData, firebaseSubscription]);
 
   // Set default currency when currencies are loaded
   useEffect(() => {
@@ -384,11 +441,14 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         }
 
         const dateStr = format(formData.startDate, 'yyyy-MM-dd');
-        
+
+        // Use subscription's teacher if set, otherwise fall back to student's teacher
+        const validationTeacherId = formData.teacherId || studentTeacherId;
+
         // Validate each schedule item
         for (const scheduleItem of formData.schedule) {
           const result = await validateTeacherScheduleOverlap({
-            teacherId: studentTeacherId,
+            teacherId: validationTeacherId,
             date: dateStr,
             startTime: scheduleItem.time,
             durationMinutes: parseInt(formData.sessionDuration) || 60,
@@ -410,7 +470,7 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
     // Debounce validation to avoid too many API calls
     const timeoutId = setTimeout(validateSchedule, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.startDate, formData.schedule, studentTeacherId, subscription?.id]);
+  }, [formData.startDate, formData.schedule, formData.teacherId, studentTeacherId, subscription?.id]);
 
   const addScheduleItem = () => {
     setFormData({
@@ -551,8 +611,18 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
       return;
     }
 
+    // Validate teacher selection
+    if (!formData.teacherId) {
+      toast({
+        title: "Error",
+        description: "Please select a teacher for this subscription",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Final validation before submission
-    if (studentTeacherId) {
+    if (formData.teacherId) {
       setIsValidating(true);
 
       try {
@@ -564,10 +634,10 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         }
 
         const dateStr = format(formData.startDate, 'yyyy-MM-dd');
-        
+
         for (const scheduleItem of formData.schedule) {
           const result = await validateTeacherScheduleOverlap({
-            teacherId: studentTeacherId,
+            teacherId: formData.teacherId, // Use subscription's teacher
             date: dateStr,
             startTime: scheduleItem.time,
             durationMinutes: parseInt(formData.sessionDuration) || 60,
@@ -687,6 +757,20 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
         throw new Error(response.message || 'Failed to update subscription');
       }
 
+      // Update teacherId in Firebase Firestore (FIREBASE ONLY - NO SUPABASE)
+      if (formData.teacherId) {
+        console.log('🔥 Updating teacherId in Firebase subscription:', formData.teacherId);
+        try {
+          await databaseService.update('subscriptions', subscription.id, {
+            teacherId: formData.teacherId
+          });
+          console.log('✅ Teacher ID updated in Firebase subscription');
+        } catch (firebaseError) {
+          console.error('❌ Error updating teacherId in Firebase:', firebaseError);
+          // Don't throw - Supabase update succeeded, this is just additional data
+        }
+      }
+
       toast({
         title: "Success",
         description: response?.message || "Subscription updated successfully!",
@@ -770,8 +854,8 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                 </div>
                 <div>
                   <Label htmlFor="currency" className="text-sm font-semibold text-muted-foreground">Currency</Label>
-                  <Select 
-                    value={formData.currency} 
+                  <Select
+                    value={formData.currency}
                     onValueChange={(value) => setFormData({ ...formData, currency: value })}
                   >
                     <SelectTrigger className="mt-1">
@@ -786,6 +870,44 @@ const EditSubscriptionDialog: React.FC<EditSubscriptionDialogProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Teacher Selection */}
+              <div>
+                <Label htmlFor="teacher" className="text-sm font-semibold text-muted-foreground">
+                  Teacher <span className="text-destructive">*</span>
+                </Label>
+                {isLoadingTeachers ? (
+                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading teachers...
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.teacherId}
+                    onValueChange={(value) => setFormData({ ...formData, teacherId: value })}
+                  >
+                    <SelectTrigger className="mt-1 bg-background border-border">
+                      <SelectValue placeholder="Select a teacher for this subscription" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers.length > 0 ? (
+                        teachers.map((teacher) => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.firstName || teacher.first_name} {teacher.lastName || teacher.last_name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-teachers" disabled>
+                          No teachers available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  This teacher is assigned to this subscription only
+                </p>
               </div>
 
               {/* Start Date */}

@@ -52,6 +52,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { handleSessionAction } from "@/integrations/supabase/client";
 import { supabase } from "@/integrations/supabase/client";
+import { databaseService } from "@/services/firebase/database.service";
 
 interface SessionsTabProps {
   studentData: Partial<Student>;
@@ -90,6 +91,8 @@ interface SubscriptionInfo {
   schedule: any;
   notes: string | null;
   sessions: DatabaseSession[];
+  teacherId?: string; // Teacher assigned to this subscription
+  teacher_id?: string; // Support both camelCase and snake_case
 }
 
 interface SessionActionResponse {
@@ -106,6 +109,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
   const [subscriptions, setSubscriptions] = useState<SubscriptionInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [teacherNames, setTeacherNames] = useState<Record<string, { firstName: string; lastName: string }>>({});
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSession, setSelectedSession] = React.useState<DatabaseSession | null>(null);
@@ -191,19 +195,31 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
       console.log('Unique subscription IDs in sessions:', Array.from(sessionSubscriptionIds));
       
       // Group sessions by subscription, but include ALL subscriptions even if they don't have sessions
-      const subscriptionsWithSessions: SubscriptionInfo[] = subscriptionData.map(sub => {
+      const subscriptionsWithSessions: SubscriptionInfo[] = await Promise.all(subscriptionData.map(async (sub) => {
         console.log(`\n🔍 SESSIONS TAB: Processing subscription: ${sub.id}`);
         console.log(`   Subscription ID type: ${typeof sub.id}`);
-        
+
         // Filter sessions for this specific subscription
         const subscriptionSessions = sessionsArray.filter(session => {
           const matches = session.subscription_id === sub.id;
           console.log(`   Session ${session.id}: ${matches ? '✅' : '❌'} matches subscription ${sub.id}`);
           return matches;
         });
-        
+
         console.log(`✅ SESSIONS TAB: Found ${subscriptionSessions.length} sessions for subscription ${sub.id}`);
-        
+
+        // Fetch teacherId from Firebase for this subscription
+        let teacherId = null;
+        try {
+          const subscriptionDoc = await databaseService.getById('subscriptions', sub.id);
+          if (subscriptionDoc) {
+            teacherId = subscriptionDoc.teacherId || subscriptionDoc.teacher_id || null;
+            console.log(`✅ Found teacherId for subscription ${sub.id}:`, teacherId);
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching teacherId for subscription ${sub.id}:`, error);
+        }
+
         return {
           id: sub.id,
           session_count: sub.session_count,
@@ -215,9 +231,10 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
           status: sub.status,
           schedule: sub.schedule,
           notes: sub.notes,
-          sessions: subscriptionSessions
+          sessions: subscriptionSessions,
+          teacherId: teacherId
         };
-      });
+      }));
 
       // Also create virtual subscriptions for any sessions that don't match existing subscriptions
       // This handles cases where sessions exist for old/deleted subscriptions
@@ -279,7 +296,38 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
 
       setSubscriptions(sortedSubscriptions);
       console.log('=== SESSIONS TAB: LOAD COMPLETE ===');
-      
+
+      // Fetch teacher names for all subscriptions
+      const uniqueTeacherIds = Array.from(new Set(
+        sortedSubscriptions
+          .map(sub => sub.teacherId || sub.teacher_id)
+          .filter(Boolean) as string[]
+      ));
+
+      console.log('🔍 Fetching teacher names for IDs:', uniqueTeacherIds);
+
+      if (uniqueTeacherIds.length > 0) {
+        const teacherData: Record<string, { firstName: string; lastName: string }> = {};
+
+        for (const teacherId of uniqueTeacherIds) {
+          try {
+            const teacher = await databaseService.getById('users', teacherId);
+            if (teacher) {
+              teacherData[teacherId] = {
+                firstName: teacher.firstName || teacher.first_name || '',
+                lastName: teacher.lastName || teacher.last_name || ''
+              };
+              console.log(`✅ Found teacher ${teacherId}:`, teacherData[teacherId]);
+            }
+          } catch (error) {
+            console.error(`❌ Error fetching teacher ${teacherId}:`, error);
+          }
+        }
+
+        setTeacherNames(teacherData);
+        console.log('✅ All teacher names loaded:', teacherData);
+      }
+
     } catch (error) {
       console.error('❌ SESSIONS TAB: Critical error:', error);
       toast({
@@ -600,7 +648,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
     }
   };
 
-  const renderSession = (session: DatabaseSession) => (
+  const renderSession = (session: DatabaseSession, subscription: SubscriptionInfo) => (
     <div
       key={session.id}
       className={cn(
@@ -653,35 +701,48 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-            <Clock className="h-3 w-3" />
-            <span>
-              {(() => {
-                // Use scheduled_datetime if available, otherwise combine date and time
-                let sessionDateTime: Date;
-                
-                if (session.scheduled_datetime) {
-                  // Use the full datetime if available (already in correct timezone)
-                  sessionDateTime = new Date(session.scheduled_datetime);
-                } else if (session.scheduled_time) {
-                  // Combine date and time in Cairo timezone
-                  const dateStr = session.scheduled_date;
-                  const timeStr = session.scheduled_time;
-                  
-                  // Parse the date as local Cairo time
-                  const [year, month, day] = dateStr.split('-').map(Number);
-                  const [hours, minutes] = timeStr.split(':').map(Number);
-                  
-                  // Create date in local timezone (which should be Cairo)
-                  sessionDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-                } else {
-                  // Fallback to just the date (should not happen with new data)
-                  sessionDateTime = new Date(session.scheduled_date);
-                }
-                
-                return format(sessionDateTime, "HH:mm");
-              })()} • {session.duration_minutes || 60} min
-            </span>
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground mt-1">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              <span>
+                {(() => {
+                  // Use scheduled_datetime if available, otherwise combine date and time
+                  let sessionDateTime: Date;
+
+                  if (session.scheduled_datetime) {
+                    // Use the full datetime if available (already in correct timezone)
+                    sessionDateTime = new Date(session.scheduled_datetime);
+                  } else if (session.scheduled_time) {
+                    // Combine date and time in Cairo timezone
+                    const dateStr = session.scheduled_date;
+                    const timeStr = session.scheduled_time;
+
+                    // Parse the date as local Cairo time
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    const [hours, minutes] = timeStr.split(':').map(Number);
+
+                    // Create date in local timezone (which should be Cairo)
+                    sessionDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+                  } else {
+                    // Fallback to just the date (should not happen with new data)
+                    sessionDateTime = new Date(session.scheduled_date);
+                  }
+
+                  return format(sessionDateTime, "HH:mm");
+                })()} • {session.duration_minutes || 60} min
+              </span>
+            </div>
+            {(() => {
+              const teacherId = subscription.teacherId || subscription.teacher_id;
+              const teacher = teacherId ? teacherNames[teacherId] : null;
+
+              return teacher ? (
+                <div className="text-xs">
+                  <span className="text-muted-foreground">with </span>
+                  <span className="font-medium text-foreground">{teacher.firstName} {teacher.lastName}</span>
+                </div>
+              ) : null;
+            })()}
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">
@@ -930,6 +991,17 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                       <div className="mb-4 p-4 bg-muted/30 rounded-lg">
                         <h5 className="font-medium mb-2">Subscription Details</h5>
                         <div className="grid grid-cols-2 gap-4 text-sm">
+                          {(() => {
+                            const teacherId = subscription.teacherId || subscription.teacher_id;
+                            const teacher = teacherId ? teacherNames[teacherId] : null;
+
+                            return teacher ? (
+                              <div>
+                                <span className="text-muted-foreground">Teacher:</span>
+                                <p className="font-medium text-primary">{teacher.firstName} {teacher.lastName}</p>
+                              </div>
+                            ) : null;
+                          })()}
                           <div>
                             <span className="text-muted-foreground">Schedule:</span>
                             <p>{formatSchedule(subscription.schedule)}</p>
@@ -963,7 +1035,7 @@ const SessionsTab: React.FC<SessionsTabProps> = ({
                         <div className="space-y-0">
                           {subscription.sessions
                             .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime())
-                            .map(renderSession)}
+                            .map(session => renderSession(session, subscription))}
                         </div>
                       )}
                     </CardContent>

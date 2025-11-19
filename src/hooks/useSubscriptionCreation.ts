@@ -12,6 +12,7 @@ interface SubscriptionFormData {
   sessionDuration?: number; // Add session duration field
   startDate: Date;
   schedule: any[];
+  teacherId?: string; // Teacher assigned to this subscription (FIREBASE ONLY)
   priceMode: 'perSession' | 'fixedPrice';
   pricePerSession?: number;
   fixedPrice?: number;
@@ -184,6 +185,20 @@ export const useSubscriptionCreation = (studentId: string, onSuccess?: () => voi
       }
 
       console.log('✅ Subscription created with ID:', subscriptionId);
+
+      // Save teacherId to Firebase Firestore (FIREBASE ONLY - NO SUPABASE)
+      if (formData.teacherId) {
+        console.log('🔥 Saving teacherId to Firebase subscription:', formData.teacherId);
+        try {
+          await databaseService.update('subscriptions', subscriptionId, {
+            teacherId: formData.teacherId
+          });
+          console.log('✅ Teacher ID saved to Firebase subscription');
+        } catch (firebaseError) {
+          console.error('❌ Error saving teacherId to Firebase:', firebaseError);
+          // Don't throw - subscription is already created, this is just additional data
+        }
+      }
 
       // If there's an initial payment, create it as a transaction
       if (formData.initialPayment.amount > 0 && formData.initialPayment.accountId) {

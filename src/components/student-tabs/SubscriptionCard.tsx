@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Subscription, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
+import { databaseService } from '@/services/firebase/database.service';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,6 +76,33 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       return data?.[0] || null;
     },
     enabled: !!subscription?.id && !subscription?.start_date
+  });
+
+  // Fetch teacher data from Firebase
+  const { data: teacherData } = useQuery({
+    queryKey: ['subscription-teacher', subscription?.teacherId || subscription?.teacher_id],
+    queryFn: async () => {
+      const teacherId = subscription?.teacherId || subscription?.teacher_id;
+      if (!teacherId) return null;
+
+      console.log('🔍 Fetching teacher data for subscription:', teacherId);
+
+      try {
+        const teacher = await databaseService.getById('users', teacherId);
+        if (teacher) {
+          console.log('✅ Found teacher:', teacher);
+          return {
+            firstName: teacher.firstName || teacher.first_name || '',
+            lastName: teacher.lastName || teacher.last_name || ''
+          };
+        }
+        return null;
+      } catch (error) {
+        console.error('❌ Error fetching teacher:', error);
+        return null;
+      }
+    },
+    enabled: !!(subscription?.teacherId || subscription?.teacher_id)
   });
 
   // Use subscription start_date if available, otherwise use first session date
@@ -275,9 +303,16 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
     <Card className="border hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium">
-            {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
-          </CardTitle>
+          <div>
+            <CardTitle className="text-base font-medium">
+              {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
+            </CardTitle>
+            {teacherData && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Teacher: {teacherData.firstName} {teacherData.lastName}
+              </p>
+            )}
+          </div>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"

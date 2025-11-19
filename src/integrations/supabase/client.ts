@@ -132,6 +132,8 @@ export interface Subscription {
   notes?: string;
   status: string;
   created_at: string;
+  teacherId?: string; // Teacher assigned to this subscription (stored in Firebase)
+  teacher_id?: string; // Support both camelCase and snake_case
 }
 
 export interface PaymentRecord {

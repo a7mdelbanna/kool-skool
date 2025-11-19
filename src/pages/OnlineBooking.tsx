@@ -75,12 +75,12 @@ const OnlineBooking = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Online Booking</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Online Booking</h1>
+          <p className="text-foreground/70 mt-2">
             Manage teacher availability and booking settings
           </p>
         </div>
-        <Button 
+        <Button
           onClick={() => setBlockDialogOpen(true)}
           disabled={!currentTeacherId}
         >
@@ -91,13 +91,13 @@ const OnlineBooking = () => {
 
       {/* Teacher Selection (Admin only) */}
       {isAdmin && (
-        <Card>
+        <Card className="bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <Users className="h-5 w-5" />
               Select Teacher
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-foreground/70">
               Choose a teacher to manage their availability
             </CardDescription>
           </CardHeader>
@@ -113,7 +113,7 @@ const OnlineBooking = () => {
                   <span className="font-medium">
                     {teacher.firstName} {teacher.lastName}
                   </span>
-                  <span className="text-xs text-muted-foreground capitalize">
+                  <span className="text-xs opacity-70 capitalize">
                     {teacher.role}
                   </span>
                 </Button>

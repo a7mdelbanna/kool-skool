@@ -28,10 +28,20 @@ import TimePicker from '@/components/ui/time-picker';
 import SchedulePreview from './SchedulePreview';
 import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { databaseService } from '@/services/firebase/database.service';
 
 interface ScheduleItem {
   day: string;
   time: string;
+}
+
+interface Teacher {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
 }
 
 interface AddSubscriptionDialogProps {
@@ -135,12 +145,39 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     enabled: !!schoolId,
   });
 
+  // Fetch teachers from Firebase (FIREBASE ONLY - NO SUPABASE)
+  const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
+    queryKey: ['teachers', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      console.log('🔥 Fetching teachers from Firebase for school:', schoolId);
+
+      try {
+        // Query Firebase users collection for teachers in this school
+        const allTeachers = await databaseService.query<Teacher>('users', {
+          where: [
+            { field: 'schoolId', operator: '==', value: schoolId },
+            { field: 'role', operator: '==', value: 'teacher' }
+          ]
+        });
+
+        console.log('✅ Loaded teachers from Firebase:', allTeachers);
+        return allTeachers;
+      } catch (error) {
+        console.error('❌ Error fetching teachers from Firebase:', error);
+        return [];
+      }
+    },
+    enabled: !!schoolId && open,
+  });
+
   const [formData, setFormData] = useState({
     sessionCount: '',
     durationMonths: '',
     sessionDuration: '60', // Default to 60 minutes
     startDate: undefined as Date | undefined,
     schedule: [] as ScheduleItem[],
+    teacherId: '', // Teacher assigned to this subscription
     priceMode: 'perSession' as 'perSession' | 'fixedPrice',
     pricePerSession: '',
     fixedPrice: '',
@@ -175,6 +212,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
         sessionDuration: '60', // Default to 60 minutes
         startDate: undefined,
         schedule: [],
+        teacherId: '', // Reset teacher selection
         priceMode: 'perSession',
         pricePerSession: '',
         fixedPrice: '',
@@ -230,8 +268,10 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       validationTimeoutRef.current = null;
     }
 
-    // Skip if no teacher or incomplete data
-    if (!studentTeacherId || !formData.startDate || formData.schedule.length === 0) {
+    // Skip if no teacher selected or incomplete data
+    // Use the subscription's teacherId if set, otherwise fall back to student's teacher
+    const validationTeacherId = formData.teacherId || studentTeacherId;
+    if (!validationTeacherId || !formData.startDate || formData.schedule.length === 0) {
       setIsValidating(false);
       setValidationError('');
       validationInProgressRef.current = false;
@@ -280,7 +320,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
           }
 
           const result = await validateTeacherScheduleOverlap({
-            teacherId: studentTeacherId,
+            teacherId: validationTeacherId,
             date: dateStr,
             startTime: timeIn24Hour,
             durationMinutes: parseInt(formData.sessionDuration) || 60
@@ -307,7 +347,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
         validationTimeoutRef.current = null;
       }
     };
-  }, [formData.startDate, scheduleKey, studentTeacherId, formData.sessionDuration, isAdmin]);
+  }, [formData.startDate, scheduleKey, formData.teacherId, studentTeacherId, formData.sessionDuration, isAdmin]);
 
   const addScheduleItem = () => {
     setFormData({
@@ -353,6 +393,16 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       toast({
         title: "Error",
         description: "Please fill in start date and at least one schedule",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate teacher selection
+    if (!formData.teacherId) {
+      toast({
+        title: "Error",
+        description: "Please select a teacher for this subscription",
         variant: "destructive",
       });
       return;
@@ -489,8 +539,8 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                 </div>
                 <div>
                   <Label htmlFor="currency" className="text-sm font-semibold text-foreground">Currency</Label>
-                  <Select 
-                    value={formData.currency} 
+                  <Select
+                    value={formData.currency}
                     onValueChange={(value) => setFormData({ ...formData, currency: value })}
                   >
                     <SelectTrigger className="mt-1">
@@ -505,6 +555,44 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Teacher Selection */}
+              <div>
+                <Label htmlFor="teacher" className="text-sm font-semibold text-foreground">
+                  Teacher <span className="text-destructive">*</span>
+                </Label>
+                {isLoadingTeachers ? (
+                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading teachers...
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.teacherId}
+                    onValueChange={(value) => setFormData({ ...formData, teacherId: value })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select a teacher for this subscription" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers.length > 0 ? (
+                        teachers.map((teacher) => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.firstName || teacher.first_name} {teacher.lastName || teacher.last_name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-teachers" disabled>
+                          No teachers available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  This teacher will be assigned to this subscription only
+                </p>
               </div>
 
               {/* Start Date */}
@@ -811,9 +899,9 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
                 >
                   Cancel
                 </Button>
-                <Button 
-                  onClick={handleSubmit} 
-                  disabled={isSubmitting || isValidating || !!validationError || formData.schedule.length === 0 || !formData.startDate}
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || isValidating || !!validationError || formData.schedule.length === 0 || !formData.startDate || !formData.teacherId}
                   className={validationError ? "opacity-50 cursor-not-allowed min-w-[120px]" : "min-w-[120px]"}
                 >
                   {isSubmitting ? (

@@ -72,7 +72,20 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
               sessions_cancelled: subscription.sessions_cancelled,
               sessions_scheduled: subscription.sessions_scheduled
             });
-            
+
+            // Fetch teacherId from Firebase for this subscription
+            let teacherId = null;
+            try {
+              const { databaseService } = await import('@/services/firebase/database.service');
+              const subscriptionDoc = await databaseService.getById('subscriptions', subscription.id);
+              if (subscriptionDoc) {
+                teacherId = subscriptionDoc.teacherId || subscriptionDoc.teacher_id || null;
+                console.log(`✅ Found teacherId for subscription ${subscription.id}:`, teacherId);
+              }
+            } catch (firebaseError) {
+              console.error(`❌ Error fetching teacherId for subscription ${subscription.id}:`, firebaseError);
+            }
+
             try {
               // Get payments for this student from Firebase
               let studentPayments = [];
@@ -152,13 +165,15 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
 
               return {
                 ...subscription,
-                total_paid: totalPaid
+                total_paid: totalPaid,
+                teacherId: teacherId
               };
             } catch (error) {
               console.error('❌ Error calculating payments for subscription:', subscription.id, error);
               return {
                 ...subscription,
-                total_paid: 0
+                total_paid: 0,
+                teacherId: teacherId
               };
             }
           })
