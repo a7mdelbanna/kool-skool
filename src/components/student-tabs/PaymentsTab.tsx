@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { CalendarIcon, CreditCard, Plus, Receipt, Trash, Wallet, RefreshCw } from "lucide-react";
+import { CalendarIcon, CreditCard, Plus, Receipt, Trash, Wallet, RefreshCw, Eye, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Student } from "@/components/StudentCard";
 import { useForm } from "react-hook-form";
@@ -30,6 +30,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSchoolTransactions, supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { databaseService } from "@/services/firebase/database.service";
+import { Badge } from "@/components/ui/badge";
+import { PaymentReviewDialog } from "@/components/payments/PaymentReviewDialog";
 
 interface PaymentsTabProps {
   studentData: Partial<Student>;
@@ -51,13 +53,15 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 const paymentMethods = ["Cash", "Credit Card", "Bank Transfer", "PayPal", "Other"];
 
-const PaymentsTab: React.FC<PaymentsTabProps> = ({ 
-  studentData, 
-  setStudentData, 
-  isViewMode = false 
+const PaymentsTab: React.FC<PaymentsTabProps> = ({
+  studentData,
+  setStudentData,
+  isViewMode = false
 }) => {
   const [selectedCurrency, setSelectedCurrency] = useState<any>(null);
   const [isSyncingPaymentStatus, setIsSyncingPaymentStatus] = useState(false);
+  const [selectedPaymentForReview, setSelectedPaymentForReview] = useState<any>(null);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   
   const form = useForm<PaymentFormValues>({
@@ -192,6 +196,48 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
         return numberedData;
       }
       return data;
+    },
+    enabled: !!studentData.id,
+  });
+
+  // Fetch pending payment submissions from student dashboard
+  const { data: pendingPayments = [], isLoading: pendingPaymentsLoading, refetch: refetchPendingPayments } = useQuery({
+    queryKey: ['student-pending-payments', studentData.id],
+    queryFn: async () => {
+      if (!studentData.id) return [];
+
+      console.log('🔍 Fetching pending payment submissions for student:', studentData.id);
+
+      try {
+        // Query student_payments collection from Firebase
+        const payments = await databaseService.query('student_payments', {
+          where: [
+            { field: 'student_id', operator: '==', value: studentData.id }
+          ]
+        });
+
+        console.log('📥 All student payments found:', payments);
+
+        // Filter to only show pending and recent accepted/declined
+        const filteredPayments = payments.filter(p =>
+          p.payment_status === 'pending_verification' ||
+          (p.reviewed_at && new Date(p.reviewed_at).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
+        );
+
+        // Sort by submitted_at descending (newest first)
+        const sortedPayments = filteredPayments.sort((a, b) => {
+          const dateA = new Date(a.submitted_at || 0);
+          const dateB = new Date(b.submitted_at || 0);
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        console.log('✅ Filtered and sorted pending payments:', sortedPayments);
+
+        return sortedPayments;
+      } catch (error) {
+        console.error('❌ Error fetching pending payments:', error);
+        return [];
+      }
     },
     enabled: !!studentData.id,
   });
@@ -647,6 +693,24 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
     deletePaymentMutation.mutate(paymentId);
   };
 
+  const handleReviewPayment = (payment: any) => {
+    console.log('📋 Opening review dialog for payment:', payment.id);
+    setSelectedPaymentForReview(payment);
+    setReviewDialogOpen(true);
+  };
+
+  const handleReviewSuccess = () => {
+    console.log('✅ Payment review successful, refreshing data');
+    refetchPendingPayments();
+    queryClient.invalidateQueries({ queryKey: ['school-transactions', schoolId] });
+    queryClient.invalidateQueries({ queryKey: ['student-subscriptions', studentData.id] });
+
+    // Update student payment status after review
+    if (studentData.id) {
+      updateStudentPaymentStatus(studentData.id);
+    }
+  };
+
   const handleCurrencyChange = (currencyCode: string) => {
     const currency = currencies.find(c => (c.code || c.currency_code) === currencyCode) || currencies[0];
     setSelectedCurrency(currency);
@@ -751,6 +815,86 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Pending Payment Submissions Section */}
+      {pendingPayments.length > 0 && (
+        <div className="bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-950/20 dark:to-orange-900/20 p-5 rounded-lg border border-orange-200 dark:border-orange-800">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-300">Pending Payment Submissions</h3>
+            <Badge variant="secondary" className="bg-orange-200 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300">
+              {pendingPayments.filter(p => p.payment_status === 'pending_verification').length} pending
+            </Badge>
+          </div>
+          <div className="space-y-3">
+            {pendingPayments.map((payment) => (
+              <div
+                key={payment.id}
+                className={cn(
+                  "border rounded-lg p-4 shadow-sm transition-all hover:shadow-md bg-white dark:bg-gray-800",
+                  payment.payment_status === 'pending_verification' && "border-orange-300 dark:border-orange-700",
+                  payment.payment_status === 'accepted' && "border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-950/20",
+                  payment.payment_status === 'declined' && "border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-950/20"
+                )}
+              >
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-semibold text-lg text-gray-900 dark:text-white">
+                        {payment.amount} {payment.currency}
+                      </h4>
+                      <Badge
+                        variant={
+                          payment.payment_status === 'accepted' ? 'default' :
+                          payment.payment_status === 'declined' ? 'destructive' :
+                          'secondary'
+                        }
+                        className={cn(
+                          payment.payment_status === 'pending_verification' && "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
+                          payment.payment_status === 'accepted' && "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300",
+                          payment.payment_status === 'declined' && "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
+                        )}
+                      >
+                        {payment.payment_status === 'pending_verification' ? 'Pending Review' :
+                         payment.payment_status === 'accepted' ? 'Accepted' : 'Declined'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
+                      <span className="font-medium">Submitted:</span> {format(new Date(payment.submitted_at), 'PPP')}
+                    </p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="font-medium">Via:</span> {payment.payment_account_name}
+                    </p>
+                    {payment.notes && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 italic border-l-2 border-orange-300 dark:border-orange-700 pl-3">
+                        {payment.notes}
+                      </p>
+                    )}
+                    {payment.admin_notes && (
+                      <p className="text-sm text-blue-700 dark:text-blue-400 mt-2 font-medium bg-blue-50 dark:bg-blue-950/30 p-2 rounded border-l-2 border-blue-400 dark:border-blue-600">
+                        <span className="font-semibold">Admin:</span> {payment.admin_notes}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleReviewPayment(payment)}
+                    className={cn(
+                      "ml-4 shrink-0",
+                      payment.payment_status === 'pending_verification' && "border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                    )}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    {payment.payment_status === 'pending_verification' ? 'Review' : 'View'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Payment History Section */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-medium">Payment History</h3>
@@ -1117,6 +1261,14 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
           </Form>
         </div>
       )}
+
+      {/* Payment Review Dialog */}
+      <PaymentReviewDialog
+        payment={selectedPaymentForReview}
+        open={reviewDialogOpen}
+        onOpenChange={setReviewDialogOpen}
+        onSuccess={handleReviewSuccess}
+      />
     </div>
   );
 };

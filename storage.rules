@@ -40,7 +40,16 @@ service firebase.storage {
             request.resource.contentType.matches("application/.*"));
       allow delete: if request.auth != null;
     }
-    
+
+    // Payment screenshots - students can upload to their own folder
+    match /payment-screenshots/{studentId}/{subscriptionId}/{fileName} {
+      allow read: if request.auth != null;  // Anyone authenticated can read
+      allow write: if request.auth != null && request.auth.uid == studentId
+        && request.resource.size < 5 * 1024 * 1024  // Max 5MB
+        && request.resource.contentType.matches("image/.*");  // Only images
+      allow delete: if request.auth != null && request.auth.uid == studentId;
+    }
+
     // Default: deny all other access
     match /{allPaths=**} {
       allow read, write: if false;

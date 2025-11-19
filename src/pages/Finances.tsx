@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { DollarSign, Search, Filter as FilterIcon, Calendar, Clock, Plus } from 'lucide-react';
+import { DollarSign, Search, Filter as FilterIcon, Calendar, Clock, Plus, AlertCircle, Eye } from 'lucide-react';
 import ExpectedPaymentsSection from '@/components/ExpectedPaymentsSection';
 import AccountsBalanceSection from '@/components/AccountsBalanceSection';
 import AddTransactionDialog from '@/components/AddTransactionDialog';
+import { PaymentReviewDialog } from '@/components/payments/PaymentReviewDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,8 @@ const FinancesPage = () => {
     to: Date | undefined;
   }>({ from: undefined, to: undefined });
   const [addTransactionDialogOpen, setAddTransactionDialogOpen] = useState(false);
+  const [selectedPaymentForReview, setSelectedPaymentForReview] = useState<any>(null);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
 
   // Get school ID from localStorage
   const getSchoolId = () => {
@@ -344,6 +347,65 @@ const FinancesPage = () => {
         });
 
       return studentsWithPayments;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch all pending payment submissions from Firebase
+  const { data: pendingPaymentSubmissions = [], refetch: refetchPendingPayments } = useQuery({
+    queryKey: ['pending-payment-submissions', schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+
+      try {
+        console.log('🔍 Fetching all pending payment submissions from Firebase');
+
+        // Fetch all pending payments from Firebase student_payments collection
+        const allPendingPayments = await databaseService.query('student_payments', {
+          where: [
+            { field: 'payment_status', operator: '==', value: 'pending_verification' }
+          ]
+        });
+
+        console.log('📥 Raw pending payments from Firebase:', allPendingPayments);
+
+        // Fetch student info for each payment
+        const paymentsWithStudentInfo = await Promise.all(
+          allPendingPayments.map(async (payment: any) => {
+            try {
+              const student = await databaseService.getById('students', payment.student_id);
+              const studentName = student ?
+                `${student.firstName || student.first_name || ''} ${student.lastName || student.last_name || ''}`.trim() :
+                'Unknown Student';
+
+              return {
+                ...payment,
+                student_name: studentName
+              };
+            } catch (error) {
+              console.error(`Error fetching student ${payment.student_id}:`, error);
+              return {
+                ...payment,
+                student_name: 'Unknown Student'
+              };
+            }
+          })
+        );
+
+        // Sort by submitted_at descending (newest first)
+        const sortedPayments = paymentsWithStudentInfo.sort((a, b) => {
+          const dateA = new Date(a.submitted_at || 0);
+          const dateB = new Date(b.submitted_at || 0);
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        console.log('✅ Pending payments with student info:', sortedPayments);
+
+        return sortedPayments;
+      } catch (error) {
+        console.error('❌ Error fetching pending payments:', error);
+        return [];
+      }
     },
     enabled: !!schoolId,
   });
@@ -680,6 +742,69 @@ const FinancesPage = () => {
           </AccordionContent>
         </AccordionItem>
 
+        {/* Pending Payment Submissions Section */}
+        {pendingPaymentSubmissions.length > 0 && (
+          <AccordionItem value="pending-submissions" className="border rounded-lg mb-4 bg-orange-50 dark:bg-orange-900/10">
+            <AccordionTrigger className="px-6 py-4 hover:no-underline">
+              <div className="flex items-center gap-2 text-lg font-semibold text-orange-700 dark:text-orange-400">
+                <AlertCircle className="h-5 w-5" />
+                Pending Payment Submissions
+                <Badge variant="secondary" className="ml-2 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                  {pendingPaymentSubmissions.length} pending
+                </Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-4">
+              <div className="space-y-3">
+                {pendingPaymentSubmissions.map((payment) => (
+                  <Card
+                    key={payment.id}
+                    className="border-orange-200 dark:border-orange-800 bg-white dark:bg-gray-800"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-semibold text-lg text-gray-900 dark:text-white">
+                              {payment.amount} {payment.currency}
+                            </h4>
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                              Pending Review
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                            <strong>Student:</strong> {payment.student_name}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                            <strong>Submitted:</strong> {format(new Date(payment.submitted_at), 'PPP')} via {payment.payment_account_name}
+                          </p>
+                          {payment.notes && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                              <strong>Note:</strong> {payment.notes}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPaymentForReview(payment);
+                            setReviewDialogOpen(true);
+                          }}
+                          className="ml-4 border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Review
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
+
         {/* Transactions Section */}
         <AccordionItem value="transactions" className="border rounded-lg mb-4">
           <AccordionTrigger className="px-6 py-4 hover:no-underline">
@@ -845,6 +970,18 @@ const FinancesPage = () => {
         onOpenChange={setAddTransactionDialogOpen}
         onSuccess={() => {
           // Refetch data when a transaction is added
+          window.location.reload();
+        }}
+      />
+
+      {/* Payment Review Dialog */}
+      <PaymentReviewDialog
+        payment={selectedPaymentForReview}
+        open={reviewDialogOpen}
+        onOpenChange={setReviewDialogOpen}
+        onSuccess={() => {
+          console.log('✅ Payment review successful, refreshing data');
+          refetchPendingPayments();
           window.location.reload();
         }}
       />
