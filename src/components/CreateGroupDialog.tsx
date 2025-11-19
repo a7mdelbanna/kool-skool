@@ -1132,89 +1132,12 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                             <CollapsibleContent>
                               <CardContent className="space-y-4 pt-0">
                                 <Separator />
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div>
-                                    <Label htmlFor={`start-date-${student.id}`}>Start Date</Label>
-                                    <Input
-                                      id={`start-date-${student.id}`}
-                                      type="date"
-                                      value={student.paymentDetails.start_date}
-                                      onChange={(e) => handleStudentPaymentChange(student.id, 'start_date', e.target.value)}
-                                    />
-                                  </div>
-                                  
-                                  <div>
-                                    <Label htmlFor={`payment-amount-${student.id}`}>Initial Payment Amount</Label>
-                                    <Input
-                                      id={`payment-amount-${student.id}`}
-                                      type="number"
-                                      step="0.01"
-                                      value={student.paymentDetails.initial_payment_amount}
-                                      onChange={(e) => handleStudentPaymentChange(student.id, 'initial_payment_amount', e.target.value)}
-                                      placeholder="0.00"
-                                    />
-                                  </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div>
-                                    <Label htmlFor={`payment-method-${student.id}`}>Payment Method</Label>
-                                    <Select 
-                                      value={student.paymentDetails.payment_method} 
-                                      onValueChange={(value) => handleStudentPaymentChange(student.id, 'payment_method', value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Cash">Cash</SelectItem>
-                                        <SelectItem value="Card">Card</SelectItem>
-                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                        <SelectItem value="Check">Check</SelectItem>
-                                        <SelectItem value="Online">Online</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor={`account-${student.id}`}>Account ({groupData.currency})</Label>
-                                    <Select 
-                                      value={student.paymentDetails.account_id} 
-                                      onValueChange={(value) => handleStudentPaymentChange(student.id, 'account_id', value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select account" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {accounts?.map((account) => (
-                                          <SelectItem key={account.id} value={account.id}>
-                                            {account.name} ({account.type})
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <Label htmlFor={`payment-notes-${student.id}`}>Payment Notes</Label>
-                                  <Textarea
-                                    id={`payment-notes-${student.id}`}
-                                    value={student.paymentDetails.payment_notes}
-                                    onChange={(e) => handleStudentPaymentChange(student.id, 'payment_notes', e.target.value)}
-                                    placeholder="Additional payment notes..."
-                                    rows={2}
-                                  />
-                                </div>
-
-                                {/* Pricing Override Section */}
-                                <Separator className="my-4" />
-
+                                {/* Currency Selection - MUST BE FIRST */}
                                 <div className="space-y-4">
                                   {getAvailableCurrencies().length > 0 ? (
                                     <div>
-                                      <Label className="text-sm font-medium mb-2 block">Select Currency for this Student</Label>
+                                      <Label className="text-sm font-medium mb-2 block">Currency <span className="text-destructive">*</span></Label>
                                       <p className="text-xs text-muted-foreground mb-3">
                                         Choose which currency this student will pay in from the available group prices.
                                       </p>
@@ -1248,7 +1171,7 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                                         </SelectContent>
                                       </Select>
                                       <div className="mt-2 p-2 bg-muted/50 rounded-lg">
-                                        <div className="text-xs text-muted-foreground">Price for this student:</div>
+                                        <div className="text-xs text-muted-foreground">Total subscription price:</div>
                                         <div className="text-sm font-semibold">
                                           {(() => {
                                             const selectedCurr = student.paymentDetails.custom_currency || getAvailableCurrencies()[0]?.code;
@@ -1269,6 +1192,116 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                                       </p>
                                     </div>
                                   )}
+                                </div>
+
+                                {/* Only show payment fields if currency is selected */}
+                                {getAvailableCurrencies().length > 0 && (
+                                  <>
+                                    <Separator className="my-4" />
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <Label htmlFor={`start-date-${student.id}`}>Start Date</Label>
+                                        <Input
+                                          id={`start-date-${student.id}`}
+                                          type="date"
+                                          value={student.paymentDetails.start_date}
+                                          onChange={(e) => handleStudentPaymentChange(student.id, 'start_date', e.target.value)}
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor={`payment-amount-${student.id}`}>
+                                          Initial Payment Amount ({(() => {
+                                            const selectedCurr = student.paymentDetails.custom_currency || getAvailableCurrencies()[0]?.code;
+                                            const currency = currencies?.find(c => c.code === selectedCurr);
+                                            return currency?.symbol || '';
+                                          })()})
+                                        </Label>
+                                        <Input
+                                          id={`payment-amount-${student.id}`}
+                                          type="number"
+                                          step="0.01"
+                                          value={student.paymentDetails.initial_payment_amount}
+                                          onChange={(e) => handleStudentPaymentChange(student.id, 'initial_payment_amount', e.target.value)}
+                                          placeholder="0.00"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <Label htmlFor={`payment-method-${student.id}`}>Payment Method</Label>
+                                        <Select
+                                          value={student.paymentDetails.payment_method}
+                                          onValueChange={(value) => handleStudentPaymentChange(student.id, 'payment_method', value)}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="Cash">Cash</SelectItem>
+                                            <SelectItem value="Card">Card</SelectItem>
+                                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                            <SelectItem value="Check">Check</SelectItem>
+                                            <SelectItem value="Online">Online</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+
+                                      <div>
+                                        <Label htmlFor={`account-${student.id}`}>
+                                          Account ({(() => {
+                                            const selectedCurr = student.paymentDetails.custom_currency || getAvailableCurrencies()[0]?.code;
+                                            return selectedCurr || '';
+                                          })()})
+                                        </Label>
+                                        <Select
+                                          value={student.paymentDetails.account_id}
+                                          onValueChange={(value) => handleStudentPaymentChange(student.id, 'account_id', value)}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select account" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {(() => {
+                                              const selectedCurr = student.paymentDetails.custom_currency || getAvailableCurrencies()[0]?.code;
+                                              const filteredAccounts = accounts?.filter(account => account.currency_code === selectedCurr) || [];
+
+                                              return filteredAccounts.length > 0 ? (
+                                                filteredAccounts.map((account) => (
+                                                  <SelectItem key={account.id} value={account.id}>
+                                                    {account.name} ({account.currency_symbol})
+                                                  </SelectItem>
+                                                ))
+                                              ) : (
+                                                <SelectItem value="no-account" disabled>
+                                                  No accounts available for {selectedCurr}
+                                                </SelectItem>
+                                              );
+                                            })()}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <Label htmlFor={`payment-notes-${student.id}`}>Payment Notes</Label>
+                                      <Textarea
+                                        id={`payment-notes-${student.id}`}
+                                        value={student.paymentDetails.payment_notes}
+                                        onChange={(e) => handleStudentPaymentChange(student.id, 'payment_notes', e.target.value)}
+                                        placeholder="Additional payment notes..."
+                                        rows={2}
+                                      />
+                                    </div>
+                                  </>
+                                )}
+
+                                {/* Pricing Override Section */}
+                                <Separator className="my-4" />
+
+                                <div className="space-y-4">
 
                                   {/* Advanced: Custom Price Override */}
                                   {getAvailableCurrencies().length > 0 && (
