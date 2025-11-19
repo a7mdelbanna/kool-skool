@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
+import SchedulePreview from '@/components/student-tabs/SchedulePreview';
 
 interface CreateGroupDialogProps {
   open: boolean;
@@ -1409,6 +1410,20 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                                     </div>
                                   )}
                                 </div>
+
+                                {/* Schedule Preview for this student */}
+                                {student.paymentDetails.start_date && groupData.schedule.length > 0 && (
+                                  <>
+                                    <Separator className="my-4" />
+                                    <SchedulePreview
+                                      schedule={groupData.schedule}
+                                      startDate={new Date(student.paymentDetails.start_date)}
+                                      sessionCount={parseInt(String(groupData.session_count)) || 0}
+                                      durationMonths={Math.ceil((parseInt(String(groupData.session_count)) || 0) / (groupData.schedule.length || 1))}
+                                      sessionDuration={String(groupData.session_duration_minutes || 60)}
+                                    />
+                                  </>
+                                )}
                               </CardContent>
                             </CollapsibleContent>
                           </Collapsible>
@@ -1425,17 +1440,20 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Clock className="h-5 w-5" />
-                    Schedule Preview
+                    Group Schedule Overview
                   </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Preview of the weekly group schedule. Each student will see their personalized schedule based on their start date.
+                  </p>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {groupData.schedule.map((item, index) => (
-                      <Badge key={index} variant="outline" className="mr-2">
-                        {item.day} {item.time}
-                      </Badge>
-                    ))}
-                  </div>
+                  <SchedulePreview
+                    schedule={groupData.schedule}
+                    startDate={new Date()}
+                    sessionCount={parseInt(String(groupData.session_count)) || 0}
+                    durationMonths={Math.ceil((parseInt(String(groupData.session_count)) || 0) / (groupData.schedule.length || 1))}
+                    sessionDuration={String(groupData.session_duration_minutes || 60)}
+                  />
                 </CardContent>
               </Card>
             )}
