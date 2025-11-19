@@ -178,22 +178,22 @@ const Groups = () => {
             <UsersRound className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Groups</h1>
-            <p className="text-gray-600 mt-1">Manage group lessons and subscriptions</p>
+            <h1 className="text-3xl font-bold">Groups</h1>
+            <p className="text-muted-foreground mt-1">Manage group lessons and subscriptions</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse rounded-2xl shadow-md">
               <CardHeader className="pb-4">
-                <div className="h-6 bg-gray-200 rounded-lg w-3/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2 mt-2"></div>
+                <div className="h-6 bg-muted rounded-lg w-3/4"></div>
+                <div className="h-4 bg-muted rounded w-1/2 mt-2"></div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="h-4 bg-gray-200 rounded"></div>
-                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                  <div className="h-10 bg-gray-200 rounded-lg mt-4"></div>
+                  <div className="h-4 bg-muted rounded"></div>
+                  <div className="h-4 bg-muted rounded w-2/3"></div>
+                  <div className="h-10 bg-muted rounded-lg mt-4"></div>
                 </div>
               </CardContent>
             </Card>
@@ -211,13 +211,13 @@ const Groups = () => {
             <UsersRound className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Groups</h1>
-            <p className="text-gray-600 mt-1">Manage group lessons and subscriptions</p>
+            <h1 className="text-3xl font-bold">Groups</h1>
+            <p className="text-muted-foreground mt-1">Manage group lessons and subscriptions</p>
           </div>
         </div>
-        <Card className="rounded-2xl shadow-md">
+        <Card className="rounded-2xl shadow-md border bg-card">
           <CardContent className="p-8 text-center">
-            <div className="text-red-600 font-medium">Error loading groups: {error.message}</div>
+            <div className="text-destructive font-medium">Error loading groups: {error.message}</div>
           </CardContent>
         </Card>
       </div>
@@ -233,8 +233,8 @@ const Groups = () => {
             <UsersRound className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Groups</h1>
-            <p className="text-gray-600 mt-1">Manage group lessons and subscriptions</p>
+            <h1 className="text-3xl font-bold">Groups</h1>
+            <p className="text-muted-foreground mt-1">Manage group lessons and subscriptions</p>
           </div>
         </div>
         <Button 
@@ -248,16 +248,16 @@ const Groups = () => {
 
       {/* Groups List */}
       {!groups || groups.length === 0 ? (
-        <Card className="rounded-2xl shadow-md border-0 bg-gradient-to-br from-gray-50 to-white">
+        <Card className="rounded-2xl shadow-md border bg-card">
           <CardContent className="p-12 text-center">
-            <div className="h-20 w-20 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <UsersRound className="h-10 w-10 text-blue-600" />
+            <div className="h-20 w-20 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <UsersRound className="h-10 w-10 text-blue-500" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">No Groups Yet</h2>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            <h2 className="text-2xl font-bold mb-3">No Groups Yet</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Create your first group to start managing group lessons and subscriptions.
             </p>
-            <Button 
+            <Button
               className="flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
               onClick={() => setShowCreateGroup(true)}
             >
@@ -269,9 +269,9 @@ const Groups = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => (
-            <Card 
-              key={group.id} 
-              className="rounded-2xl shadow-md border-0 bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group"
+            <Card
+              key={group.id}
+              className="rounded-2xl shadow-md border bg-card hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden group"
             >
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between mb-3">
