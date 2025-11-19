@@ -999,46 +999,61 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                       Students will choose which currency to pay in. Leave empty for currencies you don't want to offer.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {currencies.map((currency) => (
-                        <div key={currency.code} className="p-3 bg-muted/50 rounded-lg border">
-                          <Label className="text-xs font-medium mb-2 flex items-center gap-2">
-                            {currency.name} ({currency.symbol})
-                            {currency.is_default && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">Default</Badge>
-                            )}
-                          </Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder={groupData.price_mode === 'perSession' ? 'Per session' : 'Total'}
-                            value={
-                              groupData.price_mode === 'perSession'
-                                ? (groupData.prices_by_currency[currency.code]?.per_session || '')
-                                : (groupData.prices_by_currency[currency.code]?.total || '')
-                            }
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setGroupData(prev => ({
-                                ...prev,
-                                prices_by_currency: {
-                                  ...prev.prices_by_currency,
-                                  [currency.code]: {
-                                    per_session: groupData.price_mode === 'perSession' ? value : (prev.prices_by_currency[currency.code]?.per_session || ''),
-                                    total: groupData.price_mode === 'total' ? value : (prev.prices_by_currency[currency.code]?.total || '')
+                      {currencies.map((currency) => {
+                        const priceData = groupData.prices_by_currency[currency.code];
+                        const enteredValue = groupData.price_mode === 'perSession'
+                          ? (priceData?.per_session || '')
+                          : (priceData?.total || '');
+                        const numericValue = parseFloat(String(enteredValue)) || 0;
+                        const sessionCount = parseFloat(String(groupData.session_count)) || 0;
+
+                        // Calculate total based on mode
+                        const totalAmount = groupData.price_mode === 'perSession'
+                          ? numericValue * sessionCount
+                          : numericValue;
+
+                        return (
+                          <div key={currency.code} className="p-3 bg-muted/50 rounded-lg border">
+                            <Label className="text-xs font-medium mb-2 flex items-center gap-2">
+                              {currency.name} ({currency.symbol})
+                              {currency.is_default && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0">Default</Badge>
+                              )}
+                            </Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder={groupData.price_mode === 'perSession' ? 'Per session' : 'Total price'}
+                              value={enteredValue}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setGroupData(prev => ({
+                                  ...prev,
+                                  prices_by_currency: {
+                                    ...prev.prices_by_currency,
+                                    [currency.code]: {
+                                      per_session: groupData.price_mode === 'perSession' ? value : (prev.prices_by_currency[currency.code]?.per_session || ''),
+                                      total: groupData.price_mode === 'total' ? value : (prev.prices_by_currency[currency.code]?.total || '')
+                                    }
                                   }
-                                }
-                              }));
-                            }}
-                            className="h-8 text-sm"
-                          />
-                          {groupData.price_mode === 'perSession' && groupData.prices_by_currency[currency.code]?.per_session && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Total: {currency.symbol}
-                              {(parseFloat(String(groupData.prices_by_currency[currency.code]?.per_session)) * (parseFloat(String(groupData.session_count)) || 0)).toFixed(2)}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                                }));
+                              }}
+                              className="h-8 text-sm"
+                            />
+                            {/* Show total */}
+                            {enteredValue && (
+                              <div className="text-xs mt-1.5 font-medium text-blue-600 dark:text-blue-400">
+                                Total: {currency.symbol}{totalAmount.toFixed(2)}
+                                {groupData.price_mode === 'perSession' && sessionCount > 0 && (
+                                  <span className="text-muted-foreground ml-1">
+                                    ({sessionCount} sessions)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
