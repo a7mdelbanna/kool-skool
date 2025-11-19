@@ -17,7 +17,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { X, Plus, Calendar, DollarSign, Clock, Users, ChevronDown, ChevronUp, BookOpen, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, getSchoolTeachers, getStudentsWithDetails } from '@/integrations/supabase/client';
 import { databaseService } from '@/services/firebase/database.service';
 import { UserContext } from '@/App';
@@ -105,6 +105,7 @@ interface Account {
 const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogProps) => {
   const { user } = useContext(UserContext);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('details');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scheduleValidationError, setScheduleValidationError] = useState<string>('');
@@ -479,13 +480,15 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         currency: groupData.currency,
         price_mode: groupData.price_mode,
         status: 'active',
+        // Include multi-currency pricing data
+        prices_by_currency: groupData.prices_by_currency || {},
         // Handle price fields based on price_mode
-        ...(groupData.price_mode === 'perSession' 
-          ? { 
+        ...(groupData.price_mode === 'perSession'
+          ? {
               price_per_session: pricePerSession,
               total_price: pricePerSession * sessionCount
             }
-          : { 
+          : {
               price_per_session: null, // Set to null for total pricing mode
               total_price: totalPrice
             }
@@ -592,69 +595,97 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
           const subscriptionId = await databaseService.create('subscriptions', subscriptionData);
           console.log('Created subscription:', subscriptionId);
           
-          // Generate sessions based on schedule
+          // Generate sessions based on schedule with chronological distribution
           if (groupData.schedule.length > 0 && sessionCount > 0) {
             console.log('Generating sessions for subscription:', subscriptionId);
-            
+
             const startDate = new Date(student.paymentDetails.start_date || new Date());
             const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            
-            for (const scheduleItem of groupData.schedule) {
-              const dayIndex = daysOfWeek.indexOf(scheduleItem.day);
-              if (dayIndex === -1) continue;
-              
-              let currentDate = new Date(startDate);
-              let sessionsCreated = 0;
-              
-              // Find the first occurrence of the scheduled day
-              while (currentDate.getDay() !== dayIndex && sessionsCreated < 100) {
-                currentDate.setDate(currentDate.getDate() + 1);
+
+            // Build all possible session dates across all schedule days
+            const allSessionDates: Array<{ date: Date; time: string; day: string }> = [];
+            const maxWeeks = Math.ceil(sessionCount / groupData.schedule.length) + 4;
+
+            // Generate sessions week by week across all schedule days
+            for (let week = 0; week < maxWeeks && allSessionDates.length < sessionCount; week++) {
+              for (const scheduleItem of groupData.schedule) {
+                if (allSessionDates.length >= sessionCount) break;
+
+                const dayIndex = daysOfWeek.indexOf(scheduleItem.day);
+                if (dayIndex === -1) continue;
+
+                // Calculate the date for this schedule day in this week
+                const sessionDate = new Date(startDate);
+
+                // Find first occurrence of this day
+                let daysToAdd = (dayIndex - startDate.getDay() + 7) % 7;
+                if (daysToAdd === 0 && week === 0) {
+                  // If it's the same day as start date, use it
+                  daysToAdd = 0;
+                }
+
+                // Add the week offset
+                daysToAdd += (week * 7);
+                sessionDate.setDate(sessionDate.getDate() + daysToAdd);
+
+                // Only add if on or after start date
+                if (sessionDate >= startDate) {
+                  allSessionDates.push({
+                    date: sessionDate,
+                    time: scheduleItem.time,
+                    day: scheduleItem.day
+                  });
+                }
               }
-              
-              // Create sessions on the scheduled day of each week
-              for (let sessionNumber = 1; sessionNumber <= sessionCount; sessionNumber++) {
-                const sessionData = {
-                  subscription_id: subscriptionId,
-                  student_id: student.id,
-                  school_id: user.schoolId,
-                  teacher_id: groupData.teacher_id,
-                  course_id: groupData.course_id,
-                  group_id: groupResult.id,
-                  scheduled_date: currentDate.toISOString().split('T')[0],
-                  scheduled_time: scheduleItem.time,
-                  duration_minutes: groupData.session_duration_minutes,
-                  status: 'scheduled',
-                  index_in_sub: sessionNumber,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                };
-                
-                await databaseService.create('sessions', sessionData);
-                
-                // Move to next week for the next session
-                currentDate.setDate(currentDate.getDate() + 7);
-                sessionsCreated++;
-              }
-              
-              console.log(`Created ${sessionsCreated} sessions for ${student.name}`);
             }
+
+            // Sort chronologically and take only the required number
+            const sortedSessions = allSessionDates
+              .sort((a, b) => a.date.getTime() - b.date.getTime())
+              .slice(0, sessionCount);
+
+            // Create sessions in database
+            for (let i = 0; i < sortedSessions.length; i++) {
+              const session = sortedSessions[i];
+              const sessionData = {
+                subscription_id: subscriptionId,
+                student_id: student.id,
+                school_id: user.schoolId,
+                teacher_id: groupData.teacher_id,
+                course_id: groupData.course_id,
+                group_id: groupResult.id,
+                scheduled_date: session.date.toISOString().split('T')[0],
+                scheduled_time: session.time,
+                duration_minutes: groupData.session_duration_minutes,
+                status: 'scheduled',
+                index_in_sub: i + 1,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+
+              await databaseService.create('sessions', sessionData);
+            }
+
+            console.log(`Created ${sortedSessions.length} sessions for ${student.name} (requested ${sessionCount})`);
           }
           
           // Create initial payment if amount provided
           const paymentAmount = parseFloat(String(student.paymentDetails.initial_payment_amount)) || 0;
           if (paymentAmount > 0) {
-            await databaseService.create('payments', {
+            await databaseService.create('transactions', {
               school_id: user.schoolId,
+              type: 'income',
               student_id: student.id,
               group_id: groupResult.id,
               subscription_id: subscriptionId,
               amount: paymentAmount,
               currency: studentCurrency, // Use student's currency (custom or group default)
-              payment_date: new Date().toISOString().split('T')[0],
+              transaction_date: new Date().toISOString().split('T')[0],
               payment_method: student.paymentDetails.payment_method || 'Cash',
-              account_id: student.paymentDetails.account_id || null,
-              notes: student.paymentDetails.payment_notes || `Initial payment for group ${groupData.name}`,
-              status: 'paid',
+              from_account_id: student.paymentDetails.account_id || null,
+              description: `Initial payment for group ${groupData.name}`,
+              notes: student.paymentDetails.payment_notes || '',
+              status: 'completed',
               created_at: new Date().toISOString()
             });
           }
@@ -664,7 +695,14 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
       }
 
       console.log('=== CREATE GROUP SUBMISSION COMPLETED SUCCESSFULLY ===');
-      
+
+      // Invalidate queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['groups', user.schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['group-student-payments', groupResult.id] });
+      queryClient.invalidateQueries({ queryKey: ['school-transactions', user.schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['group-subscriptions', groupResult.id] });
+      queryClient.invalidateQueries({ queryKey: ['group-students', groupResult.id] });
+
       toast({
         title: "Success!",
         description: `Group "${groupData.name}" created with ${selectedStudents.length} student(s).`,
@@ -682,7 +720,8 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
         currency: 'USD',
         price_mode: 'total',
         price_per_session: 0,
-        total_price: 0
+        total_price: 0,
+        prices_by_currency: {} // Initialize empty prices
       });
       setSelectedStudents([]);
       setActiveTab('details');
@@ -956,8 +995,8 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                       Students will choose which currency to pay in. Leave empty for currencies you don't want to offer.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {currencies.map((currency) => {
-                        const priceData = groupData.prices_by_currency[currency.code];
+                      {currencies?.map((currency) => {
+                        const priceData = groupData.prices_by_currency?.[currency.code];
                         const enteredValue = groupData.price_mode === 'perSession'
                           ? (priceData?.per_session || '')
                           : (priceData?.total || '');

@@ -48,33 +48,44 @@ const SchedulePreview: React.FC<SchedulePreviewProps> = ({
 
   const getNextSessionDates = () => {
     if (!startDate || schedule.length === 0) return [];
-    
-    const dates = [];
-    const currentWeekStart = startOfWeek(startDate);
-    
-    // Generate all session dates based on sessionCount
-    // Calculate maximum weeks needed (assuming at least one session per week)
-    const maxWeeks = Math.ceil(sessionCount / schedule.length) + 4; // Add buffer weeks
-    
-    for (let week = 0; week < maxWeeks && dates.length < sessionCount; week++) {
-      schedule.forEach(scheduleItem => {
-        if (dates.length >= sessionCount) return;
-        
-        const dayOfWeek = getDayOfWeekNumber(scheduleItem.day);
-        if (dayOfWeek !== -1) {
-          const sessionDate = addDays(currentWeekStart, dayOfWeek + (week * 7));
-          if (sessionDate >= startDate) {
-            dates.push({
-              date: sessionDate,
-              time: scheduleItem.time,
-              day: scheduleItem.day
-            });
-          }
+
+    const allSessionDates = [];
+    const maxWeeks = Math.ceil(sessionCount / schedule.length) + 4;
+
+    // Use chronological distribution algorithm (same as CreateGroupDialog)
+    for (let week = 0; week < maxWeeks && allSessionDates.length < sessionCount; week++) {
+      for (const scheduleItem of schedule) {
+        if (allSessionDates.length >= sessionCount) break;
+
+        const dayIndex = getDayOfWeekNumber(scheduleItem.day);
+        if (dayIndex === -1) continue;
+
+        // Calculate the date for this schedule day in this week
+        const sessionDate = new Date(startDate);
+
+        // Find first occurrence of this day
+        let daysToAdd = (dayIndex - startDate.getDay() + 7) % 7;
+        if (daysToAdd === 0 && week === 0) {
+          daysToAdd = 0;
         }
-      });
+
+        daysToAdd += (week * 7);
+        sessionDate.setDate(sessionDate.getDate() + daysToAdd);
+
+        if (sessionDate >= startDate) {
+          allSessionDates.push({
+            date: sessionDate,
+            time: scheduleItem.time,
+            day: scheduleItem.day
+          });
+        }
+      }
     }
-    
-    return dates.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, sessionCount);
+
+    // Sort chronologically and slice to exact count
+    return allSessionDates
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .slice(0, sessionCount);
   };
 
   const nextSessions = getNextSessionDates();
