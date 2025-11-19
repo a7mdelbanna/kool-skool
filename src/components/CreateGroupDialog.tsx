@@ -973,84 +973,30 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label>Currency</Label>
-                    <Select value={groupData.currency} onValueChange={(value) => setGroupData(prev => ({ ...prev, currency: value }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currencies?.map((currency) => (
-                          <SelectItem key={currency.id} value={currency.code}>
-                            {currency.name} ({currency.symbol})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Price Mode</Label>
-                    <Select value={groupData.price_mode} onValueChange={(value: 'perSession' | 'total') => setGroupData(prev => ({ ...prev, price_mode: value }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="perSession">Per Session</SelectItem>
-                        <SelectItem value="total">Total Price</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>
-                      {groupData.price_mode === 'perSession' ? 'Price per Session' : 'Total Price'}
-                    </Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={groupData.price_mode === 'perSession' ? groupData.price_per_session : groupData.total_price}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (groupData.price_mode === 'perSession') {
-                          setGroupData(prev => ({ ...prev, price_per_session: value }));
-                        } else {
-                          setGroupData(prev => ({ ...prev, total_price: value }));
-                        }
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                {/* Total Amount Display */}
-                <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-semibold">Total Amount (Default Price)</Label>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {groupData.price_mode === 'perSession'
-                          ? `${groupData.session_count} sessions × ${getSelectedCurrencySymbol()}${groupData.price_per_session}`
-                          : 'Fixed total price'
-                        }
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-blue-500">
-                        {getSelectedCurrencySymbol()}{calculateTotalAmount().toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
+                {/* Price Mode Selection */}
+                <div>
+                  <Label className="text-base font-medium mb-2 block">Price Mode</Label>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Choose how you want to price this group - either per session or total price for all sessions.
+                  </p>
+                  <Select value={groupData.price_mode} onValueChange={(value: 'perSession' | 'total') => setGroupData(prev => ({ ...prev, price_mode: value }))}>
+                    <SelectTrigger className="w-full md:w-64">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="perSession">Per Session</SelectItem>
+                      <SelectItem value="total">Total Price (Fixed)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Multi-Currency Pricing Input */}
                 {currencies && currencies.length > 0 && (
-                  <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                    <Label className="text-sm font-medium mb-2 block">Set Prices in Multiple Currencies (Optional)</Label>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Enter prices for each currency you want to offer. Students can choose which currency to pay in.
-                      Leave empty if not offered in that currency.
+                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <Label className="text-base font-medium mb-2 block">Set Prices for Each Currency</Label>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Enter the {groupData.price_mode === 'perSession' ? 'price per session' : 'total price'} in each currency you want to accept.
+                      Students will choose which currency to pay in. Leave empty for currencies you don't want to offer.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {currencies.map((currency) => (
