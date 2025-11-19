@@ -217,77 +217,17 @@ const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroupDialogP
     enabled: !!user?.schoolId && open
   });
 
-  // Fetch accounts filtered by group currency from Firebase
-  const { data: accounts } = useQuery({
-    queryKey: ['accounts', user?.schoolId, groupData.currency],
+  // Fetch school accounts using RPC function (same as AddSubscriptionDialog)
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['school-accounts', user?.schoolId],
     queryFn: async () => {
       if (!user?.schoolId) return [];
-      
-      try {
-        console.log('Fetching accounts for currency:', groupData.currency);
-        
-        // First get all accounts from Firebase - try both field formats
-        let accountsData = await databaseService.query('accounts', {
-          where: [
-            { field: 'school_id', operator: '==', value: user.schoolId }
-          ]
-        });
-        
-        console.log('Raw accounts data:', accountsData);
-        
-        // Get all currencies to match currency_id with code
-        const currenciesData = await databaseService.query('currencies', {
-          where: [{ field: 'school_id', operator: '==', value: user.schoolId }]
-        });
-        
-        console.log('Available currencies:', currenciesData);
-        
-        // Find the currency that matches the selected code
-        const selectedCurrency = currenciesData?.find((c: any) => 
-          c.code === groupData.currency || c.code === 'RUB' // Fallback to RUB for testing
-        );
-        
-        console.log('Selected currency:', selectedCurrency);
-        
-        if (!selectedCurrency) {
-          console.log('No matching currency found for code:', groupData.currency);
-          // If no currency match, return all active accounts as fallback
-          return (accountsData || [])
-            .filter((account: any) => 
-              account.is_active !== false && !account.is_archived
-            )
-            .map((account: any) => ({
-              id: account.id,
-              name: account.name,
-              type: account.type,
-              currency_id: account.currency_id
-            }));
-        }
-
-        // Filter accounts by currency_id matching the selected currency
-        const filteredAccounts = (accountsData || [])
-          .filter((account: any) => {
-            const isActive = account.is_active !== false;
-            const notArchived = !account.is_archived;
-            const matchesCurrency = account.currency_id === selectedCurrency.id;
-            
-            console.log(`Account ${account.name}: active=${isActive}, archived=${notArchived}, currency match=${matchesCurrency}`);
-            
-            return isActive && notArchived && matchesCurrency;
-          })
-          .map((account: any) => ({
-            id: account.id,
-            name: account.name,
-            type: account.type,
-            currency_id: account.currency_id
-          }));
-
-        console.log('Filtered accounts:', filteredAccounts);
-        return filteredAccounts;
-      } catch (error) {
-        console.error('Error fetching accounts:', error);
-        return [];
-      }
+      const { data, error } = await supabase.rpc('get_school_accounts', {
+        p_school_id: user.schoolId
+      });
+      if (error) throw error;
+      // Filter out archived accounts
+      return (data || []).filter((account: any) => !account.is_archived);
     },
     enabled: !!user?.schoolId && open
   });
