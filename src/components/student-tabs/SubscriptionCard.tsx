@@ -27,6 +27,7 @@ interface ExtendedSubscription extends Subscription {
   sessions_attended?: number;
   sessions_cancelled?: number;
   sessions_scheduled?: number;
+  subscriptionNumber?: string; // Format: "01", "02", "03", etc.
 }
 
 interface SubscriptionCardProps {
@@ -306,6 +307,15 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
+              {/* Subscription Number Badge */}
+              {subscription.subscriptionNumber && (
+                <Badge
+                  variant="outline"
+                  className="bg-primary text-primary-foreground border-primary font-mono text-sm px-2.5 py-0.5"
+                >
+                  #{subscription.subscriptionNumber}
+                </Badge>
+              )}
               <CardTitle className="text-base font-medium">
                 {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
               </CardTitle>

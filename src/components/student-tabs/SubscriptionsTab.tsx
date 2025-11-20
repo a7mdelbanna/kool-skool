@@ -182,19 +182,32 @@ const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
         console.log('🎉 FINAL SUBSCRIPTIONS WITH REAL-TIME PROGRESS AND PAYMENTS:', subscriptionsWithPayments);
         console.log('📊 Total subscriptions to return with enhanced data:', subscriptionsWithPayments.length);
 
-        // Sort subscriptions by start date - NEWEST FIRST (descending order)
+        // Sort subscriptions by start date - OLDEST FIRST (ascending order) for numbering
         const sortedSubscriptions = subscriptionsWithPayments.sort((a, b) => {
           const dateA = new Date(a.start_date || a.startDate || 0);
           const dateB = new Date(b.start_date || b.startDate || 0);
-          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+          return dateA.getTime() - dateB.getTime(); // Ascending order (oldest first)
         });
 
-        console.log('🔄 Subscriptions sorted by date (newest first):', sortedSubscriptions.map(s => ({
+        console.log('🔄 Subscriptions sorted by date (oldest first for numbering):', sortedSubscriptions.map(s => ({
           id: s.id,
           startDate: s.start_date || s.startDate
         })));
 
-        return sortedSubscriptions;
+        // Add subscription numbers (01, 02, 03, etc.) - oldest is 01
+        const subscriptionsWithNumbers = sortedSubscriptions.map((subscription, index) => ({
+          ...subscription,
+          subscriptionNumber: String(index + 1).padStart(2, '0') // Format as 01, 02, 03, etc.
+        }));
+
+        console.log('🔢 Subscriptions with numbers:', subscriptionsWithNumbers.map(s => ({
+          id: s.id,
+          number: s.subscriptionNumber,
+          startDate: s.start_date || s.startDate
+        })));
+
+        // Reverse to show newest first in UI while maintaining correct numbering
+        return subscriptionsWithNumbers.reverse();
       } catch (error) {
         console.error('❌ CRITICAL ERROR in RPC subscription fetch with real-time progress:', error);
         throw error;
