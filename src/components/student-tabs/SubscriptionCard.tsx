@@ -8,6 +8,7 @@ import { Subscription, supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { databaseService } from '@/services/firebase/database.service';
+import { isTrialSubscription } from '@/types/trial.types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -304,9 +305,16 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-base font-medium">
-              {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-medium">
+                {subscription.session_count} Sessions - {subscription.duration_months} Month{subscription.duration_months !== 1 ? 's' : ''}
+              </CardTitle>
+              {isTrialSubscription(subscription) && (
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/30">
+                  TRIAL
+                </Badge>
+              )}
+            </div>
             {teacherData && (
               <p className="text-sm text-muted-foreground mt-1">
                 Teacher: {teacherData.firstName} {teacherData.lastName}

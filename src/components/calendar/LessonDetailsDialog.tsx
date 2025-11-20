@@ -32,7 +32,9 @@ import { format } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { handleSessionAction } from '@/integrations/supabase/client';
+import { handleSessionAction, supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { isTrialSubscription } from '@/types/trial.types';
 
 interface LessonDetailsDialogProps {
   session: Session | null;
@@ -62,9 +64,9 @@ const subjectColorMap: Record<string, { bg: string, border: string, text: string
   'default': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' }
 };
 
-const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({ 
-  session, 
-  open, 
+const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
+  session,
+  open,
   onOpenChange,
   onSessionUpdate
 }) => {
@@ -72,7 +74,28 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
   const [statusChangeOpen, setStatusChangeOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Fetch subscription to check if it's a trial
+  const { data: subscription } = useQuery({
+    queryKey: ['session-subscription', session?.subscriptionId],
+    queryFn: async () => {
+      if (!session?.subscriptionId) return null;
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('id', session.subscriptionId)
+        .single();
+      if (error) {
+        console.error('Error fetching subscription:', error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!session?.subscriptionId && open
+  });
+
   if (!session) return null;
+
+  const isTrial = subscription ? isTrialSubscription(subscription) : false;
 
   // Extract subject from notes if available, otherwise default to 'General'
   const subject = session.notes?.includes('Mathematics') ? 'Mathematics' :
@@ -164,7 +187,12 @@ const LessonDetailsDialog: React.FC<LessonDetailsDialogProps> = ({
                 {subject} Lesson
               </DialogDescription>
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex gap-2">
+              {isTrial && (
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/30">
+                  TRIAL
+                </Badge>
+              )}
               {renderStatusBadge(session.status)}
             </div>
           </div>

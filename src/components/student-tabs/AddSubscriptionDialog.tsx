@@ -29,6 +29,7 @@ import SchedulePreview from './SchedulePreview';
 import { validateTeacherScheduleOverlap } from '@/utils/teacherScheduleValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { databaseService } from '@/services/firebase/database.service';
+import { createTrialLesson, hasTrialLesson } from '@/services/trialLesson.service';
 
 interface ScheduleItem {
   day: string;
@@ -172,6 +173,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
   });
 
   const [formData, setFormData] = useState({
+    subscriptionType: 'individual' as 'individual' | 'group' | 'trial', // NEW: Subscription type
     sessionCount: '',
     durationMonths: '',
     sessionDuration: '60', // Default to 60 minutes
@@ -207,6 +209,7 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     if (open && !wasOpen) {
       // Dialog is being opened fresh - reset the form
       setFormData({
+        subscriptionType: 'individual', // Reset to individual by default
         sessionCount: '',
         durationMonths: '',
         sessionDuration: '60', // Default to 60 minutes
@@ -240,6 +243,19 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
       setFormData(prev => ({ ...prev, currency: defaultCurrency.code }));
     }
   }, [currencies]);
+
+  // Auto-set trial lesson defaults when trial type is selected
+  useEffect(() => {
+    if (formData.subscriptionType === 'trial') {
+      setFormData(prev => ({
+        ...prev,
+        sessionCount: '1', // Always 1 for trials
+        durationMonths: '1', // Always 1 month for trials
+        priceMode: 'fixedPrice', // Use fixed price for trials
+        sessionDuration: '30' // Default 30 minutes for trials
+      }));
+    }
+  }, [formData.subscriptionType]);
 
   // Clear validation error when dialog closes
   useEffect(() => {
@@ -388,6 +404,77 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
   };
 
   const handleSubmit = async () => {
+    // Handle trial lesson submission separately
+    if (formData.subscriptionType === 'trial') {
+      // Validate trial-specific fields
+      if (!formData.startDate) {
+        toast({
+          title: "Error",
+          description: "Please select a date for the trial lesson",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (formData.schedule.length === 0 || !formData.schedule[0].time) {
+        toast({
+          title: "Error",
+          description: "Please select a time for the trial lesson",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate price is set (can be 0 for free trials)
+      const totalPrice = getTotalPrice();
+      if (totalPrice < 0) {
+        toast({
+          title: "Error",
+          description: "Price cannot be negative. Set to 0 for free trials.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        // Check if student already has a trial
+        const alreadyHasTrial = await hasTrialLesson(studentId, schoolId);
+        if (alreadyHasTrial) {
+          toast({
+            title: "Error",
+            description: "This student already has a trial lesson. Only one trial per student is allowed.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Create trial lesson
+        await createTrialLesson({
+          studentId,
+          teacherId: formData.teacherId,
+          scheduledDate: format(formData.startDate, 'yyyy-MM-dd'),
+          scheduledTime: formData.schedule[0].time,
+          scheduleDay: formData.schedule[0].day,
+          priceAmount: totalPrice,
+          currency: formData.currency,
+          notes: formData.notes,
+          durationMinutes: parseInt(formData.sessionDuration) || 30
+        }, schoolId);
+
+        onSuccess();
+        onOpenChange(false);
+      } catch (error: any) {
+        console.error('Error creating trial lesson:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create trial lesson",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    // Regular subscription validation and submission
     // Validate required fields
     if (!formData.startDate || formData.schedule.length === 0) {
       toast({
@@ -413,8 +500,8 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
     if (totalPrice <= 0) {
       toast({
         title: "Error",
-        description: formData.priceMode === 'perSession' 
-          ? "Please enter a price per session" 
+        description: formData.priceMode === 'perSession'
+          ? "Please enter a price per session"
           : "Please enter a fixed price for the subscription",
         variant: "destructive",
       });
@@ -491,28 +578,74 @@ const AddSubscriptionDialog: React.FC<AddSubscriptionDialogProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
             {/* Left Column - Form */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Subscription Type Selector */}
+              <div className="bg-muted/30 p-4 rounded-lg border-2 border-primary/20">
+                <Label className="text-sm font-semibold text-foreground">Subscription Type</Label>
+                <Select
+                  value={formData.subscriptionType}
+                  onValueChange={(value: 'individual' | 'group' | 'trial') =>
+                    setFormData({ ...formData, subscriptionType: value })
+                  }
+                >
+                  <SelectTrigger className="mt-2 bg-background">
+                    <SelectValue placeholder="Select subscription type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="individual">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Individual Subscription</span>
+                        <span className="text-xs text-muted-foreground">Regular 1-on-1 lessons</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="group">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Group Subscription</span>
+                        <span className="text-xs text-muted-foreground">Group lessons</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="trial">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Trial Lesson (Пробный урок)</span>
+                        <span className="text-xs text-muted-foreground">Single trial session - 1 lesson, flexible pricing</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {formData.subscriptionType === 'trial' && (
+                  <div className="mt-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+                    <strong>Trial Lesson:</strong> Fixed to 1 session for 1 month. Set flexible pricing (can be 0 for free trials).
+                  </div>
+                )}
+              </div>
+
               {/* Session Count, Duration, Session Duration, and Currency */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="sessionCount" className="text-sm font-semibold text-foreground">Session Count</Label>
-                  <Input 
-                    type="number" 
-                    id="sessionCount" 
-                    value={formData.sessionCount} 
+                  <Label htmlFor="sessionCount" className="text-sm font-semibold text-foreground">
+                    Session Count {formData.subscriptionType === 'trial' && <span className="text-xs text-muted-foreground">(Fixed for trials)</span>}
+                  </Label>
+                  <Input
+                    type="number"
+                    id="sessionCount"
+                    value={formData.sessionCount}
                     onChange={(e) => setFormData({ ...formData, sessionCount: e.target.value })}
                     placeholder="4"
                     className="mt-1"
+                    disabled={formData.subscriptionType === 'trial'}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="durationMonths" className="text-sm font-semibold text-foreground">Duration (Months)</Label>
-                  <Input 
-                    type="number" 
-                    id="durationMonths" 
-                    value={formData.durationMonths} 
+                  <Label htmlFor="durationMonths" className="text-sm font-semibold text-foreground">
+                    Duration (Months) {formData.subscriptionType === 'trial' && <span className="text-xs text-muted-foreground">(Fixed for trials)</span>}
+                  </Label>
+                  <Input
+                    type="number"
+                    id="durationMonths"
+                    value={formData.durationMonths}
                     onChange={(e) => setFormData({ ...formData, durationMonths: e.target.value })}
                     placeholder="1"
                     className="mt-1"
+                    disabled={formData.subscriptionType === 'trial'}
                   />
                 </div>
                 <div>

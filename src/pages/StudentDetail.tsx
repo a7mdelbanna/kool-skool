@@ -58,6 +58,8 @@ import { sessionDetailsService } from '@/services/firebase/sessionDetails.servic
 import { todosService } from '@/services/firebase/todos.service';
 import { telegramService } from '@/services/telegram.service';
 import { supabase } from '@/integrations/supabase/client';
+import { getStudentTrials, completeTrialLesson, convertTrialToSubscription, cancelTrialLesson } from '@/services/trialLesson.service';
+import { getTrialStatus, type TrialSubscription } from '@/types/trial.types';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
@@ -210,6 +212,16 @@ const StudentDetail = () => {
 
       console.log('Sessions:', sortedSessions);
       return sortedSessions;
+    },
+    enabled: !!studentId
+  });
+
+  // Fetch trial lessons for this student
+  const { data: trialLessons = [], isLoading: trialsLoading, refetch: refetchTrials } = useQuery({
+    queryKey: ['student-trials', studentId],
+    queryFn: async () => {
+      if (!studentId) return [];
+      return await getStudentTrials(studentId);
     },
     enabled: !!studentId
   });
@@ -682,6 +694,147 @@ const StudentDetail = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Trial Lesson Card */}
+          {trialsLoading ? (
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ) : trialLessons.length > 0 ? (
+            <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-primary" />
+                  Trial Lesson (Пробный урок)
+                </CardTitle>
+                <CardDescription>
+                  Introductory session to assess student level
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {trialLessons.map((trial: TrialSubscription) => {
+                  const status = getTrialStatus(trial);
+                  const statusConfig = {
+                    scheduled: { label: 'Scheduled', variant: 'default' as const, color: 'text-blue-600' },
+                    completed: { label: 'Completed', variant: 'secondary' as const, color: 'text-green-600' },
+                    converted: { label: 'Converted', variant: 'outline' as const, color: 'text-purple-600' },
+                    cancelled: { label: 'Cancelled', variant: 'destructive' as const, color: 'text-red-600' }
+                  };
+                  const config = statusConfig[status];
+
+                  return (
+                    <div key={trial.id} className="bg-background rounded-lg p-4 space-y-3 border-2 border-border">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={config.variant} className={cn("font-medium", config.color)}>
+                              {config.label}
+                            </Badge>
+                            {trial.total_price === 0 && (
+                              <Badge variant="outline" className="text-xs">FREE</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            <span>{safeFormatDate(trial.start_date, 'MMM d, yyyy')}</span>
+                          </div>
+                          {trial.schedule && trial.schedule.length > 0 && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>{trial.schedule[0].day} at {trial.schedule[0].time}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <DollarSign className="h-4 w-4" />
+                            <span>
+                              {trial.total_price === 0
+                                ? 'Free trial'
+                                : `${trial.total_price} ${trial.currency}`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t">
+                        {status === 'scheduled' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={async () => {
+                                try {
+                                  await completeTrialLesson({
+                                    trialSubscriptionId: trial.id
+                                  });
+                                  await refetchTrials();
+                                  toast.success('Trial lesson marked as completed');
+                                } catch (error: any) {
+                                  console.error('Error completing trial:', error);
+                                }
+                              }}
+                            >
+                              <CheckSquare className="h-4 w-4 mr-2" />
+                              Mark Completed
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={async () => {
+                                if (confirm('Cancel this trial lesson?')) {
+                                  try {
+                                    await cancelTrialLesson(trial.id);
+                                    await refetchTrials();
+                                    toast.success('Trial lesson cancelled');
+                                  } catch (error: any) {
+                                    console.error('Error cancelling trial:', error);
+                                  }
+                                }
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        )}
+                        {status === 'completed' && !trial.converted_to_subscription_id && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => {
+                              // Navigate to subscriptions tab to add subscription
+                              toast.info('Please add a regular subscription to complete the conversion');
+                              setActiveTab('subscriptions');
+                            }}
+                          >
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            Convert to Subscription
+                          </Button>
+                        )}
+                        {status === 'converted' && trial.converted_to_subscription_id && (
+                          <div className="flex items-center gap-2 text-sm text-green-600">
+                            <Trophy className="h-4 w-4" />
+                            <span>Successfully converted to subscription</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {trial.notes && (
+                        <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                          <strong>Notes:</strong> {trial.notes}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Telegram Notifications Card */}
           <Card>

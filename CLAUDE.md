@@ -4,6 +4,158 @@
 
 This project uses a multi-agent system for efficient parallel development. Each agent specializes in specific aspects of development.
 
+## 🗄️ CRITICAL: Database Architecture (READ THIS FIRST!)
+
+### ⚠️ WE USE FIREBASE, NOT SUPABASE!
+
+**EXTREMELY IMPORTANT**: This project uses **Firebase/Firestore** as the database backend.
+
+**Supabase was the OLD database and is NO LONGER USED!**
+
+If you create SQL migration files or assume Supabase is connected, you are making a critical architectural error.
+
+### SupabaseToFirebase Compatibility Layer
+
+To maintain code structure during migration from Supabase to Firebase, a compatibility layer exists:
+
+**Key Files**:
+- `/src/services/migration/supabaseToFirebase.ts` - The compatibility layer implementation
+- `/src/integrations/supabase/client.ts` - Re-exports the Firebase migration layer as `supabase`
+
+**How It Works**:
+1. Code uses Supabase-style syntax: `supabase.from('table').select().eq('field', 'value')`
+2. The `SupabaseQueryBuilder` class translates these method chains into Firebase/Firestore operations
+3. RPC calls (`supabase.rpc('function_name', params)`) are mapped to handler functions via switch statement
+4. The `mapTableName()` function maps Supabase table names to Firebase collection names
+5. Responses follow Supabase format: `{ data, error }` for consistency
+
+**Example Code Flow**:
+```typescript
+// You write:
+const { data, error } = await supabase
+  .from('subscriptions')
+  .select('*')
+  .eq('student_id', studentId);
+
+// The compatibility layer:
+// 1. Maps 'subscriptions' → Firebase collection name
+// 2. Builds Firebase query with .where('student_id', '==', studentId)
+// 3. Executes query and returns { data, error }
+```
+
+### Adding New Database Features
+
+**DO** ✅:
+- Use `supabase.from(tableName)` syntax - it's automatically mapped to Firebase queries
+- Add new RPC handlers in `/src/services/migration/supabaseToFirebase.ts` for complex operations
+- Update TypeScript interfaces in `/src/integrations/supabase/client.ts` for type safety
+- Remember: Firestore is schemaless - schema changes happen through code, not migrations
+- Use the `databaseService` from `@/services/firebase/database.service` for direct Firebase operations when needed
+
+**DON'T** ❌:
+- Create SQL migration files in `/supabase/migrations/` - they won't work with Firebase!
+- Assume Supabase is actually connected - it's not!
+- Try to run PostgreSQL/SQL commands
+- Forget to implement RPC handlers for new RPC function calls
+
+### RPC Function Implementation Pattern
+
+When you need a new RPC function:
+
+1. **Add case to switch statement** in `/src/services/migration/supabaseToFirebase.ts`:
+```typescript
+rpc: async (functionName: string, params?: any) => {
+  switch (functionName) {
+    // ... existing cases
+    case 'your_new_function':
+      return handleYourNewFunction(params);
+    default:
+      console.warn(`RPC function ${functionName} not implemented`);
+      return { data: null, error: new Error('Function not implemented') };
+  }
+}
+```
+
+2. **Implement handler function** using Firebase operations:
+```typescript
+async function handleYourNewFunction(params: any) {
+  try {
+    // Use databaseService or Firebase SDK directly
+    const result = await databaseService.getDocument('collection', params.id);
+    return { data: result, error: null };
+  } catch (error) {
+    console.error('Error in handleYourNewFunction:', error);
+    return { data: null, error };
+  }
+}
+```
+
+3. **Return Supabase-compatible format**: Always return `{ data, error }` structure
+
+### Database Collections Structure
+
+Firebase collections used in this project:
+- `students` - Student records
+- `subscriptions` - Student subscriptions (individual, group, trial)
+- `sessions` - Lesson sessions
+- `schools` - School/organization data
+- `teachers` - Teacher profiles
+- `groups` - Group lesson information
+- `users` - User authentication and profiles
+
+### ⚠️ Firestore Query Limitations (CRITICAL!)
+
+**Firestore requires composite indexes for complex queries!**
+
+Unlike PostgreSQL/Supabase which auto-creates indexes, Firestore requires manual index creation for:
+
+1. **Multiple field filters + inequality/orderBy**
+   ```typescript
+   // ❌ REQUIRES COMPOSITE INDEX
+   .eq('field1', value1)
+   .eq('field2', value2)
+   .neq('field3', value3)  // Inequality!
+
+   // ✅ WORKAROUND: Filter in memory
+   .eq('field1', value1)
+   .eq('field2', value2)
+   // Then: data.filter(item => item.field3 !== value3)
+   ```
+
+2. **Multiple orderBy clauses**
+   ```typescript
+   // ❌ REQUIRES COMPOSITE INDEX
+   .orderBy('field1')
+   .orderBy('field2')
+   ```
+
+**When You See "The query requires an index" Error:**
+
+**Option A (Recommended):** Create the index in Firebase Console
+   - Click the link in the error message
+   - OR go to: Firebase Console → Firestore → Indexes → Create Composite Index
+   - Add the fields shown in the error
+   - Wait 5-10 minutes for index to build
+
+**Option B (Quick Fix):** Simplify the query
+   - Remove inequality filters (neq, lt, gt, etc.)
+   - Filter the results in memory using `.filter()`
+   - Less efficient but works immediately
+
+**Best Practice:**
+- Keep queries simple (max 2-3 equality filters)
+- Use in-memory filtering for complex conditions
+- Create composite indexes proactively for frequently-used queries
+
+### Migration SQL Files - IGNORE THEM!
+
+**Important**: The `/supabase/migrations/` directory may contain SQL files from the old Supabase setup. These files are:
+- ❌ Not executed
+- ❌ Not functional with Firebase
+- ❌ For historical reference only
+
+**Never create new SQL migration files!**
+
 ## 🌐 IMPORTANT: Git Branches & Deployment
 
 ### Branch Structure:
