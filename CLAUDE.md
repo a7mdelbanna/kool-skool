@@ -388,6 +388,248 @@ If an agent fails:
 3. Ensure proper permissions
 4. Try individual agent instead of parallel
 
+## 🔍 CRITICAL: Debugging Mobile vs Web Features
+
+### ⚠️ Working CRM Location
+
+**EXTREMELY IMPORTANT**: When debugging features that work on web but not on mobile:
+
+- **Working Web CRM**: `/Users/ahmed/Documents/Ahmedoshka'sCRM/` (root folder)
+- **Mobile App**: `/Users/ahmed/Documents/Ahmedoshka'sCRM/kool-skool-monorepo/apps/mobile/`
+- **NEVER** assume files in the monorepo match the working CRM!
+
+### 🔥 Firebase Mixed Field Naming (CRITICAL!)
+
+**Firebase has inconsistent field naming across collections!**
+
+Some documents use **snake_case**, others use **camelCase**, and some have BOTH:
+
+#### Common Mixed Fields:
+```typescript
+// Student/User fields
+student_id    vs    studentId
+teacher_id    vs    teacherId
+school_id     vs    schoolId
+
+// Subscription fields
+subscription_id    vs    subscriptionId
+index_in_sub      vs    indexInSub
+
+// Session date/time fields
+scheduled_date        vs    scheduledDate
+scheduled_time        vs    scheduledTime
+scheduled_datetime    vs    scheduledDateTime
+duration_minutes      vs    durationMinutes
+
+// Metadata fields
+created_at    vs    createdAt
+updated_at    vs    updatedAt
+```
+
+### 🎯 Debugging Methodology: Step-by-Step
+
+#### Step 1: Locate Working Implementation
+1. **Find the working feature** in `/Users/ahmed/Documents/Ahmedoshka'sCRM/`
+2. **Identify the hook/service** that handles the data fetching
+3. **Read the EXACT queries** used in the working code
+
+Example locations:
+- Attendance: `/src/hooks/useAttendanceData.ts`
+- Sessions: `/src/hooks/useSessions.ts`
+- Subscriptions: `/src/services/subscriptionService.ts`
+
+#### Step 2: Compare Queries
+**Check for differences in:**
+
+1. **Filters**: Does mobile have extra `where()` clauses?
+   ```typescript
+   // ❌ WRONG - Mobile might have extra school_id filter
+   where('school_id', '==', schoolId)
+   where('student_id', '==', studentId)
+
+   // ✅ CORRECT - Web only filters by student_id
+   where('student_id', '==', studentId)
+   ```
+
+2. **Field Names**: Are you checking both naming conventions?
+   ```typescript
+   // ❌ WRONG - Only checks snake_case
+   session.scheduled_date && session.scheduled_time
+
+   // ✅ CORRECT - Checks both
+   (session.scheduled_date || session.scheduledDate) &&
+   (session.scheduled_time || session.scheduledTime)
+   ```
+
+3. **Parallel vs Sequential**: Does web use `Promise.allSettled`?
+   ```typescript
+   // ❌ WRONG - Sequential (slow)
+   for (const studentId of studentIds) {
+     const sessions = await fetchSessions(studentId);
+   }
+
+   // ✅ CORRECT - Parallel (fast)
+   const results = await Promise.allSettled(
+     studentIds.map(id => fetchSessions(id))
+   );
+   ```
+
+#### Step 3: Add Debug Logging
+**Always add these logs to understand what's happening:**
+
+```typescript
+// 1. Log what's being queried
+console.log('🔍 Querying for studentId:', studentId);
+
+// 2. Log raw results count
+console.log('📊 Found X documents');
+
+// 3. Log field names of first document
+if (docs.length > 0) {
+  console.log('📝 Sample fields:', Object.keys(docs[0].data()));
+}
+
+// 4. Log filtering results
+console.log('✅ After filter: X of Y passed');
+```
+
+#### Step 4: Check for TypeErrors
+**Common causes:**
+
+1. **Missing null checks before `.split()`**
+   ```typescript
+   // ❌ WRONG
+   const [year, month, day] = date.split('-');
+
+   // ✅ CORRECT
+   if (!date) return null;
+   const [year, month, day] = date.split('-');
+   ```
+
+2. **Assuming field exists**
+   ```typescript
+   // ❌ WRONG
+   session.scheduled_date.trim()
+
+   // ✅ CORRECT
+   const date = session.scheduled_date || session.scheduledDate;
+   if (!date) return null;
+   ```
+
+#### Step 5: Handle Dual Field Names
+**Create interfaces supporting both conventions:**
+
+```typescript
+interface RawSession {
+  // Support BOTH naming conventions
+  student_id?: string;
+  studentId?: string;
+
+  scheduled_date?: string;
+  scheduledDate?: string;
+
+  scheduled_time?: string;
+  scheduledTime?: string;
+
+  scheduled_datetime?: any;
+  scheduledDateTime?: any;
+}
+
+// Then use fallback pattern
+const studentId = session.student_id || session.studentId;
+const date = session.scheduled_date || session.scheduledDate;
+const time = session.scheduled_time || session.scheduledTime;
+```
+
+#### Step 6: Query Both Field Variants
+**When querying, check BOTH field names:**
+
+```typescript
+// Query both snake_case and camelCase
+const q1 = query(collection(db, 'sessions'),
+  where('student_id', '==', studentId));
+const q2 = query(collection(db, 'sessions'),
+  where('studentId', '==', studentId));
+
+const [snapshot1, snapshot2] = await Promise.all([
+  getDocs(q1),
+  getDocs(q2)
+]);
+
+// Combine and deduplicate
+const sessionMap = new Map();
+snapshot1.docs.forEach(doc => sessionMap.set(doc.id, doc));
+snapshot2.docs.forEach(doc => {
+  if (!sessionMap.has(doc.id)) sessionMap.set(doc.id, doc);
+});
+```
+
+### 🚨 Common Pitfalls
+
+#### Pitfall 1: Extra Filters
+**Problem**: Mobile queries sessions with `school_id` filter, web doesn't
+**Solution**: Remove extra filters that web doesn't use
+**Result**: 36 → 253 sessions loaded
+
+#### Pitfall 2: Single Field Name Check
+**Problem**: Only checking `student_id`, missing sessions with `studentId`
+**Solution**: Query both field variants and merge results
+**Result**: All session types now showing (Trial + General)
+
+#### Pitfall 3: Assuming UTC Timestamps
+**Problem**: Applying timezone conversion to local time strings
+**Solution**: String dates are already in local time, parse directly
+**Result**: Sessions show at correct times
+
+#### Pitfall 4: Sequential Data Fetching
+**Problem**: Using `for...await` loops instead of parallel fetching
+**Solution**: Use `Promise.allSettled` for multiple students
+**Result**: Much faster loading times
+
+### ✅ Success Checklist
+
+When comparing mobile to web:
+
+- [ ] Located working implementation in root folder CRM
+- [ ] Compared exact query filters (no extra filters)
+- [ ] Added dual-field name support in interfaces
+- [ ] Query both snake_case AND camelCase field variants
+- [ ] Added null checks before string operations
+- [ ] Use Promise.allSettled for parallel fetching
+- [ ] Added debug logging to verify data flow
+- [ ] Tested with specific students showing different results
+- [ ] Verified session counts match web dashboard exactly
+
+### 📊 Example: Session Loading Fix
+
+**Problem**: Mobile showed 1 of 3 sessions for Nov 20, 2025
+
+**Root Causes Found**:
+1. Extra `school_id` filter in mobile query
+2. Only checking `student_id`, not `studentId`
+3. Only checking `scheduled_date`, not `scheduledDate`
+4. Missing null checks causing TypeErrors
+
+**Solution Applied**:
+1. Removed `school_id` filter
+2. Query both `student_id` and `studentId`
+3. Check both naming conventions in all field accesses
+4. Add null checks before `.split()` operations
+
+**Result**:
+- ✅ Sessions loaded: 36 → 253 (217 additional recovered)
+- ✅ Nov 20 sessions: 1 → 3 (all types showing)
+- ✅ Mobile matches web dashboard exactly
+
+### 🎓 Key Takeaway
+
+**When mobile doesn't match web:**
+1. Always check the ACTUAL working CRM in root folder
+2. Assume Firebase has mixed field naming until proven otherwise
+3. Query and support BOTH naming conventions
+4. Remove any filters that working CRM doesn't use
+5. Add extensive logging to see what's really happening
+
 ## 📈 Performance Tips
 
 - Use `@parallel` for independent tasks
