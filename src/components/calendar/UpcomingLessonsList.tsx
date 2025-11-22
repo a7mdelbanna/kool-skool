@@ -10,7 +10,7 @@ import {
 import { Session } from '@/contexts/PaymentContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   Calendar as CalendarIcon,
   CheckCircle,
   CalendarX,
@@ -25,7 +25,8 @@ import {
   RefreshCcw,
   CircleCheck,
   FileText,
-  ExternalLink
+  ExternalLink,
+  User
 } from 'lucide-react';
 import FunEmptyState from './FunEmptyState';
 import GroupSessionWidget from './GroupSessionWidget';
@@ -548,11 +549,20 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
                 >
                   {studentName}
                 </div>
-                <div className={`text-sm mb-3 ${
+                <div className={`text-sm mb-2 ${
                   isPastSession ? 'text-gray-400' : 'text-muted-foreground'
                 }`}>
                   {subjectAndLevel} Lesson
                 </div>
+                {/* Teacher Name */}
+                {session.teacherName && (
+                  <div className={`flex items-center text-sm mb-2 ${
+                    isPastSession ? 'text-gray-400' : 'text-muted-foreground'
+                  }`}>
+                    <User className="mr-1.5 h-3.5 w-3.5" />
+                    <span className="font-medium">{session.teacherName}</span>
+                  </div>
+                )}
                 <div className={`flex items-center text-sm mb-4 ${
                   isPastSession ? 'text-gray-400' : 'text-muted-foreground'
                 }`}>

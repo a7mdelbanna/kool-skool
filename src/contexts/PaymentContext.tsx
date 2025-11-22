@@ -16,6 +16,8 @@ export interface Session {
   studentName: string;
   cost: number;
   paymentStatus: string;
+  teacherId?: string;
+  teacherName?: string;
 }
 
 // Add back missing interfaces for compatibility

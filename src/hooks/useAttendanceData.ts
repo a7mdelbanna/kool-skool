@@ -1,7 +1,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { Session } from '@/contexts/PaymentContext';
-import { getStudentLessonSessions, getStudentsWithDetails, getStudentSubscriptions, LessonSession } from '@/integrations/supabase/client';
+import { getStudentLessonSessions, getStudentsWithDetails, getStudentSubscriptions, LessonSession, getSchoolTeachers } from '@/integrations/supabase/client';
 import { getEffectiveTimezone, convertUTCToUserTimezone, formatInUserTimezone } from '@/utils/timezone';
 
 interface StudentInfo {
@@ -25,12 +25,21 @@ interface SubscriptionInfo {
   startDate: string;
   endDate: string;
   subscriptionName?: string;
+  teacherId?: string;
+}
+
+interface TeacherInfo {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
 }
 
 export const useAttendanceData = (userTimezone?: string) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [subscriptionInfoMap, setSubscriptionInfoMap] = useState<Map<string, SubscriptionInfo>>(new Map());
   const [studentInfoMap, setStudentInfoMap] = useState<Map<string, StudentInfo>>(new Map());
+  const [teacherInfoMap, setTeacherInfoMap] = useState<Map<string, TeacherInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,18 +104,22 @@ export const useAttendanceData = (userTimezone?: string) => {
       }
 
       console.log('🚀 Loading attendance data for school:', user.schoolId);
-      
-      // Step 1: Get all students (this is fast)
-      const students = await getStudentsWithDetails(user.schoolId);
+
+      // Step 1: Get all students and teachers (both are fast)
+      const [students, teachers] = await Promise.all([
+        getStudentsWithDetails(user.schoolId),
+        getSchoolTeachers(user.schoolId)
+      ]);
       console.log('👥 Found students:', students.length);
-      
+      console.log('👨‍🏫 Found teachers:', teachers.length);
+
       if (students.length === 0) {
         setSessions([]);
         setLoading(false);
         return;
       }
 
-      // Step 2: Build student info map immediately
+      // Step 2: Build student and teacher info maps immediately
       const studentMap = new Map<string, StudentInfo>();
       students.forEach(student => {
         studentMap.set(student.id, {
@@ -118,6 +131,17 @@ export const useAttendanceData = (userTimezone?: string) => {
         });
       });
       setStudentInfoMap(studentMap);
+
+      const teacherMap = new Map<string, TeacherInfo>();
+      teachers.forEach(teacher => {
+        teacherMap.set(teacher.id, {
+          id: teacher.id,
+          firstName: teacher.first_name || teacher.firstName,
+          lastName: teacher.last_name || teacher.lastName,
+          displayName: teacher.display_name || `${teacher.first_name || teacher.firstName} ${teacher.last_name || teacher.lastName}`
+        });
+      });
+      setTeacherInfoMap(teacherMap);
 
       // Step 3: Fetch sessions and subscriptions in parallel for all students
       const studentIds = students.map(s => s.id);
@@ -252,7 +276,8 @@ export const useAttendanceData = (userTimezone?: string) => {
               currency: activeSubscription.currency,
               startDate: activeSubscription.start_date,
               endDate: endDate, // Now properly calculated above
-              subscriptionName: activeSubscription.notes || undefined
+              subscriptionName: activeSubscription.notes || undefined,
+              teacherId: activeSubscription.teacherId || activeSubscription.teacher_id
             };
 
             subscriptionMap.set(studentId, subscriptionInfo);
@@ -262,9 +287,45 @@ export const useAttendanceData = (userTimezone?: string) => {
         }
       });
 
-      console.log('✅ Loaded:', allSessions.length, 'sessions and', subscriptionMap.size, 'subscriptions');
-      
-      setSessions(allSessions);
+      // Step 4: Enrich sessions with teacher information from subscriptions
+      console.log('🔍 DEBUG: Starting teacher enrichment');
+      console.log('🔍 DEBUG: Total sessions to enrich:', allSessions.length);
+      console.log('🔍 DEBUG: Subscription map size:', subscriptionMap.size);
+      console.log('🔍 DEBUG: Teacher map size:', teacherMap.size);
+      console.log('🔍 DEBUG: Sample subscription:', Array.from(subscriptionMap.values())[0]);
+
+      const enrichedSessions = allSessions.map(session => {
+        const subscriptionInfo = subscriptionMap.get(session.studentId);
+
+        if (!subscriptionInfo) {
+          console.log('⚠️ No subscription found for student:', session.studentId, 'Student name:', session.studentName);
+        } else if (!subscriptionInfo.teacherId) {
+          console.log('⚠️ Subscription has no teacherId for student:', session.studentId, 'Subscription:', subscriptionInfo);
+        } else {
+          const teacher = teacherMap.get(subscriptionInfo.teacherId);
+          if (!teacher) {
+            console.log('⚠️ Teacher not found in map for ID:', subscriptionInfo.teacherId);
+          } else {
+            console.log('✅ Enriched session for student:', session.studentName, 'with teacher:', teacher.displayName);
+          }
+        }
+
+        if (subscriptionInfo && subscriptionInfo.teacherId) {
+          const teacher = teacherMap.get(subscriptionInfo.teacherId);
+          return {
+            ...session,
+            teacherId: subscriptionInfo.teacherId,
+            teacherName: teacher?.displayName || undefined
+          };
+        }
+        return session;
+      });
+
+      console.log('✅ Loaded:', enrichedSessions.length, 'sessions and', subscriptionMap.size, 'subscriptions');
+      console.log('📊 Sessions with teachers:', enrichedSessions.filter(s => s.teacherId).length);
+      console.log('📊 Sample enriched session:', enrichedSessions.find(s => s.teacherId));
+
+      setSessions(enrichedSessions);
       setSubscriptionInfoMap(subscriptionMap);
       
     } catch (error) {
@@ -283,6 +344,7 @@ export const useAttendanceData = (userTimezone?: string) => {
     sessions,
     subscriptionInfoMap,
     studentInfoMap,
+    teacherInfoMap,
     loading,
     error,
     loadSessions,

@@ -1801,6 +1801,8 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
         notes: subscription.notes,
         status: subscription.status,
         group_id: subscription.groupId || subscription.group_id, // For group subscriptions
+        teacherId: subscription.teacherId || subscription.teacher_id, // Teacher assignment
+        teacher_id: subscription.teacherId || subscription.teacher_id, // Support both naming conventions
         // Use the correct field names expected by the UI
         sessions_completed: sessionsCompleted,
         sessions_attended: sessionsAttended,

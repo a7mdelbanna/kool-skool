@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { 
-  ChevronDown, 
+import {
+  ChevronDown,
   ChevronRight,
   Users,
   Calendar as CalendarIcon,
-  Clock
+  Clock,
+  User
 } from 'lucide-react';
 import { Session } from '@/contexts/PaymentContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -96,10 +97,18 @@ const GroupSessionWidget: React.FC<GroupSessionWidgetProps> = ({
                       </Badge>
                     </div>
 
-                    <div className="flex items-center text-sm text-muted-foreground mb-3">
+                    <div className="flex items-center text-sm text-muted-foreground mb-2">
                       <CalendarIcon className="mr-1.5 h-4 w-4" />
                       {format(sessionDate, 'EEEE, MMMM d, yyyy')}
                     </div>
+
+                    {/* Teacher Name */}
+                    {firstSession.teacherName && (
+                      <div className="flex items-center text-sm text-muted-foreground mb-3">
+                        <User className="mr-1.5 h-4 w-4" />
+                        <span className="font-medium">{firstSession.teacherName}</span>
+                      </div>
+                    )}
 
                     {/* Status Summary */}
                     <div className="flex flex-wrap gap-2">

@@ -1,15 +1,23 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
   ChevronRight,
   Search,
-  AlertCircle
+  AlertCircle,
+  User
 } from 'lucide-react';
 import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import UpcomingLessonsList from '@/components/calendar/UpcomingLessonsList';
 import SessionSkeleton from '@/components/calendar/SessionSkeleton';
@@ -25,11 +33,13 @@ const Attendance = () => {
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(today, { weekStartsOn: 0 }));
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all');
 
   const {
     sessions,
     subscriptionInfoMap,
     studentInfoMap,
+    teacherInfoMap,
     loading,
     error,
     loadSessions,
@@ -41,6 +51,14 @@ const Attendance = () => {
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  // Debug: Log teacher info when it changes
+  useEffect(() => {
+    if (teacherInfoMap.size > 0) {
+      console.log('👨‍🏫 Teacher map loaded:', teacherInfoMap.size, 'teachers');
+      console.log('👨‍🏫 Teachers:', Array.from(teacherInfoMap.entries()));
+    }
+  }, [teacherInfoMap]);
 
   const goToPreviousPeriod = () => {
     if (viewMode === 'day') {
@@ -91,11 +109,43 @@ const Attendance = () => {
   };
 
   const getFilteredSessions = () => {
+    console.log('🔍 FILTER DEBUG: Starting filter with selectedTeacherId:', selectedTeacherId);
+    console.log('🔍 FILTER DEBUG: Total sessions before filter:', sessions.length);
+
     let filtered = sessions.filter(session => {
-      if (!searchQuery) return true;
-      return session.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             session.studentName?.toLowerCase().includes(searchQuery.toLowerCase());
+      // Search query filter
+      if (searchQuery) {
+        const matchesSearch = session.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             session.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             session.teacherName?.toLowerCase().includes(searchQuery.toLowerCase());
+        if (!matchesSearch) return false;
+      }
+
+      // Teacher filter (only if a specific teacher is selected)
+      if (selectedTeacherId !== 'all') {
+        console.log('🔍 Checking session:', session.studentName, 'teacherId:', session.teacherId, 'teacherName:', session.teacherName);
+
+        if (selectedTeacherId === 'unassigned') {
+          // Show sessions without a teacher
+          if (session.teacherId) {
+            console.log('❌ Filtering out (has teacher)');
+            return false;
+          }
+        } else {
+          // Show sessions for the selected teacher
+          console.log('🔍 Comparing:', session.teacherId, '!==', selectedTeacherId);
+          if (session.teacherId !== selectedTeacherId) {
+            console.log('❌ Filtering out (teacher mismatch)');
+            return false;
+          }
+          console.log('✅ Keeping session (teacher match)');
+        }
+      }
+
+      return true;
     });
+
+    console.log('🔍 FILTER DEBUG: Sessions after teacher filter:', filtered.length);
 
     if (viewMode === 'day') {
       filtered = filtered.filter(session => {
@@ -157,6 +207,27 @@ const Attendance = () => {
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
+          {/* Teacher Filter - Only show for admin users */}
+          {user?.role === 'admin' && (
+            <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
+              <SelectTrigger className="w-[180px] rounded-lg bg-background/50 backdrop-blur-sm border-border/50">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <SelectValue placeholder="All Teachers" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teachers</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {Array.from(teacherInfoMap.values()).map(teacher => (
+                  <SelectItem key={teacher.id} value={teacher.id}>
+                    {teacher.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           <div className="relative w-full md:w-auto">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
