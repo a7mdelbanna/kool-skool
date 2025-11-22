@@ -45,11 +45,10 @@ const GroupSessionWidget: React.FC<GroupSessionWidgetProps> = ({
   // Use the first session to get group info (they should all have the same group details)
   const firstSession = groupSessions[0];
   const sessionDate = new Date(firstSession.date);
-  
-  // Extract group name from session notes or use a default
-  const groupName = firstSession.notes?.includes('Group:') 
-    ? firstSession.notes.split('Group:')[1]?.split(' ')[0]?.trim() 
-    : 'Group Session';
+
+  // Use group name from session data (real groups have groupName populated)
+  // Fallback to 'Group Session' for time-coincidental sessions without groupName
+  const groupName = firstSession.groupName || 'Group Session';
 
   // Count different statuses
   const statusCounts = groupSessions.reduce((acc, session) => {

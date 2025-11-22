@@ -1707,7 +1707,11 @@ async function handleGetLessonSessions(params: { p_student_id: string }) {
       created_at: session.createdAt || session.created_at,
       updated_at: session.updatedAt || session.updated_at,
       cost: session.cost || null,
-      payment_status: session.paymentStatus || session.payment_status || null
+      payment_status: session.paymentStatus || session.payment_status || null,
+      group_id: session.groupId || session.group_id || null,
+      groupId: session.groupId || session.group_id || null,
+      group_name: session.groupName || session.group_name || null,
+      groupName: session.groupName || session.group_name || null
     }));
     
     return { 
@@ -1801,6 +1805,9 @@ async function handleGetStudentSubscriptions(params: { p_student_id: string }) {
         notes: subscription.notes,
         status: subscription.status,
         group_id: subscription.groupId || subscription.group_id, // For group subscriptions
+        groupId: subscription.groupId || subscription.group_id, // Support both naming conventions
+        group_name: subscription.groupName || subscription.group_name, // Group name
+        groupName: subscription.groupName || subscription.group_name, // Support both naming conventions
         teacherId: subscription.teacherId || subscription.teacher_id, // Teacher assignment
         teacher_id: subscription.teacherId || subscription.teacher_id, // Support both naming conventions
         // Use the correct field names expected by the UI

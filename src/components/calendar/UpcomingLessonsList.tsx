@@ -653,24 +653,47 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
       const sessionDate = new Date(session.date);
       const dateKey = format(sessionDate, 'yyyy-MM-dd');
       const timeKey = session.time;
-      const groupKey = `${dateKey}-${timeKey}`;
+
+      // Create grouping key that respects teacher assignments and real groups
+      // - Real groups (with groupId) share a group key
+      // - Sessions with same teacher at same time can be grouped
+      // - Sessions with DIFFERENT teachers at same time stay separate
+      const groupKey = session.groupId
+        ? `group-${session.groupId}-${dateKey}-${timeKey}`
+        : session.teacherId
+          ? `teacher-${session.teacherId}-${dateKey}-${timeKey}`
+          : `individual-${session.id}-${dateKey}-${timeKey}`;
       
       // Check if session has group indicators in notes or if multiple sessions exist at same time
-      const hasGroupIndicator = session.notes?.toLowerCase().includes('group') || 
+      const hasGroupIndicator = session.notes?.toLowerCase().includes('group') ||
                                session.notes?.toLowerCase().includes('class');
-      
-      if (hasGroupIndicator || groupMap.has(groupKey)) {
+
+      // Sessions with groupId should ALWAYS be grouped, even if only one student
+      const isRealGroup = !!session.groupId;
+
+      if (isRealGroup || hasGroupIndicator || groupMap.has(groupKey)) {
         if (!groupMap.has(groupKey)) {
           groupMap.set(groupKey, []);
         }
         groupMap.get(groupKey)!.push(session);
       } else {
         // Check if we should move existing individual session to group
+        // IMPORTANT: Only group if they have the SAME groupKey (same teacher or same groupId)
         const existingSessionIndex = individualSessions.findIndex(s => {
           const existingDate = format(new Date(s.date), 'yyyy-MM-dd');
-          return existingDate === dateKey && s.time === timeKey;
+          const existingTimeKey = s.time;
+
+          // Calculate the groupKey for the existing session
+          const existingGroupKey = s.groupId
+            ? `group-${s.groupId}-${existingDate}-${existingTimeKey}`
+            : s.teacherId
+              ? `teacher-${s.teacherId}-${existingDate}-${existingTimeKey}`
+              : `individual-${s.id}-${existingDate}-${existingTimeKey}`;
+
+          // Only match if same groupKey (same teacher OR same group)
+          return existingGroupKey === groupKey;
         });
-        
+
         if (existingSessionIndex !== -1) {
           // Move existing session to group and add current session
           const existingSession = individualSessions.splice(existingSessionIndex, 1)[0];
@@ -682,9 +705,13 @@ const UpcomingLessonsList: React.FC<UpcomingLessonsListProps> = React.memo(({
     });
     
     // Convert groups with only one session back to individual
+    // EXCEPT: If it's a real group (has groupId), keep it as a group to show group name
     const finalGroups = new Map<string, Session[]>();
     groupMap.forEach((sessions, key) => {
       if (sessions.length > 1) {
+        finalGroups.set(key, sessions);
+      } else if (sessions.length === 1 && sessions[0].groupId) {
+        // Real group with only one session showing - keep as group to display group name
         finalGroups.set(key, sessions);
       } else {
         individualSessions.push(...sessions);

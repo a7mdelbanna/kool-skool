@@ -115,6 +115,10 @@ export interface LessonSession {
   counts_toward_completion?: boolean;
   original_session_index?: number;
   moved_from_session_id?: string;
+  group_id?: string;
+  groupId?: string;
+  group_name?: string;
+  groupName?: string;
 }
 
 export interface Subscription {

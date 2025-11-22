@@ -26,6 +26,8 @@ interface SubscriptionInfo {
   endDate: string;
   subscriptionName?: string;
   teacherId?: string;
+  groupId?: string;
+  groupName?: string;
 }
 
 interface TeacherInfo {
@@ -105,13 +107,26 @@ export const useAttendanceData = (userTimezone?: string) => {
 
       console.log('🚀 Loading attendance data for school:', user.schoolId);
 
-      // Step 1: Get all students and teachers (both are fast)
-      const [students, teachers] = await Promise.all([
+      // Step 1: Get all students, teachers, and groups (all are fast)
+      const [students, teachers, groupsData] = await Promise.all([
         getStudentsWithDetails(user.schoolId),
-        getSchoolTeachers(user.schoolId)
+        getSchoolTeachers(user.schoolId),
+        // Fetch groups from Firebase directly
+        (async () => {
+          try {
+            const { databaseService } = await import('@/services/firebase/database.service');
+            return await databaseService.query('groups', {
+              where: [{ field: 'schoolId', operator: '==', value: user.schoolId }]
+            });
+          } catch (error) {
+            console.error('Error fetching groups:', error);
+            return [];
+          }
+        })()
       ]);
       console.log('👥 Found students:', students.length);
       console.log('👨‍🏫 Found teachers:', teachers.length);
+      console.log('👥 Found groups:', groupsData.length);
 
       if (students.length === 0) {
         setSessions([]);
@@ -119,7 +134,7 @@ export const useAttendanceData = (userTimezone?: string) => {
         return;
       }
 
-      // Step 2: Build student and teacher info maps immediately
+      // Step 2: Build student, teacher, and group info maps immediately
       const studentMap = new Map<string, StudentInfo>();
       students.forEach(student => {
         studentMap.set(student.id, {
@@ -142,6 +157,32 @@ export const useAttendanceData = (userTimezone?: string) => {
         });
       });
       setTeacherInfoMap(teacherMap);
+
+      // Step 2.5: Build subscription-to-group map from groups data
+      // Groups contain subscription_ids array, so we map each subscription to its group
+      const subscriptionToGroupMap = new Map<string, { groupId: string; groupName: string }>();
+      console.log('🔍 DEBUG: Processing groups for subscription mapping...');
+      groupsData.forEach((group: any) => {
+        const groupId = group.id;
+        const groupName = group.name || group.group_name || 'Group Session';
+        const subscriptionIds = group.subscription_ids || group.subscriptionIds || [];
+
+        console.log(`🔍 DEBUG: Group "${groupName}" (${groupId}):`, {
+          subscription_ids: group.subscription_ids,
+          subscriptionIds: group.subscriptionIds,
+          count: subscriptionIds.length,
+          allFields: Object.keys(group)
+        });
+
+        subscriptionIds.forEach((subId: string) => {
+          subscriptionToGroupMap.set(subId, { groupId, groupName });
+          console.log(`  ✅ Mapped subscription ${subId} → "${groupName}"`);
+        });
+      });
+      console.log('🔗 Mapped', subscriptionToGroupMap.size, 'subscriptions to groups');
+      if (subscriptionToGroupMap.size > 0) {
+        console.log('📋 Subscription→Group map entries:', Array.from(subscriptionToGroupMap.entries()).slice(0, 3));
+      }
 
       // Step 3: Fetch sessions and subscriptions in parallel for all students
       const studentIds = students.map(s => s.id);
@@ -211,7 +252,10 @@ export const useAttendanceData = (userTimezone?: string) => {
                 totalSessions: undefined,
                 notes: session.notes || '',
                 cost: session.cost,
-                paymentStatus: session.payment_status as Session['paymentStatus']
+                paymentStatus: session.payment_status as Session['paymentStatus'],
+                // Include group info directly from session if available
+                groupId: session.groupId || session.group_id || undefined,
+                groupName: session.groupName || session.group_name || undefined
               };
             });
             
@@ -264,6 +308,19 @@ export const useAttendanceData = (userTimezone?: string) => {
               console.warn(`Could not calculate end date for student ${studentId}, using start date as fallback`);
             }
 
+            // Check if this subscription is part of a group using our map
+            const groupInfo = subscriptionToGroupMap.get(activeSubscription.id);
+            console.log(`🔍 Subscription ${activeSubscription.id} for student ${studentId}:`, {
+              foundInGroupMap: !!groupInfo,
+              groupInfo: groupInfo,
+              subscriptionFields: {
+                groupId: activeSubscription.groupId,
+                group_id: activeSubscription.group_id,
+                groupName: activeSubscription.groupName,
+                group_name: activeSubscription.group_name
+              }
+            });
+
             const subscriptionInfo: SubscriptionInfo = {
               id: activeSubscription.id,
               studentId: studentId,
@@ -277,7 +334,10 @@ export const useAttendanceData = (userTimezone?: string) => {
               startDate: activeSubscription.start_date,
               endDate: endDate, // Now properly calculated above
               subscriptionName: activeSubscription.notes || undefined,
-              teacherId: activeSubscription.teacherId || activeSubscription.teacher_id
+              teacherId: activeSubscription.teacherId || activeSubscription.teacher_id,
+              // Use group info from map first, fallback to subscription fields
+              groupId: groupInfo?.groupId || activeSubscription.groupId || activeSubscription.group_id,
+              groupName: groupInfo?.groupName || activeSubscription.groupName || activeSubscription.group_name
             };
 
             subscriptionMap.set(studentId, subscriptionInfo);
@@ -310,12 +370,15 @@ export const useAttendanceData = (userTimezone?: string) => {
           }
         }
 
-        if (subscriptionInfo && subscriptionInfo.teacherId) {
-          const teacher = teacherMap.get(subscriptionInfo.teacherId);
+        if (subscriptionInfo) {
+          const teacher = subscriptionInfo.teacherId ? teacherMap.get(subscriptionInfo.teacherId) : undefined;
           return {
             ...session,
             teacherId: subscriptionInfo.teacherId,
-            teacherName: teacher?.displayName || undefined
+            teacherName: teacher?.displayName || undefined,
+            // Preserve session's own group info if it exists, otherwise use subscription's group info
+            groupId: session.groupId || subscriptionInfo.groupId,
+            groupName: session.groupName || subscriptionInfo.groupName
           };
         }
         return session;
@@ -323,7 +386,9 @@ export const useAttendanceData = (userTimezone?: string) => {
 
       console.log('✅ Loaded:', enrichedSessions.length, 'sessions and', subscriptionMap.size, 'subscriptions');
       console.log('📊 Sessions with teachers:', enrichedSessions.filter(s => s.teacherId).length);
+      console.log('📊 Sessions with groupId:', enrichedSessions.filter(s => s.groupId).length);
       console.log('📊 Sample enriched session:', enrichedSessions.find(s => s.teacherId));
+      console.log('📊 Sample session with group:', enrichedSessions.find(s => s.groupId));
 
       setSessions(enrichedSessions);
       setSubscriptionInfoMap(subscriptionMap);

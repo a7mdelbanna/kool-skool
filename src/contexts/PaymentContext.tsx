@@ -18,6 +18,8 @@ export interface Session {
   paymentStatus: string;
   teacherId?: string;
   teacherName?: string;
+  groupId?: string;
+  groupName?: string;
 }
 
 // Add back missing interfaces for compatibility
